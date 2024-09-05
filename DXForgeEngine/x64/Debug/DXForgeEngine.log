@@ -1,0 +1,5 @@
+﻿  Entity.cpp
+F:\HAL\Self\DXForge\DXForgeEngine\Components\Entity.cpp(26,36): warning C4100: 'id': 引数は関数の本体部で 1 度も参照されません。
+F:\HAL\Self\DXForge\DXForgeEngine\Components\Entity.cpp(30,26): warning C4100: 'id': 引数は関数の本体部で 1 度も参照されません。
+F:\HAL\Self\DXForge\DXForgeEngine\Components\Entity.cpp(24,1): warning C4715: 'dxforge::game_entity::create_game_entity': 値を返さないコントロール パスがあります。
+  DXForgeEngine.vcxproj -> F:\HAL\Self\DXForge\x64\Debug\DXForgeEngine.lib

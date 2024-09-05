@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.10.35122.118
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DXForgeEditor", "DXForgeEditor\DXForgeEditor.csproj", "{9BE3E628-EF34-44E3-8C91-A35459C6CF69}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DXForgeEngine", "DXForgeEngine\DXForgeEngine.vcxproj", "{A7DBD67B-496C-463E-97D0-D522150BB52F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.Debug|x64.Build.0 = Debug|Any CPU
+		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.Release|x64.ActiveCfg = Release|Any CPU
+		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.Release|x64.Build.0 = Release|Any CPU
+		{A7DBD67B-496C-463E-97D0-D522150BB52F}.Debug|x64.ActiveCfg = Debug|x64
+		{A7DBD67B-496C-463E-97D0-D522150BB52F}.Debug|x64.Build.0 = Debug|x64
+		{A7DBD67B-496C-463E-97D0-D522150BB52F}.Release|x64.ActiveCfg = Release|x64
+		{A7DBD67B-496C-463E-97D0-D522150BB52F}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {BB808F0A-8064-49D1-B786-2FED11939749}
+	EndGlobalSection
+EndGlobal
