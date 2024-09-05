@@ -13,11 +13,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "F:\\HAL\\Self\\DXForge\\DXForgeEditor\\DXForgeEditor.csproj",
+      "projectUniqueName": "F:\\HAL\\self\\DXForgeEditor\\DXForgeEditor.csproj",
       "projectName": "DXForgeEditor",
-      "projectPath": "F:\\HAL\\Self\\DXForge\\DXForgeEditor\\DXForgeEditor.csproj",
+      "projectPath": "F:\\HAL\\self\\DXForgeEditor\\DXForgeEditor.csproj",
       "packagesPath": "C:\\Users\\atame\\.nuget\\packages\\",
-      "outputPath": "F:\\HAL\\Self\\DXForge\\DXForgeEditor\\obj\\",
+      "outputPath": "F:\\HAL\\self\\DXForgeEditor\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\atame\\AppData\\Roaming\\NuGet\\NuGet.Config",
@@ -69,7 +69,7 @@
             "privateAssets": "none"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.303/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.200/PortableRuntimeIdentifierGraph.json"
       }
     }
   }
