@@ -25,6 +25,7 @@ namespace dxforge::id
 		// 世代マスクを定義し、上位ビットを世代番号として使用
 		constexpr id_type generation_mask{ (id_type{1} << generation_bits) - 1 };
 	}	// namespace internal
+
 	// ID の最大値（無効な ID を示す）を定義
 	constexpr id_type invalid_id{ (id_type)-1 };
 	// 削除された要素の最小数を定義
@@ -42,7 +43,7 @@ namespace dxforge::id
 	/// @brief ID が有効かどうかを判定する関数
 	/// @param id 判定する ID
 	/// @return ID が有効なら true、無効なら false
-	inline bool is_valid(id_type id)
+	constexpr bool is_valid(id_type id)
 	{
 		return id != invalid_id; // 無効な ID は invalid_id と一致するため、それ以外は有効とする
 	}

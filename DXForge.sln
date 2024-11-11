@@ -7,20 +7,40 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DXForgeEditor", "DXForgeEdi
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DXForgeEngine", "DXForgeEngine\DXForgeEngine.vcxproj", "{A7DBD67B-496C-463E-97D0-D522150BB52F}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EngineTest", "EngineTest\EngineTest.vcxproj", "{9213C6D0-3A75-4470-A15A-F961343100C9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
 		Release|x64 = Release|x64
+		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.Debug|x64.ActiveCfg = Debug|Any CPU
 		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.Debug|x64.Build.0 = Debug|Any CPU
+		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.Debug|x86.Build.0 = Debug|Any CPU
 		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.Release|x64.ActiveCfg = Release|Any CPU
 		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.Release|x64.Build.0 = Release|Any CPU
+		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.Release|x86.ActiveCfg = Release|Any CPU
+		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.Release|x86.Build.0 = Release|Any CPU
 		{A7DBD67B-496C-463E-97D0-D522150BB52F}.Debug|x64.ActiveCfg = Debug|x64
 		{A7DBD67B-496C-463E-97D0-D522150BB52F}.Debug|x64.Build.0 = Debug|x64
+		{A7DBD67B-496C-463E-97D0-D522150BB52F}.Debug|x86.ActiveCfg = Debug|x64
+		{A7DBD67B-496C-463E-97D0-D522150BB52F}.Debug|x86.Build.0 = Debug|x64
 		{A7DBD67B-496C-463E-97D0-D522150BB52F}.Release|x64.ActiveCfg = Release|x64
 		{A7DBD67B-496C-463E-97D0-D522150BB52F}.Release|x64.Build.0 = Release|x64
+		{A7DBD67B-496C-463E-97D0-D522150BB52F}.Release|x86.ActiveCfg = Release|x64
+		{A7DBD67B-496C-463E-97D0-D522150BB52F}.Release|x86.Build.0 = Release|x64
+		{9213C6D0-3A75-4470-A15A-F961343100C9}.Debug|x64.ActiveCfg = Debug|x64
+		{9213C6D0-3A75-4470-A15A-F961343100C9}.Debug|x64.Build.0 = Debug|x64
+		{9213C6D0-3A75-4470-A15A-F961343100C9}.Debug|x86.ActiveCfg = Debug|Win32
+		{9213C6D0-3A75-4470-A15A-F961343100C9}.Debug|x86.Build.0 = Debug|Win32
+		{9213C6D0-3A75-4470-A15A-F961343100C9}.Release|x64.ActiveCfg = Release|x64
+		{9213C6D0-3A75-4470-A15A-F961343100C9}.Release|x64.Build.0 = Release|x64
+		{9213C6D0-3A75-4470-A15A-F961343100C9}.Release|x86.ActiveCfg = Release|Win32
+		{9213C6D0-3A75-4470-A15A-F961343100C9}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

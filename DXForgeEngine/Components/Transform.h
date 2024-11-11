@@ -13,17 +13,15 @@
 
 namespace dxforge::transform
 {
-	DEFINE_TYPED_ID(transform_id);
-
 	struct init_info
 	{
-		f32 positon[3]{};        // 位置情報を格納する3次元ベクトル（x, y, z）
-		f32 rotation[4]{};       // 回転情報を格納するクォータニオン（w, x, y, z）
-		f32 scale[3]{ 1.f, 1.f, 1.f }; // スケール情報を格納する3次元ベクトル（x, y, z）、デフォルトは全軸で1.0
+		f32 position[3]{};				// 位置情報を格納する3次元ベクトル（x, y, z）
+		f32 rotation[4]{};				// 回転情報を格納するクォータニオン（w, x, y, z）
+		f32 scale[3]{ 1.f, 1.f, 1.f };	// スケール情報を格納する3次元ベクトル（x, y, z）、デフォルトは全軸で1.0
 	};
 
 	// Transformコンポーネントを作成する関数
-	transform_id create_transform(const init_info& info, game_entity::entity_id entity_id);
+	component  create_transform(const init_info& info, game_entity::entity entity);
 	// Transformコンポーネントを削除する関数
-	void remove_transform(transform_id id);
+	void remove_transform(component c);
 }

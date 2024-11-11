@@ -31,9 +31,9 @@ namespace dxforge
 		entity create_game_entity(const entity_info& info);
 
 		// ゲームエンティティを削除する関数
-		void remove_game_entity(entity id);
+		void remove_game_entity(entity e);
 
 		// 指定したエンティティが有効かどうかを確認する関数
-		bool is_alive(entity id);
+		bool is_alive(entity e);
 	}
 };

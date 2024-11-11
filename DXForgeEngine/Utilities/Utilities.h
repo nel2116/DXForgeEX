@@ -9,12 +9,11 @@
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
-
 #define USE_STL_VECTOR 1
 #define USE_STL_DEQUE 1
 
 #if USE_STL_VECTOR
-#include <vector>          // vector ヘッダーファイルをインクルード
+#include <vector>
 namespace dxforge::utl
 {
 	template<typename T>
@@ -23,7 +22,7 @@ namespace dxforge::utl
 #endif
 
 #if USE_STL_DEQUE
-#include <deque>           // deque ヘッダーファイルをインクルード
+#include <deque>
 namespace dxforge::utl
 {
 	template<typename T>
@@ -34,4 +33,5 @@ namespace dxforge::utl
 
 namespace dxforge::util
 {
+	// TODO : 独自のコンテナを実装する
 }
