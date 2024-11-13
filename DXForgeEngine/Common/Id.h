@@ -17,7 +17,7 @@ namespace dxforge::id
 
 	namespace internal
 	{
-		constexpr u32 generation_bits{ 8 }; // 世代番号を保持するために使用するビット数を 8 に設定
+		constexpr u32 generation_bits{ 10 }; // 世代番号を保持するために使用するビット数を 8 に設定
 		// インデックスに使用するビット数を計算
 		constexpr u32 index_bits{ sizeof(id_type) * 8 - generation_bits };
 		// インデックスマスクを定義し、下位ビットをインデックスとして使用
@@ -32,7 +32,7 @@ namespace dxforge::id
 	constexpr u32 min_deleted_elements{ 1024 };
 
 	// generation_type を条件に基づいて決定 (generation_bits が 8 以下なら u8、16 以下なら u16、それ以外は u32)
-	using generation_type = std::conditional_t<internal::generation_bits <= 8, u8, std::conditional_t<internal::generation_bits <= 16, u16, u32>>;
+	using generation_type = std::conditional_t<internal::generation_bits <= 16, std::conditional_t<internal::generation_bits <= 8, u8, u16>, u32>;
 
 	// generation_type のサイズが、generation_bits によって必要なビット数を確保できることを確認する
 	static_assert(sizeof(generation_type) * 8 >= internal::generation_bits);
