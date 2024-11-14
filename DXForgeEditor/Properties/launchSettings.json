@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DXForgeEditor": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}

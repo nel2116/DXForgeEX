@@ -36,5 +36,11 @@ namespace DXForgeEditor.Dictionaries
                 Keyboard.ClearFocus();
             }
         }
+
+        private void OnClose_Button_Click(object sender, RoutedEventArgs e)
+        {
+            var window = (Window)((FrameworkElement)sender).TemplatedParent;
+            window.Close();
+        }
     }
 }

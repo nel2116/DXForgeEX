@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DXForgeEditor")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+251135d7ca6533b8a2aff469378926564b17cb59")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7b33fffaaeff9b410539f86a639e6265ed4bd347")]
 [assembly: System.Reflection.AssemblyProductAttribute("DXForgeEditor")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DXForgeEditor")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

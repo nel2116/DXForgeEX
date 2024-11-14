@@ -6,7 +6,8 @@
         xmlns:local="clr-namespace:DXForgeEditor"
         xmlns:editors="clr-namespace:DXForgeEditor.Editors"
         mc:Ignorable="d" WindowStartupLocation="CenterScreen"
-        Title="DXForge Editor" Height="720" Width="1280">
+        Title="DXForge Editor" Height="720" Width="1280"
+        Style="{StaticResource DXForgeWindowStyle}">
     <Grid>
         <editors:WorldEditorView/>
     </Grid>

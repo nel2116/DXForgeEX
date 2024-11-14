@@ -161,3 +161,4 @@ F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Debug\refint\DXForgeEditor.dll
 F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Debug\DXForgeEditor.pdb
 F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Debug\DXForgeEditor.genruntimeconfig.cache
 F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Debug\ref\DXForgeEditor.dll
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\obj\Debug\Dictionaries\EditorColors.baml
