@@ -163,3 +163,7 @@ F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Debug\DXForgeEditor.genruntimeconfig.cac
 F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Debug\ref\DXForgeEditor.dll
 F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\obj\Debug\Dictionaries\EditorColors.baml
 F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Debug\Dictionaries\EditorColors.baml
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\obj\Debug\Editors\WorldEditor\ComponentView.g.cs
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\obj\Debug\Editors\WorldEditor\TransformView.g.cs
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\obj\Debug\Editors\WorldEditor\ComponentView.baml
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\obj\Debug\Editors\WorldEditor\TransformView.baml
