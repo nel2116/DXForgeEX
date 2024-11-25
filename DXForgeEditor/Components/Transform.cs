@@ -13,8 +13,8 @@ namespace DXForgeEditor.Components
     [DataContract]
     class Transform : Component
     {
-        [DataMember]
         private Vector3 _position;
+        [DataMember]
         public Vector3 Position
         {
             get => _position;
@@ -28,8 +28,8 @@ namespace DXForgeEditor.Components
             }
         }
 
-        [DataMember]
         private Vector3 _rotation;
+        [DataMember]
         public Vector3 Rotation
         {
             get => _rotation;
@@ -43,8 +43,8 @@ namespace DXForgeEditor.Components
             }
         }
 
-        [DataMember]
         private Vector3 _scale;
+        [DataMember]
         public Vector3 Scale
         {
             get => _scale;
