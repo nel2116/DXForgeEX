@@ -1,3 +1,153 @@
 ﻿  Entity.cpp
+  Script.cpp
   Transform.cpp
-  DXForgeEngine.vcxproj -> F:\HAL\Self\DXForgeEX\x64\Debug\DXForgeEngine.lib
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\EngineAPI\GameEntity.h(70): error C2882: 'game_entity': 式の中で名前空間の識別子が正しく使用されていません。 (ソース ファイルをコンパイルしています Components\Script.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\EngineAPI\GameEntity.h(70,41): error C2146: 構文エラー: ')' が、識別子 'entity' の前に必要です。 (ソース ファイルをコンパイルしています Components\Script.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\EngineAPI\GameEntity.h(71,1): error C2143: 構文エラー: ';' が '{' の前にありません。 (ソース ファイルをコンパイルしています Components\Script.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\EngineAPI\GameEntity.h(71,1): error C2447: '{': 対応する関数ヘッダーがありません (旧形式の仮引数リスト?) (ソース ファイルをコンパイルしています Components\Script.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.h(22,29): error C2955: 'dxforge::script::init_info': クラス テンプレート を使用するには テンプレート 引数リストが必要です (ソース ファイルをコンパイルしています Components\Script.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.h(17,2): message : 'dxforge::script::init_info' の宣言を確認してください (ソース ファイルをコンパイルしています Components\Script.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(33,29): error C2955: 'dxforge::game_entity::entity_info': クラス テンプレート を使用するには テンプレート 引数リストが必要です (ソース ファイルをコンパイルしています Components\Script.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(26,3): message : 'dxforge::game_entity::entity_info' の宣言を確認してください (ソース ファイルをコンパイルしています Components\Script.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(27,4): error C2065: 'generations': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(27,4): error C2065: 'id_mapping': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(27,4): error C2065: 'entity_scripts': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(28,4): error C2065: 'generations': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(29,11): error C2065: 'generations': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\EngineAPI\GameEntity.h(70): error C2882: 'game_entity': 式の中で名前空間の識別子が正しく使用されていません。 (ソース ファイルをコンパイルしています Components\Entity.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(29,56): error C2065: 'entity_scripts': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\EngineAPI\GameEntity.h(70,41): error C2146: 構文エラー: ')' が、識別子 'entity' の前に必要です。 (ソース ファイルをコンパイルしています Components\Entity.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\EngineAPI\GameEntity.h(70): error C2882: 'game_entity': 式の中で名前空間の識別子が正しく使用されていません。 (ソース ファイルをコンパイルしています Components\Transform.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(29,71): error C2065: 'id_mapping': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\EngineAPI\GameEntity.h(71,1): error C2143: 構文エラー: ';' が '{' の前にありません。 (ソース ファイルをコンパイルしています Components\Entity.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\EngineAPI\GameEntity.h(70,41): error C2146: 構文エラー: ')' が、識別子 'entity' の前に必要です。 (ソース ファイルをコンパイルしています Components\Transform.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(29,93): error C2065: 'entity_scripts': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(29,108): error C2065: 'id_mapping': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\EngineAPI\GameEntity.h(71,1): error C2143: 構文エラー: ';' が '{' の前にありません。 (ソース ファイルをコンパイルしています Components\Transform.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\EngineAPI\GameEntity.h(71,1): error C2447: '{': 対応する関数ヘッダーがありません (旧形式の仮引数リスト?) (ソース ファイルをコンパイルしています Components\Entity.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\EngineAPI\GameEntity.h(71,1): error C2447: '{': 対応する関数ヘッダーがありません (旧形式の仮引数リスト?) (ソース ファイルをコンパイルしています Components\Transform.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(33,29): error C2955: 'dxforge::script::init_info': クラス テンプレート を使用するには テンプレート 引数リストが必要です
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(20,2): message : 'dxforge::script::init_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(33,12): error C2027: 認識できない型 'dxforge::script::init_info' が使われています。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(20,2): message : 'dxforge::script::init_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(33,29): error C2955: 'dxforge::game_entity::entity_info': クラス テンプレート を使用するには テンプレート 引数リストが必要です (ソース ファイルをコンパイルしています Components\Entity.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(26,3): message : 'dxforge::game_entity::entity_info' の宣言を確認してください (ソース ファイルをコンパイルしています Components\Entity.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.h(24,30): error C2955: 'dxforge::transform::init_info': クラス テンプレート を使用するには テンプレート 引数リストが必要です (ソース ファイルをコンパイルしています Components\Transform.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.h(17,2): message : 'dxforge::transform::init_info' の宣言を確認してください (ソース ファイルをコンパイルしています Components\Transform.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(36,3): error C2027: 認識できない型 'dxforge::script::init_info' が使われています。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(20,2): message : 'dxforge::script::init_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(39,7): error C2065: 'free_ids': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(41,7): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(41,9): error C2065: 'free_ids': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(42,4): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.h(24,30): error C2955: 'dxforge::transform::init_info': クラス テンプレート を使用するには テンプレート 引数リストが必要です (ソース ファイルをコンパイルしています Components\Entity.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.h(17,2): message : 'dxforge::transform::init_info' の宣言を確認してください (ソース ファイルをコンパイルしています Components\Entity.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(43,4): error C2065: 'free_ids': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(33,29): error C2955: 'dxforge::game_entity::entity_info': クラス テンプレート を使用するには テンプレート 引数リストが必要です (ソース ファイルをコンパイルしています Components\Transform.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(26,3): message : 'dxforge::game_entity::entity_info' の宣言を確認してください (ソース ファイルをコンパイルしています Components\Transform.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(44,7): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(44,41): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(45,6): error C2065: 'generations': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(45,30): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(45,31): error C2105: '++' には左辺値が必要です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.h(22,29): error C2955: 'dxforge::script::init_info': クラス テンプレート を使用するには テンプレート 引数リストが必要です (ソース ファイルをコンパイルしています Components\Entity.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.h(17,2): message : 'dxforge::script::init_info' の宣言を確認してください (ソース ファイルをコンパイルしています Components\Entity.cpp)
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(23,29): error C2955: 'dxforge::transform::init_info': クラス テンプレート を使用するには テンプレート 引数リストが必要です
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(19,2): message : 'dxforge::transform::init_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(49,7): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(49,33): error C2065: 'generations': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(50,4): error C2065: 'id_mapping': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(23,12): error C2027: 認識できない型 'dxforge::transform::init_info' が使われています。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(19,2): message : 'dxforge::transform::init_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(51,4): error C2065: 'generations': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(54,3): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(25,28): error C2955: 'dxforge::game_entity::entity_info': クラス テンプレート を使用するには テンプレート 引数リストが必要です
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(26,3): message : 'dxforge::game_entity::entity_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(31,7): error C2065: 'positions': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(55,3): error C2065: 'entity_scripts': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(35,4): error C2065: 'rotations': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(25,9): error C2027: 認識できない型 'dxforge::game_entity::entity_info' が使われています。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(26,3): message : 'dxforge::game_entity::entity_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(55,35): error C2027: 認識できない型 'dxforge::script::init_info' が使われています。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(20,2): message : 'dxforge::script::init_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(35,43): error C2027: 認識できない型 'dxforge::transform::init_info' が使われています。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(19,2): message : 'dxforge::transform::init_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(27,3): error C2027: 認識できない型 'dxforge::game_entity::entity_info' が使われています。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(26,3): message : 'dxforge::game_entity::entity_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(56,3): error C2065: 'entity_scripts': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(36,4): error C2065: 'positions': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(57,41): error C2065: 'entity_scripts': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(28): error C2027: 認識できない型 'dxforge::game_entity::entity_info' が使われています。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(26,3): message : 'dxforge::game_entity::entity_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(36,43): error C2027: 認識できない型 'dxforge::transform::init_info' が使われています。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(19,2): message : 'dxforge::transform::init_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(58,3): error C2065: 'id_mapping': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(37,4): error C2065: 'scales': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(58,26): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(33,7): error C2065: 'free_ids': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(59,24): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(35,7): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(37,40): error C2027: 認識できない型 'dxforge::transform::init_info' が使われています。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(19,2): message : 'dxforge::transform::init_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(35,9): error C2065: 'free_ids': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(60,2): error C2036: 'unknown-type': サイズが不明です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(42,4): error C2065: 'positions': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(36,4): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(43,4): error C2065: 'rotations': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(37,4): error C2065: 'free_ids': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(65,28): error C2065: 'id_mapping': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(38,7): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(43,31): error C2027: 認識できない型 'dxforge::transform::init_info' が使われています。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(19,2): message : 'dxforge::transform::init_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(66,28): error C2065: 'entity_scripts': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(38,41): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(44,4): error C2065: 'positions': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(67,24): error C2065: 'entity_scripts': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(39,6): error C2065: 'generations': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.cpp(69,3): error C2065: 'id_mapping': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(39,30): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(44,31): error C2027: 認識できない型 'dxforge::transform::init_info' が使われています。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(19,2): message : 'dxforge::transform::init_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(39,31): error C2105: '++' には左辺値が必要です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(45,4): error C2065: 'scales': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(43,7): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(43,33): error C2065: 'generations': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(45,28): error C2027: 認識できない型 'dxforge::transform::init_info' が使われています。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(19,2): message : 'dxforge::transform::init_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(44,4): error C2065: 'generations': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(48,46): error C2065: 'positions': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(48,4): error C2065: 'transforms': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(51,31): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(52,40): error C2882: 'id': 式の中で名前空間の識別子が正しく使用されていません。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(55,3): error C2065: 'transforms': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(57,10): error C2065: 'rotations': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(56,3): error C2065: 'transforms': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(56,34): error C2039: 'create': 'dxforge::transform' のメンバーではありません
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.h(14,11): message : 'dxforge::transform' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(62,10): error C2065: 'positions': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(56,46): error C2027: 認識できない型 'dxforge::game_entity::entity_info' が使われています。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(26,3): message : 'dxforge::game_entity::entity_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(57,8): error C2065: 'transforms': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(67,10): error C2065: 'scales': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(60): error C2027: 認識できない型 'dxforge::game_entity::entity_info' が使われています。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(26,3): message : 'dxforge::game_entity::entity_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(62,4): error C2065: 'scripts': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(63,4): error C2065: 'scripts': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(63,29): error C2039: 'create': 'dxforge::script' のメンバーではありません
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Script.h(14,11): message : 'dxforge::script' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(63,41): error C2027: 認識できない型 'dxforge::game_entity::entity_info' が使われています。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.h(26,3): message : 'dxforge::game_entity::entity_info' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(64,4): error C2065: 'scripts': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(68,2): error C2036: 'unknown-type': サイズが不明です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(73,3): error C3861: 'is_alive': 識別子が見つかりませんでした
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(74,14): error C2039: 'remove': 'dxforge::transform' のメンバーではありません
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.h(14,11): message : 'dxforge::transform' の宣言を確認してください
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(74,21): error C2065: 'transforms': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(75,3): error C2065: 'transforms': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(76,3): error C2065: 'free_ids': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(83,3): error C2065: 'generations': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(84,3): error C2065: 'generations': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(85,11): error C2065: 'generations': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(85,55): error C2065: 'transforms': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(92,10): error C2065: 'transforms': 定義されていない識別子です。
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Entity.cpp(99,10): error C2065: 'scripts': 定義されていない識別子です。

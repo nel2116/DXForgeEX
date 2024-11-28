@@ -11,6 +11,7 @@
 // ====== インクルード部 ======
 #include "..\Components\ComponentsCommon.h"
 #include "TransformComponent.h"
+#include "ScriptComponent.h"
 
 namespace dxforge
 {
@@ -38,7 +39,7 @@ namespace dxforge
 			constexpr bool is_valid() const { return id::is_valid(_id); }
 
 			transform::component transform() const;
-
+			script::component script() const;
 		private:
 			/// <summary>
 			/// ゲームエンティティのID
@@ -65,6 +66,8 @@ namespace dxforge
 			using script_ptr = std::unique_ptr<entity_script>;
 			using script_creator = script_ptr(*)(game_entity::entity entity);
 
+			u8 register_script(size_t, script_creator);
+
 			template<class script_class>
 			script_ptr create_script(game_entity entity)
 			{
@@ -72,5 +75,12 @@ namespace dxforge
 				return std::make_unique<script_class>(entity);
 			}
 		}	// namespace detail
+
+#define REGISTER_SCRIPT(TYPE)
+		class TYPE;
+		namespace
+		{
+			const u8 _reg_character_script{ dxforge::script::detail::register_script(std::hash<std::string>("character_script"), &dxforge::script::detail::create_script<character_script>) };
+		}
 	};	// namespace script
 }	// namespace dxforge

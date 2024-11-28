@@ -20,7 +20,7 @@ namespace dxforge::transform
 		utl::vector<math::v3> scales;
 
 	}
-	component create_transform(const init_info& info, game_entity::entity entity)
+	component create(init_info info, game_entity::entity entity)
 	{
 		// エンティティが有効かどうかを確認
 		assert(entity.is_valid());
@@ -47,7 +47,7 @@ namespace dxforge::transform
 
 		return component(transform_id((id::id_type)positions.size() - 1));
 	}
-	void remove_transform(component c)
+	void remove(component c)
 	{
 		assert(c.is_valid());
 	}
