@@ -54,8 +54,8 @@ namespace dxforge
 		{
 		public:
 			virtual ~entity_script() = default;
-			virtual void begin_play() = 0;
-			virtual void update(float) = 0;
+			virtual void begin_play() {}
+			virtual void update(float) {}
 		protected:
 			constexpr explicit entity_script(game_entity::entity entity)
 				: game_entity::entity{ entity.get_id() } {}
@@ -65,6 +65,7 @@ namespace dxforge
 		{
 			using script_ptr = std::unique_ptr<entity_script>;
 			using script_creator = script_ptr(*)(game_entity::entity entity);
+			using string_hash = std::hash<std::string>;
 
 			u8 register_script(size_t, script_creator);
 
@@ -74,13 +75,16 @@ namespace dxforge
 				assert(entity.is_valid());
 				return std::make_unique<script_class>(entity);
 			}
-		}	// namespace detail
 
-#define REGISTER_SCRIPT(TYPE)
-		class TYPE;
-		namespace
-		{
-			const u8 _reg_character_script{ dxforge::script::detail::register_script(std::hash<std::string>("character_script"), &dxforge::script::detail::create_script<character_script>) };
-		}
-	};	// namespace script
+#define REGISTER_SCRIPT(TYPE)										\
+			class TYPE;												\
+			namespace												\
+			{														\
+			const u8 _reg##TYPE										\
+			{ dxforge::script::detail::register_script(				\
+			std::hash<std::string>()(#TYPE),						\
+				&dxforge::script::detail::create_script<TYPE>) };	\
+			}														\
+		}	// namespace detail
+	}	// namespace script
 }	// namespace dxforge

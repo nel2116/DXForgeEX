@@ -167,3 +167,7 @@ F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\obj\Debug\Editors\WorldEditor\Component
 F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\obj\Debug\Editors\WorldEditor\TransformView.g.cs
 F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\obj\Debug\Editors\WorldEditor\ComponentView.baml
 F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\obj\Debug\Editors\WorldEditor\TransformView.baml
+F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Debug\Editors\WorldEditor\ComponentView.g.cs
+F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Debug\Editors\WorldEditor\TransformView.g.cs
+F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Debug\Editors\WorldEditor\ComponentView.baml
+F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Debug\Editors\WorldEditor\TransformView.baml

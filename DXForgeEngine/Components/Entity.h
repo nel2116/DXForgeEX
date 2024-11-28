@@ -18,6 +18,7 @@ namespace dxforge
 	// transform –¼‘O‹óŠÔ‚É init_info \‘¢‘Ì‚ğ’è‹`
 	INIT_INFO(transform);
 	INIT_INFO(script);
+
 #undef INIT_INFO
 
 	namespace game_entity {

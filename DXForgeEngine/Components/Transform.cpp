@@ -19,7 +19,8 @@ namespace dxforge::transform
 		utl::vector<math::v3> positions;
 		utl::vector<math::v3> scales;
 
-	}
+	}	// anonymous namespace
+
 	component create(init_info info, game_entity::entity entity)
 	{
 		// エンティティが有効かどうかを確認
@@ -47,20 +48,24 @@ namespace dxforge::transform
 
 		return component(transform_id((id::id_type)positions.size() - 1));
 	}
+
 	void remove(component c)
 	{
 		assert(c.is_valid());
 	}
+
 	math::v4 component::rotation() const
 	{
 		assert(is_valid());
 		return rotations[id::index(_id)];
 	}
+
 	math::v3 component::position() const
 	{
 		assert(is_valid());
 		return positions[id::index(_id)];
 	}
+
 	math::v3 component::scale() const
 	{
 		assert(is_valid());

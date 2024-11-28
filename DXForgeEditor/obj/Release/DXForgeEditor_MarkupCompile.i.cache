@@ -4,17 +4,17 @@
 winexe
 C#
 .cs
-F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\obj\Release\
+F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Release\
 DXForgeEditor
 none
 false
 TRACE;RELEASE;NET;NET8_0;NETCOREAPP
-F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\App.xaml
-1075710464
+F:\HAL\Self\DXForgeEX\DXForgeEditor\App.xaml
+13-418563608
 
-28241343805
-198-556154604
-Dictionaries\ControlTemplates.xaml;Editors\WorldEditor\GameEntityView.xaml;Editors\WorldEditor\ProjectLayoutView.xaml;Editors\WorldEditor\WorldEditorView.xaml;GameProject\NewProjectView.xaml;GameProject\OpenProjectView.xaml;GameProject\ProjectBrowserDialog.xaml;MainWindow.xaml;Utilities\LoggerView.xaml;Utilities\UndoRedoView.xaml;
+341692840847
+198-1431420039
+Dictionaries\ControlTemplates.xaml;Dictionaries\EditorColors.xaml;Editors\WorldEditor\ComponentView.xaml;Editors\WorldEditor\GameEntityView.xaml;Editors\WorldEditor\ProjectLayoutView.xaml;Editors\WorldEditor\TransformView.xaml;Editors\WorldEditor\WorldEditorView.xaml;GameProject\NewProjectView.xaml;GameProject\OpenProjectView.xaml;GameProject\ProjectBrowserDialog.xaml;MainWindow.xaml;Utilities\LoggerView.xaml;Utilities\UndoRedoView.xaml;
 
-True
+False
 
