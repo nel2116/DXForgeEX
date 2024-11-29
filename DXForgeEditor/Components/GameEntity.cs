@@ -46,9 +46,10 @@ namespace DXForgeEditor.Components
                         EntityId = EngineAPI.CreateGameEntity(this);
                         Debug.Assert(ID.IsValid(_entityId));
                     }
-                    else
+                    else if (ID.IsValid(EntityId))
                     {
                         EngineAPI.RemoveGameEntity(this);
+                        EntityId = ID.INVALID_ID;
                     }
                     OnPropertyChanged(nameof(IsActive));
                 }
@@ -148,6 +149,11 @@ namespace DXForgeEditor.Components
         private readonly ObservableCollection<IMSComponent> _components = new ObservableCollection<IMSComponent>();
         public ReadOnlyObservableCollection<IMSComponent> Components { get; private set; }
 
+        public T GetMSComponent<T>() where T : IMSComponent
+        {
+            return (T)Components.FirstOrDefault(x => x.GetType() == typeof(T));
+        }
+
         public List<GameEntity> SelectedEntities { get; }
 
         private void MakeComponentList()
@@ -159,7 +165,7 @@ namespace DXForgeEditor.Components
             foreach (var component in firstEntity.Components)
             {
                 var type = component.GetType();
-                if (SelectedEntities.Skip(1).Any(entity => entity.GetComponent(type) == null))
+                if (!SelectedEntities.Skip(1).Any(entity => entity.GetComponent(type) == null))
                 {
                     Debug.Assert(Components.FirstOrDefault(x => x.GetType() == type) == null);
                     _components.Add(component.GetMultiselectionComponent(this));

@@ -17,7 +17,6 @@ namespace DXForgeEditor.Components
     {
         public abstract IMSComponent GetMultiselectionComponent(MSEntity msEntity);
 
-
         [DataMember]
         public GameEntity Owner { get; private set; }
 

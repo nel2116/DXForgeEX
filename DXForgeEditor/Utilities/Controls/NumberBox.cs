@@ -61,6 +61,7 @@ namespace DXForgeEditor.Utilities.Controls
             _valueChanged = false;
             e.Handled = true;
             _mouseXStart = e.GetPosition(this).X;
+            Focus();
         }
 
         private void OnTextBlok_Mouse_LBU(object sender, MouseButtonEventArgs e)

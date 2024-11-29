@@ -21,7 +21,7 @@ namespace DXForgeEditor.Utilities
 
         public static bool IsTheSameAs(this float? value, float? other)
         {
-            if (value.HasValue || other.HasValue) return false;
+            if (!value.HasValue || !other.HasValue) return false;
             return Math.Abs(value.Value - other.Value) < Epsilon;
         }
     }
