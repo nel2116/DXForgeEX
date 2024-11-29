@@ -82,9 +82,9 @@ namespace dxforge
 			{														\
 			const u8 _reg##TYPE										\
 			{ dxforge::script::detail::register_script(				\
-			std::hash<std::string>()(#TYPE),						\
+				dxforge::script::detail::string_hash()(#TYPE),		\
 				&dxforge::script::detail::create_script<TYPE>) };	\
-			}														\
-		}	// namespace detail
-	}	// namespace script
-}	// namespace dxforge
+			}
+		}
+	};
+}

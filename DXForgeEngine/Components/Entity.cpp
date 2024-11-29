@@ -46,6 +46,7 @@ namespace dxforge::game_entity
 			// Resize components
 			// NOTE : resize()を呼び出さないので、メモリ割り当ての回数が少ない。
 			transforms.emplace_back();							// Transformコンポーネントを追加
+			scripts.emplace_back();								// Scriptコンポーネントを追加
 		}
 
 		const entity new_entity{ id };							// 新しいエンティティを作成
@@ -71,6 +72,13 @@ namespace dxforge::game_entity
 	{
 		const id::id_type index{ id::index(id) };
 		assert(is_alive(id));
+
+		if (scripts[index].is_valid())
+		{
+			script::remove(scripts[index]);
+			scripts[index] = {};		// Scriptコンポーネントを削除
+		}
+
 		transform::remove(transforms[index]);
 		transforms[index] = {};		// Transformコンポーネントを削除
 		free_ids.push_back(id);

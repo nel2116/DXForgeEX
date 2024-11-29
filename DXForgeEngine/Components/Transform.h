@@ -21,7 +21,7 @@ namespace dxforge::transform
 	};
 
 	// Transformコンポーネントを作成する関数
-	component  create(init_info info, game_entity::entity entity);
+	component create(init_info info, game_entity::entity entity);
 	// Transformコンポーネントを削除する関数
 	void remove(component c);
 }
