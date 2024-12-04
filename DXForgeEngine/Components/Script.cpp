@@ -1,12 +1,12 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Script.cpp]
-// 作成日 : 2024/11/28
+// 作成日 : 2024/12/2
 // 作成者 : 田中ミノル
 // 概要
-// 　Scriptコンポーネントを実装したファイル
+// 　スクリプトを実装したファイル
 // 更新履歴
-// 2024/11/28 新規作成
-// /_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+// 2024/12/2 新規作成
+// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Script.h"
 #include "Entity.h"
@@ -24,8 +24,9 @@ namespace dxforge::script
 
 		script_registry& registery()
 		{
-			// NOTE : 静的データの初期化順序の関係で、この静的変数を関数内に置いた。
-			// こうすることで、アクセスする前にデータが初期化されていることを確認できる。
+			// NOTE : この静的変数を関数内に置くのは、次の理由からである。
+			//		  静的データの初期化順序 
+			//		  こうすることでアクセスする前にデータが初期化されていることを確認できる。
 			static script_registry reg;
 			return reg;
 		}
@@ -36,26 +37,28 @@ namespace dxforge::script
 			const id::id_type index{ id::index(id) };
 			assert(index < generations.size() && id_mapping[index] < entity_scripts.size());
 			assert(generations[index] == id::generation(id));
-			return(generations[index] == id::generation(id)) && entity_scripts[id_mapping[index]] && entity_scripts[id_mapping[index]]->is_valid();
+			return (generations[index] == id::generation(id)) && entity_scripts[id_mapping[index]] && entity_scripts[id_mapping[index]]->is_valid();
 		}
-	} // anonymous namespace
+
+	}// anonymous namespace
 
 	namespace detail
 	{
 		u8 register_script(size_t tag, script_creator func)
 		{
-			bool result{ registery().insert(script_registry::value_type{tag, func }).second };
+			bool result{ registery().insert(script_registry::value_type{tag,func}).second };
 			assert(result);
 			return result;
-		};
-	} // namespace detail
+		}
+
+	}	// namespace detail
 
 	component create(init_info info, game_entity::entity entity)
 	{
 		assert(entity.is_valid());
 		assert(info.script_creator);
 
-		script_id id;
+		script_id id{};
 		if (free_ids.size() > id::min_deleted_elements)
 		{
 			id = free_ids.front();
@@ -66,7 +69,7 @@ namespace dxforge::script
 		}
 		else
 		{
-			id = script_id{ (id::id_type)generations.size() };
+			id = script_id{ (id::id_type)id_mapping.size() };
 			id_mapping.emplace_back();
 			generations.push_back(0);
 		}
@@ -89,4 +92,4 @@ namespace dxforge::script
 		id_mapping[id::index(last_id)] = index;
 		id_mapping[id::index(id)] = id::invalid_id;
 	}
-} // namespace dxforge::script
+}	// namespace dxforge::script

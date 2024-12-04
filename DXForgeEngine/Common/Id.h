@@ -90,7 +90,7 @@ namespace dxforge::id
 	}	// namespace detail
 
 #define DEFINE_TYPED_ID(name)								\
-    struct name final : id::detail::id_base				\
+    struct name final : id::detail::id_base					\
     {														\
         constexpr explicit name(id::id_type id)				\
             : id_base{ id } {}								\

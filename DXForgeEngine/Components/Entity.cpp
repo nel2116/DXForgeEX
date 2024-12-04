@@ -20,7 +20,7 @@ namespace dxforge::game_entity
 		utl::vector<script::component> scripts;
 		utl::vector<id::generation_type> generations;
 		utl::deque<entity_id> free_ids;
-	}	// anonymous namespace
+	}
 
 	entity create(entity_info info)
 	{
@@ -60,8 +60,8 @@ namespace dxforge::game_entity
 		// Scriptコンポーネントの作成
 		if (info.script && info.script->script_creator)
 		{
-			assert(!scripts[index].is_valid());
-			scripts[index] = script::create(*info.script, new_entity);
+			assert(!scripts[index].is_valid());					// 有効なScriptコンポーネントであることを確認
+			scripts[index] = script::create(*info.script, new_entity);	// Scriptコンポーネントを作成
 			assert(scripts[index].is_valid());
 		}
 
@@ -76,17 +76,17 @@ namespace dxforge::game_entity
 		if (scripts[index].is_valid())
 		{
 			script::remove(scripts[index]);
-			scripts[index] = {};		// Scriptコンポーネントを削除
+			scripts[index] = {};	// Scriptコンポーネントを削除
 		}
 
 		transform::remove(transforms[index]);
-		transforms[index] = {};		// Transformコンポーネントを削除
+		transforms[index] = {};	// Transformコンポーネントを削除
 		free_ids.push_back(id);
 	}
 
 	bool is_alive(entity_id id)
 	{
-		assert(id::is_valid(id));								// 有効なエンティティであることを確認
+		assert(id::is_valid(id));							// 有効なエンティティであることを確認
 		const id::id_type index{ id::index(id) };
 		assert(index < generations.size());					// インデックスが範囲内であることを確認
 		assert(generations[index] == id::generation(id));

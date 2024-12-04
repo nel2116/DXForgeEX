@@ -15,6 +15,7 @@ namespace dxforge
 {
 	// INIT_INFO マクロを定義：指定された component の名前空間に init_info 構造体を定義する
 #define INIT_INFO(component) namespace component { struct init_info; }
+
 	// transform 名前空間に init_info 構造体を定義
 	INIT_INFO(transform);
 	INIT_INFO(script);
