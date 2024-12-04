@@ -18,6 +18,20 @@ namespace dxforge::utl
 {
 	template<typename T>
 	using vector = std::vector<T>;  // std::vector を primal::utl 名前空間内の vector としてエイリアス
+
+	template<typename T>
+	void erase_unordered(vector<T>& v, size_t index)
+	{
+		if (v.size() > 1)
+		{
+			std::iter_swap(v.begin() + index, v.end() - 1);
+			v.pop_back();
+		}
+		else
+		{
+			v.clear();
+		}
+	}
 }
 #endif
 

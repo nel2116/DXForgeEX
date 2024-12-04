@@ -10,11 +10,11 @@ none
 false
 TRACE;DEBUG;NET;NET8_0;NETCOREAPP
 F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\App.xaml
-13-418563608
+14-1382407192
 
-34646775400
+351905902870
 198-1431420039
-Dictionaries\ControlTemplates.xaml;Dictionaries\EditorColors.xaml;Editors\WorldEditor\ComponentView.xaml;Editors\WorldEditor\GameEntityView.xaml;Editors\WorldEditor\ProjectLayoutView.xaml;Editors\WorldEditor\TransformView.xaml;Editors\WorldEditor\WorldEditorView.xaml;GameProject\NewProjectView.xaml;GameProject\OpenProjectView.xaml;GameProject\ProjectBrowserDialog.xaml;MainWindow.xaml;Utilities\LoggerView.xaml;Utilities\UndoRedoView.xaml;
+Dictionaries\ControlTemplates.xaml;Dictionaries\EditorColors.xaml;Editors\WorldEditor\ComponentView.xaml;Editors\WorldEditor\GameEntityView.xaml;Editors\WorldEditor\ProjectLayoutView.xaml;Editors\WorldEditor\TransformView.xaml;Editors\WorldEditor\WorldEditorView.xaml;EnginePathDialog.xaml;GameProject\NewProjectView.xaml;GameProject\OpenProjectView.xaml;GameProject\ProjectBrowserDialog.xaml;MainWindow.xaml;Utilities\LoggerView.xaml;Utilities\UndoRedoView.xaml;
 
-False
+True
 

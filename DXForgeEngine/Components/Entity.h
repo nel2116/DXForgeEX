@@ -15,8 +15,11 @@ namespace dxforge
 {
 	// INIT_INFO マクロを定義：指定された component の名前空間に init_info 構造体を定義する
 #define INIT_INFO(component) namespace component { struct init_info; }
+
 	// transform 名前空間に init_info 構造体を定義
 	INIT_INFO(transform);
+	INIT_INFO(script);
+
 #undef INIT_INFO
 
 	namespace game_entity {
@@ -25,15 +28,16 @@ namespace dxforge
 		{
 			// transform 名前空間の init_info 型のポインタを宣言、初期化は nullptr
 			transform::init_info* transform{ nullptr };
+			script::init_info* script{ nullptr };
 		};
 
 		// ゲームエンティティを作成する関数
-		entity create_game_entity(const entity_info& info);
+		entity create(entity_info info);
 
 		// ゲームエンティティを削除する関数
-		void remove_game_entity(entity e);
+		void remove(entity_id id);
 
 		// 指定したエンティティが有効かどうかを確認する関数
-		bool is_alive(entity e);
+		bool is_alive(entity_id id);
 	}
 };
