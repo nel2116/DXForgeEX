@@ -171,3 +171,8 @@ F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Debug\Editors\WorldEditor\ComponentView.
 F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Debug\Editors\WorldEditor\TransformView.g.cs
 F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Debug\Editors\WorldEditor\ComponentView.baml
 F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Debug\Editors\WorldEditor\TransformView.baml
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\obj\Debug\EnginePathDialog.g.cs
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\obj\Debug\EnginePathDialog.baml
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\obj\Debug\Interop.EnvDTE80.dll
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\obj\Debug\Interop.EnvDTE.dll
+F:\HAL\ThirdYear\DXForgeEX\DXForgeEditor\obj\Debug\DXForgeEditor.csproj.ResolveComReference.cache

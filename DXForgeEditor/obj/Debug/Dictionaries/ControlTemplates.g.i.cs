@@ -54,7 +54,7 @@ namespace DXForgeEditor.Dictionaries {
                 return;
             }
             _contentLoaded = true;
-            System.Uri resourceLocater = new System.Uri("/DXForgeEditor;V1.0.0.0;component/dictionaries/controltemplates.xaml", System.UriKind.Relative);
+            System.Uri resourceLocater = new System.Uri("/DXForgeEditor;component/dictionaries/controltemplates.xaml", System.UriKind.Relative);
             
             #line 1 "..\..\..\Dictionaries\ControlTemplates.xaml"
             System.Windows.Application.LoadComponent(this, resourceLocater);

@@ -22,6 +22,7 @@ namespace DXForgeEditor
         public EnginePathDialog()
         {
             InitializeComponent();
+            Owner = Application.Current.MainWindow;
         }
 
         private void OnOk_Button_Click(object sender, RoutedEventArgs e)
@@ -30,15 +31,23 @@ namespace DXForgeEditor
             messageTextBlock.Text = string.Empty;
             if (string.IsNullOrEmpty(path))
             {
-                messageTextBlock.Text = "Invalid path.";
+                messageTextBlock.Text = "無効なパスです";
             }
             else if (path.IndexOfAny(Path.GetInvalidPathChars()) != -1)
             {
-                messageTextBlock.Text = "Invalid charcter(s) used in path.";
+                messageTextBlock.Text = "パスに無効な文字が使用されています";
             }
             else if (!Directory.Exists(Path.Combine(path, @"DXForgeEngine\EngineAPI\")))
             {
                 messageTextBlock.Text = "Unable to fine the engine at the specifined location.";
+            }
+
+            if (string.IsNullOrEmpty(messageTextBlock.Text))
+            {
+                if (!Path.EndsInDirectorySeparator(path)) path += @"\";
+                DXForgePath = path;
+                DialogResult = true;
+                Close();
             }
         }
     }

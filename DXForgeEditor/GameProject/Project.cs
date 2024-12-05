@@ -39,7 +39,7 @@ namespace DXForgeEditor.GameProject
             }
         }
 
-        public static Project Currnt => Application.Current.MainWindow.DataContext as Project;
+        public static Project Current => Application.Current.MainWindow.DataContext as Project;
 
         public static UndoRedo UndoRedo { get; } = new UndoRedo();
 

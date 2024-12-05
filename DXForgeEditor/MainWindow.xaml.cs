@@ -40,7 +40,8 @@ namespace DXForgeEditor
                 var dlg = new EnginePathDialog();
                 if (dlg.ShowDialog() == true)
                 {
-
+                    DXForgePath = dlg.DXForgePath;
+                    Environment.SetEnvironmentVariable("DXFORGE_ENGINE", DXForgePath.ToUpper(), EnvironmentVariableTarget.User);
                 }
                 else
                 {
@@ -56,7 +57,7 @@ namespace DXForgeEditor
         private void OnMainWindowClosing(object? sender, CancelEventArgs e)
         {
             Closing -= OnMainWindowClosing;
-            Project.Currnt?.Unload();
+            Project.Current?.Unload();
         }
 
         private void OpenProjectBrowserDialog()
@@ -68,7 +69,7 @@ namespace DXForgeEditor
             }
             else
             {
-                Project.Currnt?.Unload();
+                Project.Current?.Unload();
                 DataContext = projectBrowser.DataContext;
             }
         }

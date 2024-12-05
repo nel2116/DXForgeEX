@@ -5,6 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:local="clr-namespace:DXForgeEditor"
              mc:Ignorable="d" Style="{StaticResource DXForgeDialogStyle}"
+             ResizeMode="NoResize" ShowInTaskbar="False" WindowStartupLocation="CenterOwner"
              Title="Where's DXForge Engine?" Height="250" Width="400">
     <Border CornerRadius="3" Background="{StaticResource Editor.Window.GrayBrush3}" HorizontalAlignment="Stretch"
         Margin="10">
