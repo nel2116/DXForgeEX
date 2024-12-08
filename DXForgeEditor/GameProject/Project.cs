@@ -1,4 +1,5 @@
-﻿using DXForgeEditor.Utilities;
+﻿using DXForgeEditor.GameDev;
+using DXForgeEditor.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -11,6 +12,14 @@ using System.Windows.Input;
 
 namespace DXForgeEditor.GameProject
 {
+    enum BuildConfiguration
+    {
+        Debug,
+        DebugEditor,
+        Release,
+        ReleaseEditor,
+    }
+
     [DataContract(Name = "Game")]
     class Project : ViewModelBase
     {
@@ -19,7 +28,30 @@ namespace DXForgeEditor.GameProject
         public string Name { get; private set; } = "New Project";
         [DataMember]
         public string Path { get; set; }
-        public string FullPath => $@"{Path}{Name}\{Name}{Extension}";
+        public string FullPath => $@"{Path}{Name}{Extension}";
+        public string Solution => $@"{Path}{Name}.sln";
+
+        private static readonly string[] _buildConfigurationNames = new string[] { "Debug", "DebugEditor", "Release", "ReleaseEditor" };
+
+        private int _buildConfig;
+
+        public int BuildConfig
+        {
+            get => _buildConfig;
+            set
+            {
+                if (_buildConfig != value)
+                {
+                    _buildConfig = value;
+                    OnPropertyChanged(nameof(BuildConfig));
+                }
+            }
+        }
+
+        public BuildConfiguration StandAloneBuildConfig => BuildConfig == 0 ? BuildConfiguration.Debug : BuildConfiguration.Release;
+
+        public BuildConfiguration DllBuildConfig => BuildConfig == 1 ? BuildConfiguration.DebugEditor : BuildConfiguration.ReleaseEditor;
+
         [DataMember(Name = "Scenes")]
         private ObservableCollection<Scene> _scenes = new ObservableCollection<Scene>();
         public ReadOnlyObservableCollection<Scene> Scenes { get; private set; }
@@ -52,6 +84,9 @@ namespace DXForgeEditor.GameProject
         public ICommand RemoveSceneCommand { get; private set; }
         public ICommand SaveCommand { get; private set; }
 
+        public ICommand BuildCommand { get; private set; }
+
+        private static string GetConfigurationName(BuildConfiguration config) => _buildConfigurationNames[(int)config];
 
         public void AddScene(string sceneName)
         {
@@ -73,6 +108,7 @@ namespace DXForgeEditor.GameProject
 
         public void Unload()
         {
+            VisualStudio.CloseVisualStudio();
             UndoRedo.Reset();
         }
 
@@ -80,6 +116,34 @@ namespace DXForgeEditor.GameProject
         {
             Serializer.ToFile(project, project.FullPath);
             Logger.Log(MessageType.Info, $"Project saved to {project.FullPath}");
+        }
+
+        public void BuildGameCodeDll()
+        {
+            try
+            {
+                UnloadGameCode();
+                VisualStudio.BuildSolution(this, GetConfigurationName(DllBuildConfig));
+                if (VisualStudio.BuildSucceeded)
+                {
+                    LoadGameCodeDll();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                Logger.Log(MessageType.Error, $"Failed to build GameCode.dll");
+            }
+        }
+
+        private void LoadGameCodeDll()
+        {
+            throw new NotImplementedException();
+        }
+
+        private void UnloadGameCode()
+        {
+            throw new NotImplementedException();
         }
 
         [OnDeserialized]
@@ -116,6 +180,7 @@ namespace DXForgeEditor.GameProject
             UndoCommand = new RelayCommand<object>(x => UndoRedo.Undo());
             RedoCommand = new RelayCommand<object>(x => UndoRedo.Redo());
             SaveCommand = new RelayCommand<object>(x => Save(this));
+            BuildCommand = new RelayCommand<object>(x => BuildGameCodeDll());
         }
 
         public Project(string name, string path)

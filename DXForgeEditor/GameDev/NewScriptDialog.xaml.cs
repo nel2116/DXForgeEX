@@ -1,18 +1,14 @@
 ﻿using DXForgeEditor.GameProject;
 using DXForgeEditor.Utilities;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using System.Windows.Media.Animation;
 
 namespace DXForgeEditor.GameDev
 {
@@ -26,17 +22,13 @@ namespace DXForgeEditor.GameDev
 #include ""{0}.h""
 namespace {1}
 {{
-REGISTER_SCRIPT({0});
-void {0}::begin_pray()
-{{
-
-
-}}
-void {0}::update(float dt)
-{{
-
-
-}}
+    REGISTER_SCRIPT({0});
+    void {0}::begin_play()
+    {{
+    }}
+    void {0}::update(float dt)
+    {{
+    }}
 }} // namespace {1}";
 
         private static readonly string _hCode =
@@ -44,17 +36,15 @@ void {0}::update(float dt)
 #pragma once
 namespace {1}
 {{
-class {0} : public dxforge::script::entity_script
-{{
-public:
-    constexpr explicit {0}(dxforge::game_entity::entity entity)
-        : dxforge::script::entity_script{{entity}}{{}}
+    class {0} : public dxforge::script::entity_script
+    {{
+    public:
+        constexpr explicit {0}(dxforge::game_entity::entity entity) : dxforge::script::entity_script{{entity}}{{}}
 
-    void begin_play() override;
-    void update(float dt) override;
-private:
-}};
-
+        void begin_play() override;
+        void update(float dt) override;
+    private:
+    }};
 }} // namespace {1};
 ";
 
@@ -82,7 +72,7 @@ private:
             {
                 errorMsg = "スクリプト名に使用できない文字が含まれています";
             }
-            if (string.IsNullOrEmpty(path))
+            else if (string.IsNullOrEmpty(path))
             {
                 errorMsg = "有効なスクリプトフォルダを選択してください";
             }
@@ -110,7 +100,7 @@ private:
             }
             else
             {
-                messageTextBlock.Foreground = FindResource("Editor.FrontBrush") as Brush;
+                messageTextBlock.Foreground = FindResource("Editor.FontBrush") as Brush;
             }
             messageTextBlock.Text = errorMsg;
             return isValid;
@@ -132,15 +122,34 @@ private:
         {
             if (!Validate()) return;
             IsEnabled = false;
+            busyAnimation.Opacity = 0;
+            busyAnimation.Visibility = Visibility.Visible;
+            DoubleAnimation fadeIn = new DoubleAnimation(0, 1, new Duration(TimeSpan.FromMilliseconds(500)));
+            busyAnimation.BeginAnimation(OpacityProperty, fadeIn);
 
             try
             {
+                var name = scriptName.Text.Trim();
+                var path = Path.GetFullPath(Path.Combine(Project.Current.Path, scriptPath.Text.Trim()));
+                var solution = Project.Current.Solution;
+                var projectName = Project.Current.Name;
                 await Task.Run(() => CreateScript(name, path, solution, projectName));
             }
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
                 Logger.Log(MessageType.Error, $"Failed to create script {scriptName.Text}");
+            }
+            finally
+            {
+                DoubleAnimation fadeOut = new DoubleAnimation(1, 0, new Duration(TimeSpan.FromMilliseconds(200)));
+                fadeOut.Completed += (s, e) =>
+                {
+                    busyAnimation.Opacity = 0;
+                    busyAnimation.Visibility = Visibility.Hidden;
+                    Close();
+                };
+                busyAnimation.BeginAnimation(OpacityProperty, fadeOut);
             }
         }
 
@@ -161,6 +170,13 @@ private:
                 sw.Write(string.Format(_hCode, name, _namespace));
             }
 
+            string[] files = new string[] { cpp, h };
+
+            for (int i = 0; i < 3; ++i)
+            {
+                if (!VisualStudio.AddFilesToSolution(solution, projectName, files)) System.Threading.Thread.Sleep(1000);
+                else break;
+            }
         }
         public NewScriptDialog()
         {

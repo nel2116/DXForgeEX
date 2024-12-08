@@ -109,3 +109,8 @@ F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Release\DXForgeEditor.csproj.CoreCompile
 F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Release\DXForgeEditor.sourcelink.json
 F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Release\DXForgeEditor.genruntimeconfig.cache
 F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Release\ref\DXForgeEditor.dll
+F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Release\Interop.EnvDTE80.dll
+F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Release\Interop.EnvDTE.dll
+F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Release\DXForgeEditor.csproj.ResolveComReference.cache
+F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Release\GameDev\NewScriptDialog.g.cs
+F:\HAL\Self\DXForgeEX\DXForgeEditor\obj\Release\GameDev\NewScriptDialog.baml
