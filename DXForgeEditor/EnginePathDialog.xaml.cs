@@ -39,7 +39,7 @@ namespace DXForgeEditor
             }
             else if (!Directory.Exists(Path.Combine(path, @"DXForgeEngine\EngineAPI\")))
             {
-                messageTextBlock.Text = "Unable to fine the engine at the specifined location.";
+                messageTextBlock.Text = "指定された場所にエンジンが見つかりません";
             }
 
             if (string.IsNullOrEmpty(messageTextBlock.Text))

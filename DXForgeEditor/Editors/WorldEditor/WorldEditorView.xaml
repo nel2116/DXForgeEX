@@ -17,6 +17,7 @@
         <KeyBinding Command="{Binding UndoCommand}" Key="Z" Modifiers="Control"/>
         <KeyBinding Command="{Binding RedoCommand}" Key="Y" Modifiers="Control"/>
         <KeyBinding Command="{Binding SaveCommand}" Key="S" Modifiers="Control"/>
+        <KeyBinding Command="{Binding BuildCommand}" Key="F5"/>
     </UserControl.InputBindings>
     <Grid>
         <Grid.RowDefinitions>
@@ -26,7 +27,8 @@
         <StackPanel Orientation="Horizontal">
             <Button Content="Undo" Command="{Binding UndoCommand}" Cursor=""/>
             <Button Content="Redo" Command="{Binding RedoCommand}" Margin="5,0"/>
-            <Button Content="New Script" Click="OnNewScript_Button_Click"/>
+            <Button Content="New Script" Click="OnNewScript_Button_Click"
+                    IsEnabled="{Binding Path=IsEnabled,ElementName=buildButton}"/>
             <Button x:Name="buildButton" Content="Build"  Margin="5,0"
                     Command="{Binding BuildCommand}" CommandParameter="{StaticResource True}"/>
             <ComboBox x:Name="runConfig" VerticalAlignment="Center"
@@ -61,15 +63,17 @@
                 </Border>
                 <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch"
                               VerticalAlignment="Top" Background="Transparent"/>
-                <TabControl Grid.Row="1" Background="{StaticResource Editor.Window.GrayBrush2}"
-                            Margin="0,5,0,0">
-                    <TabItem Header="History">
-                        <util:UndoRedoView DataContext="{Binding UndoRedo}"/>
-                    </TabItem>
-                    <TabItem Header="Log">
-                        <util:LoggerView />
-                    </TabItem>
-                </TabControl>
+                <Grid Grid.Row="1" Margin="0,5,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition/>
+                        <ColumnDefinition/>
+                    </Grid.ColumnDefinitions>
+                    <util:UndoRedoView DataContext="{Binding UndoRedo}" Grid.Column="0"
+                                           Background="{StaticResource Editor.Window.GrayBrush2}"/>
+                    <GridSplitter Grid.Column="1" Width="5" VerticalAlignment="Stretch"
+                                    HorizontalAlignment="Left" Background="Transparent"/>
+                    <util:LoggerView Grid.Column="1" Margin="5,0,0,0" Cursor=""/>
+                </Grid>
             </Grid>
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Left"
                           VerticalAlignment="Stretch" Background="Transparent"/>

@@ -29,30 +29,39 @@ namespace DXForgeEditor.DllWrappers
 {
     static class EngineAPI
     {
-        private const string _dllName = "DXForgeEngineDLL.dll";
+        private const string _engineDll = "DXForgeEngineDLL.dll";
+        [DllImport(_engineDll, CharSet = CharSet.Ansi)]
+        public static extern int LoadGameCodeDll(string dllPath);
 
-        [DllImport(_dllName)]
-        private static extern int CreateGameEntity(GameEntityDescriptor desc);
+        [DllImport(_engineDll)]
+        public static extern int UnloadGameCodeDll();
 
-        public static int CreateGameEntity(GameEntity entity)
+
+        internal static class EntityAPI
         {
-            GameEntityDescriptor desc = new GameEntityDescriptor();
+            [DllImport(_engineDll)]
+            private static extern int CreateGameEntity(GameEntityDescriptor desc);
 
-            // transform component
+            public static int CreateGameEntity(GameEntity entity)
             {
-                var c = entity.GetComponent<Transform>();
-                desc.Transform.Position = c.Position;
-                desc.Transform.Rotation = c.Rotation;
-                desc.Transform.Scale = c.Scale;
-            }
-            return CreateGameEntity(desc);
-        }
+                GameEntityDescriptor desc = new GameEntityDescriptor();
 
-        [DllImport(_dllName)]
-        public static extern void RemoveGameEntity(int id);
-        public static void RemoveGameEntity(GameEntity entity)
-        {
-            RemoveGameEntity(entity.EntityId);
+                // transform component
+                {
+                    var c = entity.GetComponent<Transform>();
+                    desc.Transform.Position = c.Position;
+                    desc.Transform.Rotation = c.Rotation;
+                    desc.Transform.Scale = c.Scale;
+                }
+                return CreateGameEntity(desc);
+            }
+
+            [DllImport(_engineDll)]
+            public static extern void RemoveGameEntity(int id);
+            public static void RemoveGameEntity(GameEntity entity)
+            {
+                RemoveGameEntity(entity.EntityId);
+            }
         }
     }
 }

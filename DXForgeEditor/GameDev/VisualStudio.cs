@@ -170,10 +170,9 @@ namespace DXForgeEditor.GameDev
             bool result = false;
             for (int i = 0; i < 3; i++)
             {
-
                 try
                 {
-                    result = _vsInstance != null && (_vsInstance.Debugger.CurrentProgram != null) || _vsInstance.Debugger.CurrentMode == EnvDTE.dbgDebugMode.dbgRunMode;
+                    result = _vsInstance != null && (_vsInstance.Debugger.CurrentProgram != null || _vsInstance.Debugger.CurrentMode == EnvDTE.dbgDebugMode.dbgRunMode);
                 }
                 catch (Exception ex)
                 {
@@ -195,7 +194,7 @@ namespace DXForgeEditor.GameDev
             OpenVisualStudio(project.Solution);
             BuildDone = BuildSucceeded = false;
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 3; ++i)
             {
                 try
                 {
@@ -205,13 +204,25 @@ namespace DXForgeEditor.GameDev
                     _vsInstance.Events.BuildEvents.OnBuildProjConfigBegin += OnBuildSolutionBegin;
                     _vsInstance.Events.BuildEvents.OnBuildProjConfigDone += OnBuildSolutionDone;
 
+                    try
+                    {
+                        foreach (var pdbFile in Directory.GetFiles(Path.Combine($"{project.Path}", $@"x64\{configName}"), "*.pdb"))
+                        {
+                            File.Delete(pdbFile);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine(ex.Message);
+                    }
+
                     _vsInstance.Solution.SolutionBuild.SolutionConfigurations.Item(configName).Activate();
                     _vsInstance.ExecuteCommand("Build.BuildSolution");
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine(ex.Message);
-                    Debug.WriteLine($"Attempt {1}:faild to build {project.Name}");
+                    Debug.WriteLine($"Attempt {i}:faild to build {project.Name}");
                     System.Threading.Thread.Sleep(1000);
                 }
             }

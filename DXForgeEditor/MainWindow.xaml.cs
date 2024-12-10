@@ -16,7 +16,7 @@ namespace DXForgeEditor
 {
     public partial class MainWindow : Window
     {
-        public static string DXForgePath { get; private set; } = @"F:\HAL\ThirdYear\DXForgeEX";
+        public static string DXForgePath { get; private set; }
 
         public MainWindow()
         {
