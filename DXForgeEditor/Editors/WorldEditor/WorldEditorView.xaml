@@ -6,8 +6,13 @@
              xmlns:local="clr-namespace:DXForgeEditor.Editors"
              xmlns:util="clr-namespace:DXForgeEditor.Utilities"
              xmlns:ctlr="clr-namespace:DXForgeEditor.Utilities.Controls"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              mc:Ignorable="d" Focusable="True"
              d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Resources>
+        <sys:Boolean x:Key="True">True</sys:Boolean>
+        <sys:Boolean x:Key="False">False</sys:Boolean>
+    </UserControl.Resources>
     <UserControl.InputBindings>
         <KeyBinding Command="{Binding UndoCommand}" Key="Z" Modifiers="Control"/>
         <KeyBinding Command="{Binding RedoCommand}" Key="Y" Modifiers="Control"/>
@@ -22,7 +27,8 @@
             <Button Content="Undo" Command="{Binding UndoCommand}" Cursor=""/>
             <Button Content="Redo" Command="{Binding RedoCommand}" Margin="5,0"/>
             <Button Content="New Script" Click="OnNewScript_Button_Click"/>
-            <Button x:Name="buildButton" Content="Build"  Margin="5,0"/>
+            <Button x:Name="buildButton" Content="Build"  Margin="5,0"
+                    Command="{Binding BuildCommand}" CommandParameter="{StaticResource True}"/>
             <ComboBox x:Name="runConfig" VerticalAlignment="Center"
                       Width="72" SelectedIndex="{Binding BuildConfig}">
                 <ComboBoxItem Content="Debug"/>

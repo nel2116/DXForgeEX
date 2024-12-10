@@ -35,6 +35,7 @@ namespace DXForgeEditor.GameProject
 
         private int _buildConfig;
 
+        [DataMember]
         public int BuildConfig
         {
             get => _buildConfig;
@@ -118,12 +119,12 @@ namespace DXForgeEditor.GameProject
             Logger.Log(MessageType.Info, $"Project saved to {project.FullPath}");
         }
 
-        public void BuildGameCodeDll()
+        public void BuildGameCodeDll(bool showWindow = true)
         {
             try
             {
                 UnloadGameCode();
-                VisualStudio.BuildSolution(this, GetConfigurationName(DllBuildConfig));
+                VisualStudio.BuildSolution(this, GetConfigurationName(DllBuildConfig), showWindow);
                 if (VisualStudio.BuildSucceeded)
                 {
                     LoadGameCodeDll();
@@ -177,10 +178,10 @@ namespace DXForgeEditor.GameProject
                     $"Remove {x.Name}"));
             }, x => !x.IsActive);
 
-            UndoCommand = new RelayCommand<object>(x => UndoRedo.Undo());
-            RedoCommand = new RelayCommand<object>(x => UndoRedo.Redo());
+            UndoCommand = new RelayCommand<object>(x => UndoRedo.Undo(), x => UndoRedo.UndoList.Any());
+            RedoCommand = new RelayCommand<object>(x => UndoRedo.Redo(), x => UndoRedo.RedoList.Any());
             SaveCommand = new RelayCommand<object>(x => Save(this));
-            BuildCommand = new RelayCommand<object>(x => BuildGameCodeDll());
+            BuildCommand = new RelayCommand<bool>(x => BuildGameCodeDll(x), x => !VisualStudio.IsDebugging() && VisualStudio.BuildDone);
         }
 
         public Project(string name, string path)
