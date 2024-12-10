@@ -19,9 +19,16 @@ namespace DXForgeEditor.EngineAPIStructs
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    class ScriptComponent
+    {
+        public IntPtr ScriptCreater;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     class GameEntityDescriptor
     {
         public TransformComponent Transform = new TransformComponent();
+        public ScriptComponent Script = new ScriptComponent();
     }
 }
 
@@ -35,6 +42,13 @@ namespace DXForgeEditor.DllWrappers
 
         [DllImport(_engineDll)]
         public static extern int UnloadGameCodeDll();
+
+        [DllImport(_engineDll)]
+        public static extern IntPtr GetScriptCreater(string name);
+
+        [DllImport(_engineDll)]
+        [return: MarshalAs(UnmanagedType.SafeArray)]
+        public static extern string[] GetScriptNames();
 
 
         internal static class EntityAPI
@@ -53,6 +67,11 @@ namespace DXForgeEditor.DllWrappers
                     desc.Transform.Rotation = c.Rotation;
                     desc.Transform.Scale = c.Scale;
                 }
+                // script component
+                {
+                    // var c = entity.GetComponent<Script>();
+                }
+
                 return CreateGameEntity(desc);
             }
 

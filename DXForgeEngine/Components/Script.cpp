@@ -25,11 +25,23 @@ namespace dxforge::script
 		script_registry& registery()
 		{
 			// NOTE : この静的変数を関数内に置くのは、次の理由からである。
-			//		  静的データの初期化順序 
+			//		  静的データの初期化順序
 			//		  こうすることでアクセスする前にデータが初期化されていることを確認できる。
 			static script_registry reg;
 			return reg;
 		}
+
+#ifdef USE_WITH_EDITOR
+		utl::vector<std::string>& script_names()
+		{
+			// NOTE : この静的変数を関数内に置くのは、次の理由からである。
+			//		  静的データの初期化順序
+			//		  こうすることでアクセスする前にデータが初期化されていることを確認できる。
+			static utl::vector<std::string> names;
+			return names;
+		}
+#endif // USE_WITH_EDITOR
+
 
 		bool exists(script_id id)
 		{
@@ -50,6 +62,23 @@ namespace dxforge::script
 			assert(result);
 			return result;
 		}
+
+		script_creator get_script_creator(size_t tag)
+		{
+			auto script = dxforge::script::registery().find(tag);
+			assert(script != dxforge::script::registery().end() && script->first == tag);
+			return script->second;
+		}
+
+#ifdef USE_WITH_EDITOR
+		u8 add_script_name(const char* name)
+		{
+			script_names().emplace_back(name);
+			return true;
+		}
+
+#endif // USE_WITH_EDITOR
+
 
 	}	// namespace detail
 
@@ -93,3 +122,23 @@ namespace dxforge::script
 		id_mapping[id::index(id)] = id::invalid_id;
 	}
 }	// namespace dxforge::script
+
+#ifdef USE_WITH_EDITOR
+#include <atlsafe.h>
+
+extern "C" __declspec(dllexport)
+LPSAFEARRAY get_script_names()
+{
+	const u32 size{ (u32)dxforge::script::script_names().size() };
+	if (!size) return nullptr;
+	CComSafeArray<BSTR> names{ size };
+	for (u32 i{ 0 }; i < size; ++i)
+	{
+		names.SetAt(i, A2BSTR_EX(dxforge::script::script_names()[i].c_str()), false);
+	}
+	return names.Detach();
+}
+
+
+
+#endif // USE_WITH_EDITOR
