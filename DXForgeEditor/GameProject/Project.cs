@@ -54,6 +54,20 @@ namespace DXForgeEditor.GameProject
 
         public BuildConfiguration DllBuildConfig => BuildConfig == 0 ? BuildConfiguration.DebugEditor : BuildConfiguration.ReleaseEditor;
 
+        private string[] _availableScripts;
+        public string[] AvailableScripts
+        {
+            get => _availableScripts;
+            set
+            {
+                if (_availableScripts != value)
+                {
+                    _availableScripts = value;
+                    OnPropertyChanged(nameof(AvailableScripts));
+                }
+            }
+        }
+
         [DataMember(Name = "Scenes")]
         private ObservableCollection<Scene> _scenes = new ObservableCollection<Scene>();
         public ReadOnlyObservableCollection<Scene> Scenes { get; private set; }
@@ -178,8 +192,10 @@ namespace DXForgeEditor.GameProject
         {
             var configName = GetConfigurationName(DllBuildConfig);
             var dllPath = $@"{Path}x64\{configName}\{Name}.dll";
+            AvailableScripts = null;
             if ((File.Exists(dllPath) && EngineAPI.LoadGameCodeDll(dllPath) != 0))
             {
+                AvailableScripts = EngineAPI.GetScriptNames();
                 Logger.Log(MessageType.Info, "GameCode.dllは正常にロードされました。");
             }
             else
@@ -194,6 +210,7 @@ namespace DXForgeEditor.GameProject
             if (EngineAPI.UnloadGameCodeDll() != 0)
             {
                 Logger.Log(MessageType.Info, "GameCode.dllは正常にアンロードされました。");
+                AvailableScripts = null;
             }
         }
 

@@ -88,20 +88,17 @@ namespace dxforge
 
 
 #define REGISTER_SCRIPT(TYPE)                                   \
-		class TYPE;                                             \
 		namespace{                                              \
 		const u8 _reg##TYPE                                     \
 		{ dxforge::script::detail::register_script(             \
 			dxforge::script::detail::string_hash()( #TYPE ),    \
 			&dxforge::script::detail::create_script<TYPE>)};    \
-		}														\
 		const u8 _name_##TYPE									\
 		{ dxforge::script::detail::add_script_name( #TYPE ) };	\
 		}
 
 #else
 #define REGISTER_SCRIPT(TYPE)                                   \
-		class TYPE;                                             \
 		namespace{                                              \
 		const u8 _reg##TYPE                                     \
 		{ dxforge::script::detail::register_script(             \
@@ -110,6 +107,6 @@ namespace dxforge
 		}
 #endif // USE_WITH_EDITOR
 
-	}	// namespace detail
-}	// namespace script
+		}	// namespace detail
+	}	// namespace script
 }	// namespace dxforge

@@ -60,8 +60,5 @@ EDITOR_INTERFACE script::detail::script_creator GetScriptCreater(const char* nam
 EDITOR_INTERFACE LPSAFEARRAY GetScriptNames()
 {
 	return (game_code_dll && get_script_names) ? get_script_names() : nullptr;
-}
-{
-
 };
 

@@ -16,6 +16,8 @@ namespace DXForgeEditor.Components
 {
     [DataContract]
     [KnownType(typeof(Transform))]
+    [KnownType(typeof(Script))]
+
     class GameEntity : ViewModelBase
     {
         private int _entityId = ID.INVALID_ID;
@@ -95,6 +97,33 @@ namespace DXForgeEditor.Components
         public Component GetComponent(Type type) => Components.FirstOrDefault(c => c.GetType() == type);
 
         public T GetComponent<T>() where T : Component => GetComponent(typeof(T)) as T;
+
+        public bool AddComponent(Component component)
+        {
+            Debug.Assert(component != null);
+            if (!Components.Any(x => x.GetType() == component.GetType()))
+            {
+                IsActive = false;
+                _components.Add(component);
+                IsActive = true;
+                return true;
+            }
+            Logger.Log(MessageType.Warning, $"Entity {Name} はすでに {component.GetType().Name} Componentを持っています。");
+            return false;
+        }
+
+        public void RemoveComponent(Component component)
+        {
+            Debug.Assert(component != null);
+            if (component is Transform) return; // TransformComponentは削除できない
+
+            if (_components.Contains(component))
+            {
+                IsActive = false;
+                _components.Remove(component);
+                IsActive = true;
+            }
+        }
 
         [OnDeserialized]
         void OnDeserialized(StreamingContext context)
