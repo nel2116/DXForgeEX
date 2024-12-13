@@ -9,6 +9,9 @@
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Script.h"
+
+#include <Windows.h>
+
 #include "Entity.h"
 
 namespace dxforge::script
@@ -138,7 +141,5 @@ LPSAFEARRAY get_script_names()
 	}
 	return names.Detach();
 }
-
-
 
 #endif // USE_WITH_EDITOR
