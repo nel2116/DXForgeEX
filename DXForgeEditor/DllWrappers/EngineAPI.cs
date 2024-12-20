@@ -1,5 +1,7 @@
 ﻿using DXForgeEditor.Components;
 using DXForgeEditor.EngineAPIStructs;
+using DXForgeEditor.GameProject;
+using DXForgeEditor.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -69,10 +71,23 @@ namespace DXForgeEditor.DllWrappers
                 }
                 // script component
                 {
-                    // var c = entity.GetComponent<Script>();
+                    // NOTE: ここでは、現在のプロジェクトがNULLでないかどうかもチェックします。
+                    // DLLがロードされているかどうかを知ることができます。
+                    // こうすることで、ScriptComponentを持つEntityの作成がDLLがロードされるまで延期されます。
+                    var c = entity.GetComponent<Script>();
+                    if (c != null && Project.Current != null)
+                    {
+                        if (Project.Current.AvailableScripts.Contains(c.Name))
+                        {
+                            desc.Script.ScriptCreater = GetScriptCreater(c.Name);
+                        }
+                        else
+                        {
+                            Logger.Log(MessageType.Error, $"{c.Name}という名前のスクリプトが見つかりません！");
+                        }
+                    }
+                    return CreateGameEntity(desc);
                 }
-
-                return CreateGameEntity(desc);
             }
 
             [DllImport(_engineDll)]

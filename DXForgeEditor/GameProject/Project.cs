@@ -1,4 +1,5 @@
-﻿using DXForgeEditor.DllWrappers;
+﻿using DXForgeEditor.Components;
+using DXForgeEditor.DllWrappers;
 using DXForgeEditor.GameDev;
 using DXForgeEditor.Utilities;
 using System;
@@ -160,6 +161,7 @@ namespace DXForgeEditor.GameProject
 
         public void Unload()
         {
+            UnloadGameCodeDll();
             VisualStudio.CloseVisualStudio();
             UndoRedo.Reset();
         }
@@ -174,7 +176,7 @@ namespace DXForgeEditor.GameProject
         {
             try
             {
-                UnloadGameCode();
+                UnloadGameCodeDll();
                 await Task.Run(() => VisualStudio.BuildSolution(this, GetConfigurationName(DllBuildConfig), showWindow));
                 if (VisualStudio.BuildSucceeded)
                 {
@@ -196,6 +198,7 @@ namespace DXForgeEditor.GameProject
             if ((File.Exists(dllPath) && EngineAPI.LoadGameCodeDll(dllPath) != 0))
             {
                 AvailableScripts = EngineAPI.GetScriptNames();
+                ActiveScene.GameEntities.Where(x => x.GetComponent<Script>() != null).ToList().ForEach(x => x.IsActive = true);
                 Logger.Log(MessageType.Info, "GameCode.dllは正常にロードされました。");
             }
             else
@@ -205,8 +208,9 @@ namespace DXForgeEditor.GameProject
 
         }
 
-        private void UnloadGameCode()
+        private void UnloadGameCodeDll()
         {
+            ActiveScene.GameEntities.Where(x => x.GetComponent<Script>() != null).ToList().ForEach(x => x.IsActive = false);
             if (EngineAPI.UnloadGameCodeDll() != 0)
             {
                 Logger.Log(MessageType.Info, "GameCode.dllは正常にアンロードされました。");
@@ -222,8 +226,8 @@ namespace DXForgeEditor.GameProject
                 Scenes = new ReadOnlyObservableCollection<Scene>(_scenes);
                 OnPropertyChanged(nameof(Scenes));
             }
-
             ActiveScene = Scenes.FirstOrDefault(x => x.IsActive);
+            Debug.Assert(ActiveScene != null);
 
             await BuildGameCodeDll(false);
 

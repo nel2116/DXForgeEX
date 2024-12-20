@@ -168,11 +168,13 @@ namespace DXForgeEditor.GameDev
         public static bool IsDebugging()
         {
             bool result = false;
-            for (int i = 0; i < 3; i++)
+            bool tryAgain = true;
+            for (int i = 0; i < 3 && tryAgain; i++)
             {
                 try
                 {
                     result = _vsInstance != null && (_vsInstance.Debugger.CurrentProgram != null || _vsInstance.Debugger.CurrentMode == EnvDTE.dbgDebugMode.dbgRunMode);
+                    tryAgain = false;
                 }
                 catch (Exception ex)
                 {
@@ -194,7 +196,7 @@ namespace DXForgeEditor.GameDev
             OpenVisualStudio(project.Solution);
             BuildDone = BuildSucceeded = false;
 
-            for (int i = 0; i < 3; ++i)
+            for (int i = 0; i < 3 && !BuildDone; ++i)
             {
                 try
                 {

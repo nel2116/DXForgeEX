@@ -18,6 +18,18 @@ using System.Windows.Shapes;
 
 namespace DXForgeEditor.Editors
 {
+    public class NullableBoolToBoolConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            return value is bool b && b == true;
+        }
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            return value is bool b && b == true;
+        }
+    }
+
     /// <summary>
     /// GameEntityView.xaml の相互作用ロジック
     /// </summary>
@@ -103,9 +115,40 @@ namespace DXForgeEditor.Editors
             menu.IsOpen = true;
         }
 
+        private void AddComponent(ComponentType componentType, object data)
+        {
+            var creationFunction = ComponentFactory.GetCreationFunction(componentType);
+            var chandedEntities = new List<(GameEntity entity, Component component)>();
+            var vm = DataContext as MSEntity;
+            foreach (var entity in vm.SelectedEntities)
+            {
+                var component = creationFunction(entity, data);
+                if (entity.AddComponent(component))
+                {
+                    chandedEntities.Add((entity, component));
+                }
+            }
+
+            if (chandedEntities.Any())
+            {
+                Project.UndoRedo.Add(new UndoRedoAction(
+                () =>
+                {
+                    chandedEntities.ForEach(x => x.entity.RemoveComponent(x.component));
+                    (DataContext as MSEntity).Refresh();
+                },
+                () =>
+                {
+                    chandedEntities.ForEach(x => x.entity.AddComponent(x.component));
+                    (DataContext as MSEntity).Refresh();
+                },
+                $"Add {componentType} component"));
+            }
+        }
+
         private void OnAddScriptComponent(object sender, RoutedEventArgs e)
         {
-
+            AddComponent(ComponentType.Script, (sender as MenuItem).Header.ToString());
         }
     }
 }

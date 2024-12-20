@@ -66,6 +66,7 @@ namespace DXForgeEditor.Components
 
         public MSScript(MSEntity msEntity) : base(msEntity)
         {
+            Refresh();
         }
     }
 }
