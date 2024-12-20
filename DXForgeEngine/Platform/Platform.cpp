@@ -178,14 +178,11 @@ namespace dxforge::platform
 					GetWindowRect(info.hwnd, &rect);
 					info.top_left.x = rect.left;
 					info.top_left.y = rect.top;
-					info.style = 0;
-					SetWindowLongPtr(info.hwnd, GWL_STYLE, info.style);
+					SetWindowLongPtr(info.hwnd, GWL_STYLE, 0);
 					ShowWindow(info.hwnd, SW_MAXIMIZE);
 				}
 				else
 				{	// ウィンドウ状態にする
-
-					info.style = WS_VISIBLE | WS_OVERLAPPEDWINDOW;
 					SetWindowLongPtr(info.hwnd, GWL_STYLE, info.style);
 					resize_window(info, info.cliant_area);
 					ShowWindow(info.hwnd, SW_SHOWNORMAL);
@@ -213,7 +210,7 @@ namespace dxforge::platform
 		math::u32v4 get_window_size(window_id id)
 		{
 			window_info& info{ get_from_id(id) };
-			RECT area{ info.is_fullscreen ? info.fullscreen_area : info.cliant_area };
+			RECT& area{ info.is_fullscreen ? info.fullscreen_area : info.cliant_area };
 			return { (u32)area.left,(u32)area.top, (u32)area.right, (u32)area.bottom };
 		}
 
@@ -254,18 +251,18 @@ namespace dxforge::platform
 		window_info info{};
 		info.cliant_area.right = (init_info && init_info->width) ? info.cliant_area.left + init_info->width : info.cliant_area.right;
 		info.cliant_area.bottom = (init_info && init_info->height) ? info.cliant_area.top + init_info->height : info.cliant_area.bottom;
+		info.style |= parent ? WS_CHILD : WS_OVERLAPPEDWINDOW;
 
 		RECT rect{ info.cliant_area };
 
 		// デバイスのサイズに合わせてウィンドウサイズを調整
 		AdjustWindowRect(&rect, info.style, FALSE);
+
 		const wchar_t* caption{ (init_info && init_info->caption) ? init_info->caption : L"DXForge Game" };
 		const s32 left{ init_info ? init_info->left : info.top_left.x };
 		const s32 top{ init_info ? init_info->top : info.top_left.y };
 		const s32 width{ rect.right - rect.left };
 		const s32 height{ rect.bottom - rect.top };
-
-		info.style |= parent ? WS_CHILD : WS_OVERLAPPEDWINDOW;
 
 		// ウィンドウクラスのインスタンスを作成する
 		info.hwnd = CreateWindowEx(
