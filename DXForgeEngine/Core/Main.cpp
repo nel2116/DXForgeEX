@@ -45,6 +45,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 				DispatchMessage(&msg);
 				is_running &= (msg.message != WM_QUIT);	// 終了メッセージが来たらループを抜ける
 			}
+
+			engine_update();	// エンジンの更新
 		}
 	}
 	// エンジンの終了処理

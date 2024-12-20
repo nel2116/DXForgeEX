@@ -15,6 +15,8 @@
 
 #if !defined(SHIPPING)
 #include <fstream>
+#include <filesystem>
+#include <Windows.h>
 
 namespace dxforge::content
 {
@@ -93,6 +95,13 @@ namespace dxforge::content
 	/// @return 読み込みに成功したらtrue
 	bool load_game()
 	{
+		// 作業ディレクトリを実行パスに設定する
+		wchar_t path[MAX_PATH];
+		const u32 length{ GetModuleFileName(0, &path[0], MAX_PATH) };
+		if (!length || GetLastError() == ERROR_INSUFFICIENT_BUFFER) return false;	// パスの取得に失敗したらエラー
+		std::filesystem::path p{ path };
+		SetCurrentDirectory(p.parent_path().wstring().c_str());	// 作業ディレクトリを実行パスに設定
+
 		// game.binを読み込み、Entityを作成する。
 		std::ifstream game("game.bin", std::ios::in | std::ios::binary);	//
 		utl::vector<u8> buffer(std::istreambuf_iterator<char>(game), {});	// ファイルの内容を読み込む
