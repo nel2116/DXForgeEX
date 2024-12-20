@@ -1,6 +1,7 @@
 ﻿using DXForgeEditor.Utilities;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http.Headers;
 using System.Numerics;
@@ -58,6 +59,14 @@ namespace DXForgeEditor.Components
             }
         }
         public override IMSComponent GetMultiselectionComponent(MSEntity msEntity) => new MSTransform(msEntity);
+
+        public override void WriteToBinary(BinaryWriter bw)
+        {
+            // 位置、回転、スケールをバイナリに書き込む
+            bw.Write(_position.X); bw.Write(_position.Y); bw.Write(_position.Z);
+            bw.Write(_rotation.X); bw.Write(_rotation.Y); bw.Write(_rotation.Z);
+            bw.Write(_scale.X); bw.Write(_scale.Y); bw.Write(_scale.Z);
+        }
 
         public Transform(GameEntity owner) : base(owner)
         {

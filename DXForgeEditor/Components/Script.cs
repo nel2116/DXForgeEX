@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
@@ -26,6 +27,14 @@ namespace DXForgeEditor.Components
         }
 
         public override IMSComponent GetMultiselectionComponent(MSEntity msEntity) => new MSScript(msEntity);
+
+        public override void WriteToBinary(BinaryWriter bw)
+        {
+            // 名前を書き込む
+            var nameBytes = Encoding.UTF8.GetBytes(Name);   // UTF-8でエンコード
+            bw.Write(nameBytes.Length); // バイト数を書き込む
+            bw.Write(nameBytes);        // バイト列を書き込む
+        }
 
         public Script(GameEntity owner) : base(owner)
         {
