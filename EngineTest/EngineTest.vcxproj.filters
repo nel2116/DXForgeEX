@@ -6,5 +6,6 @@
   <ItemGroup>
     <ClInclude Include="Test.h" />
     <ClInclude Include="TestEntityComponent.h" />
+    <ClInclude Include="TestWindow.h" />
   </ItemGroup>
 </Project>

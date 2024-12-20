@@ -89,7 +89,6 @@ namespace dxforge::game_entity
 		assert(id::is_valid(id));							// 有効なエンティティであることを確認
 		const id::id_type index{ id::index(id) };
 		assert(index < generations.size());					// インデックスが範囲内であることを確認
-		assert(generations[index] == id::generation(id));
 		return (generations[index] == id::generation(id) && transforms[index].is_valid());
 	}
 

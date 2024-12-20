@@ -4,5 +4,7 @@
   ContentLoader.cpp
   Engine.cpp
   Main.cpp
+  Platform.cpp
+F:\HAL\Self\DXForgeEX\DXForgeEngine\Platform\Platform.cpp(90,17): warning C4189: 'info': ローカル変数が初期化されましたが、参照されていません
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Content\ContentLoader.cpp(119,14): warning C4189: 'entity_type': ローカル変数が初期化されましたが、参照されていません
   DXForgeEngine.vcxproj -> F:\HAL\Self\DXForgeEX\x64\Debug\DXForgeEngine.lib

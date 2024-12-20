@@ -28,3 +28,6 @@
 
 // 基本的な型を定義したファイル
 #include "PrimitiveTypes.h"
+
+// ID型を定義したファイル
+#include "Id.h"

@@ -95,7 +95,7 @@ namespace dxforge::script
 		{
 			id = free_ids.front();
 			assert(!exists(id));
-			free_ids.pop_back();
+			free_ids.pop_front();
 			id = script_id{ id::new_generation(id) };
 			++generations[id::index(id)];
 		}
