@@ -12,13 +12,15 @@
 
 #define TEST_ENTITY_COMPONENTS 0
 #define TEST_WINDOW 1
+#define TEST_DLL 0
 
 #if TEST_ENTITY_COMPONENTS
 #include "TestEntityComponent.h"
 #elif TEST_WINDOW
 #include "TestWindow.h"
+#elif TEST_DLL
+#include "TestDll.h"
 #else
-
 #error いずれかのテストを有効にする必要があります
 #endif	// TEST_ENTITY_COMPONENTS
 

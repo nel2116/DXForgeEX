@@ -10,14 +10,17 @@
 // ====== インクルード部 ======
 #include "Common.h"
 #include "CommonHeaders.h"
-#include "../DXForgeEngine/Components/Script.h"
+#include "..\DXForgeEngine\Components\Script.h"
+#include "..\Graphics\Renderer.h"
+#include "..\Platform\PlatformType.h"
+#include "..\Platform\Platform.h"
 
 #ifdef WIN32_MEAN_AND_LEAN
 #define WIN32_MEAN_AND_LEAN
 #endif // WIN32_MEAN_AND_LEAN
 
-
 #include <Windows.h>
+#include <iostream>
 
 using namespace dxforge;
 
@@ -28,6 +31,7 @@ namespace
 	_get_script_creater get_script_creator{ nullptr };
 	using _get_script_names = LPSAFEARRAY(*)(void);
 	_get_script_names get_script_names{ nullptr };
+	utl::vector<graphics::render_surface> surfaces;
 } // 匿名名前空間
 
 EDITOR_INTERFACE u32 LoadGameCodeDll(const char* dll_path)
@@ -62,3 +66,24 @@ EDITOR_INTERFACE LPSAFEARRAY GetScriptNames()
 	return (game_code_dll && get_script_names) ? get_script_names() : nullptr;
 };
 
+EDITOR_INTERFACE u32 CreateRenderSurface(HWND host, s32 width, s32 height)
+{
+	assert(host);
+	platform::window_init_info info{ nullptr,host,nullptr,0,0,width,height };
+	graphics::render_surface surface{ platform::create_window(&info),{} };
+	assert(surface.window.is_valid());
+	surfaces.emplace_back(surface);
+	return (u32)surfaces.size() - 1;
+}
+
+EDITOR_INTERFACE void RemoveRenderSurface(u32 id)
+{
+	assert(id < surfaces.size());
+	platform::remove_window(surfaces[id].window.get_id());
+}
+
+EDITOR_INTERFACE intptr_t GetWindowHandle(u32 id)
+{
+	assert(id < surfaces.size());
+	return reinterpret_cast<intptr_t>(surfaces[id].window.handle());
+}

@@ -7,5 +7,6 @@
     <ClInclude Include="Test.h" />
     <ClInclude Include="TestEntityComponent.h" />
     <ClInclude Include="TestWindow.h" />
+    <ClInclude Include="TestDll.h" />
   </ItemGroup>
 </Project>
