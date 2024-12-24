@@ -145,15 +145,28 @@ namespace dxforge::platform
 			MoveWindow(info.hwnd, info.top_left.x, info.top_left.y, width, height, true);
 		}
 
+		/// @brief ウィンドウのリサイズ
+		/// @param id ウィンドウID
+		/// @param width ウィンドウの幅
+		/// @param height ウィンドウの高さ
 		void resize_window(window_id id, u32 width, u32 height)
 		{
 			window_info& info{ get_from_id(id) };
 
-			// NOTE: また、画面解像度が変更された場合にも対応できるよう、フルスクリーンモードでのリサイズも行っている。
-			RECT& area{ info.is_fullscreen ? info.fullscreen_area : info.cliant_area };
-			area.bottom = area.top + height;
-			area.right = area.left + width;
-			resize_window(info, area);
+			// NOTE: レベルエディタでウィンドウをホストするとき、内部データ (クライアント領域の寸法) を更新します。
+			if (info.style & WS_CHILD)
+			{
+				// 子ウィンドウの場合は、親ウィンドウのクライアント領域を取得する
+				GetClientRect(info.hwnd, &info.cliant_area);
+			}
+			else
+			{
+				// NOTE: 画面解像度が変更された場合にも対応できるよう、フルスクリーンモードでのリサイズも行っています。
+				RECT& area{ info.is_fullscreen ? info.fullscreen_area : info.cliant_area };
+				area.bottom = area.top + height;
+				area.right = area.left + width;
+				resize_window(info, area);
+			}
 		}
 
 		/// @brief ウィンドウのリサイズ

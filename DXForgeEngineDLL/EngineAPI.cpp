@@ -87,3 +87,9 @@ EDITOR_INTERFACE intptr_t GetWindowHandle(u32 id)
 	assert(id < surfaces.size());
 	return reinterpret_cast<intptr_t>(surfaces[id].window.handle());
 }
+
+EDITOR_INTERFACE void ResizeRenderSurface(u32 id)
+{
+	assert(id < surfaces.size());
+	surfaces[id].window.resize(0, 0);
+}
