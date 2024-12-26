@@ -13,19 +13,51 @@
 
 namespace dxforge::tools
 {
+	namespace packed_vertex
+	{
+		struct vertex_static
+		{
+			math::v3 position;	// 位置
+			u8 reserved[3];		// 3バイトの予約領域
+			u8 t_sign;			// bit 0; tangent handedness * (tangent.z sign), bit 1; normal.z sign (0 means -1,1 means +1)
+			u16 normal[2];		// 法線
+			u16 tangent[2];		// 接線
+			math::v2 uv;		// UV座標
+		};
+
+
+
+	}	// dxforge::tools::packed_vertex
+
+	// 頂点データ
+	struct vertex
+	{
+		math::v4 tangent{};
+		math::v3 position{};
+		math::v3 normal{};
+		math::v2 uv{};
+	};
+
 	// メッシュデータ
 	struct mesh
 	{
 		// 初期データ
 		utl::vector<math::v3> positions;				// 頂点座標
 		utl::vector<math::v3> normals;					// 法線
-		utl::vector<math::v3> tangents;					// 接線
+		utl::vector<math::v4> tangents;					// 接線
 		utl::vector< utl::vector<math::v2>> uv_sets;	// UVセット
 
 		utl::vector<u32> raw_indices;					// インデックス
+
 		// 中間データ
+		utl::vector<vertex> vertices;					// 頂点
+		utl::vector<u32> indices;						// インデックス
 
 		// 出力データ
+		std::string name;								// メッシュの名前
+		utl::vector<packed_vertex::vertex_static> packed_vertices_static;	// 静的頂点
+		f32 lod_threshold{ -1.0f }; 					// LOD閾値
+		u32 lod_id{ u32_invalid_id };					// LOD ID
 	};
 
 	// LODグループ
@@ -60,7 +92,12 @@ namespace dxforge::tools
 		u32 buffer_size;								// バッファのサイズ
 		geometry_import_settings settings;				// インポート設定
 	};
-}
+
+	void process_scene(scene& scene, const geometry_import_settings& settings);
+	void pack_data(const scene& scene, scene_data& data);
+
+
+} // namespace dxforge::tools
 
 
 

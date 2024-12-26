@@ -10,6 +10,7 @@
 #pragma once
 // ====== インクルード部 ======
 #include "CommonHeaders.h"
+#include <combaseapi.h>
 
 // ====== マクロ定義 ======
 #pragma once

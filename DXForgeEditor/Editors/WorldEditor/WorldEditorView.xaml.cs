@@ -1,4 +1,5 @@
-﻿using DXForgeEditor.GameDev;
+﻿using DXForgeEditor.Content;
+using DXForgeEditor.GameDev;
 using DXForgeEditor.GameProject;
 using System;
 using System.Collections.Generic;
@@ -38,6 +39,12 @@ namespace DXForgeEditor.Editors
         private void OnNewScript_Button_Click(object sender, RoutedEventArgs e)
         {
             new NewScriptDialog().ShowDialog();
+        }
+
+        private void OnCreatePrimitiveMesh_Button_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new PrimitiveMeshDialog();
+            dlg.ShowDialog();
         }
     }
 }

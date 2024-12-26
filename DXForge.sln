@@ -8,8 +8,14 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DXForgeEngine", "DXForgeEngine\DXForgeEngine.vcxproj", "{A7DBD67B-496C-463E-97D0-D522150BB52F}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EngineTest", "EngineTest\EngineTest.vcxproj", "{9213C6D0-3A75-4470-A15A-F961343100C9}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A7DBD67B-496C-463E-97D0-D522150BB52F} = {A7DBD67B-496C-463E-97D0-D522150BB52F}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DXForgeEngineDLL", "DXForgeEngineDLL\DXForgeEngineDLL.vcxproj", "{361E815A-8387-49DA-B8A5-10B7E0CE8EC2}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A7DBD67B-496C-463E-97D0-D522150BB52F} = {A7DBD67B-496C-463E-97D0-D522150BB52F}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ContentTools", "ContentTools\ContentTools.vcxproj", "{184FC280-4B34-4698-990D-AC18609E845D}"
 EndProject

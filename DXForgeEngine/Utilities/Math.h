@@ -1,0 +1,58 @@
+// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+// [Math.h]
+// 作成日 : 2024/12/24
+// 作成者 : 田中ミノル
+// 概要
+//
+// 更新履歴
+// 2024/12/24 新規作成
+// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+#pragma once
+// ====== インクルード部 ======
+#include "CommonHeaders.h"
+#include "MathType.h"
+
+namespace dxforge::math
+{
+	template<typename T>
+	constexpr T clamp(T value, T min, T max)
+	{
+		return (value < min) ? min : (value > max) ? max : value;
+	}
+
+	template<u32 bits>
+	constexpr u32 pack_unit_float(f32 f)
+	{
+		static_assert(bits <= sizeof(u32) * 8);
+		assert(f >= 0.0f && f <= 1.0f);
+		constexpr f32 intervals{ (f32)((1ui32 << bits) - 1) };
+		return (u32)(intervals * f + 0.5f);
+	}
+
+	template<u32 bits>
+	constexpr f32 unpack_to_unit_float(u32 i)
+	{
+		static_assert(bits <= sizeof(u32) * 8);
+		assert(i <= (1ui32 << bits));
+		constexpr f32 intervals{ (f32)((1ui32 << bits) - 1) };
+		return (f32)i / intervals;
+	}
+
+	template<u32 bits>
+	constexpr u32 pack_float(f32 f, f32 min, f32 max)
+	{
+		assert(min < max);
+		assert(f <= max && f >= min);
+		const f32 distance{ (f - min) / (max - min) };
+		return pack_unit_float<bits>(distance);
+	}
+
+	template<u32 bits>
+	constexpr f32 unpack_to_float(u32 i, f32 min, f32 max)
+	{
+		assert(min < max);
+		return unpack_to_unit_float<bits>(i) * (max - min) + min;
+	}
+
+}	// namespace dxforge::math
+

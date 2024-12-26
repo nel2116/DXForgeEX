@@ -15,12 +15,12 @@
 #include "..\Platform\PlatformType.h"
 #include "..\Platform\Platform.h"
 
-#ifdef WIN32_MEAN_AND_LEAN
-#define WIN32_MEAN_AND_LEAN
-#endif // WIN32_MEAN_AND_LEAN
+#ifdef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif // WIN32_LEAN_AND_MEAN
 
 #include <Windows.h>
-#include <iostream>
+#include <atlsafe.h>
 
 using namespace dxforge;
 

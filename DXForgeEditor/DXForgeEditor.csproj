@@ -32,5 +32,12 @@
 			<EmbedInteropTypes>False</EmbedInteropTypes>
 		</COMReference>
 	</ItemGroup>
-
+	<ItemGroup>
+	  <None Include="Resources\PrimitiveMeshView\PlaneTexture.png" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Resource Include="Resources\PrimitiveMeshView\PlaneTexture.png">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Resource>
+	</ItemGroup>
 </Project>

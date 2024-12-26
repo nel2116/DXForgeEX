@@ -23,11 +23,10 @@
 #endif
 
 // ユーティリティ関数をまとめたファイル
+#include "PrimitiveTypes.h"
+#include "..\Utilities\Math.h"
 #include "..\Utilities\Utilities.h"
 #include "..\Utilities\MathType.h"
-
-// 基本的な型を定義したファイル
-#include "PrimitiveTypes.h"
 
 // ID型を定義したファイル
 #include "Id.h"
