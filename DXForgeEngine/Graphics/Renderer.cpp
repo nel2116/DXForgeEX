@@ -42,7 +42,7 @@ namespace dxforge::graphics
 
 	bool initialize(graphics_platform platform)
 	{
-		return set_platform_interface(platform);
+		return set_platform_interface(platform) && gfx.initialize();
 	}
 
 	void shutdown()
