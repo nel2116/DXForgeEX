@@ -11,8 +11,9 @@
 #pragma comment(lib, "DXForgeEngine.lib")
 
 #define TEST_ENTITY_COMPONENTS 0
-#define TEST_WINDOW 1
+#define TEST_WINDOW 0
 #define TEST_DLL 0
+#define TEST_RENDERER 1
 
 #if TEST_ENTITY_COMPONENTS
 #include "TestEntityComponent.h"
@@ -20,6 +21,8 @@
 #include "TestWindow.h"
 #elif TEST_DLL
 #include "TestDll.h"
+#elif TEST_RENDERER
+#include "TestRenderer.h"
 #else
 #error いずれかのテストを有効にする必要があります
 #endif	// TEST_ENTITY_COMPONENTS

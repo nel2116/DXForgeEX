@@ -22,7 +22,15 @@
     <ClInclude Include="EngineAPI\GameEntity.h" />
     <ClInclude Include="EngineAPI\ScriptComponent.h" />
     <ClInclude Include="EngineAPI\TransformComponent.h" />
+    <ClInclude Include="Graphics\Direct3D12\D3D12CommonHeaders.h" />
+    <ClInclude Include="Graphics\Direct3D12\D3D12Core.h" />
+    <ClInclude Include="Graphics\Direct3D12\D3D12Interface.h" />
+    <ClInclude Include="Graphics\GraphicsPlatformInterface.h" />
+    <ClInclude Include="Graphics\OpenGL\OpenGLCore.h" />
+    <ClInclude Include="Graphics\OpenGL\OpenGLInterface.h" />
     <ClInclude Include="Graphics\Renderer.h" />
+    <ClInclude Include="Graphics\Vulkan\VulkanCore.h" />
+    <ClInclude Include="Graphics\Vulkan\VulkanInterface.h" />
     <ClInclude Include="Platform\Platform.h" />
     <ClInclude Include="Platform\PlatformType.h" />
     <ClInclude Include="Platform\Window.h" />
@@ -37,6 +45,13 @@
     <ClCompile Include="Content\ContentLoader.cpp" />
     <ClCompile Include="Core\Engine.cpp" />
     <ClCompile Include="Core\Main.cpp" />
+    <ClCompile Include="Graphics\Direct3D12\D3D12Core.cpp" />
+    <ClCompile Include="Graphics\Direct3D12\D3D12Interface.cpp" />
+    <ClCompile Include="Graphics\OpenGL\OpenGLCore.cpp" />
+    <ClCompile Include="Graphics\OpenGL\OpenGLInterface.cpp" />
+    <ClCompile Include="Graphics\Renderer.cpp" />
+    <ClCompile Include="Graphics\Vulkan\VulkanCore.cpp" />
+    <ClCompile Include="Graphics\Vulkan\VulkanInterface.cpp" />
     <ClCompile Include="Platform\Platform.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -95,7 +110,7 @@
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <BufferSecurityCheck>false</BufferSecurityCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir)Common</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Common</AdditionalIncludeDirectories>
       <LanguageStandard_C>Default</LanguageStandard_C>
     </ClCompile>
     <Link>
@@ -126,7 +141,7 @@
       <FloatingPointModel>Fast</FloatingPointModel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <BufferSecurityCheck>false</BufferSecurityCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir)Common</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Common</AdditionalIncludeDirectories>
       <LanguageStandard_C>Default</LanguageStandard_C>
     </ClCompile>
     <Link>

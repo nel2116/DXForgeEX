@@ -26,4 +26,14 @@ namespace dxforge::graphics
 		platform::window window{};
 		surface surface{};
 	};
+
+	enum class graphics_platform
+	{
+		direct3d12 = 0,
+		vulkan,
+		opengl,
+	};
+
+	bool initialize(graphics_platform platform);
+	void shutdown();
 }

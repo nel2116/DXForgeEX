@@ -1,0 +1,22 @@
+// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+// [VulkanCore.cpp]
+// 作成日 : 2024/12/27
+// 作成者 : 田中ミノル
+// 概要
+// 　Vulkanのコア
+// 更新履歴
+// 2024/12/27 新規作成
+// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+// ====== インクルード部 ======
+#include "VulkanCore.h"
+
+namespace dxforge::graphics::vulkan::core
+{
+	bool initialize(void)
+	{
+		return false;
+	}
+	void shutdown(void)
+	{
+	}
+}	// namespace dxforge::graphics
