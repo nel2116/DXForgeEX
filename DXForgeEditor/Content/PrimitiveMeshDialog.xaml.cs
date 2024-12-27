@@ -44,6 +44,7 @@ namespace DXForgeEditor.Content
 
             var primitiveType = (PrimitiveMeshType)primTypeComboBox.SelectedIndex;
             var info = new PrimitiveInitInfo() { Type = primitiveType };
+            var smoothingAngle = 0;
 
             switch (primitiveType)
             {
@@ -58,7 +59,15 @@ namespace DXForgeEditor.Content
                 case PrimitiveMeshType.Cube:
                     return;
                 case PrimitiveMeshType.UvSphere:
-                    return;
+                    {
+                        info.SegmentsX = (int)xSliderUvSphere.Value;
+                        info.SegmentsY = (int)ySliderUvSphere.Value;
+                        info.Size.X = Value(xScalarBoxUvSphere, 0.001f);
+                        info.Size.Y = Value(yScalarBoxUvSphere, 0.001f);
+                        info.Size.Z = Value(zScalarBoxUvSphere, 0.001f);
+                        smoothingAngle = (int)angleSliderUvSphere.Value;
+                        break;
+                    }
                 case PrimitiveMeshType.IcoSphere:
                     return;
                 case PrimitiveMeshType.Cylinder:
@@ -70,6 +79,7 @@ namespace DXForgeEditor.Content
             }
 
             var geometry = new Geometry();
+            geometry.ImportSettings.SmoothingAngle = smoothingAngle;
             ContentToolsAPI.CreatePrimitiveMesh(geometry, info);
             (DataContext as GeometryEditor).SetAsset(geometry);
             OnTexture_CheckBox_Click(textureCheckBox, null);
@@ -81,6 +91,8 @@ namespace DXForgeEditor.Content
             var uris = new List<Uri>()
             {
                 new Uri("pack://application:,,,/Resources/PrimitiveMeshView/PlaneTexture.png"),
+                new Uri("pack://application:,,,/Resources/PrimitiveMeshView/PlaneTexture.png"),
+                new Uri("pack://application:,,,/Resources/PrimitiveMeshView/CheckerMap.png"),
             };
 
             _textures.Clear();

@@ -3,7 +3,7 @@
 // 作成日 : 2024/11/11
 // 作成者 : 田中ミノル
 // 概要
-// 	
+//
 // 更新履歴
 // 2024/11/11 新規作成
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
@@ -14,6 +14,7 @@
 namespace dxforge::math
 {
 	constexpr float pi = 3.1415926535897932384626433832795f;
+	constexpr float two_pi = 2.f * pi;
 	constexpr float epsilon = 1e-5f;
 
 #if defined(_WIN64)

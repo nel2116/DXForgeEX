@@ -102,16 +102,16 @@ namespace DXForgeEditor.Editors
 
         public Point3D OffsetCameraPosition => new Point3D(CameraPosition.X + CameraTarget.X, CameraPosition.Y + CameraTarget.Y, CameraPosition.Z + CameraTarget.Z);
 
-        private Color _keyKight = (Color)ColorConverter.ConvertFromString("#ffaeaeae");
-        public Color KeyKight
+        private Color _keyLight = (Color)ColorConverter.ConvertFromString("#ffaeaeae");
+        public Color KeyLight
         {
-            get => _keyKight;
+            get => _keyLight;
             set
             {
-                if (_keyKight != value)
+                if (_keyLight != value)
                 {
-                    _keyKight = value;
-                    OnPropertyChanged(nameof(KeyKight));
+                    _keyLight = value;
+                    OnPropertyChanged(nameof(KeyLight));
                 }
             }
         }
@@ -144,16 +144,16 @@ namespace DXForgeEditor.Editors
             }
         }
 
-        private Color _ambient = (Color)ColorConverter.ConvertFromString("#ff3b3b3b");
-        public Color Ambient
+        private Color _ambientLight = (Color)ColorConverter.ConvertFromString("#ff3b3b3b");
+        public Color AmbientLight
         {
-            get => _ambient;
+            get => _ambientLight;
             set
             {
-                if (_ambient != value)
+                if (_ambientLight != value)
                 {
-                    _ambient = value;
-                    OnPropertyChanged(nameof(Ambient));
+                    _ambientLight = value;
+                    OnPropertyChanged(nameof(AmbientLight));
                 }
             }
         }

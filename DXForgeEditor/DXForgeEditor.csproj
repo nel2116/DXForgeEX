@@ -6,10 +6,11 @@
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UseWPF>true</UseWPF>
+		<XamlDebuggingInformation>True</XamlDebuggingInformation>
 		<PlatformTarget>x64</PlatformTarget>
 		<BaseOutputPath>../</BaseOutputPath>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-		<Configurations>Debug;Release;DebugEditor;ReleaseEditor</Configurations>
+		<Configurations>DebugEditor;ReleaseEditor</Configurations>
 		<Platforms>x64</Platforms>
 	</PropertyGroup>
 	<ItemGroup>
@@ -31,6 +32,11 @@
 			<Isolated>false</Isolated>
 			<EmbedInteropTypes>False</EmbedInteropTypes>
 		</COMReference>
+	</ItemGroup>
+	<ItemGroup>
+	  <Resource Include="Resources\PrimitiveMeshView\CheckerMap.png">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Resource>
 	</ItemGroup>
 	<ItemGroup>
 	  <None Include="Resources\PrimitiveMeshView\PlaneTexture.png" />
