@@ -7,6 +7,9 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace DXForgeEditor.Content
 {
@@ -229,6 +232,16 @@ namespace DXForgeEditor.Content
             ImportEmbeddedTextures = true;
             ImportAnimations = true;
         }
+
+        public void ToBinary(BinaryWriter writer)
+        {
+            writer.Write(CalculateNormals);
+            writer.Write(CalculateTangents);
+            writer.Write(SmoothingAngle);
+            writer.Write(ReverseHandedness);
+            writer.Write(ImportEmbeddedTextures);
+            writer.Write(ImportAnimations);
+        }
     }
 
     class Geometry : Asset
@@ -336,6 +349,123 @@ namespace DXForgeEditor.Content
                 lodList.Add(lod);
             }
             lod.Meshes.Add(mesh);
+        }
+
+        public override IEnumerable<string> Save(string file)
+        {
+            Debug.Assert(_lodGroups.Any());
+            var savedFiles = new List<string>();
+            if (!_lodGroups.Any()) return savedFiles;
+
+            var path = Path.GetDirectoryName(file) + Path.DirectorySeparatorChar;
+            var fileName = Path.GetFileNameWithoutExtension(file);
+
+            try
+            {
+                foreach (var lodGroup in _lodGroups)
+                {
+                    Debug.Assert(lodGroup.LODs.Any());
+                    // ファイル名に最も詳細なLODの名前を使用する。
+                    var meshFileName = ContentHelper.SanitizeFileName(path + fileName + "_" + lodGroup.LODs[0].Name + AssetFileExtension);
+                    // NOTE: 新しいアセットファイルごとに異なるIDを作成する必要がある。
+                    Guid = Guid.NewGuid();
+                    byte[] data = null;
+                    // ファイルに書き込むデータを作成
+                    using (var writer = new BinaryWriter(new MemoryStream()))
+                    {
+                        // ヘッダーを書き込む
+                        writer.Write(lodGroup.Name);
+                        writer.Write(lodGroup.LODs.Count);
+                        var hashes = new List<byte>();
+                        // メッシュデータを書き込む
+                        foreach (var lod in lodGroup.LODs)
+                        {
+                            // メッシュデータをバイナリ形式に変換
+                            writer.Write(lod.Name);
+                            writer.Write(lod.Meshes.Count);
+
+                            // メッシュデータのハッシュを計算
+                            foreach (var mesh in lod.Meshes)
+                            {
+                                LODToBinary(lod, writer, out var hash);
+                                hashes.AddRange(hash);
+                            }
+                            Hash = ContentHelper.ComputeHash(hashes.ToArray());
+                            data = (writer.BaseStream as MemoryStream).ToArray();
+                            Icon = GenerateIcon(lodGroup.LODs[0]);
+                        }
+                    }
+
+                    // ファイルにデータを書き込む
+                    Debug.Assert(data?.Length > 0);
+
+                    using (var writer = new BinaryWriter(File.Open(meshFileName, FileMode.Create, FileAccess.Write)))
+                    {
+                        WriteAssetFileHeader(writer);
+                        ImportSettings.ToBinary(writer);
+                        writer.Write(data.Length);
+                        writer.Write(data);
+                    }
+
+                    savedFiles.Add(meshFileName);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                Logger.Log(MessageType.Error, $"GeometryAssetの保存に失敗しました: {file}");
+            }
+
+            return savedFiles;
+        }
+
+        private void LODToBinary(MeshLOD lod, BinaryWriter writer, out byte[] hash)
+        {
+            writer.Write(lod.Name);
+            writer.Write(lod.LodThreshold);
+            writer.Write(lod.Meshes.Count);
+
+            var meshDataBegin = writer.BaseStream.Position;
+
+            foreach (var mesh in lod.Meshes)
+            {
+                writer.Write(mesh.VertexSize);
+                writer.Write(mesh.VertexCount);
+                writer.Write(mesh.IndexSize);
+                writer.Write(mesh.IndexCount);
+                writer.Write(mesh.Vertices);
+                writer.Write(mesh.Indices);
+            }
+
+            var meshDataSize = writer.BaseStream.Position - meshDataBegin;
+            Debug.Assert(meshDataSize > 0);
+            var buffer = (writer.BaseStream as MemoryStream).ToArray();
+            hash = ContentHelper.ComputeHash(buffer, (int)meshDataBegin, (int)meshDataSize);
+        }
+        private byte[] GenerateIcon(MeshLOD lod)
+        {
+            // 4バイの大きさのビットマップを生成してから、縮小することでアイコンを生成する。
+            var width = 90 * 4;
+
+            BitmapSource bmp = null;
+
+            // NOTE: WPFのコントロール（ビュー）をviewModelで使用するのは良い習慣ではありません。
+            // しかし、スクリーンショットに使えるグラフィックレンダラーがない限り、このケースは例外とする必要があります。
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                bmp = Editors.GeometryView.RenderToBitmap(new Editors.MeshRenderer(lod, null), width, width);
+                bmp = new TransformedBitmap(bmp, new ScaleTransform(0.25, 0.25, 0.5, 0.5));
+            });
+
+            // ビットマップをPNG形式にエンコード
+            using var memStream = new MemoryStream();
+            memStream.SetLength(0);
+
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bmp));
+            encoder.Save(memStream);
+
+            return memStream.ToArray();
         }
 
         public Geometry() : base(AssetType.Mesh) { }

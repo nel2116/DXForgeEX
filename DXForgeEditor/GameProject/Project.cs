@@ -32,6 +32,7 @@ namespace DXForgeEditor.GameProject
         public string Path { get; set; }
         public string FullPath => $@"{Path}{Name}{Extension}";
         public string Solution => $@"{Path}{Name}.sln";
+        public string ContentPath => $@"{Path}Content\";
 
         private static readonly string[] _buildConfigurationNames = new string[] { "Debug", "DebugEditor", "Release", "ReleaseEditor" };
 
