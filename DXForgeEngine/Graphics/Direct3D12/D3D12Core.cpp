@@ -10,6 +10,7 @@
 // ====== インクルード部 ======
 #include "D3D12Core.h"
 #include "D3D12Resource.h"
+#include "D3D12Surface.h"
 
 using namespace Microsoft::WRL;	// ComPtrを使うため
 
@@ -211,6 +212,7 @@ namespace dxforge::graphics::d3d12::core
 		ID3D12Device8* main_device{ nullptr };											// メインデバイス
 		IDXGIFactory7* dxgi_factory{ nullptr };											// DXGIファクトリ
 		d3d12_command gfx_command;														// グラフィックスコマンド
+		utl::vector<d3d12_surface> surfaces{};											// サーフェス
 
 		descriptor_heap rtv_desc_heap{ D3D12_DESCRIPTOR_HEAP_TYPE_RTV };				// RTVディスクリプタヒープ
 		descriptor_heap dsv_desc_heap{ D3D12_DESCRIPTOR_HEAP_TYPE_DSV };				// DSVディスクリプタヒープ
@@ -221,6 +223,7 @@ namespace dxforge::graphics::d3d12::core
 		u32 deferred_release_flag[frame_buffer_count]{};								// 遅延解放フラグ
 		std::mutex deferred_release_mutex{};											// 遅延解放ミューテックス
 
+		constexpr DXGI_FORMAT render_target_format{ DXGI_FORMAT_R8G8B8A8_UNORM_SRGB };	// レンダーターゲットのフォーマット
 		constexpr D3D_FEATURE_LEVEL minimum_feature_level{ D3D_FEATURE_LEVEL_11_0 };	// 最低限必要な機能レベル
 
 		// ====== 関数 ======
@@ -309,7 +312,7 @@ namespace dxforge::graphics::d3d12::core
 			const u32 frame_idx{ current_frame_index() };
 			std::lock_guard lock{ deferred_release_mutex };
 			deferred_releases[frame_idx].push_back(ptr);
-			set_deferred_release_flag();
+			set_deferred_releases_flag();
 		}
 	}	// namespace detail
 
@@ -444,8 +447,79 @@ namespace dxforge::graphics::d3d12::core
 		release(main_device);
 	}
 
+	ID3D12Device* const device()
+	{
+		return main_device;
+	}
+
+	descriptor_heap& rtv_heap()
+	{
+		return rtv_desc_heap;
+	}
+
+	descriptor_heap& dsv_heap()
+	{
+		return dsv_desc_heap;
+	}
+
+	descriptor_heap& srv_heap()
+	{
+		return srv_desc_heap;
+	}
+
+	descriptor_heap& uav_heap()
+	{
+		return uav_desc_heap;
+	}
+
+	DXGI_FORMAT default_render_target_format()
+	{
+		return render_target_format;
+	}
+
+	u32 current_frame_index()
+	{
+		return gfx_command.frame_index();
+	}
+
+	void set_deferred_releases_flag()
+	{
+		deferred_release_flag[current_frame_index()] = 1;
+	}
+
+	surface create_surface(platform::window window)
+	{
+		surfaces.emplace_back(window);
+		surface_id id{ static_cast<surface_id>(surfaces.size() - 1) };
+		surfaces[id].create_swap_chain(dxgi_factory, gfx_command.command_queue(), render_target_format);
+		return surface{ id };
+	}
+
+	void remove_surface(surface_id id)
+	{
+		gfx_command.flush();
+		// TODO: surfacesの適切な除去を行う。
+		surfaces[id].~d3d12_surface();
+	}
+
+	void resize_surface(surface_id id, u32 width, u32 height)
+	{
+		gfx_command.flush();
+		surfaces[id].resize();
+	}
+
+	u32 surface_width(surface_id id)
+	{
+		return surfaces[id].width();
+	}
+
+	u32 surface_height(surface_id id)
+	{
+		return surfaces[id].height();
+	}
+
 	/// @brief レンダリング処理
-	void render(void)
+	void render_surface(surface_id id)
 	{
 		// GPUがコマンドアロケータを終了するのを待ち、GPUがコマンドアロケータを終了したら、アロケータをリセットする。
 		// これにより、コマンドを格納するために使用されていたメモリが解放されます。
@@ -459,26 +533,11 @@ namespace dxforge::graphics::d3d12::core
 			process_deferred_releases(frame_idx);
 		}
 
-
+		const d3d12_surface& surface{ surfaces[id] };
+		surface.present();
 		// Record commands
 
 		// コマンドの記録が終わったので次のフレームのフェンス値をインクリメントする。
 		gfx_command.end_frame();
 	}
-
-	ID3D12Device* const device()
-	{
-		return main_device;
-	}
-
-	u32 current_frame_index()
-	{
-		return gfx_command.frame_index();
-	}
-
-	void set_deferred_release_flag()
-	{
-		deferred_release_flag[current_frame_index()] = 1;
-	}
-
 }	// namespace dxforge::graphics

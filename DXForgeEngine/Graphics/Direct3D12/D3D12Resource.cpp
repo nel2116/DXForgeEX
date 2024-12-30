@@ -113,22 +113,23 @@ namespace dxforge::graphics::d3d12
 
 	void descriptor_heap::free(descriptor_handle& handle)
 	{
+		// ハンドルが有効か確認
 		if (!handle.is_valid()) return;
 		std::lock_guard lock{ _mutex };
 		// ヒープがあるか確認
 		assert(_heap && _size);
-		// デバッグ情報を確認
 		assert(handle.container == this);
-		// ハンドルが有効か確認
 		assert(handle.cpu.ptr >= _cpu_start.ptr);
-		assert((handle.cpu.ptr < _cpu_start.ptr) % _descriptor_size == 0);
+		assert((handle.cpu.ptr - _cpu_start.ptr) % _descriptor_size == 0);
 		assert(handle.index < _capacity);
-		const u64 index{ handle.cpu.ptr - _cpu_start.ptr / _descriptor_size };
+		// インデックスを取得
+		const u32 index{ (u32)(handle.cpu.ptr - _cpu_start.ptr) / _descriptor_size };
 		assert(handle.index == index);
 
+		// 遅延解放
 		const u32 frame_idx{ core::current_frame_index() };
 		_deferred_free_indices[frame_idx].push_back(index);
-		core::set_deferred_release_flag();
+		core::set_deferred_releases_flag();
 		handle = {};
 	}
 }	// namespace dxforge::graphics::d3d12

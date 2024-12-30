@@ -17,6 +17,8 @@
 using namespace dxforge;
 
 graphics::render_surface _surface[4];
+time_it timer{};
+void destroy_renderer_surface(graphics::render_surface& surface);
 
 LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
@@ -27,9 +29,16 @@ LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		bool all_closed{ true };
 		for (u32 i{ 0 }; i < _countof(_surface); ++i)
 		{
-			if (!_surface[i].window.is_closed())
+			if (_surface[i].window.is_valid())
 			{
-				all_closed = false;
+				if (_surface[i].window.is_closed())
+				{
+					destroy_renderer_surface(_surface[i]);
+				}
+				else
+				{
+					all_closed = false;
+				}
 			}
 		}
 		if (all_closed)
@@ -47,6 +56,12 @@ LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 			win.set_fullscrean(!win.is_fullscreen());
 			return 0;
 		}
+	case WM_KEYDOWN:
+		if (wparam == VK_ESCAPE)
+		{
+			PostMessage(hwnd, WM_CLOSE, 0, 0);
+			return 0;
+		}
 		break;
 	}
 	return DefWindowProc(hwnd, msg, wparam, lparam);
@@ -55,11 +70,15 @@ LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 void create_renderer_surface(graphics::render_surface& surface, platform::window_init_info info)
 {
 	surface.window = platform::create_window(&info);
+	surface.surface = graphics::create_surface(surface.window);
 }
 
 void destroy_renderer_surface(graphics::render_surface& surface)
 {
-	platform::remove_window(surface.window.get_id());
+	graphics::render_surface temp{ surface };
+	surface = {};
+	if (temp.surface.is_valid()) graphics::remove_surface(temp.surface.get_id());
+	if (temp.surface.is_valid()) platform::remove_window(temp.window.get_id());
 }
 
 bool engine_test::initialize()
@@ -85,8 +104,16 @@ bool engine_test::initialize()
 
 void engine_test::run()
 {
-	std::this_thread::sleep_for(std::chrono::milliseconds(10));
-	graphics::render();
+	timer.begin();
+	// std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	for (u32 i{ 0 }; i < _countof(_surface); ++i)
+	{
+		if (_surface[i].surface.is_valid())
+		{
+			_surface[i].surface.render();
+		}
+	}
+	timer.end();
 }
 
 void engine_test::shutdown()

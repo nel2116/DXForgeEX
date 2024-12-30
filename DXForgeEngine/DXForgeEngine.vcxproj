@@ -34,6 +34,7 @@
     <ClInclude Include="Graphics\Direct3D12\D3D12Core.h" />
     <ClInclude Include="Graphics\Direct3D12\D3D12Interface.h" />
     <ClInclude Include="Graphics\Direct3D12\D3D12Resource.h" />
+    <ClInclude Include="Graphics\Direct3D12\D3D12Surface.h" />
     <ClInclude Include="Graphics\GraphicsPlatformInterface.h" />
     <ClInclude Include="Graphics\OpenGL\OpenGLCore.h" />
     <ClInclude Include="Graphics\OpenGL\OpenGLInterface.h" />
@@ -57,6 +58,7 @@
     <ClCompile Include="Graphics\Direct3D12\D3D12Core.cpp" />
     <ClCompile Include="Graphics\Direct3D12\D3D12Interface.cpp" />
     <ClCompile Include="Graphics\Direct3D12\D3D12Resource.cpp" />
+    <ClCompile Include="Graphics\Direct3D12\D3D12Surface.cpp" />
     <ClCompile Include="Graphics\OpenGL\OpenGLCore.cpp" />
     <ClCompile Include="Graphics\OpenGL\OpenGLInterface.cpp" />
     <ClCompile Include="Graphics\Renderer.cpp" />

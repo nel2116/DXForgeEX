@@ -69,7 +69,7 @@ namespace dxforge::graphics::d3d12
 		D3D12_CPU_DESCRIPTOR_HANDLE _cpu_start{};							// CPUディスクリプタヒープの開始アドレス
 		D3D12_GPU_DESCRIPTOR_HANDLE _gpu_start{};							// GPUディスクリプタヒープの開始アドレス
 		std::unique_ptr<u32[]> _free_handles{};								// 空きハンドル
-		std::vector<u32> _deferred_free_indices[frame_buffer_count]{};		// 遅延解放インデックス
+		utl::vector<u32> _deferred_free_indices[frame_buffer_count]{};		// 遅延解放インデックス
 		std::mutex _mutex{};												// ミューテックス
 		u32 _capacity{ 0 };													// 容量
 		u32 _size{ 0 };														// サイズ
