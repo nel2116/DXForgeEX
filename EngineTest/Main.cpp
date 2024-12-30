@@ -8,12 +8,8 @@
 // 2024/11/11 新規作成
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
+#include "Test.h"
 #pragma comment(lib, "DXForgeEngine.lib")
-
-#define TEST_ENTITY_COMPONENTS 0
-#define TEST_WINDOW 0
-#define TEST_DLL 0
-#define TEST_RENDERER 1
 
 #if TEST_ENTITY_COMPONENTS
 #include "TestEntityComponent.h"

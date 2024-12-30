@@ -15,7 +15,7 @@ namespace dxforge::graphics::d3d12::core
 {
 	bool initialize(void);
 	void shutdown(void);
-
+	void render(void);
 
 	// 安全にリソースを解放する
 	template<typename T>
@@ -28,4 +28,22 @@ namespace dxforge::graphics::d3d12::core
 		}
 	}
 
+	namespace detail
+	{
+		void deferred_release(IUnknown* ptr);
+	}	// namespace detail
+
+	template<typename T>
+	constexpr void deferred_release(T*& ptr)
+	{
+		if (ptr)
+		{
+			detail::deferred_release(ptr);
+			ptr = nullptr;
+		}
+	}
+
+	ID3D12Device* const device();
+	u32 current_frame_index();
+	void set_deferred_release_flag();
 }	// namespace dxforge::graphics

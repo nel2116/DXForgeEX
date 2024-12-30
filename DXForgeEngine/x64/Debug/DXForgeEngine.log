@@ -1,2 +1,8 @@
-﻿  D3D12Core.cpp
+﻿  D3D12Resource.cpp
+F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Resource.cpp(124,3): warning C4804: '%': 演算中の 'bool' 型の使用方法が安全ではありません
+F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Resource.cpp(130,47): warning C4244: '引数': 'const u64' から '_Ty' への変換です。データが失われる可能性があります。
+          with
+          [
+              _Ty=u32
+          ]
   DXForgeEngine.vcxproj -> F:\HAL\Self\DXForgeEX\x64\Debug\DXForgeEngine.lib

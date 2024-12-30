@@ -19,4 +19,7 @@ namespace dxforge::graphics::vulkan::core
 	void shutdown(void)
 	{
 	}
+	void render(void)
+	{
+	}
 }	// namespace dxforge::graphics

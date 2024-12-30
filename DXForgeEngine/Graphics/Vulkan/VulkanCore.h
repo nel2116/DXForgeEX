@@ -14,5 +14,6 @@ namespace dxforge::graphics::vulkan::core
 {
 	bool initialize(void);
 	void shutdown(void);
+	void render(void);
 
 }	// namespace dxforge::graphics

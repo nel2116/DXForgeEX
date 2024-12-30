@@ -49,4 +49,10 @@ namespace dxforge::graphics
 	{
 		gfx.shutdown();
 	}
+
+	void render()
+	{
+		gfx.render();
+	}
+
 }	// namespace dxforge::graphics

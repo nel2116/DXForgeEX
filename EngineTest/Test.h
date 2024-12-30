@@ -12,6 +12,13 @@
 // ====== インクルード部 ======
 #include <thread>
 
+// ====== 定数 ======
+#define TEST_ENTITY_COMPONENTS 0
+#define TEST_WINDOW 0
+#define TEST_DLL 0
+#define TEST_RENDERER 1
+
+// ====== クラスの定義 ======
 class test
 {
 	virtual bool initialize() = 0;

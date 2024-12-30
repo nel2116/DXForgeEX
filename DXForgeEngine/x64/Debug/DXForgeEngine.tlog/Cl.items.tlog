@@ -6,6 +6,7 @@ F:\HAL\Self\DXForgeEX\DXForgeEngine\Core\Engine.cpp;F:\HAL\Self\DXForgeEX\DXForg
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Core\Main.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\Main.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Core.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\D3D12Core.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Interface.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\D3D12Interface.obj
+F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Resource.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\D3D12Resource.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\OpenGL\OpenGLCore.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\OpenGLCore.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\OpenGL\OpenGLInterface.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\OpenGLInterface.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Renderer.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\Renderer.obj

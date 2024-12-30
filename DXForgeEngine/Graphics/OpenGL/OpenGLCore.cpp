@@ -19,5 +19,8 @@ namespace dxforge::graphics::opengl::core
 	void shutdown(void)
 	{
 	}
+	void render(void)
+	{
+	}
 }	// namespace dxforge::graphics
 

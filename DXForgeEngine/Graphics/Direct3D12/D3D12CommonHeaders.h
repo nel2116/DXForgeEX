@@ -19,6 +19,11 @@
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
 
+namespace dxforge::graphics::d3d12
+{
+	constexpr u32 frame_buffer_count{ 3 };	// フレームバッファの数
+}
+
 // ====== マクロ定義 ======
 // DirectX12のエラーチェック
 #ifdef _DEBUG
@@ -44,9 +49,20 @@ __debugbreak();								\
 #endif // _DEBUG
 
 #ifdef _DEBUG
-// COM オブジェクトの名前を設定し、デバッグ文字列を Visual Studio* の出力ウィンドウに出力します。
+// COM オブジェクトの名前を設定し、デバッグ文字列を Visual Studio* の出力ウィンドウに出力
 #define NAME_D3D12_OBJECT(obj,name) obj->SetName(name); OutputDebugString(L"::D3D12 Object Created: "); OutputDebugString(name); OutputDebugString(L"\n");
+// COM オブジェクトの名前をインデックス付きで設定し、デバッグ文字列を Visual Studio* の出力ウィンドウに出力
+#define NAME_D3D12_OBJECT_INDEXED(obj, n, name)			\
+{														\
+wchar_t full_name[128];									\
+if (swprintf_s(full_name, L"%s[%u]", name, n) > 0){		\
+	obj->SetName(full_name);							\
+	OutputDebugString(L"::D3D12 Object Created: ");		\
+	OutputDebugString(full_name);						\
+	OutputDebugString(L"\n");							\
+}}
 #else
 #define NAME_D3D12_OBJECT(obj,name)
+#define NAME_D3D12_OBJECT_INDEXED(obj,n,name)
 #endif // _DEBUG
 
