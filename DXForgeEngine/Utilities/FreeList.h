@@ -96,7 +96,7 @@ namespace dxforge::utl
 
 		/// @brief ”z—ñ‚ª‹ó‚©‚Ç‚¤‚©‚ğæ“¾‚·‚é
 		/// @return ”z—ñ‚ª‹ó‚Ìê‡ true, ‚»‚êˆÈŠO‚Ìê‡ false
-		constexpr u32 empty() const
+		constexpr bool empty() const
 		{
 			return _size == 0;
 		}

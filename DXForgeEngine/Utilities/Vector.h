@@ -129,9 +129,9 @@ namespace dxforge::utl
 			}
 			assert(_size < _capacity);
 
-			new(std::addressof(_data[_size])) T(std::forward<params>(args)...);
+			T* const item{ new(std::addressof(_data[_size])) T(std::forward<params>(args)...) };
 			++_size;
-			return _data[_size - 1];
+			return *item;
 		}
 
 
@@ -156,6 +156,7 @@ namespace dxforge::utl
 				{
 					destruct_range(new_size, _size);
 				}
+				_size = new_size;
 			}
 
 			// new_size == _size ÇÃèÍçáÇÕâΩÇ‡ÇµÇ»Ç¢ÅB
@@ -183,6 +184,7 @@ namespace dxforge::utl
 				{
 					destruct_range(new_size, _size);
 				}
+				_size = new_size;
 			}
 
 			// new_size == _size ÇÃèÍçáÇÕâΩÇ‡ÇµÇ»Ç¢ÅB
@@ -267,9 +269,9 @@ namespace dxforge::utl
 		{
 			if (this != std::addressof(o))
 			{
-				auto temp{ o };
-				o = *this;
-				*this = temp;
+				auto temp(std::move(o));
+				o.move(*this);
+				move(temp);
 			}
 		}
 

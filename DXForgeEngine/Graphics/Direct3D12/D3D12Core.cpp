@@ -11,12 +11,14 @@
 #include "D3D12Core.h"
 #include "D3D12Resource.h"
 #include "D3D12Surface.h"
+#include "D3D12Helpers.h"
 
 using namespace Microsoft::WRL;	// ComPtrを使うため
 
 // ====== 名前空間 ======
 namespace dxforge::graphics::d3d12::core
 {
+	void create_a_root_signature();
 	namespace
 	{
 		class d3d12_command
@@ -395,6 +397,8 @@ namespace dxforge::graphics::d3d12::core
 		NAME_D3D12_OBJECT(srv_desc_heap.heap(), L"SRV Descriptor Heap");
 		NAME_D3D12_OBJECT(uav_desc_heap.heap(), L"UAV Descriptor Heap");
 
+		create_a_root_signature();
+
 		return true;
 	}
 
@@ -450,7 +454,7 @@ namespace dxforge::graphics::d3d12::core
 		release(main_device);
 	}
 
-	ID3D12Device* const device()
+	ID3D12Device8* const device()
 	{
 		return main_device;
 	}
@@ -540,5 +544,72 @@ namespace dxforge::graphics::d3d12::core
 
 		// コマンドの記録が終わったので次のフレームのフェンス値をインクリメントする。
 		gfx_command.end_frame();
+	}
+
+	void create_a_root_signature()
+	{
+		d3dx::d3d12_descriptor_range range{ D3D12_DESCRIPTOR_RANGE_TYPE_SRV,D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND,0 };
+		d3dx::d3d12_root_parameter params[3];
+		params[0].as_constants(2, D3D12_SHADER_VISIBILITY_PIXEL, 0);
+		params[1].as_cbv(D3D12_SHADER_VISIBILITY_PIXEL, 1);
+		params[2].as_descriptor_table(D3D12_SHADER_VISIBILITY_PIXEL, &range, 1);
+
+		d3dx::d3d12_root_signature_desc root_sig_desc{ &params[0],_countof(params) };
+		ID3D12RootSignature* root_sig{ root_sig_desc.create() };
+
+		//use root_sig
+
+		// when renderer shuts down
+		release(root_sig);
+	}
+
+	ID3D12RootSignature* _root_signature{ nullptr };
+	D3D12_SHADER_BYTECODE _vs{};
+
+	void create_a_pipeline_state_object()
+	{
+		struct
+		{
+			struct alignas(void*)
+			{
+				const D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type{ D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE };
+				ID3D12RootSignature* root_signature;
+			} root_sig;
+			struct alignas(void*)
+			{
+				const D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type{ D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS };
+				D3D12_SHADER_BYTECODE vs_code{};
+			} vs;
+		} stream;
+
+		stream.root_sig.root_signature = _root_signature;
+		stream.vs.vs_code = _vs;
+
+		D3D12_PIPELINE_STATE_STREAM_DESC desc{};
+		desc.pPipelineStateSubobjectStream = &stream;
+		desc.SizeInBytes = sizeof(stream);
+
+		ID3D12PipelineState* pso{ nullptr };
+		device()->CreatePipelineState(&desc, IID_PPV_ARGS(&pso));
+
+		//use pso during rendering
+
+		// when renderer shuts down
+		release(pso);
+	}
+
+	void create_a_pipeline_state_object2()
+	{
+		struct {
+			d3dx::d3d12_pipeline_state_subobject_root_signature root_sig{ _root_signature };
+			d3dx::d3d12_pipeline_state_subobject_vs vs{ _vs };
+		} stream;
+
+		auto pso = d3dx::create_pipeline_state(&stream, sizeof(stream));
+
+		// use pso during rendering
+
+		// when renderer shuts down
+		// release(pso);
 	}
 }	// namespace dxforge::graphics
