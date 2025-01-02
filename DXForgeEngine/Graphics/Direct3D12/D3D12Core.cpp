@@ -209,10 +209,13 @@ namespace dxforge::graphics::d3d12::core
 		};	// class d3d12_command
 
 		// ====== 変数 ======
+
+		using surface_collection = utl::free_list<d3d12_surface>;							// サーフェスコレクション
+
 		ID3D12Device8* main_device{ nullptr };											// メインデバイス
 		IDXGIFactory7* dxgi_factory{ nullptr };											// DXGIファクトリ
 		d3d12_command gfx_command;														// グラフィックスコマンド
-		utl::vector<d3d12_surface> surfaces{};											// サーフェス
+		surface_collection surfaces{};													// サーフェス
 
 		descriptor_heap rtv_desc_heap{ D3D12_DESCRIPTOR_HEAP_TYPE_RTV };				// RTVディスクリプタヒープ
 		descriptor_heap dsv_desc_heap{ D3D12_DESCRIPTOR_HEAP_TYPE_DSV };				// DSVディスクリプタヒープ
@@ -489,8 +492,7 @@ namespace dxforge::graphics::d3d12::core
 
 	surface create_surface(platform::window window)
 	{
-		surfaces.emplace_back(window);
-		surface_id id{ static_cast<surface_id>(surfaces.size() - 1) };
+		surface_id id{ surfaces.add(window) };
 		surfaces[id].create_swap_chain(dxgi_factory, gfx_command.command_queue(), render_target_format);
 		return surface{ id };
 	}
@@ -498,8 +500,7 @@ namespace dxforge::graphics::d3d12::core
 	void remove_surface(surface_id id)
 	{
 		gfx_command.flush();
-		// TODO: surfacesの適切な除去を行う。
-		surfaces[id].~d3d12_surface();
+		surfaces.remove(id);
 	}
 
 	void resize_surface(surface_id id, u32 width, u32 height)

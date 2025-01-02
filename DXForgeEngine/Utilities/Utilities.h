@@ -10,7 +10,7 @@
 #pragma once
 // ====== インクルード部 ======
 #include <algorithm>
-#define USE_STL_VECTOR 1
+#define USE_STL_VECTOR 0
 #define USE_STL_DEQUE 1
 #include <algorithm>
 
@@ -35,6 +35,18 @@ namespace dxforge::utl
 		}
 	}
 }
+#else
+#include "Vector.h"
+
+namespace dxforge::utl
+{
+	template<typename T>
+	void erase_unordered(vector<T>& v, size_t index)
+	{
+		v.erase_unordered(index);
+	}
+}
+
 #endif
 
 #if USE_STL_DEQUE
@@ -51,3 +63,5 @@ namespace dxforge::util
 {
 	// TODO : 独自のコンテナを実装する
 }
+
+#include "FreeList.h"

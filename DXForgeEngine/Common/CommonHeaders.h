@@ -41,6 +41,13 @@
 #define DISABLE_COPY_AND_MOVE(T) DISABLE_COPY(T) DISABLE_MOVE(T)
 #endif // !DISABLE_COPY_AND_MOVE
 
+// デバッグ時のみ処理を行うマクロ
+#ifdef _DEBUG
+#define DEBUG_OP(x) x
+#else
+#define DEBUG_OP(x)
+#endif // _DEBUG
+
 // ユーティリティ関数をまとめたファイル
 #include "PrimitiveTypes.h"
 #include "..\Utilities\Math.h"
@@ -50,11 +57,4 @@
 // ID型を定義したファイル
 #include "Id.h"
 
-
-// デバッグ時のみ処理を行うマクロ
-#ifdef _DEBUG
-#define DEBUG_OP(x) x
-#else
-#define DEBUG_OP(x) (void(0))
-#endif // _DEBUG
 

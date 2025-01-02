@@ -103,7 +103,7 @@ namespace dxforge::content
 		SetCurrentDirectory(p.parent_path().wstring().c_str());	// 作業ディレクトリを実行パスに設定
 
 		// game.binを読み込み、Entityを作成する。
-		std::ifstream game("game.bin", std::ios::in | std::ios::binary);	//
+		std::ifstream game("game.bin", std::ios::in | std::ios::binary);
 		utl::vector<u8> buffer(std::istreambuf_iterator<char>(game), {});	// ファイルの内容を読み込む
 		assert(buffer.size());	// ファイルが空でないことを確認
 		const u8* at{ buffer.data() };	// バッファの先頭アドレス

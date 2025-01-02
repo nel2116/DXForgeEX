@@ -78,7 +78,7 @@ void destroy_renderer_surface(graphics::render_surface& surface)
 	graphics::render_surface temp{ surface };
 	surface = {};
 	if (temp.surface.is_valid()) graphics::remove_surface(temp.surface.get_id());
-	if (temp.surface.is_valid()) platform::remove_window(temp.window.get_id());
+	if (temp.window.is_valid()) platform::remove_window(temp.window.get_id());
 }
 
 bool engine_test::initialize()
@@ -105,7 +105,7 @@ bool engine_test::initialize()
 void engine_test::run()
 {
 	timer.begin();
-	// std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	for (u32 i{ 0 }; i < _countof(_surface); ++i)
 	{
 		if (_surface[i].surface.is_valid())

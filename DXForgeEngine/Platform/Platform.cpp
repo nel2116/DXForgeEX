@@ -29,39 +29,11 @@ namespace dxforge::platform
 			DWORD style{ WS_VISIBLE };
 			bool is_fullscreen{ false };
 			bool is_closed{ false };
+			~window_info() { assert(!is_fullscreen); }
 		};
 
 		// ウィンドウ情報のリスト
-		utl::vector<window_info> windows;
-		//////////////////////////////////////////////////////////
-		// TODO: この部分は後でフリーリストのコンテナで処理する。
-		utl::vector<u32> available_slots;
-
-		u32 add_to_windows(window_info info)
-		{
-			u32 id{ u32_invalid_id };
-			if (available_slots.empty())
-			{
-				id = (u32)windows.size();
-				windows.emplace_back(info);
-			}
-			else
-			{
-				id = available_slots.back();
-				available_slots.pop_back();
-				assert(id != u32_invalid_id);
-				windows[id] = info;
-			}
-			return id;
-		}
-
-		void remove_from_windows(u32 id)
-		{
-			assert(id < windows.size());
-			windows[id].is_closed = true;
-			available_slots.emplace_back(id);
-		}
-		//////////////////////////////////////////////////////////
+		utl::free_list<window_info> windows;
 
 		/// @brief ウィンドウ情報の取得
 		/// @param id ウィンドウID
@@ -295,7 +267,7 @@ namespace dxforge::platform
 		if (info.hwnd)
 		{
 			DEBUG_OP(SetLastError(0));
-			const window_id id{ add_to_windows(info) };
+			const window_id id{ windows.add(info) };
 			SetWindowLongPtr(info.hwnd, GWLP_USERDATA, ((LONG_PTR)id));
 			// ウィンドウのメッセージを処理するウィンドウコールバック関数へのポインタを "extra "バイトにセットする。
 			if (callback) SetWindowLongPtr(info.hwnd, 0, (LONG_PTR)callback);
@@ -311,7 +283,7 @@ namespace dxforge::platform
 	{
 		window_info& info{ get_from_id(id) };
 		DestroyWindow(info.hwnd);
-		remove_from_windows(id);
+		windows.remove(id);
 	}
 #else
 #error "must implementat least one platform"

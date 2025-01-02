@@ -49,7 +49,9 @@ namespace dxforge::graphics::d3d12
 			}
 			return *this;
 		}
-#endif
+#else
+		DISABLE_COPY_AND_MOVE(d3d12_surface);
+#endif	// USE_STL_VECTOR
 
 		~d3d12_surface() { release(); }
 
@@ -107,7 +109,8 @@ namespace dxforge::graphics::d3d12
 			_viewport = {};
 			_scissor_rect = {};
 		}
-#endif
+#endif	// USE_STL_VECTOR
+
 		// ------ ç\ë¢ëÃíËã` ------
 		struct render_target_data
 		{
