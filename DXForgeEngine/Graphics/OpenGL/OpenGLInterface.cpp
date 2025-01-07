@@ -19,6 +19,8 @@ namespace dxforge::graphics::opengl
 	{
 		pi.initialize = core::initialize;
 		pi.shutdown = core::shutdown;
+
+		pi.platform = graphics_platform::opengl;
 	}
 
 }	// namespace dxforge::graphics

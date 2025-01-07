@@ -12,6 +12,7 @@
 #include "..\Components\Entity.h"
 #include "..\Components\Transform.h"
 #include "..\Components\Script.h"
+#include "Graphics/Renderer.h"
 
 #if !defined(SHIPPING)
 #include <fstream>
@@ -89,27 +90,49 @@ namespace dxforge::content
 		};
 		static_assert(_countof(component_readers) == conponent_type::count);	// コンポーネントの種類数と関数ポインタの数が一致していることを確認
 
+		/// @brief ファイルを読み込む
+		/// @param path ファイルのパス
+		/// @param data 読み込んだデータ
+		/// @param size データのサイズ
+		/// @return 読み込みに成功したらtrue
+		bool read_file(std::filesystem::path path, std::unique_ptr<u8[]>& data, u64& size)
+		{
+			// ファイルが存在しない場合はfalseを返す
+			if (!std::filesystem::exists(path)) return false;
+
+			// ファイルを読み込む
+			size = std::filesystem::file_size(path);
+			assert(size);
+			if (!size) return false;
+			data = std::make_unique<u8[]>(size);
+			std::ifstream file{ path, std::ios::in | std::ios::binary };
+			// ファイルが開けない場合はfalseを返す
+			if (!file || !file.read((char*)data.get(), size))
+			{
+				file.close();
+				return false;
+			}
+
+			file.close();
+			return true;
+		}
 	}	// 匿名名前空間
 
 	/// @brief ゲームのBinaryファイルを読み込む
 	/// @return 読み込みに成功したらtrue
 	bool load_game()
 	{
-		// 作業ディレクトリを実行パスに設定する
-		wchar_t path[MAX_PATH];
-		const u32 length{ GetModuleFileName(0, &path[0], MAX_PATH) };
-		if (!length || GetLastError() == ERROR_INSUFFICIENT_BUFFER) return false;	// パスの取得に失敗したらエラー
-		std::filesystem::path p{ path };
-		SetCurrentDirectory(p.parent_path().wstring().c_str());	// 作業ディレクトリを実行パスに設定
-
 		// game.binを読み込み、Entityを作成する。
-		std::ifstream game("game.bin", std::ios::in | std::ios::binary);
-		utl::vector<u8> buffer(std::istreambuf_iterator<char>(game), {});	// ファイルの内容を読み込む
-		assert(buffer.size());	// ファイルが空でないことを確認
-		const u8* at{ buffer.data() };	// バッファの先頭アドレス
-		constexpr u32 su32{ sizeof(u32) }; // 4バイトのチャンクで読み取るので
-		const u32 num_entities{ *at }; at += su32;	// エンティティ数
-		if (!num_entities) return false;	// エンティティ数が0ならエラー
+		std::unique_ptr<u8[]> game_data{};
+		u64 size{ 0 };
+		if (!read_file("game.bin", game_data, size)) return false;
+		// データが読み込めなかったらエラー
+		assert(game_data.get());
+		const u8* at{ game_data.get() };
+		constexpr u32 su32{ sizeof(u32) };
+		const u32 num_entities{ *at }; at += su32;
+		// エンティティ数が0ならエラー
+		if (!num_entities) return false;
 
 		// エンティティを読み込む
 		for (u32 entity_index{ 0 }; entity_index < num_entities; ++entity_index)
@@ -135,7 +158,7 @@ namespace dxforge::content
 			entities.emplace_back(entity);	// エンティティをリストに追加
 		}
 
-		assert(at == buffer.data() + buffer.size());	// バッファの最後まで読み込んだことを確認
+		assert(at == game_data.get() + size);	// バッファの最後まで読み込んだことを確認
 		return true;
 	}
 
@@ -146,6 +169,13 @@ namespace dxforge::content
 		{
 			game_entity::remove(entity.get_id());
 		}
+	}
+
+	bool load_engine_shaders(std::unique_ptr<u8[]>& shaders, u64& size)
+	{
+		auto path = graphics::get_engine_shaders_path();
+
+		return read_file(path, shaders, size);
 	}
 }
 #endif // !defined(SHIPPING)

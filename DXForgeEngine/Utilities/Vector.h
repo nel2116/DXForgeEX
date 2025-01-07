@@ -45,14 +45,6 @@ namespace dxforge::utl
 			resize(count, value);
 		}
 
-		template<typename it, typename = std::enable_if_t<std::_Is_iterator_v<it>>>
-		constexpr explicit vector(it first, it last)
-		{
-			for (; first != last; ++first)
-			{
-				emplace_back(*first);
-			}
-		}
 
 		/// @brief コピーコンストラクタ
 		/// @param o コピー元の配列
@@ -65,7 +57,7 @@ namespace dxforge::utl
 		/// @brief Moveコンストラクタ
 		/// @param o コピー元の配列
 		/// 別の配列を移動させて構築する。 移動後の元の配列は空になる。
-		constexpr vector(const vector&& o)
+		constexpr vector(vector&& o)
 			: _capacity{ o._capacity }, _size{ o._size }, _data{ o._data }
 		{
 			o.reset();
@@ -140,7 +132,7 @@ namespace dxforge::utl
 		/// 配列のサイズを変更し、新しい要素をデフォルト値で初期化する
 		constexpr void resize(u64 new_size)
 		{
-			static_assert(std::is_default_constructible_v<T>, "Type must be default-constructible");
+			static_assert(std::is_default_constructible<T>::value, "Type must be default-constructible");
 
 			if (new_size > _size)
 			{
@@ -168,7 +160,7 @@ namespace dxforge::utl
 		/// 配列のサイズを変更し、新しい要素をコピーした値で初期化する
 		constexpr void resize(u64 new_size, const T& value)
 		{
-			static_assert(std::is_copy_constructible_v<T>, "Type must be copy-constructible");
+			static_assert(std::is_copy_constructible<T>::value, "Type must be copy-constructible");
 
 			if (new_size > _size)
 			{

@@ -23,6 +23,8 @@
 namespace dxforge::graphics::d3d12
 {
 	constexpr u32 frame_buffer_count{ 3 };	// フレームバッファの数
+	using id3d12_device = ID3D12Device8;
+	using id3d12_graphics_command_list = ID3D12GraphicsCommandList6;
 }
 
 // ====== マクロ定義 ======
@@ -66,4 +68,7 @@ if (swprintf_s(full_name, L"%s[%u]", name, n) > 0){		\
 #define NAME_D3D12_OBJECT(obj,name)
 #define NAME_D3D12_OBJECT_INDEXED(obj,n,name)
 #endif // _DEBUG
+
+#include "D3D12Helpers.h"
+#include "D3D12Resource.h"
 

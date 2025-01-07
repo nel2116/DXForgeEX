@@ -12,6 +12,7 @@
 #include "..\Platform\Platform.h"
 #include "..\Graphics\Renderer.h"
 #include "TestRenderer.h"
+#include "ShaderCompilation.h"
 #if TEST_RENDERER
 
 using namespace dxforge;
@@ -83,8 +84,15 @@ void destroy_renderer_surface(graphics::render_surface& surface)
 
 bool engine_test::initialize()
 {
-	bool result{ graphics::initialize(graphics::graphics_platform::direct3d12) };
-	if (!result) return result;
+	while (!compile_shaders())
+	{
+		// pop up a message box allowing the user to retry compilation
+		if (MessageBox(nullptr, L"Failed to compile shaders. Retry?", L"Error", MB_YESNO) != IDYES)
+			return false;
+	}
+
+	if (!graphics::initialize(graphics::graphics_platform::direct3d12)) return false;
+
 
 	platform::window_init_info info[]
 	{
@@ -99,7 +107,7 @@ bool engine_test::initialize()
 	{
 		create_renderer_surface(_surface[i], info[i]);
 	}
-	return result;
+	return true;
 }
 
 void engine_test::run()

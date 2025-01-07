@@ -18,6 +18,15 @@ namespace dxforge::graphics
 {
 	namespace
 	{
+		// サポートされているAPIごとに、コンパイルされたエンジンシェーダーファイルの場所を定義
+		constexpr const char* engine_shader_paths[]
+		{
+			".\\shaders\\d3d12\\shaders.bin",
+			// ".\\shaders\\vulkan\\shaders.bin",
+			// ".\\shaders\\opengl\\shaders.bin",
+		};
+
+
 		platform_interface gfx{};
 
 		bool set_platform_interface(graphics_platform platform)
@@ -36,6 +45,7 @@ namespace dxforge::graphics
 			default:
 				return false;
 			}
+			assert(gfx.platform == platform);
 			return true;
 		}
 	}	// 匿名名前空間
@@ -48,6 +58,16 @@ namespace dxforge::graphics
 	void shutdown()
 	{
 		gfx.shutdown();
+	}
+
+	const char* get_engine_shaders_path()
+	{
+		return engine_shader_paths[static_cast<u32>(gfx.platform)];
+	}
+
+	const char* get_engine_shaders_path(graphics_platform platform)
+	{
+		return engine_shader_paths[static_cast<u32>(platform)];
 	}
 
 	surface create_surface(platform::window window)

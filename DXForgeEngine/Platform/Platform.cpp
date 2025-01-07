@@ -45,6 +45,9 @@ namespace dxforge::platform
 			return windows[id];
 		}
 
+		/// @brief ウィンドウ情報の取得
+		/// @param handle ウィンドウハンドル
+		/// @return window_infoの参照
 		window_info& get_from_handle(window_handle handle)
 		{
 			const window_id id{ (id::id_type)GetWindowLongPtr(handle, GWLP_USERDATA) };

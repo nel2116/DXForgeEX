@@ -9,16 +9,14 @@
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Core.h"
-#include "D3D12Resource.h"
 #include "D3D12Surface.h"
-#include "D3D12Helpers.h"
+#include "D3D12Shaders.h"
 
 using namespace Microsoft::WRL;	// ComPtrを使うため
 
 // ====== 名前空間 ======
 namespace dxforge::graphics::d3d12::core
 {
-	void create_a_root_signature();
 	namespace
 	{
 		class d3d12_command
@@ -26,7 +24,7 @@ namespace dxforge::graphics::d3d12::core
 		public:
 			d3d12_command() = default;
 			DISABLE_COPY_AND_MOVE(d3d12_command);
-			explicit d3d12_command(ID3D12Device8* const device, D3D12_COMMAND_LIST_TYPE type)
+			explicit d3d12_command(id3d12_device* const device, D3D12_COMMAND_LIST_TYPE type)
 			{
 				HRESULT hr{ S_OK };
 
@@ -166,7 +164,7 @@ namespace dxforge::graphics::d3d12::core
 			constexpr ID3D12CommandQueue* const command_queue() const { return _cmd_queue; }
 			/// @brief コマンドリストを取得
 			/// @return ID3D12GraphicsCommandList6* コマンドリスト
-			constexpr ID3D12GraphicsCommandList6* const command_list() const { return _cmd_list; }
+			constexpr id3d12_graphics_command_list* const command_list() const { return _cmd_list; }
 			/// @brief フレームインデックスを取得
 			/// @return u32 フレームインデックス
 			constexpr u32 frame_index() const { return _frame_index; }
@@ -201,7 +199,7 @@ namespace dxforge::graphics::d3d12::core
 			};
 
 			ID3D12CommandQueue* _cmd_queue{ nullptr };									// コマンドキュー
-			ID3D12GraphicsCommandList6* _cmd_list{ nullptr };							// コマンドリスト
+			id3d12_graphics_command_list* _cmd_list{ nullptr };							// コマンドリスト
 			ID3D12Fence1* _fence{ nullptr };											// フェンス
 			u64 _fence_value{ 0 };														// フェンスの値
 			HANDLE _fence_event{ nullptr };												// フェンスイベント
@@ -214,7 +212,7 @@ namespace dxforge::graphics::d3d12::core
 
 		using surface_collection = utl::free_list<d3d12_surface>;							// サーフェスコレクション
 
-		ID3D12Device8* main_device{ nullptr };											// メインデバイス
+		id3d12_device* main_device{ nullptr };											// メインデバイス
 		IDXGIFactory7* dxgi_factory{ nullptr };											// DXGIファクトリ
 		d3d12_command gfx_command;														// グラフィックスコマンド
 		surface_collection surfaces{};													// サーフェス
@@ -228,7 +226,6 @@ namespace dxforge::graphics::d3d12::core
 		u32 deferred_release_flag[frame_buffer_count]{};								// 遅延解放フラグ
 		std::mutex deferred_release_mutex{};											// 遅延解放ミューテックス
 
-		constexpr DXGI_FORMAT render_target_format{ DXGI_FORMAT_R8G8B8A8_UNORM_SRGB };	// レンダーターゲットのフォーマット
 		constexpr D3D_FEATURE_LEVEL minimum_feature_level{ D3D_FEATURE_LEVEL_11_0 };	// 最低限必要な機能レベル
 
 		// ====== 関数 ======
@@ -390,14 +387,15 @@ namespace dxforge::graphics::d3d12::core
 		new (&gfx_command) d3d12_command(main_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
 		if (!gfx_command.command_queue()) return failed_init();
 
+		// シェーダーを初期化
+		if (!shaders::initialize()) return failed_init();
+
 		// デバッグネームを設定
 		NAME_D3D12_OBJECT(main_device, L"Main D3D12 Device");
 		NAME_D3D12_OBJECT(rtv_desc_heap.heap(), L"RTV Descriptor Heap");
 		NAME_D3D12_OBJECT(dsv_desc_heap.heap(), L"DSV Descriptor Heap");
 		NAME_D3D12_OBJECT(srv_desc_heap.heap(), L"SRV Descriptor Heap");
 		NAME_D3D12_OBJECT(uav_desc_heap.heap(), L"UAV Descriptor Heap");
-
-		create_a_root_signature();
 
 		return true;
 	}
@@ -415,8 +413,16 @@ namespace dxforge::graphics::d3d12::core
 			process_deferred_releases(i);
 		}
 
+		// シェーダーの解放
+		shaders::shutdown();
+
 		// DXGIファクトリの解放
 		release(dxgi_factory);
+
+		// NOTE: 一部のモジュールは、シャットダウン時にディスクリプタを解放する。 process_deferred_free()をもう一度呼び出すことで、それらを処理する。
+		rtv_desc_heap.process_deferred_free(0);
+		dsv_desc_heap.process_deferred_free(0);
+		srv_desc_heap.process_deferred_free(0);
 
 		// ヒープの解放
 		rtv_desc_heap.release();
@@ -454,7 +460,7 @@ namespace dxforge::graphics::d3d12::core
 		release(main_device);
 	}
 
-	ID3D12Device8* const device()
+	id3d12_device* const device()
 	{
 		return main_device;
 	}
@@ -479,11 +485,6 @@ namespace dxforge::graphics::d3d12::core
 		return uav_desc_heap;
 	}
 
-	DXGI_FORMAT default_render_target_format()
-	{
-		return render_target_format;
-	}
-
 	u32 current_frame_index()
 	{
 		return gfx_command.frame_index();
@@ -497,7 +498,7 @@ namespace dxforge::graphics::d3d12::core
 	surface create_surface(platform::window window)
 	{
 		surface_id id{ surfaces.add(window) };
-		surfaces[id].create_swap_chain(dxgi_factory, gfx_command.command_queue(), render_target_format);
+		surfaces[id].create_swap_chain(dxgi_factory, gfx_command.command_queue());
 		return surface{ id };
 	}
 
@@ -529,7 +530,7 @@ namespace dxforge::graphics::d3d12::core
 		// GPUがコマンドアロケータを終了するのを待ち、GPUがコマンドアロケータを終了したら、アロケータをリセットする。
 		// これにより、コマンドを格納するために使用されていたメモリが解放されます。
 		gfx_command.begin_frame();
-		ID3D12GraphicsCommandList6* cmd_list{ gfx_command.command_list() };
+		id3d12_graphics_command_list* cmd_list{ gfx_command.command_list() };
 
 		const u32 frame_idx{ current_frame_index() };
 		if (deferred_release_flag[frame_idx])
@@ -546,70 +547,4 @@ namespace dxforge::graphics::d3d12::core
 		gfx_command.end_frame();
 	}
 
-	void create_a_root_signature()
-	{
-		d3dx::d3d12_descriptor_range range{ D3D12_DESCRIPTOR_RANGE_TYPE_SRV,D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND,0 };
-		d3dx::d3d12_root_parameter params[3];
-		params[0].as_constants(2, D3D12_SHADER_VISIBILITY_PIXEL, 0);
-		params[1].as_cbv(D3D12_SHADER_VISIBILITY_PIXEL, 1);
-		params[2].as_descriptor_table(D3D12_SHADER_VISIBILITY_PIXEL, &range, 1);
-
-		d3dx::d3d12_root_signature_desc root_sig_desc{ &params[0],_countof(params) };
-		ID3D12RootSignature* root_sig{ root_sig_desc.create() };
-
-		//use root_sig
-
-		// when renderer shuts down
-		release(root_sig);
-	}
-
-	ID3D12RootSignature* _root_signature{ nullptr };
-	D3D12_SHADER_BYTECODE _vs{};
-
-	void create_a_pipeline_state_object()
-	{
-		struct
-		{
-			struct alignas(void*)
-			{
-				const D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type{ D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE };
-				ID3D12RootSignature* root_signature;
-			} root_sig;
-			struct alignas(void*)
-			{
-				const D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type{ D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS };
-				D3D12_SHADER_BYTECODE vs_code{};
-			} vs;
-		} stream;
-
-		stream.root_sig.root_signature = _root_signature;
-		stream.vs.vs_code = _vs;
-
-		D3D12_PIPELINE_STATE_STREAM_DESC desc{};
-		desc.pPipelineStateSubobjectStream = &stream;
-		desc.SizeInBytes = sizeof(stream);
-
-		ID3D12PipelineState* pso{ nullptr };
-		device()->CreatePipelineState(&desc, IID_PPV_ARGS(&pso));
-
-		//use pso during rendering
-
-		// when renderer shuts down
-		release(pso);
-	}
-
-	void create_a_pipeline_state_object2()
-	{
-		struct {
-			d3dx::d3d12_pipeline_state_subobject_root_signature root_sig{ _root_signature };
-			d3dx::d3d12_pipeline_state_subobject_vs vs{ _vs };
-		} stream;
-
-		auto pso = d3dx::create_pipeline_state(&stream, sizeof(stream));
-
-		// use pso during rendering
-
-		// when renderer shuts down
-		// release(pso);
-	}
 }	// namespace dxforge::graphics

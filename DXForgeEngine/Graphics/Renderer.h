@@ -52,6 +52,14 @@ namespace dxforge::graphics
 	bool initialize(graphics_platform platform);
 	void shutdown();
 
+	// コンパイルされたエンジンシェーダーの場所を、実行ファイルのパスから相対的に取得する。
+	// このパスは、現在使用されているグラフィックスAPIのものです。
+	const char* get_engine_shaders_path();
+
+	// 指定されたプラットフォーム用にコンパイルされたエンジンシェーダーの場所を、実行ファイルのパスから相対的に取得します。
+	// このパスは、現在使用されているグラフィックスAPIのものです。
+	const char* get_engine_shaders_path(graphics_platform platform);
+
 	surface create_surface(platform::window window);
 	void remove_surface(surface_id id);
 }

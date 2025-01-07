@@ -11,6 +11,7 @@
 #pragma warning(disable: 4530) // 例外警告を無効にする
 // ====== インクルード部 ======
 // C/C++標準ライブラリ
+// NOTE: std::vectorやstd::dequeをインクルードするヘッダーはここに書かないでください。
 #include <stdint.h>
 #include <assert.h>
 #include <typeinfo>

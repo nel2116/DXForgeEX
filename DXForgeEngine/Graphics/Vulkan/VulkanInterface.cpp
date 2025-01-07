@@ -20,6 +20,8 @@ namespace dxforge::graphics::vulkan
 	{
 		pi.initialize = core::initialize;
 		pi.shutdown = core::shutdown;
+
+		pi.platform = graphics_platform::vulkan;
 	}
 
 }	// namespace dxforge::graphics

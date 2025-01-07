@@ -10,14 +10,14 @@
 #pragma once
 // ====== インクルード部 ======
 #include "D3D12CommonHeaders.h"
-#include "D3D12Resource.h"
 
 namespace dxforge::graphics::d3d12
 {
 	class d3d12_surface
 	{
 	public:	// 定数
-		constexpr static u32 buffer_count{ 3 };							// バッファ数
+		constexpr static DXGI_FORMAT default_back_buffer_format{ DXGI_FORMAT_R8G8B8A8_UNORM_SRGB };	// デフォルトのバックバッファフォーマット
+		constexpr static u32 buffer_count{ 3 };	// バッファ数
 
 	public:	// メソッド
 		explicit d3d12_surface(platform::window window)
@@ -59,7 +59,7 @@ namespace dxforge::graphics::d3d12
 		~d3d12_surface() { release(); }
 
 		/// @brief スワップチェインの作成
-		void create_swap_chain(IDXGIFactory7* factory, ID3D12CommandQueue* cmd_queue, DXGI_FORMAT format);
+		void create_swap_chain(IDXGIFactory7* factory, ID3D12CommandQueue* cmd_queue, DXGI_FORMAT format = default_back_buffer_format);
 
 		/// @brief サーフェスの表示
 		void present() const;
@@ -125,6 +125,7 @@ namespace dxforge::graphics::d3d12
 		IDXGISwapChain4* _swap_chain{ nullptr };						// スワップチェイン
 		render_target_data _render_target_data[buffer_count]{};			// レンダーターゲットデータ
 		platform::window _window{};										// ウィンドウ
+		DXGI_FORMAT _format{ default_back_buffer_format };				// バックバッファフォーマット
 		mutable u32 _current_bb_index{ 0 };								// 現在のバックバッファインデックス
 		u32 _allow_tearing{ 0 };										// ティアリングを許可するかどうか
 		u32 _present_flags{ 0 };										// プレゼントフラグ

@@ -49,12 +49,11 @@ namespace dxforge::graphics::d3d12::core
 	}
 
 	// ------ アクセサ ------
-	ID3D12Device8* const device();
+	id3d12_device* const device();
 	descriptor_heap& rtv_heap();
 	descriptor_heap& dsv_heap();
 	descriptor_heap& srv_heap();
 	descriptor_heap& uav_heap();
-	DXGI_FORMAT default_render_target_format();
 	u32 current_frame_index();
 	void set_deferred_releases_flag();
 
