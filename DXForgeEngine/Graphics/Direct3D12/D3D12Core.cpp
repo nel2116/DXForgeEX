@@ -6,11 +6,14 @@
 // 　Direct3D12のコア
 // 更新履歴
 // 2024/12/27 新規作成
+// 2025/01/07 Gパスの追加
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Core.h"
 #include "D3D12Surface.h"
 #include "D3D12Shaders.h"
+#include "D3D12GPass.h"
+#include "D3D12PostProcess.h"
 
 using namespace Microsoft::WRL;	// ComPtrを使うため
 
@@ -108,7 +111,7 @@ namespace dxforge::graphics::d3d12::core
 
 			/// @brief フレームの終了処理
 			/// 新しいフェンス値をフェンスに知らせる
-			void end_frame()
+			void end_frame(const d3d12_surface& surface)
 			{
 				//  ====== フレームの終了処理 ======
 				// コマンドリストを閉じる
@@ -117,6 +120,9 @@ namespace dxforge::graphics::d3d12::core
 				// コマンドリストを実行
 				ID3D12CommandList* const cmd_lists[]{ _cmd_list };
 				_cmd_queue->ExecuteCommandLists(_countof(cmd_lists), &cmd_lists[0]);
+
+				// スワップチェーンバッファの提示は、フレームバッファと同期して行われる。
+				surface.present();
 
 				// フェンスにシグナルを送る
 				u64& fence_value{ _fence_value };
@@ -216,6 +222,7 @@ namespace dxforge::graphics::d3d12::core
 		IDXGIFactory7* dxgi_factory{ nullptr };											// DXGIファクトリ
 		d3d12_command gfx_command;														// グラフィックスコマンド
 		surface_collection surfaces{};													// サーフェス
+		d3dx::d3d12_resource_barrier resource_barriers{};								// リソースバリア
 
 		descriptor_heap rtv_desc_heap{ D3D12_DESCRIPTOR_HEAP_TYPE_RTV };				// RTVディスクリプタヒープ
 		descriptor_heap dsv_desc_heap{ D3D12_DESCRIPTOR_HEAP_TYPE_DSV };				// DSVディスクリプタヒープ
@@ -223,7 +230,7 @@ namespace dxforge::graphics::d3d12::core
 		descriptor_heap uav_desc_heap{ D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV };		// UAVディスクリプタヒープ
 
 		utl::vector<IUnknown*> deferred_releases[frame_buffer_count]{};					// 保留中のリソース
-		u32 deferred_release_flag[frame_buffer_count]{};								// 遅延解放フラグ
+		u32 deferred_releases_flag[frame_buffer_count]{};								// 遅延解放フラグ
 		std::mutex deferred_release_mutex{};											// 遅延解放ミューテックス
 
 		constexpr D3D_FEATURE_LEVEL minimum_feature_level{ D3D_FEATURE_LEVEL_11_0 };	// 最低限必要な機能レベル
@@ -289,7 +296,7 @@ namespace dxforge::graphics::d3d12::core
 			// NOTE: このフラグは最初にクリアする。
 			// もし最後にこのフラグをクリアしたら、このフラグを設定しようとしていた他のスレッドを上書きしてしまうかもしれない。
 			// 上書きはアイテムを処理する前に起こるので問題ない。
-			deferred_release_flag[frame_idx] = 0;
+			deferred_releases_flag[frame_idx] = 0;
 
 			rtv_desc_heap.process_deferred_free(frame_idx);
 			dsv_desc_heap.process_deferred_free(frame_idx);
@@ -387,8 +394,8 @@ namespace dxforge::graphics::d3d12::core
 		new (&gfx_command) d3d12_command(main_device, D3D12_COMMAND_LIST_TYPE_DIRECT);
 		if (!gfx_command.command_queue()) return failed_init();
 
-		// シェーダーを初期化
-		if (!shaders::initialize()) return failed_init();
+		// モジュールの初期化
+		if (!(shaders::initialize() && gpass::initialize() && fx::initialize())) return failed_init();
 
 		// デバッグネームを設定
 		NAME_D3D12_OBJECT(main_device, L"Main D3D12 Device");
@@ -413,7 +420,9 @@ namespace dxforge::graphics::d3d12::core
 			process_deferred_releases(i);
 		}
 
-		// シェーダーの解放
+		// モジュールのシャットダウン
+		fx::shutdown();
+		gpass::shutdown();
 		shaders::shutdown();
 
 		// DXGIファクトリの解放
@@ -492,7 +501,7 @@ namespace dxforge::graphics::d3d12::core
 
 	void set_deferred_releases_flag()
 	{
-		deferred_release_flag[current_frame_index()] = 1;
+		deferred_releases_flag[current_frame_index()] = 1;
 	}
 
 	surface create_surface(platform::window window)
@@ -527,24 +536,69 @@ namespace dxforge::graphics::d3d12::core
 	/// @brief レンダリング処理
 	void render_surface(surface_id id)
 	{
-		// GPUがコマンドアロケータを終了するのを待ち、GPUがコマンドアロケータを終了したら、アロケータをリセットする。
-		// これにより、コマンドを格納するために使用されていたメモリが解放されます。
+		// GPUがコマンド・アロケータを終了するのを待ち、GPUがコマンド・アロケータを終了したら、アロケータをリセットする。
+		// これにより、コマンドの保存に使われていたメモリが解放される。
 		gfx_command.begin_frame();
 		id3d12_graphics_command_list* cmd_list{ gfx_command.command_list() };
 
 		const u32 frame_idx{ current_frame_index() };
-		if (deferred_release_flag[frame_idx])
+		if (deferred_releases_flag[frame_idx])
 		{
-			// 遅延解放フラグが立っている場合は、リソースを解放する
 			process_deferred_releases(frame_idx);
 		}
 
 		const d3d12_surface& surface{ surfaces[id] };
-		surface.present();
-		// Record commands
+		ID3D12Resource* const current_back_buffer{ surface.back_buffer() };
 
-		// コマンドの記録が終わったので次のフレームのフェンス値をインクリメントする。
-		gfx_command.end_frame();
+		d3d12_frame_info frame_info
+		{
+			surface.width(),
+			surface.height()
+		};
+
+		gpass::set_size({ frame_info.surface_width, frame_info.surface_height });
+		d3dx::d3d12_resource_barrier& barriers{ resource_barriers };
+
+		// コマンドの記録
+		ID3D12DescriptorHeap* const heaps[]{ srv_desc_heap.heap() };
+		cmd_list->SetDescriptorHeaps(1, &heaps[0]);
+
+		cmd_list->RSSetViewports(1, &surface.viewport());
+		cmd_list->RSSetScissorRects(1, &surface.scissor_rect());
+
+		// Depth prepass
+		barriers.add(current_back_buffer,
+			D3D12_RESOURCE_STATE_PRESENT,
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY);
+		gpass::add_transitions_for_depth_prepass(barriers);
+		barriers.apply(cmd_list);
+		gpass::set_render_targets_for_depth_prepass(cmd_list);
+		gpass::depth_prepass(cmd_list, frame_info);
+
+		// Geometry and lighting pass
+		gpass::add_transitions_for_gpass(barriers);
+		barriers.apply(cmd_list);
+		gpass::set_render_targets_for_gpass(cmd_list);
+		gpass::render(cmd_list, frame_info);
+
+		// Post-process
+		barriers.add(current_back_buffer,
+			D3D12_RESOURCE_STATE_PRESENT,
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			D3D12_RESOURCE_BARRIER_FLAG_END_ONLY);
+		gpass::add_transitions_for_post_process(barriers);
+		barriers.apply(cmd_list);
+		// 現在のバックバッファに書き込むので、バックバッファはレンダリングターゲットになる
+		fx::post_process(cmd_list, surface.rtv());
+		// after post process
+		d3dx::transition_resource(cmd_list, current_back_buffer,
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			D3D12_RESOURCE_STATE_PRESENT);
+
+		// コマンドの録音が終わった。 コマンドを実行してください、
+		// 信号を受信し、次のフレームのフェンス値をインクリメントする。
+		gfx_command.end_frame(surface);
 	}
 
 }	// namespace dxforge::graphics

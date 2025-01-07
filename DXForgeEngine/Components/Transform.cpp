@@ -6,6 +6,7 @@
 // 　Transformを実装したファイル
 // 更新履歴
 // 2024/11/11 新規作成
+// 2025/01/07 コメント修正
 // /_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Transform.h"
@@ -15,11 +16,16 @@ namespace dxforge::transform
 {
 	namespace
 	{
-		utl::vector<math::v4> rotations;
-		utl::vector<math::v3> positions;
-		utl::vector<math::v3> scales;
+		utl::vector<math::v4> rotations;	// 回転値
+		utl::vector<math::v3> positions;	// 位置値
+		utl::vector<math::v3> scales;		// スケール値
 
-	}
+	}	// 匿名名前空間
+
+	/// @brief Transformコンポーネントの作成
+	/// @param info Transformの初期化情報
+	/// @param entity コンポーネントを追加するエンティティ
+	/// @return component
 	component create(init_info info, game_entity::entity entity)
 	{
 		// エンティティが有効かどうかを確認
@@ -45,22 +51,32 @@ namespace dxforge::transform
 			scales.emplace_back(info.scale);
 		}
 
-		return component(transform_id((id::id_type)positions.size() - 1));
+		return component{ transform_id{ entity.get_id() } };
 	}
-	void remove(component c)
+
+	void remove([[maybe_unused]] component c)
 	{
 		assert(c.is_valid());
 	}
+
+	/// @brief Transformコンポーネントの回転値を取得
+	/// @return math::v4
 	math::v4 component::rotation() const
 	{
 		assert(is_valid());
 		return rotations[id::index(_id)];
 	}
+
+	/// @brief Transformコンポーネントの位置値を取得
+	/// @return math::v3
 	math::v3 component::position() const
 	{
 		assert(is_valid());
 		return positions[id::index(_id)];
 	}
+
+	/// @brief Transformコンポーネントのスケール値を取得
+	/// @return math::v3
 	math::v3 component::scale() const
 	{
 		assert(is_valid());

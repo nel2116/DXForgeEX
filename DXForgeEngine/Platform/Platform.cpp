@@ -40,7 +40,6 @@ namespace dxforge::platform
 		/// @return window_info‚ÌQÆ
 		window_info& get_from_id(window_id id)
 		{
-			assert(id < windows.size());
 			assert(windows[id].hwnd);
 			return windows[id];
 		}

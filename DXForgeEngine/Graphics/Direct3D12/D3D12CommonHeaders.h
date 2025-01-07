@@ -13,6 +13,11 @@
 #include "Graphics/Renderer.h"
 #include "Platform/Window.h"
 
+// windows.hのmin/maxマクロの定義をスキップする。
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif // !NOMINMAX
+
 #include <dxgi1_6.h>
 #include <d3d12.h>
 #include <wrl.h>
@@ -67,7 +72,7 @@ if (swprintf_s(full_name, L"%s[%u]", name, n) > 0){		\
 #else
 #define NAME_D3D12_OBJECT(obj,name)
 #define NAME_D3D12_OBJECT_INDEXED(obj,n,name)
-#endif // _DEBUG
+#endif // !_DEBUG
 
 #include "D3D12Helpers.h"
 #include "D3D12Resource.h"

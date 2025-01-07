@@ -18,16 +18,16 @@ namespace dxforge::graphics::d3d12
 	/// @brief ディスクリプタハンドル
 	struct descriptor_handle
 	{
-		D3D12_CPU_DESCRIPTOR_HANDLE cpu{};									// CPUディスクリプタハンドル
-		D3D12_GPU_DESCRIPTOR_HANDLE gpu{};									// GPUディスクリプタハンドル
+		D3D12_CPU_DESCRIPTOR_HANDLE cpu{};												// CPUディスクリプタハンドル
+		D3D12_GPU_DESCRIPTOR_HANDLE gpu{};												// GPUディスクリプタハンドル
+		u32 index{ u32_invalid_id };													// インデックス
 
-		constexpr bool is_valid() const { return cpu.ptr != 0; }			// 有効かどうか
-		constexpr bool is_shader_visible() const { return gpu.ptr != 0; }	// シェーダーから見えるかどうか
+		[[nodiscard]] constexpr bool is_valid() const { return cpu.ptr != 0; }			// 有効かどうか
+		[[nodiscard]] constexpr bool is_shader_visible() const { return gpu.ptr != 0; }	// シェーダーから見えるかどうか
 
 #ifdef _DEBUG
-		friend class descriptor_heap;										// デバッグ用にフレンド化
-		descriptor_heap* container{ nullptr };								// ディスクリプタヒープ
-		u32 index{ u32_invalid_id };										// インデックス
+		friend class descriptor_heap;													// デバッグ用にフレンド化
+		descriptor_heap* container{ nullptr };											// ディスクリプタヒープ
 
 #endif // _DEBUG
 	};
@@ -55,37 +55,37 @@ namespace dxforge::graphics::d3d12
 		void free(descriptor_handle& handle);
 
 		// ------ アクセサ ------
-		constexpr D3D12_DESCRIPTOR_HEAP_TYPE type() const { return _type; }
-		constexpr D3D12_CPU_DESCRIPTOR_HANDLE cpu_start() const { return _cpu_start; }
-		constexpr D3D12_GPU_DESCRIPTOR_HANDLE gpu_start() const { return _gpu_start; }
-		constexpr ID3D12DescriptorHeap* const heap() const { return _heap; }
-		constexpr u32 capacity() const { return _capacity; }
-		constexpr u32 size() const { return _size; }
-		constexpr u32 descriptor_size() const { return _descriptor_size; }
-		constexpr bool is_shader_visible() const { return _gpu_start.ptr != 0; }
+		[[nodiscard]] constexpr D3D12_DESCRIPTOR_HEAP_TYPE type() const { return _type; }
+		[[nodiscard]] constexpr D3D12_CPU_DESCRIPTOR_HANDLE cpu_start() const { return _cpu_start; }
+		[[nodiscard]] constexpr D3D12_GPU_DESCRIPTOR_HANDLE gpu_start() const { return _gpu_start; }
+		[[nodiscard]] constexpr ID3D12DescriptorHeap* const heap() const { return _heap; }
+		[[nodiscard]] constexpr u32 capacity() const { return _capacity; }
+		[[nodiscard]] constexpr u32 size() const { return _size; }
+		[[nodiscard]] constexpr u32 descriptor_size() const { return _descriptor_size; }
+		[[nodiscard]] constexpr bool is_shader_visible() const { return _gpu_start.ptr != 0; }
 
 	private:
-		ID3D12DescriptorHeap* _heap;										// ヒープ
-		D3D12_CPU_DESCRIPTOR_HANDLE _cpu_start{};							// CPUディスクリプタヒープの開始アドレス
-		D3D12_GPU_DESCRIPTOR_HANDLE _gpu_start{};							// GPUディスクリプタヒープの開始アドレス
-		std::unique_ptr<u32[]> _free_handles{};								// 空きハンドル
-		utl::vector<u32> _deferred_free_indices[frame_buffer_count]{};		// 遅延解放インデックス
-		std::mutex _mutex{};												// ミューテックス
-		u32 _capacity{ 0 };													// 容量
-		u32 _size{ 0 };														// サイズ
-		u32 _descriptor_size{};												// ディスクリプタサイズ
-		const D3D12_DESCRIPTOR_HEAP_TYPE _type{};							// ヒープの種類
+		ID3D12DescriptorHeap* _heap;
+		D3D12_CPU_DESCRIPTOR_HANDLE         _cpu_start{};									// CPUディスクリプタハンドルの開始位置
+		D3D12_GPU_DESCRIPTOR_HANDLE         _gpu_start{};									// GPUディスクリプタハンドルの開始位置
+		std::unique_ptr<u32[]>              _free_handles{};								// 空きハンドル
+		utl::vector<u32>                    _deferred_free_indices[frame_buffer_count]{};	// 遅延解放インデックス
+		std::mutex                          _mutex{};										// ミューテックス
+		u32                                 _capacity{ 0 };									// 容量
+		u32                                 _size{ 0 };										// サイズ
+		u32                                 _descriptor_size{};								// ディスクリプタサイズ
+		const D3D12_DESCRIPTOR_HEAP_TYPE    _type{};										// ヒープの種類
 	};
 
 	struct d3d12_texture_init_info
 	{
-		ID3D12Heap1* heap{ nullptr };										// ヒープ
-		ID3D12Resource* resource{ nullptr };								// リソース
-		D3D12_SHADER_RESOURCE_VIEW_DESC* srv_desc{ nullptr };				// シェーダーリソースビューの設定
-		D3D12_RESOURCE_DESC* desc{ nullptr };								// リソースの設定
-		D3D12_RESOURCE_ALLOCATION_INFO1 allocation_info{ };					// リソースのアロケーション情報
-		D3D12_RESOURCE_STATES initial_state{};								// 初期状態
-		D3D12_CLEAR_VALUE clear_value{};									// クリア値
+		ID3D12Heap1* heap{ nullptr };													// ヒープ
+		ID3D12Resource* resource{ nullptr };											// リソース
+		D3D12_SHADER_RESOURCE_VIEW_DESC* srv_desc{ nullptr };							// シェーダーリソースビューの設定
+		D3D12_RESOURCE_DESC* desc{ nullptr };											// リソースの設定
+		D3D12_RESOURCE_ALLOCATION_INFO1 allocation_info{ };								// リソースのアロケーション情報
+		D3D12_RESOURCE_STATES initial_state{};											// 初期状態
+		D3D12_CLEAR_VALUE clear_value{};												// クリア値
 	};
 
 	class d3d12_texture
@@ -120,8 +120,8 @@ namespace dxforge::graphics::d3d12
 		void release();
 
 		// ------ アクセサ ------
-		constexpr ID3D12Resource* const resource() const { return _resource; }
-		constexpr descriptor_handle srv() const { return _srv; }
+		[[nodiscard]] constexpr ID3D12Resource* const resource() const { return _resource; }
+		[[nodiscard]] constexpr descriptor_handle srv() const { return _srv; }
 
 	private:	// プライベート関数
 		constexpr void move(d3d12_texture& o)
@@ -138,8 +138,8 @@ namespace dxforge::graphics::d3d12
 		}
 
 	private:	// メンバ変数
-		ID3D12Resource* _resource{ nullptr };								// リソース
-		descriptor_handle _srv;												// シェーダーリソースビュー
+		ID3D12Resource* _resource{ nullptr };											// リソース
+		descriptor_handle _srv;															// シェーダーリソースビュー
 	};
 
 	class d3d12_render_texture
@@ -170,10 +170,12 @@ namespace dxforge::graphics::d3d12
 		~d3d12_render_texture() { release(); }
 
 		void release();
-		constexpr u32 mip_count() const { return _mip_count; }
-		constexpr D3D12_CPU_DESCRIPTOR_HANDLE rtv(u32 mip_index) const { assert(mip_index < _mip_count); return _rtv[mip_index].cpu; }
-		constexpr descriptor_handle srv() const { return _texture.srv(); }
-		constexpr ID3D12Resource* const resource() const { return _texture.resource(); }
+
+		// ------ アクセサ ------
+		[[nodiscard]] constexpr u32 mip_count() const { return _mip_count; }
+		[[nodiscard]] constexpr D3D12_CPU_DESCRIPTOR_HANDLE rtv(u32 mip_index) const { assert(mip_index < _mip_count); return _rtv[mip_index].cpu; }
+		[[nodiscard]] constexpr descriptor_handle srv() const { return _texture.srv(); }
+		[[nodiscard]] constexpr ID3D12Resource* const resource() const { return _texture.resource(); }
 
 	private:	// プライベート関数
 		constexpr void move(d3d12_render_texture& o)
@@ -191,9 +193,9 @@ namespace dxforge::graphics::d3d12
 		}
 
 	private:	// メンバ変数
-		d3d12_texture _texture;												// テクスチャ
-		descriptor_handle _rtv[d3d12_texture::max_mip]{};					// レンダーターゲットビュー
-		u32 _mip_count{ 0 };												// ミップレベル
+		d3d12_texture _texture;															// テクスチャ
+		descriptor_handle _rtv[d3d12_texture::max_mip]{};								// レンダーターゲットビュー
+		u32 _mip_count{ 0 };															// ミップレベル
 	};
 
 	class d3d12_depth_buffer
@@ -224,9 +226,11 @@ namespace dxforge::graphics::d3d12
 		~d3d12_depth_buffer() { release(); }
 
 		void release();
-		constexpr D3D12_CPU_DESCRIPTOR_HANDLE dsv() const { return _dsv.cpu; }
-		constexpr descriptor_handle srv() const { return _texture.srv(); }
-		constexpr ID3D12Resource* const resource() const { return _texture.resource(); };
+
+		// ------ アクセサ ------
+		[[nodiscard]] constexpr D3D12_CPU_DESCRIPTOR_HANDLE dsv() const { return _dsv.cpu; }
+		[[nodiscard]] constexpr descriptor_handle srv() const { return _texture.srv(); }
+		[[nodiscard]] constexpr ID3D12Resource* const resource() const { return _texture.resource(); };
 
 	private:	// プライベート関数
 		constexpr void move(d3d12_depth_buffer& o)
@@ -241,8 +245,8 @@ namespace dxforge::graphics::d3d12
 		}
 
 	private:	// メンバ変数
-		d3d12_texture _texture{};											// テクスチャ
-		descriptor_handle _dsv{};											// デプスステンシルビュー
+		d3d12_texture _texture{};														// テクスチャ
+		descriptor_handle _dsv{};														// デプスステンシルビュー
 	};
 
 }	// namespace dxforge::graphics::d3d12

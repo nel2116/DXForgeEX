@@ -5,8 +5,10 @@ F:\HAL\Self\DXForgeEX\DXForgeEngine\Content\ContentLoader.cpp;F:\HAL\Self\DXForg
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Core\Engine.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\Engine.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Core\Main.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\Main.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Core.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\D3D12Core.obj
+F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12GPass.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\D3D12GPass.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Helpers.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\D3D12Helpers.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Interface.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\D3D12Interface.obj
+F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12PostProcess.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\D3D12PostProcess.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Resource.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\D3D12Resource.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Shaders.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\D3D12Shaders.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Surface.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\D3D12Surface.obj

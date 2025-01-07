@@ -41,6 +41,7 @@ namespace
 	{
 		{"FullScreenTriangle.hlsl","FullScreenTriangleVS",engine_shader::fullscreen_triangle_vs,shader_type::vertex },
 		{"FillColor.hlsl","FillColorPS",engine_shader::fill_color_ps,shader_type::pixel },
+		{"PostProcess.hlsl","PostProcessPS",engine_shader::post_process_ps,shader_type::pixel }
 	};
 
 	static_assert(_countof(shader_files) == engine_shader::count);
@@ -83,12 +84,14 @@ namespace
 			std::wstring file{ to_wstring(info.file) };
 			std::wstring func{ to_wstring(info.function) };
 			std::wstring prof{ to_wstring(_profile_string[(u32)info.type]) };
+			std::wstring inc{ to_wstring(shaders_source_path) };
 
 			LPCWSTR args[]
 			{
 				file.c_str(),                       // エラー報告用のオプションのシェーダー・ソース・ファイル名
 				L"-E", func.c_str(),                // エントリー機能
 				L"-T", prof.c_str(),                // ターゲット・プロフィール
+				L"-I", inc.c_str(),                 // インクルード・ディレクトリ
 				DXC_ARG_ALL_RESOURCES_BOUND,
 	#if _DEBUG
 				DXC_ARG_DEBUG,
@@ -138,7 +141,8 @@ namespace
 		}
 
 	private:
-		const char* _profile_string[shader_type::count]{ "vs_6_5","hs_6_5", "ds_6_5", "gs_6_5", "ps_6_5", "cs_6_5", "as_6_5", "ms_6_5" };
+		// NOTE: シェーダーモデル6.xも使用できます（ASとMSはSM6.5以降のみサポート）。
+		constexpr static const char* _profile_string[]{ "vs_6_5","hs_6_5", "ds_6_5", "gs_6_5", "ps_6_5", "cs_6_5", "as_6_5", "ms_6_5" };
 
 		ComPtr<IDxcCompiler3> _compiler{ nullptr };
 		ComPtr<IDxcUtils> _utils{ nullptr };
@@ -148,7 +152,7 @@ namespace
 	// コンパイルされたシェーダのバイナリファイルへのパスを取得する。
 	decltype(auto) get_engine_shaders_path()
 	{
-		return std::filesystem::absolute(graphics::get_engine_shaders_path(graphics::graphics_platform::direct3d12));
+		return std::filesystem::path{ graphics::get_engine_shaders_path(graphics::graphics_platform::direct3d12) };
 	}
 
 	bool compiled_shaders_are_up_to_date()
@@ -168,7 +172,7 @@ namespace
 
 			path = shaders_source_path;
 			path += info.file;
-			full_path = std::filesystem::absolute(path);
+			full_path = path;
 			if (!std::filesystem::exists(full_path)) return false;
 
 			auto shader_file_time = std::filesystem::last_write_time(full_path);
@@ -218,10 +222,10 @@ bool compile_shaders()
 
 		path = shaders_source_path;
 		path += info.file;
-		full_path = std::filesystem::absolute(path);
+		full_path = path;
 		if (!std::filesystem::exists(full_path)) return false;
 		ComPtr<IDxcBlob> compiled_shader{ compiler.compile(info,full_path) };
-		if (compiled_shader->GetBufferPointer() && compiled_shader->GetBufferSize() && compiled_shader != nullptr)
+		if (compiled_shader && compiled_shader->GetBufferPointer() && compiled_shader->GetBufferSize())
 		{
 			shaders.emplace_back(std::move(compiled_shader));
 		}

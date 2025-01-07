@@ -27,7 +27,7 @@ namespace dxforge::graphics::d3d12
 		assert(!(_type == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER && capacity > D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE));
 
 		// シェーダーが見えるかどうかを確認
-		if (_type == D3D12_DESCRIPTOR_HEAP_TYPE_DSV || D3D12_DESCRIPTOR_HEAP_TYPE_RTV)
+		if (_type == D3D12_DESCRIPTOR_HEAP_TYPE_DSV || _type == D3D12_DESCRIPTOR_HEAP_TYPE_RTV)
 		{
 			is_shader_visible = false;
 		}
@@ -56,13 +56,12 @@ namespace dxforge::graphics::d3d12
 		_capacity = capacity;
 		_size = 0;
 
-		for (u32 i{ 0 }; i < capacity; ++i)_free_handles[i] = i;
+		for (u32 i{ 0 }; i < capacity; ++i) _free_handles[i] = i;
 		DEBUG_OP(for (u32 i{ 0 }; i < frame_buffer_count; ++i) assert(_deferred_free_indices[i].empty()));
 
 		_descriptor_size = device->GetDescriptorHandleIncrementSize(_type);
 		_cpu_start = _heap->GetCPUDescriptorHandleForHeapStart();
 		_gpu_start = is_shader_visible ? _heap->GetGPUDescriptorHandleForHeapStart() : D3D12_GPU_DESCRIPTOR_HANDLE{ 0 };
-
 
 		return true;
 	}
@@ -115,10 +114,10 @@ namespace dxforge::graphics::d3d12
 		descriptor_handle handle{};
 		handle.cpu.ptr = _cpu_start.ptr + offset;
 		if (is_shader_visible()) handle.gpu.ptr = _gpu_start.ptr + offset;
+		handle.index = index;
 
 		// デバッグ情報を設定
 		DEBUG_OP(handle.container = this);
-		DEBUG_OP(handle.index = index);
 		return handle;
 	}
 

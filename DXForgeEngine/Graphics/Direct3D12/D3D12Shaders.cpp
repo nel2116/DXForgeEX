@@ -60,7 +60,7 @@ namespace dxforge::graphics::d3d12::shaders
 
 	bool initialize()
 	{
-		return true;
+		return load_engine_shaders();
 	}
 
 	void shutdown()

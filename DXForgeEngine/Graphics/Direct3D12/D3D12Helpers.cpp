@@ -19,6 +19,26 @@ namespace dxforge::graphics::d3d12::d3dx
 
 	}	// 匿名名前空間
 
+	/// @brief リソースを遷移
+	/// @param cmd_list コマンドリスト
+	/// @param resource リソース
+	/// @param before 変更前の状態
+	/// @param after 変更後の状態
+	/// @param flags フラグ
+	/// @param subresource サブリソース
+	void transition_resource(id3d12_graphics_command_list* cmd_list, ID3D12Resource* resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after, D3D12_RESOURCE_BARRIER_FLAGS flags, u32 subresource)
+	{
+		D3D12_RESOURCE_BARRIER barrier{};
+		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		barrier.Flags = flags;
+		barrier.Transition.pResource = resource;
+		barrier.Transition.StateBefore = before;
+		barrier.Transition.StateAfter = after;
+		barrier.Transition.Subresource = subresource;
+
+		cmd_list->ResourceBarrier(1, &barrier);
+	}
+
 	/// @brief ルートシグネチャを作成
 	/// @param desc ルートシグネチャ記述子
 	/// @return ID3D12RootSignature* ルートシグネチャ
