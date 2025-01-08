@@ -53,6 +53,8 @@ namespace dxforge::platform
 			return get_from_id(id);
 		}
 
+		bool resized{ false };
+
 		/// @brief ウィンドウプロシージャ
 		/// @param hwnd
 		/// @param msg
@@ -61,40 +63,36 @@ namespace dxforge::platform
 		/// @return LRESULT
 		LRESULT CALLBACK internal_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		{
-			window_info* info{ nullptr };
 			switch (msg)
 			{
-
+			case WM_NCCREATE:
+			{
+				// ウィンドウのデータ・バッファのユーザー・データ・フィールドにウィンドウIDを入れる。
+				DEBUG_OP(SetLastError(0));
+				const window_id id{ windows.add() };
+				windows[id].hwnd = hwnd;
+				SetWindowLongPtr(hwnd, GWLP_USERDATA, ((LONG_PTR)id));
+				assert(GetLastError() == 0);
+			}
+			break;
 			case WM_DESTROY:
 				get_from_handle(hwnd).is_closed = true;
 				break;
 
-			case WM_EXITSIZEMOVE:
-				info = &get_from_handle(hwnd);
-				break;
-
 			case WM_SIZE:
-				if (wparam == SIZE_MAXIMIZED)
-				{
-					info = &get_from_handle(hwnd);
-				}
-				break;
-
-			case WM_SYSCOMMAND:
-				if (wparam == SC_RESTORE)
-				{
-					info = &get_from_handle(hwnd);
-				}
+				resized = (wparam != SIZE_MINIMIZED);
 				break;
 
 			default:
 				break;
 			}
 
-			if (info)
+			if (resized && GetAsyncKeyState(VK_LBUTTON) >= 0)
 			{
-				assert(info->hwnd);
-				GetClientRect(info->hwnd, &info->is_fullscreen ? &info->fullscreen_area : &info->cliant_area);
+				window_info& info{ get_from_handle(hwnd) };
+				assert(info.hwnd);
+				GetClientRect(info.hwnd, info.is_fullscreen ? &info.fullscreen_area : &info.cliant_area);
+				resized = false;
 			}
 
 			LONG_PTR long_ptr{ GetWindowLongPtr(hwnd,0) };
@@ -268,14 +266,16 @@ namespace dxforge::platform
 
 		if (info.hwnd)
 		{
-			DEBUG_OP(SetLastError(0));
-			const window_id id{ windows.add(info) };
-			SetWindowLongPtr(info.hwnd, GWLP_USERDATA, ((LONG_PTR)id));
 			// ウィンドウのメッセージを処理するウィンドウコールバック関数へのポインタを "extra "バイトにセットする。
+			DEBUG_OP(SetLastError(0));
 			if (callback) SetWindowLongPtr(info.hwnd, 0, (LONG_PTR)callback);
 			assert(GetLastError() == 0);
 			ShowWindow(info.hwnd, SW_SHOWNORMAL);
 			UpdateWindow(info.hwnd);
+
+			window_id id{ (id::id_type)GetWindowLongPtr(info.hwnd,GWLP_USERDATA) };
+			windows[id] = info;
+
 			return window{ id };
 		}
 		return {};

@@ -7,25 +7,8 @@ struct VSOut
 VSOut FullScreenTriangleVS(in uint VertexIdx : SV_VertexID)
 {
     VSOut output;
-    float2 tex;
-    float2 pos;
-    if (VertexIdx == 0)
-    {
-        tex = float2(0.0f, 0.0f);
-        pos = float2(-1.0f, 1.0f);
-    }
-    else if (VertexIdx == 1)
-    {
-        tex = float2(0.0f, 2.0f);
-        pos = float2(-1.0f, -3.0f);
-    }
-    else if (VertexIdx == 2)
-    {
-        tex = float2(2.0f, 0.0f);
-        pos = float2(3.0f, 1.0f);
-    }
-
-    output.Position = float4(pos, 0.0f, 1.0f);
+    const float2 tex = float2(uint2(VertexIdx, VertexIdx << 1) & 2);
+    output.Position = float4(lerp(float2(-1, 1), float2(1, -1), tex), 0, 1);
     output.UV = tex;
 
     return output;

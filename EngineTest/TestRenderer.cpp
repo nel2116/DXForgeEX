@@ -20,6 +20,7 @@ using namespace dxforge;
 graphics::render_surface _surfaces[4];
 time_it timer{};
 
+bool resized{ false };
 bool is_restarting{ false };
 void destroy_render_surface(graphics::render_surface& surface);
 bool test_initialize();
@@ -27,6 +28,8 @@ void test_shutdown();
 
 LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
+	bool toggle_fullscreen{ false };
+
 	switch (msg)
 	{
 	case WM_DESTROY:
@@ -53,14 +56,12 @@ LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		}
 	}
 	break;
-
+	case WM_SIZE:
+		resized = (wparam != SIZE_MAXIMIZED);
+		break;
 	case WM_SYSCHAR:
-		if (wparam == VK_RETURN && (HIWORD(lparam) & KF_ALTDOWN))
-		{
-			platform::window win{ platform::window_id{(id::id_type)GetWindowLongPtr(hwnd, GWLP_USERDATA)} };
-			win.set_fullscrean(!win.is_fullscreen());
-			return 0;
-		}
+		toggle_fullscreen = (wparam == VK_RETURN && (HIWORD(lparam) & KF_ALTDOWN));
+		break;
 	case WM_KEYDOWN:
 		if (wparam == VK_ESCAPE)
 		{
@@ -75,6 +76,32 @@ LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		}
 		break;
 	}
+
+	if ((resized && GetAsyncKeyState(VK_LBUTTON) >= 0) || toggle_fullscreen)
+	{
+		platform::window win{ platform::window_id{(id::id_type)GetWindowLongPtr(hwnd, GWLP_USERDATA)} };
+		for (u32 i{ 0 }; i < _countof(_surfaces); ++i)
+		{
+			if (_surfaces[i].window.get_id() == win.get_id())
+			{
+				if (toggle_fullscreen)
+				{
+					win.set_fullscrean(!win.is_fullscreen());
+					// デフォルトのウィンドウプロシージャでは、WM_SCHARが処理されない場合、Alt+Enterキーボードの組み合わせが押されると、
+					// システム通知音が再生される。 0を返すことで、このメッセージを処理したことをシステムに伝えることができる。
+					return 0;
+				}
+				else
+				{
+					_surfaces[i].surface.resize(win.width(), win.height());
+					resized = false;
+				}
+				break;
+			}
+		}
+
+	}
+
 	return DefWindowProc(hwnd, msg, wparam, lparam);
 }
 

@@ -167,13 +167,13 @@ namespace dxforge::graphics::d3d12::core
 
 			/// @brief コマンドキューを取得
 			/// @return ID3D12CommandQueue* コマンドキュー
-			constexpr ID3D12CommandQueue* const command_queue() const { return _cmd_queue; }
+			[[nodiscard]] constexpr ID3D12CommandQueue* const command_queue() const { return _cmd_queue; }
 			/// @brief コマンドリストを取得
 			/// @return ID3D12GraphicsCommandList6* コマンドリスト
-			constexpr id3d12_graphics_command_list* const command_list() const { return _cmd_list; }
+			[[nodiscard]] constexpr id3d12_graphics_command_list* const command_list() const { return _cmd_list; }
 			/// @brief フレームインデックスを取得
 			/// @return u32 フレームインデックス
-			constexpr u32 frame_index() const { return _frame_index; }
+			[[nodiscard]] constexpr u32 frame_index() const { return _frame_index; }
 
 		private:
 

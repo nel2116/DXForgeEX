@@ -14,7 +14,8 @@ float4 FillColorPS(in noperspective float4 Position : SV_Position,
 {
     const float2 invDim = float2(1.f / ShaderParam.Width, 1.f / ShaderParam.Height);
     const float2 uv = (Position.xy) * invDim;
-    float3 color = DrawMandelbrot(uv);
+    // float3 color = DrawMandelbrot(uv);
+    float3 color = DrawJuliaSet(uv, ShaderParam.Frame);
 
     return float4(color, 1.f);
 }
