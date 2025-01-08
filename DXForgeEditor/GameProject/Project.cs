@@ -14,18 +14,10 @@ using System.Windows.Input;
 
 namespace DXForgeEditor.GameProject
 {
-    enum BuildConfiguration
-    {
-        Debug,
-        DebugEditor,
-        Release,
-        ReleaseEditor,
-    }
-
     [DataContract(Name = "Game")]
     class Project : ViewModelBase
     {
-        public static string Extension { get; } = ".dxproj";
+        public static string Extension => ".dxproj";
         [DataMember]
         public string Name { get; private set; } = "New Project";
         [DataMember]
@@ -33,8 +25,6 @@ namespace DXForgeEditor.GameProject
         public string FullPath => $@"{Path}{Name}{Extension}";
         public string Solution => $@"{Path}{Name}.sln";
         public string ContentPath => $@"{Path}Content\";
-
-        private static readonly string[] _buildConfigurationNames = new string[] { "Debug", "DebugEditor", "Release", "ReleaseEditor" };
 
         private int _buildConfig;
 
@@ -54,13 +44,13 @@ namespace DXForgeEditor.GameProject
 
         public BuildConfiguration StandAloneBuildConfig => BuildConfig == 0 ? BuildConfiguration.Debug : BuildConfiguration.Release;
 
-        public BuildConfiguration DllBuildConfig => BuildConfig == 0 ? BuildConfiguration.DebugEditor : BuildConfiguration.ReleaseEditor;
+        public BuildConfiguration DLLBuildConfig => BuildConfig == 0 ? BuildConfiguration.DebugEditor : BuildConfiguration.ReleaseEditor;
 
         private string[] _availableScripts;
         public string[] AvailableScripts
         {
             get => _availableScripts;
-            set
+            private set
             {
                 if (_availableScripts != value)
                 {
@@ -70,8 +60,8 @@ namespace DXForgeEditor.GameProject
             }
         }
 
-        [DataMember(Name = "Scenes")]
-        private ObservableCollection<Scene> _scenes = new ObservableCollection<Scene>();
+        [DataMember(Name = nameof(Scenes))]
+        private readonly ObservableCollection<Scene> _scenes = new ObservableCollection<Scene>();
         public ReadOnlyObservableCollection<Scene> Scenes { get; private set; }
 
         private Scene _activeScene;
@@ -89,7 +79,7 @@ namespace DXForgeEditor.GameProject
             }
         }
 
-        public static Project Current => Application.Current.MainWindow.DataContext as Project;
+        public static Project Current => Application.Current.MainWindow?.DataContext as Project;
 
         public static UndoRedo UndoRedo { get; } = new UndoRedo();
 
@@ -114,6 +104,7 @@ namespace DXForgeEditor.GameProject
                 AddScene($"New Scene {_scenes.Count}");
                 var newScene = _scenes.Last();
                 var sceneIndex = _scenes.Count - 1;
+
                 UndoRedo.Add(new UndoRedoAction(
                     () => RemoveScene(newScene),
                     () => _scenes.Insert(sceneIndex, newScene),
@@ -124,6 +115,7 @@ namespace DXForgeEditor.GameProject
             {
                 var sceneIndex = _scenes.IndexOf(x);
                 RemoveScene(x);
+
                 UndoRedo.Add(new UndoRedoAction(
                     () => _scenes.Insert(sceneIndex, x),
                     () => RemoveScene(x),
@@ -136,7 +128,7 @@ namespace DXForgeEditor.GameProject
             DebugStartCommand = new RelayCommand<object>(async x => await RunGame(true), x => !VisualStudio.IsDebugging() && VisualStudio.BuildDone);
             DebugStartWithoutDebuggingCommand = new RelayCommand<object>(async x => await RunGame(false), x => !VisualStudio.IsDebugging() && VisualStudio.BuildDone);
             DebugStopCommand = new RelayCommand<object>(async x => await StopGame(), x => VisualStudio.IsDebugging());
-            BuildCommand = new RelayCommand<bool>(async x => await BuildGameCodeDll(x), x => !VisualStudio.IsDebugging() && VisualStudio.BuildDone);
+            BuildCommand = new RelayCommand<bool>(async x => await BuildGameCodeDLL(x), x => !VisualStudio.IsDebugging() && VisualStudio.BuildDone);
 
             OnPropertyChanged(nameof(AddSceneCommand));
             OnPropertyChanged(nameof(RemoveSceneCommand));
@@ -149,8 +141,6 @@ namespace DXForgeEditor.GameProject
             OnPropertyChanged(nameof(BuildCommand));
         }
 
-        private static string GetConfigurationName(BuildConfiguration config) => _buildConfigurationNames[(int)config];
-
         public void AddScene(string sceneName)
         {
             Debug.Assert(!string.IsNullOrEmpty(sceneName.Trim()));
@@ -159,7 +149,7 @@ namespace DXForgeEditor.GameProject
 
         public void RemoveScene(Scene scene)
         {
-            Debug.Assert(scene != null);
+            Debug.Assert(_scenes.Contains(scene));
             _scenes.Remove(scene);
         }
 
@@ -171,12 +161,13 @@ namespace DXForgeEditor.GameProject
 
         public void Unload()
         {
-            UnloadGameCodeDll();
+            UnloadGameCodeDLL();
             VisualStudio.CloseVisualStudio();
             UndoRedo.Reset();
+            Logger.Clear();
         }
 
-        public static void Save(Project project)
+        private static void Save(Project project)
         {
             Serializer.ToFile(project, project.FullPath);
             Logger.Log(MessageType.Info, $"Project saved to {project.FullPath}");
@@ -184,7 +175,7 @@ namespace DXForgeEditor.GameProject
 
         private void SaveToBinary()
         {
-            var configName = GetConfigurationName(StandAloneBuildConfig);
+            var configName = VisualStudio.GetConfigurationName(StandAloneBuildConfig);
             var bin = $@"{Path}x64\{configName}\game.bin";
 
             using (var bw = new BinaryWriter(File.Open(bin, FileMode.Create, FileAccess.Write)))
@@ -192,8 +183,8 @@ namespace DXForgeEditor.GameProject
                 bw.Write(ActiveScene.GameEntities.Count);
                 foreach (var entity in ActiveScene.GameEntities)
                 {
-                    bw.Write(0);    // entity type (後日実装)
-                    bw.Write(entity.Components.Count);  // component count
+                    bw.Write(0); // entity type (reserved for later)
+                    bw.Write(entity.Components.Count);
                     foreach (var component in entity.Components)
                     {
                         bw.Write((int)component.ToEnumType());
@@ -205,26 +196,25 @@ namespace DXForgeEditor.GameProject
 
         private async Task RunGame(bool debug)
         {
-            var configName = GetConfigurationName(StandAloneBuildConfig);
-            await Task.Run(() => VisualStudio.BuildSolution(this, configName, debug));
+            await Task.Run(() => VisualStudio.BuildSolution(this, StandAloneBuildConfig, debug));
             if (VisualStudio.BuildSucceeded)
             {
                 SaveToBinary();
-                await Task.Run(() => VisualStudio.Run(this, configName, debug));
+                await Task.Run(() => VisualStudio.Run(this, StandAloneBuildConfig, debug));
             }
         }
 
         private async Task StopGame() => await Task.Run(() => VisualStudio.Stop());
 
-        private async Task BuildGameCodeDll(bool showWindow = true)
+        private async Task BuildGameCodeDLL(bool showWindow = true)
         {
             try
             {
-                UnloadGameCodeDll();
-                await Task.Run(() => VisualStudio.BuildSolution(this, GetConfigurationName(DllBuildConfig), showWindow));
+                UnloadGameCodeDLL();
+                await Task.Run(() => VisualStudio.BuildSolution(this, DLLBuildConfig, showWindow));
                 if (VisualStudio.BuildSucceeded)
                 {
-                    LoadGameCodeDll();
+                    LoadGameCodeDLL();
                 }
             }
             catch (Exception ex)
@@ -234,30 +224,29 @@ namespace DXForgeEditor.GameProject
             }
         }
 
-        private void LoadGameCodeDll()
+        private void LoadGameCodeDLL()
         {
-            var configName = GetConfigurationName(DllBuildConfig);
-            var dllPath = $@"{Path}x64\{configName}\{Name}.dll";
+            var configName = VisualStudio.GetConfigurationName(DLLBuildConfig);
+            var dll = $@"{Path}x64\{configName}\{Name}.dll";
             AvailableScripts = null;
-            if ((File.Exists(dllPath) && EngineAPI.LoadGameCodeDll(dllPath) != 0))
+            if (File.Exists(dll) && EngineAPI.LoadGameCodeDll(dll) != 0)
             {
                 AvailableScripts = EngineAPI.GetScriptNames();
                 ActiveScene.GameEntities.Where(x => x.GetComponent<Script>() != null).ToList().ForEach(x => x.IsActive = true);
-                Logger.Log(MessageType.Info, "GameCode.dllは正常にロードされました。");
+                Logger.Log(MessageType.Info, "Game code DLL loaded successfully.");
             }
             else
             {
-                Logger.Log(MessageType.Warning, "GameCode.dllファイルのロードに失敗しました。まずプロジェクトをビルドしてみてください。");
+                Logger.Log(MessageType.Warning, "Failed to load game code DLL file. Try to build the project first!");
             }
-
         }
 
-        private void UnloadGameCodeDll()
+        private void UnloadGameCodeDLL()
         {
             ActiveScene.GameEntities.Where(x => x.GetComponent<Script>() != null).ToList().ForEach(x => x.IsActive = false);
             if (EngineAPI.UnloadGameCodeDll() != 0)
             {
-                Logger.Log(MessageType.Info, "GameCode.dllは正常にアンロードされました。");
+                Logger.Log(MessageType.Info, "Game code DLL unloaded");
                 AvailableScripts = null;
             }
         }
@@ -270,10 +259,11 @@ namespace DXForgeEditor.GameProject
                 Scenes = new ReadOnlyObservableCollection<Scene>(_scenes);
                 OnPropertyChanged(nameof(Scenes));
             }
-            ActiveScene = Scenes.FirstOrDefault(x => x.IsActive);
+
+            ActiveScene = _scenes.FirstOrDefault(x => x.IsActive);
             Debug.Assert(ActiveScene != null);
 
-            await BuildGameCodeDll(false);
+            await BuildGameCodeDLL(false);
 
             SetCommands();
         }
@@ -283,6 +273,8 @@ namespace DXForgeEditor.GameProject
         {
             Name = name;
             Path = path;
+
+            Debug.Assert(File.Exists((Path + Name + Extension).ToLower()));
             OnDeserialized(new StreamingContext());
         }
     }

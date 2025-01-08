@@ -7,7 +7,9 @@ using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows.Xps;
+using System.Xml.Linq;
 
 namespace DXForgeEditor.GameProject
 {
@@ -94,7 +96,7 @@ namespace DXForgeEditor.GameProject
             }
         }
 
-        private ObservableCollection<ProjectTemplate> _projectTemplates = new ObservableCollection<ProjectTemplate>();
+        private readonly ObservableCollection<ProjectTemplate> _projectTemplates = new ObservableCollection<ProjectTemplate>();
         public ReadOnlyObservableCollection<ProjectTemplate> ProjectTemplates { get; }
 
         private bool ValidateProjectPath()
@@ -102,6 +104,7 @@ namespace DXForgeEditor.GameProject
             var path = ProjectPath;
             if (!Path.EndsInDirectorySeparator(path)) path += @"\";
             path += $@"{ProjectName}\";
+            var nameRegex = new Regex(@"[^A-Za-z_][A-Za-z0-9_]*$");
 
             IsValid = false;
             // プロジェクト名が空白かどうか
@@ -109,7 +112,7 @@ namespace DXForgeEditor.GameProject
             {
                 ErrorMsg = "プロジェクト名を入力してください";
             }
-            else if (ProjectName.IndexOfAny(Path.GetInvalidFileNameChars()) != -1)
+            else if (!nameRegex.IsMatch(ProjectName))
             {
                 ErrorMsg = "プロジェクト名に使用できない文字が含まれています";
             }
@@ -176,13 +179,13 @@ namespace DXForgeEditor.GameProject
             Debug.Assert(File.Exists(Path.Combine(template.TemplatePath, "MSVCSolution")));
             Debug.Assert(File.Exists(Path.Combine(template.TemplatePath, "MSVCProject")));
 
-            var engineAPIPath = Path.Combine(MainWindow.DXForgePath, @"DXForgeEngine\EngineAPI\");
+            var engineAPIPath = @"$(DXFORGE_ENGINE)DXForgeEngine\EngineAPI\";
             Debug.Assert(Directory.Exists(engineAPIPath));
 
             var _0 = ProjectName;
             var _1 = "{" + Guid.NewGuid().ToString().ToUpper() + "}";
             var _2 = engineAPIPath;
-            var _3 = MainWindow.DXForgePath;
+            var _3 = "$(DXFORGE_ENGINE)";
 
             var solution = File.ReadAllText(Path.Combine(template.TemplatePath, "MSVCSolution"));
             solution = string.Format(solution, _0, _1, "{" + Guid.NewGuid().ToString().ToUpper() + "}");

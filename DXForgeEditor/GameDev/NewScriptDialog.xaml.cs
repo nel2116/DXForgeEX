@@ -4,6 +4,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -52,9 +53,10 @@ namespace {1}
 
         private static string GetNamespaceFromProjectName()
         {
-            var projectName = Project.Current.Name;
+            var projectName = Project.Current.Name.Trim();
             if (string.IsNullOrEmpty(projectName)) return string.Empty;
-            projectName = projectName.Replace(' ', '_');
+            projectName = Regex.Replace(projectName, @"[^A-Za-z0-9_]", "");
+
             return projectName;
         }
 
@@ -64,11 +66,13 @@ namespace {1}
             var name = scriptName.Text.Trim();
             var path = scriptPath.Text.Trim();
             string errorMsg = string.Empty;
+            var nameRegex = new Regex(@"[^A-Za-z_][A-Za-z0-9_]*$");
+
             if (string.IsNullOrEmpty(name))
             {
                 errorMsg = "スクリプト名を入力してください";
             }
-            else if (name.IndexOfAny(Path.GetInvalidFileNameChars()) != -1 || name.Any(x => char.IsWhiteSpace(x)))
+            else if (!nameRegex.IsMatch(name))
             {
                 errorMsg = "スクリプト名に使用できない文字が含まれています";
             }
