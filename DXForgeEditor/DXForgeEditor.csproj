@@ -34,6 +34,27 @@
 			<EmbedInteropTypes>False</EmbedInteropTypes>
 		</COMReference>
 	</ItemGroup>
+
+	<ItemGroup>
+		<Resource Include="Resources\ContentBrowser\TileView.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Resource>
+	</ItemGroup>
+
+	<ItemGroup>
+		<Resource Include="Resources\ContentBrowser\ListView.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Resource>
+	</ItemGroup>
+
+	<ItemGroup>
+		<Resource Include="Resources\ContentBrowser\FolderLarge.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Resource>
+		<Resource Include="Resources\ContentBrowser\FolderSmall.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Resource>
+	</ItemGroup>
 	<ItemGroup>
 		<Resource Include="Resources\PrimitiveMeshView\CheckerMap.png">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

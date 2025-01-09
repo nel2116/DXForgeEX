@@ -88,7 +88,7 @@ namespace DXForgeEditor
                 Project.Current?.Unload();
                 var project = projectBrowser.DataContext as Project;
                 Debug.Assert(project != null);
-                AssetRegistry.Reset(project.ContentPath);
+                ContentWatcher.Reset(project.ContentPath, project.Path);
                 DataContext = projectBrowser.DataContext;
             }
         }
