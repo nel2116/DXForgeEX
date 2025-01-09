@@ -8,6 +8,7 @@
              xmlns:ctlr="clr-namespace:DXForgeEditor.Utilities.Controls"
              xmlns:sys="clr-namespace:System;assembly=mscorlib"
              xmlns:gameproject="clr-namespace:DXForgeEditor.GameProject"
+             xmlns:c="clr-namespace:DXForgeEditor.Content"
              d:DataContext="{d:DesignInstance Type=gameproject:Project}"
              mc:Ignorable="d" Focusable="True"
              d:DesignHeight="450" d:DesignWidth="800">
@@ -78,6 +79,7 @@
                               VerticalAlignment="Top" Background="Transparent"/>
                 <Grid Grid.Row="1" Margin="0,5,0,0">
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="250"/>
                         <ColumnDefinition/>
                         <ColumnDefinition/>
                     </Grid.ColumnDefinitions>
@@ -86,6 +88,9 @@
                     <GridSplitter Grid.Column="1" Width="5" VerticalAlignment="Stretch"
                                     HorizontalAlignment="Left" Background="Transparent"/>
                     <util:LoggerView Grid.Column="1" Margin="5,0,0,0" Cursor=""/>
+                    <GridSplitter Grid.Column="2" Width="5" VerticalAlignment="Stretch"
+                                    HorizontalAlignment="Left" Background="Transparent"/>
+                    <c:ContentBrowserView Grid.Column="2" Margin="5,0,0,0"/>
                 </Grid>
             </Grid>
             <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Left"

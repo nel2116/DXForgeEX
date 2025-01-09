@@ -1,5 +1,7 @@
-﻿using DXForgeEditor.GameProject;
+﻿using DXForgeEditor.Content;
+using DXForgeEditor.GameProject;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Windows;
@@ -84,6 +86,9 @@ namespace DXForgeEditor
             else
             {
                 Project.Current?.Unload();
+                var project = projectBrowser.DataContext as Project;
+                Debug.Assert(project != null);
+                AssetRegistry.Reset(project.ContentPath);
                 DataContext = projectBrowser.DataContext;
             }
         }

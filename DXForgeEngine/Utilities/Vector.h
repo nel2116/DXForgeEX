@@ -341,7 +341,6 @@ namespace dxforge::utl
 		///ベクトルが空の場合は null を返します。
 		[[nodiscard]] constexpr T* begin()
 		{
-			assert(_data);
 			return std::addressof(_data[0]);
 		}
 
@@ -349,7 +348,6 @@ namespace dxforge::utl
 		///ベクトルが空の場合は null を返します。
 		[[nodiscard]] constexpr const T* begin() const
 		{
-			assert(_data);
 			return std::addressof(_data[0]);
 		}
 
@@ -357,7 +355,7 @@ namespace dxforge::utl
 		///ベクトルが空の場合は null を返します。
 		[[nodiscard]] constexpr T* end()
 		{
-			assert(_data);
+			assert(!(_data == nullptr && _size > 0));
 			return std::addressof(_data[_size]);
 		}
 
@@ -365,7 +363,7 @@ namespace dxforge::utl
 		///ベクトルが空の場合は null を返します。
 		[[nodiscard]] constexpr const T* end() const
 		{
-			assert(_data);
+			assert(!(_data == nullptr && _size > 0));
 			return std::addressof(_data[_size]);
 		}
 

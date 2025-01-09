@@ -13,6 +13,7 @@
 		<Configurations>DebugEditor;ReleaseEditor</Configurations>
 		<Platforms>x64</Platforms>
 	</PropertyGroup>
+
 	<ItemGroup>
 		<COMReference Include="EnvDTE80">
 			<WrapperTool>tlbimp</WrapperTool>
@@ -34,16 +35,16 @@
 		</COMReference>
 	</ItemGroup>
 	<ItemGroup>
-	  <Resource Include="Resources\PrimitiveMeshView\CheckerMap.png">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </Resource>
+		<Resource Include="Resources\PrimitiveMeshView\CheckerMap.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Resource>
 	</ItemGroup>
 	<ItemGroup>
-	  <None Include="Resources\PrimitiveMeshView\PlaneTexture.png" />
+		<None Include="Resources\PrimitiveMeshView\PlaneTexture.png" />
 	</ItemGroup>
 	<ItemGroup>
-	  <Resource Include="Resources\PrimitiveMeshView\PlaneTexture.png">
-	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	  </Resource>
+		<Resource Include="Resources\PrimitiveMeshView\PlaneTexture.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Resource>
 	</ItemGroup>
 </Project>
