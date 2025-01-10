@@ -366,7 +366,9 @@ namespace DXForgeEditor.Content
                 {
                     Debug.Assert(lodGroup.LODs.Any());
                     // ファイル名に最も詳細なLODの名前を使用する。
-                    var meshFileName = ContentHelper.SanitizeFileName(path + fileName + "_" + lodGroup.LODs[0].Name + AssetFileExtension);
+                    var meshFileName = ContentHelper.SanitizeFileName(_lodGroups.Count > 1 ?
+                        path + fileName + "_" + lodGroup.LODs[0].Name + AssetFileExtension :
+                        path + fileName + AssetFileExtension);
                     // NOTE: 新しいアセットファイルごとに異なるIDを作成する必要がある。
                     Guid = Guid.NewGuid();
                     byte[] data = null;

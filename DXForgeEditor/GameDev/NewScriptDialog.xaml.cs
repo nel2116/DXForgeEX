@@ -72,7 +72,7 @@ namespace {1}
             {
                 errorMsg = "スクリプト名を入力してください";
             }
-            else if (!nameRegex.IsMatch(name))
+            else if (nameRegex.IsMatch(name))
             {
                 errorMsg = "スクリプト名に使用できない文字が含まれています";
             }

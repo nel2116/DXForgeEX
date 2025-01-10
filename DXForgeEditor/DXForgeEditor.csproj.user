@@ -10,6 +10,9 @@
     <Compile Update="Content\ContentBrowser\ContentBrowserView.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Update="Content\ContentBrowser\SaveDialog.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Update="Content\PrimitiveMeshDialog.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -58,6 +61,9 @@
   </ItemGroup>
   <ItemGroup>
     <Page Update="Content\ContentBrowser\ContentBrowserView.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Update="Content\ContentBrowser\SaveDialog.xaml">
       <SubType>Designer</SubType>
     </Page>
     <Page Update="Content\PrimitiveMeshDialog.xaml">

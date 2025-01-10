@@ -13,7 +13,6 @@
 		<Configurations>DebugEditor;ReleaseEditor</Configurations>
 		<Platforms>x64</Platforms>
 	</PropertyGroup>
-
 	<ItemGroup>
 		<COMReference Include="EnvDTE80">
 			<WrapperTool>tlbimp</WrapperTool>
