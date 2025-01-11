@@ -46,6 +46,8 @@ namespace dxforge::tools
 		utl::vector<math::v3> normals;					// 法線
 		utl::vector<math::v4> tangents;					// 接線
 		utl::vector< utl::vector<math::v2>> uv_sets;	// UVセット
+		utl::vector<u32> material_indices;				// マテリアルインデックス
+		utl::vector<u32> material_used;					// マテリアルが使用されているかどうか
 
 		utl::vector<u32> raw_indices;					// インデックス
 

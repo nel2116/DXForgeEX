@@ -326,6 +326,91 @@ namespace dxforge::tools
 			memcpy(&buffer[at], data, s); at += s;		// インデックスのコピーして位置を進める
 		}
 
+		bool split_meshes_by_material(u32 material_index, mesh& m, mesh& submesh)
+		{
+			submesh.name = m.name;
+			submesh.lod_threshold = m.lod_threshold;
+			submesh.lod_id = m.lod_id;
+			submesh.material_used.emplace_back(material_index);
+			submesh.uv_sets.resize(m.uv_sets.size());
+
+			const u32 num_polys{ (u32)m.raw_indices.size() / 3 };
+			utl::vector<u32> vertex_ref(m.positions.size(), u32_invalid_id);
+
+			for (u32 i{ 0 }; i < num_polys; ++i)
+			{
+				const u32 mtl_idx{ m.material_indices[i] };
+				if (mtl_idx != material_index) continue;
+
+				const u32 index{ i * 3 };
+				for (u32 j = index; j < index + 3; ++j)
+				{
+					const u32 v_idx{ m.raw_indices[j] };
+					if (vertex_ref[v_idx] != u32_invalid_id)
+					{
+						submesh.raw_indices.emplace_back(vertex_ref[v_idx]);
+					}
+					else
+					{
+						submesh.raw_indices.emplace_back((u32)submesh.positions.size());
+						vertex_ref[v_idx] = (u32)submesh.raw_indices.back();
+						submesh.positions.emplace_back(m.positions[v_idx]);
+					}
+
+					if (m.normals.size())
+					{
+						submesh.normals.emplace_back(m.normals[j]);
+					}
+
+					if (m.tangents.size())
+					{
+						submesh.tangents.emplace_back(m.tangents[j]);
+					}
+
+					for (u32 k{ 0 }; k < m.uv_sets.size(); ++k)
+					{
+						if (m.uv_sets[k].size())
+						{
+							submesh.uv_sets[k].emplace_back(m.uv_sets[k][j]);
+						}
+					}
+
+				}
+			}
+			assert((submesh.raw_indices.size() % 3) == 0);
+			return !submesh.positions.empty();
+		}
+
+		void split_meshes_by_material(scene& scene)
+		{
+			for (auto& lod : scene.lod_groups)
+			{
+				utl::vector<mesh> new_meshes;
+
+				for (auto& m : lod.meshes)
+				{
+					// このメッシュに複数のマテリアルが使用されている場合は、サブメッシュに分割する。
+					const u32 num_materials{ (u32)m.material_used.size() };
+					if (num_materials > 1)
+					{
+						for (u32 i{ 0 }; i < num_materials; ++i)
+						{
+							mesh submesh{};
+							if (split_meshes_by_material(m.material_used[i], m, submesh))
+							{
+								new_meshes.emplace_back(submesh);
+							}
+						}
+					}
+					else
+					{
+						new_meshes.emplace_back(m);
+					}
+				}
+				new_meshes.swap(lod.meshes);
+			}
+		}
+
 	} // 匿名名前空間
 
 	/// @brief シーンデータの処理
@@ -333,6 +418,8 @@ namespace dxforge::tools
 	/// @param settings インポート設定
 	void process_scene(scene& scene, const geometry_import_settings& settings)
 	{
+		split_meshes_by_material(scene);
+
 		for (auto& lod : scene.lod_groups)
 		{
 			for (auto& m : lod.meshes)
