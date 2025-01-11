@@ -132,6 +132,7 @@ namespace DXForgeEditor.Content
             DataContext = null;
             InitializeComponent();
             Loaded += OnContentBrowseLoaded;
+            AllowDrop = true;
         }
 
         private void OnContentBrowseLoaded(object sender, RoutedEventArgs e)
@@ -260,6 +261,20 @@ namespace DXForgeEditor.Content
             {
                 var vm = DataContext as ContentBrowser;
                 vm.SelectedFolder = info.FullPath;
+            }
+        }
+
+        private void OnFolderContent_ListView_Drop(object sender, DragEventArgs e)
+        {
+            var vm = DataContext as ContentBrowser;
+            if (vm.SelectedFolder != null && e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                if (files?.Length > 0 && Directory.Exists(vm.SelectedFolder))
+                {
+                    _ = ContentHelper.ImportFilesAsync(files, vm.SelectedFolder);
+                    e.Handled = true;
+                }
             }
         }
 

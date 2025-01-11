@@ -70,16 +70,14 @@ namespace DXForgeEditor.DllWrappers
     {
         private const string _toolsDLL = "ContentTools.dll";
 
-        [DllImport(_toolsDLL)]
-        private static extern void CreatePrimitiveMesh([In, Out] SceneData data, PrimitiveInitInfo info);
-        public static void CreatePrimitiveMesh(Content.Geometry geometry, PrimitiveInitInfo info)
+        private static void GeometryFromSceneData(Content.Geometry geometry, Action<SceneData> sceneDataGenerator, string failureMessage)
         {
-            Debug.Assert(geometry.Type != null);
+            Debug.Assert(geometry != null);
             using var sceneData = new SceneData();
             try
             {
                 sceneData.ImportSettings.FromContentSettings(geometry);
-                CreatePrimitiveMesh(sceneData, info);
+                sceneDataGenerator(sceneData);
                 Debug.Assert(sceneData.Data != IntPtr.Zero && sceneData.DataSize > 0);
                 var data = new byte[sceneData.DataSize];
                 Marshal.Copy(sceneData.Data, data, 0, sceneData.DataSize);
@@ -87,9 +85,24 @@ namespace DXForgeEditor.DllWrappers
             }
             catch (Exception ex)
             {
-                Logger.Log(MessageType.Error, $"{info.Type} プリミティブメッシュの作成に失敗しました。");
+                Logger.Log(MessageType.Error, failureMessage);
                 Debug.WriteLine(ex.Message);
             }
+        }
+
+        [DllImport(_toolsDLL)]
+        private static extern void CreatePrimitiveMesh([In, Out] SceneData data, PrimitiveInitInfo info);
+        public static void CreatePrimitiveMesh(Content.Geometry geometry, PrimitiveInitInfo info)
+        {
+            GeometryFromSceneData(geometry, (sceneData) => CreatePrimitiveMesh(sceneData, info), $"{info.Type}プリミティブ・メッシュの作成に失敗しました。");
+        }
+
+        [DllImport(_toolsDLL)]
+        private static extern void ImportFbx(string file, [In, Out] SceneData data);
+
+        public static void ImportFbx(string file, Content.Geometry geometry)
+        {
+            GeometryFromSceneData(geometry, (sceneData) => ImportFbx(file, sceneData), $"FBXファイルからのインポートに失敗しました： {file}");
         }
     }
 }

@@ -18,11 +18,11 @@
   VulkanCore.cpp
   VulkanInterface.cpp
   Platform.cpp
-F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Core.cpp(520,52): warning C4100: 'height': 引数は関数の本体部で 1 度も参照されません。
-F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Core.cpp(520,41): warning C4100: 'width': 引数は関数の本体部で 1 度も参照されません。
+F:\HAL\Self\DXForgeEX\DXForgeEngine\Content\ContentLoader.cpp(142,14): warning C4189: 'entity_type': ローカル変数が初期化されましたが、参照されていません
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Helpers.h(350,1): warning C4324: 'dxforge::graphics::d3d12::d3dx::d3d12_pipeline_state_subobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL1,D3D12_DEPTH_STENCIL_DESC1>': アラインメント指定子のために構造体がパッドされました (ソース ファイルをコンパイルしています Graphics\Direct3D12\D3D12GPass.cpp)
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12GPass.cpp(126): message : コンパイル対象の クラス テンプレート インスタンス化 'dxforge::graphics::d3d12::d3dx::d3d12_pipeline_state_subobject<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_DEPTH_STENCIL1,D3D12_DEPTH_STENCIL_DESC1>' のリファレンスを確認してください
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12GPass.cpp(186,85): warning C4100: 'info': 引数は関数の本体部で 1 度も参照されません。
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12GPass.cpp(186,51): warning C4100: 'cmd_list': 引数は関数の本体部で 1 度も参照されません。
-F:\HAL\Self\DXForgeEX\DXForgeEngine\Content\ContentLoader.cpp(142,14): warning C4189: 'entity_type': ローカル変数が初期化されましたが、参照されていません
+F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Core.cpp(520,52): warning C4100: 'height': 引数は関数の本体部で 1 度も参照されません。
+F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Core.cpp(520,41): warning C4100: 'width': 引数は関数の本体部で 1 度も参照されません。
   DXForgeEngine.vcxproj -> F:\HAL\Self\DXForgeEX\x64\Debug\DXForgeEngine.lib

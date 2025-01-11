@@ -21,10 +21,20 @@ namespace DXForgeEditor.GameProject
         [DataMember]
         public string Name { get; private set; } = "New Project";
         [DataMember]
+
+        /// <summary>
+        /// 現在のプロジェクトを含むルート・フォルダーを取得する
+        /// </summary>
         public string Path { get; set; }
+
+        /// <summary>
+        /// 現在の DXForge プロジェクトファイルのフルパスを取得する
+        /// </summary>
         public string FullPath => $@"{Path}{Name}{Extension}";
         public string Solution => $@"{Path}{Name}.sln";
         public string ContentPath => $@"{Path}Content\";
+
+        public string TempFolder => $@"{Path}.DXForge\Temp\";
 
         private int _buildConfig;
 
@@ -165,6 +175,15 @@ namespace DXForgeEditor.GameProject
             VisualStudio.CloseVisualStudio();
             UndoRedo.Reset();
             Logger.Clear();
+            DeleteTmpFolder();
+        }
+
+        private void DeleteTmpFolder()
+        {
+            if (Directory.Exists(TempFolder))
+            {
+                Directory.Delete(TempFolder, true);
+            }
         }
 
         private static void Save(Project project)

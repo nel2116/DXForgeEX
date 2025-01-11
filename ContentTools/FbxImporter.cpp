@@ -138,6 +138,9 @@ namespace dxforge::tools
 				meshes.emplace_back(m);
 			}
 		}
+
+		// さらに下の階層にメッシュがあるかどうかを確認する。
+		get_scene(node);
 	}
 
 

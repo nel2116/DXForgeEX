@@ -1,4 +1,6 @@
-﻿using DXForgeEditor.Utilities;
+﻿using DXForgeEditor.DllWrappers;
+using DXForgeEditor.GameProject;
+using DXForgeEditor.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -247,6 +249,7 @@ namespace DXForgeEditor.Content
     class Geometry : Asset
     {
         private readonly List<LODGroup> _lodGroups = new List<LODGroup>();
+        private readonly object _lock = new object();
 
         public GeometryImportSettings ImportSettings { get; } = new GeometryImportSettings();
 
@@ -351,6 +354,47 @@ namespace DXForgeEditor.Content
             lod.Meshes.Add(mesh);
         }
 
+        public override void Import(string file)
+        {
+            Debug.Assert(File.Exists(file));
+            Debug.Assert(!string.IsNullOrEmpty(file));
+            var ext = Path.GetExtension(file).ToLower();
+
+            SourcePath = file;
+
+            try
+            {
+                if (ext == ".fbx")
+                {
+                    ImportFbx(file);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                var msg = $"インポート用の {file} の読み込みに失敗しました。";
+                Debug.WriteLine(msg);
+                Logger.Log(MessageType.Error, msg);
+            }
+
+        }
+
+        private void ImportFbx(string file)
+        {
+            Logger.Log(MessageType.Info, $"FBXファイルのインポートを開始: {file}");
+            var tempPath = Application.Current.Dispatcher.Invoke(() => Project.Current.TempFolder);
+            if (string.IsNullOrEmpty(tempPath)) return;
+
+            lock (_lock)
+            {
+                if (!Directory.Exists(tempPath)) Directory.CreateDirectory(tempPath);
+            }
+
+            var tempFile = $"{tempPath}{ContentHelper.GetRandomString()}.fbx";
+            File.Copy(file, tempFile, true);
+            ContentToolsAPI.ImportFbx(tempFile, this);
+        }
+
         public override IEnumerable<string> Save(string file)
         {
             Debug.Assert(_lodGroups.Any());
@@ -447,8 +491,9 @@ namespace DXForgeEditor.Content
         private byte[] GenerateIcon(MeshLOD lod)
         {
             // 4バイの大きさのビットマップを生成してから、縮小することでアイコンを生成する。
-            var width = 90 * 4;
+            var width = ContentInfo.IconWidth * 4;
 
+            using var memStream = new MemoryStream();
             BitmapSource bmp = null;
 
             // NOTE: WPFのコントロール（ビュー）をviewModelで使用するのは良い習慣ではありません。
@@ -457,15 +502,14 @@ namespace DXForgeEditor.Content
             {
                 bmp = Editors.GeometryView.RenderToBitmap(new Editors.MeshRenderer(lod, null), width, width);
                 bmp = new TransformedBitmap(bmp, new ScaleTransform(0.25, 0.25, 0.5, 0.5));
+
+                // ビットマップをPNG形式にエンコード
+                memStream.SetLength(0);
+
+                var encoder = new PngBitmapEncoder();
+                encoder.Frames.Add(BitmapFrame.Create(bmp));
+                encoder.Save(memStream);
             });
-
-            // ビットマップをPNG形式にエンコード
-            using var memStream = new MemoryStream();
-            memStream.SetLength(0);
-
-            var encoder = new PngBitmapEncoder();
-            encoder.Frames.Add(BitmapFrame.Create(bmp));
-            encoder.Save(memStream);
 
             return memStream.ToArray();
         }

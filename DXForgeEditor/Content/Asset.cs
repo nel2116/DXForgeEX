@@ -61,6 +61,7 @@ namespace DXForgeEditor.Content
         public Guid Guid { get; protected set; } = Guid.NewGuid();
         public DateTime ImportDate { get; protected set; }
         public byte[] Hash { get; protected set; }
+        public abstract void Import(string file);
         public abstract IEnumerable<string> Save(string file);
 
         private static AssetInfo GetAssetInfo(BinaryReader reader)
