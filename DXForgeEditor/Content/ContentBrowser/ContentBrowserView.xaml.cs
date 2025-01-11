@@ -1,4 +1,5 @@
-﻿using DXForgeEditor.GameProject;
+﻿using DXForgeEditor.Editors;
+using DXForgeEditor.GameProject;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -262,6 +263,72 @@ namespace DXForgeEditor.Content
                 var vm = DataContext as ContentBrowser;
                 vm.SelectedFolder = info.FullPath;
             }
+            else if (FileAccess.HasFlag(FileAccess.Read))
+            {
+                var assetInfo = Asset.GetAssetInfo(info.FullPath);
+                if (assetInfo != null)
+                {
+                    OpenAssetEditor(assetInfo);
+                }
+            }
+        }
+
+        private IAssetEditor OpenAssetEditor(AssetInfo info)
+        {
+            IAssetEditor editor = null;
+            try
+            {
+                switch (info.Type)
+                {
+                    case AssetType.Animation: break;
+                    case AssetType.Audio: break;
+                    case AssetType.Material: break;
+                    case AssetType.Mesh:
+                        editor = OpenEditorPanel<GeometryEditorView>(info, info.Guid, "GeometryEditor");
+                        break;
+                    case AssetType.Skeleton: break;
+                    case AssetType.Texture: break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+            }
+
+            return editor;
+        }
+
+        private IAssetEditor OpenEditorPanel<T>(AssetInfo info, Guid guid, string title)
+                   where T : FrameworkElement, new()
+        {
+            // まず、すでに開いていて同じアセットを表示しているウィンドウを探す。
+            foreach (Window window in Application.Current.Windows)
+            {
+                if (window.Content is FrameworkElement content &&
+                    content.DataContext is IAssetEditor editor &&
+                    editor.Asset.Guid == info.Guid)
+                {
+                    window.Activate();
+                    return editor;
+                }
+            }
+
+            // まだアセットエディタで開いていない場合は、新しいウィンドウを作成してアセットを読み込む。
+            var newEditor = new T();
+            Debug.Assert(newEditor.DataContext is IAssetEditor);
+            (newEditor.DataContext as IAssetEditor).SetAsset(info);
+
+            var win = new Window()
+            {
+                Content = newEditor,
+                Title = title,
+                Owner = Application.Current.MainWindow,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Style = Application.Current.FindResource("DXForgeWindowStyle") as Style
+            };
+
+            win.Show();
+            return newEditor.DataContext as IAssetEditor;
         }
 
         private void OnFolderContent_ListView_Drop(object sender, DragEventArgs e)

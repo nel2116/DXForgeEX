@@ -24,7 +24,7 @@ namespace DXForgeEditor.ContentToolsAPIStructs
         public void FromContentSettings(Content.Geometry geometry)
         {
             var settings = geometry.ImportSettings;
-            SmoothingAngle = settings.SmoothingAngle;
+            SmoothingAngle = settings.SmootingAngle;
             CalculateNormals = ToByte(settings.CalculateNormals);
             CalculateTangents = ToByte(settings.CalculateTangents);
             ReverseHandedness = ToByte(settings.ReverseHandedness);
@@ -102,7 +102,7 @@ namespace DXForgeEditor.DllWrappers
 
         public static void ImportFbx(string file, Content.Geometry geometry)
         {
-            GeometryFromSceneData(geometry, (sceneData) => ImportFbx(file, sceneData), $"FBXファイルからのインポートに失敗しました： {file}");
+            GeometryFromSceneData(geometry, (sceneData) => ImportFbx(file, sceneData), $"FBXファイルのインポートに失敗しました： {file}");
         }
     }
 }

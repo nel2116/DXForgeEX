@@ -68,6 +68,7 @@ namespace DXForgeEditor.Content
                 }
             }
         }
+
         private int _indexCount;
         public int IndexCount
         {
@@ -168,16 +169,16 @@ namespace DXForgeEditor.Content
             }
         }
 
-        private float _smoothingAngle;
-        public float SmoothingAngle
+        private float _smootingAngle;
+        public float SmootingAngle
         {
-            get => _smoothingAngle;
+            get => _smootingAngle;
             set
             {
-                if (!_smoothingAngle.IsTheSameAs(value))
+                if (_smootingAngle != value)
                 {
-                    _smoothingAngle = value;
-                    OnPropertyChanged(nameof(SmoothingAngle));
+                    _smootingAngle = value;
+                    OnPropertyChanged(nameof(SmootingAngle));
                 }
             }
         }
@@ -197,7 +198,6 @@ namespace DXForgeEditor.Content
         }
 
         private bool _importEmbeddedTextures;
-
         public bool ImportEmbeddedTextures
         {
             get => _importEmbeddedTextures;
@@ -229,7 +229,7 @@ namespace DXForgeEditor.Content
         {
             CalculateNormals = false;
             CalculateTangents = false;
-            SmoothingAngle = 178;
+            SmootingAngle = 178f;
             ReverseHandedness = false;
             ImportEmbeddedTextures = true;
             ImportAnimations = true;
@@ -239,10 +239,20 @@ namespace DXForgeEditor.Content
         {
             writer.Write(CalculateNormals);
             writer.Write(CalculateTangents);
-            writer.Write(SmoothingAngle);
+            writer.Write(SmootingAngle);
             writer.Write(ReverseHandedness);
             writer.Write(ImportEmbeddedTextures);
             writer.Write(ImportAnimations);
+        }
+
+        public void FromBinary(BinaryReader reader)
+        {
+            CalculateNormals = reader.ReadBoolean();
+            CalculateTangents = reader.ReadBoolean();
+            SmootingAngle = reader.ReadSingle();
+            ReverseHandedness = reader.ReadBoolean();
+            ImportEmbeddedTextures = reader.ReadBoolean();
+            ImportAnimations = reader.ReadBoolean();
         }
     }
 
@@ -256,7 +266,7 @@ namespace DXForgeEditor.Content
         public LODGroup GetLODGroup(int lodGroup = 0)
         {
             Debug.Assert(lodGroup >= 0 && lodGroup < _lodGroups.Count);
-            return _lodGroups.Any() ? _lodGroups[lodGroup] : null;
+            return (lodGroup < _lodGroups.Count) ? _lodGroups[lodGroup] : null;
         }
 
         public void FromRawData(byte[] data)
@@ -265,16 +275,16 @@ namespace DXForgeEditor.Content
             _lodGroups.Clear();
 
             using var reader = new BinaryReader(new MemoryStream(data));
-            // シーン名文字列の読み込みをスキップ
+            // skip scene name string
             var s = reader.ReadInt32();
             reader.BaseStream.Position += s;
-            // LOD数を取得
+            // get number of LODs
             var numLODGroups = reader.ReadInt32();
             Debug.Assert(numLODGroups > 0);
 
-            for (int i = 0; i < numLODGroups; i++)
+            for (int i = 0; i < numLODGroups; ++i)
             {
-                // LODグループ名を取得
+                // get LOD group's name
                 s = reader.ReadInt32();
                 string lodGroupName;
                 if (s > 0)
@@ -286,12 +296,13 @@ namespace DXForgeEditor.Content
                 {
                     lodGroupName = $"lod_{ContentHelper.GetRandomString()}";
                 }
-                // このLODグループに含まれるメッシュ数を取得
+
+                // get number of meshes in this LOD group
                 var numMeshes = reader.ReadInt32();
                 Debug.Assert(numMeshes > 0);
-                List<MeshLOD> lods = ReadMeshLODs(numMeshes, reader);
+                var lods = ReadMeshLODs(numMeshes, reader);
 
-                var lodGroup = new LODGroup { Name = lodGroupName };
+                var lodGroup = new LODGroup() { Name = lodGroupName };
                 lods.ForEach(l => lodGroup.LODs.Add(l));
 
                 _lodGroups.Add(lodGroup);
@@ -302,16 +313,17 @@ namespace DXForgeEditor.Content
         {
             var lodIds = new List<int>();
             var lodList = new List<MeshLOD>();
-            for (int i = 0; i < numMeshes; i++)
+            for (int i = 0; i < numMeshes; ++i)
             {
                 ReadMeshes(reader, lodIds, lodList);
             }
+
             return lodList;
         }
 
         private static void ReadMeshes(BinaryReader reader, List<int> lodIds, List<MeshLOD> lodList)
         {
-            // メッシュの名前を取得
+            // get mesh's name
             var s = reader.ReadInt32();
             string meshName;
             if (s > 0)
@@ -348,16 +360,17 @@ namespace DXForgeEditor.Content
             else
             {
                 lodIds.Add(lodId);
-                lod = new MeshLOD { Name = meshName, LodThreshold = lodThreshold };
+                lod = new MeshLOD() { Name = meshName, LodThreshold = lodThreshold };
                 lodList.Add(lod);
             }
+
             lod.Meshes.Add(mesh);
         }
 
         public override void Import(string file)
         {
             Debug.Assert(File.Exists(file));
-            Debug.Assert(!string.IsNullOrEmpty(file));
+            Debug.Assert(!string.IsNullOrEmpty(FullPath));
             var ext = Path.GetExtension(file).ToLower();
 
             SourcePath = file;
@@ -372,16 +385,15 @@ namespace DXForgeEditor.Content
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
-                var msg = $"インポート用の {file} の読み込みに失敗しました。";
+                var msg = $"インポート用ファイルの読み込みに失敗しました: {file} ";
                 Debug.WriteLine(msg);
                 Logger.Log(MessageType.Error, msg);
             }
-
         }
 
         private void ImportFbx(string file)
         {
-            Logger.Log(MessageType.Info, $"FBXファイルのインポートを開始: {file}");
+            Logger.Log(MessageType.Info, $"FBXファイルのインポート: {file}");
             var tempPath = Application.Current.Dispatcher.Invoke(() => Project.Current.TempFolder);
             if (string.IsNullOrEmpty(tempPath)) return;
 
@@ -393,6 +405,48 @@ namespace DXForgeEditor.Content
             var tempFile = $"{tempPath}{ContentHelper.GetRandomString()}.fbx";
             File.Copy(file, tempFile, true);
             ContentToolsAPI.ImportFbx(tempFile, this);
+        }
+
+        public override void Load(string file)
+        {
+            Debug.Assert(File.Exists(file));
+            Debug.Assert(Path.GetExtension(file).ToLower() == AssetFileExtension);
+
+            try
+            {
+                byte[] data = null;
+                using (var reader = new BinaryReader(File.Open(file, FileMode.Open, FileAccess.Read)))
+                {
+                    ReadAssetFileHeader(reader);
+                    ImportSettings.FromBinary(reader);
+                    int dataLength = reader.ReadInt32();
+                    Debug.Assert(dataLength > 0);
+                    data = reader.ReadBytes(dataLength);
+                }
+
+                Debug.Assert(data.Length > 0);
+
+                using (var reader = new BinaryReader(new MemoryStream(data)))
+                {
+                    LODGroup lodGroup = new LODGroup();
+                    lodGroup.Name = reader.ReadString();
+                    var lodGroupCount = reader.ReadInt32();
+
+                    for (int i = 0; i < lodGroupCount; ++i)
+                    {
+                        lodGroup.LODs.Add(BinaryToLOD(reader));
+                    }
+
+                    _lodGroups.Clear();
+                    _lodGroups.Add(lodGroup);
+                }
+
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                Logger.Log(MessageType.Error, $"ファイルからのGeometryAssetのロードに失敗しました: {file}");
+            }
         }
 
         public override IEnumerable<string> Save(string file)
@@ -409,40 +463,30 @@ namespace DXForgeEditor.Content
                 foreach (var lodGroup in _lodGroups)
                 {
                     Debug.Assert(lodGroup.LODs.Any());
-                    // ファイル名に最も詳細なLODの名前を使用する。
+                    // Use the name of most detailed LOD for file name
                     var meshFileName = ContentHelper.SanitizeFileName(_lodGroups.Count > 1 ?
                         path + fileName + "_" + lodGroup.LODs[0].Name + AssetFileExtension :
                         path + fileName + AssetFileExtension);
-                    // NOTE: 新しいアセットファイルごとに異なるIDを作成する必要がある。
-                    Guid = Guid.NewGuid();
+                    // NOTE: we have to make a different id for each new asset file, but if a geometry asset file
+                    //       with the same name already exists then we use its guid instead.
+                    Guid = TryGetAssetInfo(meshFileName) is AssetInfo info && info.Type == Type ? info.Guid : Guid.NewGuid();
                     byte[] data = null;
-                    // ファイルに書き込むデータを作成
                     using (var writer = new BinaryWriter(new MemoryStream()))
                     {
-                        // ヘッダーを書き込む
                         writer.Write(lodGroup.Name);
                         writer.Write(lodGroup.LODs.Count);
                         var hashes = new List<byte>();
-                        // メッシュデータを書き込む
                         foreach (var lod in lodGroup.LODs)
                         {
-                            // メッシュデータをバイナリ形式に変換
-                            writer.Write(lod.Name);
-                            writer.Write(lod.Meshes.Count);
-
-                            // メッシュデータのハッシュを計算
-                            foreach (var mesh in lod.Meshes)
-                            {
-                                LODToBinary(lod, writer, out var hash);
-                                hashes.AddRange(hash);
-                            }
-                            Hash = ContentHelper.ComputeHash(hashes.ToArray());
-                            data = (writer.BaseStream as MemoryStream).ToArray();
-                            Icon = GenerateIcon(lodGroup.LODs[0]);
+                            LODToBinary(lod, writer, out var hash);
+                            hashes.AddRange(hash);
                         }
+
+                        Hash = ContentHelper.ComputeHash(hashes.ToArray());
+                        data = (writer.BaseStream as MemoryStream).ToArray();
+                        Icon = GenerateIcon(lodGroup.LODs[0]);
                     }
 
-                    // ファイルにデータを書き込む
                     Debug.Assert(data?.Length > 0);
 
                     using (var writer = new BinaryWriter(File.Open(meshFileName, FileMode.Create, FileAccess.Write)))
@@ -453,6 +497,7 @@ namespace DXForgeEditor.Content
                         writer.Write(data);
                     }
 
+                    Logger.Log(MessageType.Info, $"Geometryを保存: {meshFileName}");
                     savedFiles.Add(meshFileName);
                 }
             }
@@ -488,22 +533,47 @@ namespace DXForgeEditor.Content
             var buffer = (writer.BaseStream as MemoryStream).ToArray();
             hash = ContentHelper.ComputeHash(buffer, (int)meshDataBegin, (int)meshDataSize);
         }
+
+        private MeshLOD BinaryToLOD(BinaryReader reader)
+        {
+            var lod = new MeshLOD();
+            lod.Name = reader.ReadString();
+            lod.LodThreshold = reader.ReadSingle();
+            var meshCount = reader.ReadInt32();
+
+            for (int i = 0; i < meshCount; ++i)
+            {
+                var mesh = new Mesh()
+                {
+                    VertexSize = reader.ReadInt32(),
+                    VertexCount = reader.ReadInt32(),
+                    IndexSize = reader.ReadInt32(),
+                    IndexCount = reader.ReadInt32()
+                };
+
+                mesh.Vertices = reader.ReadBytes(mesh.VertexSize * mesh.VertexCount);
+                mesh.Indices = reader.ReadBytes(mesh.IndexSize * mesh.IndexCount);
+
+                lod.Meshes.Add(mesh);
+            }
+
+            return lod;
+        }
+
         private byte[] GenerateIcon(MeshLOD lod)
         {
-            // 4バイの大きさのビットマップを生成してから、縮小することでアイコンを生成する。
             var width = ContentInfo.IconWidth * 4;
 
             using var memStream = new MemoryStream();
             BitmapSource bmp = null;
-
-            // NOTE: WPFのコントロール（ビュー）をviewModelで使用するのは良い習慣ではありません。
-            // しかし、スクリーンショットに使えるグラフィックレンダラーがない限り、このケースは例外とする必要があります。
+            // NOTE: it's not good practice to use a WPF control (view) in the ViewModel.
+            //       But we need to make an exception for this case, for as long as we don't
+            //       have a graphics renderer that we can use for screenshots.
             Application.Current.Dispatcher.Invoke(() =>
             {
                 bmp = Editors.GeometryView.RenderToBitmap(new Editors.MeshRenderer(lod, null), width, width);
                 bmp = new TransformedBitmap(bmp, new ScaleTransform(0.25, 0.25, 0.5, 0.5));
 
-                // ビットマップをPNG形式にエンコード
                 memStream.SetLength(0);
 
                 var encoder = new PngBitmapEncoder();

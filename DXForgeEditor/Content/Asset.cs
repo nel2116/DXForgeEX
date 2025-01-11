@@ -62,7 +62,9 @@ namespace DXForgeEditor.Content
         public DateTime ImportDate { get; protected set; }
         public byte[] Hash { get; protected set; }
         public abstract void Import(string file);
+        public abstract void Load(string file);
         public abstract IEnumerable<string> Save(string file);
+
 
         private static AssetInfo GetAssetInfo(BinaryReader reader)
         {
@@ -81,6 +83,8 @@ namespace DXForgeEditor.Content
 
             return info;
         }
+
+        public static AssetInfo TryGetAssetInfo(string file) => File.Exists(file) && Path.GetExtension(file) == AssetFileExtension ? AssetRegistry.GetAssetInfo(file) ?? GetAssetInfo(file) : null;
 
         public static AssetInfo GetAssetInfo(string file)
         {
@@ -129,7 +133,6 @@ namespace DXForgeEditor.Content
             var info = GetAssetInfo(reader);
 
             Debug.Assert(Type == info.Type);
-            //            Type = info.Type;
             Guid = info.Guid;
             ImportDate = info.ImportDate;
             Hash = info.Hash;

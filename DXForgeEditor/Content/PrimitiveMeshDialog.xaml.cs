@@ -82,7 +82,7 @@ namespace DXForgeEditor.Content
             }
 
             var geometry = new Geometry();
-            geometry.ImportSettings.SmoothingAngle = smoothingAngle;
+            geometry.ImportSettings.SmootingAngle = smoothingAngle;
             ContentToolsAPI.CreatePrimitiveMesh(geometry, info);
             (DataContext as GeometryEditor).SetAsset(geometry);
             OnTexture_CheckBox_Click(textureCheckBox, null);
