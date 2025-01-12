@@ -6,6 +6,8 @@
 // 　レンダラー
 // 更新履歴
 // 2024/12/27 新規作成
+// 2025/01/12 add_submesh()、remove_submesh()の追加
+// 2025/01/12 カメラ関連の処理の追加
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Renderer.h"
@@ -103,6 +105,157 @@ namespace dxforge::graphics
 	{
 		assert(is_valid());
 		gfx.surface.render(_id);
+	}
+
+	camera create_camera(camera_init_info info)
+	{
+		return gfx.camera.create(info);
+	}
+
+	void remove_camera(camera_id id)
+	{
+		gfx.camera.remove(id);
+	}
+
+	void camera::up(math::v3 up) const
+	{
+		assert(is_valid());
+		gfx.camera.set_parameter(_id, camera_parameter::up_vector, &up, sizeof(up));
+	}
+	void camera::field_of_view(f32 fov) const
+	{
+		assert(is_valid());
+		gfx.camera.set_parameter(_id, camera_parameter::field_of_view, &fov, sizeof(fov));
+	}
+	void camera::aspect_ratio(f32 aspect_ratio) const
+	{
+		assert(is_valid());
+		gfx.camera.set_parameter(_id, camera_parameter::aspect_ratio, &aspect_ratio, sizeof(aspect_ratio));
+	}
+	void camera::view_width(f32 width) const
+	{
+		assert(is_valid());
+		gfx.camera.set_parameter(_id, camera_parameter::view_width, &width, sizeof(width));
+	}
+	void camera::view_height(f32 height) const
+	{
+		assert(is_valid());
+		gfx.camera.set_parameter(_id, camera_parameter::view_height, &height, sizeof(height));
+	}
+	void camera::range(f32 near_z, f32 far_z) const
+	{
+		assert(is_valid());
+		gfx.camera.set_parameter(_id, camera_parameter::near_z, &near_z, sizeof(near_z));
+		gfx.camera.set_parameter(_id, camera_parameter::far_z, &far_z, sizeof(far_z));
+	}
+
+	math::m4x4 camera::view() const
+	{
+		assert(is_valid());
+		math::m4x4 matrix;
+		gfx.camera.get_parameter(_id, camera_parameter::view, &matrix, sizeof(matrix));
+		return matrix;
+	}
+	math::m4x4 camera::projection() const
+	{
+		assert(is_valid());
+		math::m4x4 matrix;
+		gfx.camera.get_parameter(_id, camera_parameter::projection, &matrix, sizeof(matrix));
+		return matrix;
+	}
+	math::m4x4 camera::inverse_projection() const
+	{
+		assert(is_valid());
+		math::m4x4 matrix;
+		gfx.camera.get_parameter(_id, camera_parameter::inverse_projection, &matrix, sizeof(matrix));
+		return matrix;
+	}
+	math::m4x4 camera::view_projection() const
+	{
+		assert(is_valid());
+		math::m4x4 matrix;
+		gfx.camera.get_parameter(_id, camera_parameter::view_projection, &matrix, sizeof(matrix));
+		return matrix;
+	}
+	math::m4x4 camera::inverse_view_projection() const
+	{
+		assert(is_valid());
+		math::m4x4 matrix;
+		gfx.camera.get_parameter(_id, camera_parameter::inverse_view_projection, &matrix, sizeof(matrix));
+		return matrix;
+	}
+	math::v3 camera::up() const
+	{
+		assert(is_valid());
+		math::v3 up_vector;
+		gfx.camera.get_parameter(_id, camera_parameter::up_vector, &up_vector, sizeof(up_vector));
+		return up_vector;
+	}
+	f32 camera::near_z() const
+	{
+		assert(is_valid());
+		f32 near_z;
+		gfx.camera.get_parameter(_id, camera_parameter::near_z, &near_z, sizeof(near_z));
+		return near_z;
+	}
+	f32 camera::far_z() const
+	{
+		assert(is_valid());
+		f32 far_z;
+		gfx.camera.get_parameter(_id, camera_parameter::far_z, &far_z, sizeof(far_z));
+		return far_z;
+	}
+	f32 camera::field_of_view() const
+	{
+		assert(is_valid());
+		f32 fov;
+		gfx.camera.get_parameter(_id, camera_parameter::field_of_view, &fov, sizeof(fov));
+		return fov;
+	}
+	f32 camera::aspect_ratio() const
+	{
+		assert(is_valid());
+		f32 aspect_ratio;
+		gfx.camera.get_parameter(_id, camera_parameter::aspect_ratio, &aspect_ratio, sizeof(aspect_ratio));
+		return aspect_ratio;
+	}
+	f32 camera::view_width() const
+	{
+		assert(is_valid());
+		f32 width;
+		gfx.camera.get_parameter(_id, camera_parameter::view_width, &width, sizeof(width));
+		return width;
+	}
+	f32 camera::view_height() const
+	{
+		assert(is_valid());
+		f32 height;
+		gfx.camera.get_parameter(_id, camera_parameter::view_height, &height, sizeof(height));
+		return height;
+	}
+	camera::type camera::projection_type() const
+	{
+		assert(is_valid());
+		camera::type type;
+		gfx.camera.get_parameter(_id, camera_parameter::type, &type, sizeof(type));
+		return type;
+	}
+	id::id_type camera::entity_id() const
+	{
+		assert(is_valid());
+		id::id_type entity_id;
+		gfx.camera.get_parameter(_id, camera_parameter::entity_id, &entity_id, sizeof(entity_id));
+		return entity_id;
+	}
+
+	id::id_type add_submesh(const u8*& data)
+	{
+		return gfx.resources.add_submesh(data);
+	}
+
+	void remove_submesh(id::id_type id)
+	{
+		gfx.resources.remove_submesh(id);
 	}
 
 }	// namespace dxforge::graphics

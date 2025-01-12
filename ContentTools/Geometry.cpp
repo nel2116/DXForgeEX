@@ -483,34 +483,44 @@ namespace dxforge::tools
 		/// @param at バッファの位置
 		void pack_mesh_data(const mesh& m, utl::blob_stream_writer& blob)
 		{
-			// mesh name
+			// メッシュ名の書き込み
 			blob.write((u32)m.name.size());
 			blob.write(m.name.c_str(), m.name.size());
-			// lod id
+
+			// LOD IDの書き込み
 			blob.write(m.lod_id);
-			// vertex element size
+
+			// 頂点要素サイズの書き込み
 			const u32 elements_size{ (u32)get_vertex_element_size(m.elements_type) };
 			blob.write(elements_size);
-			// elements type enumeration
+
+			// 要素タイプの書き込み
 			blob.write((u32)m.elements_type);
-			// number of vertices
+
+			// 頂点数の書き込み
 			const u32 num_vertices{ (u32)m.vertices.size() };
 			blob.write(num_vertices);
-			// index size (16 bit or 32 bit)
+
+			// インデックスサイズ(16ビットまたは32ビット)の書き込み
 			const u32 index_size{ (num_vertices < (1 << 16)) ? sizeof(u16) : sizeof(u32) };
 			blob.write(index_size);
-			// number of indices
+
+			// インデックス数の書き込み
 			const u32 num_indices{ (u32)m.indices.size() };
 			blob.write(num_indices);
-			// LOD threshold
+
+			// LOD閾値の書き込み
 			blob.write(m.lod_threshold);
-			// position buffer
+
+			// position bufferの書き込み
 			assert(m.position_buffer.size() == sizeof(math::v3) * num_vertices);
 			blob.write(m.position_buffer.data(), m.position_buffer.size());
-			// element buffer
+
+			// element bufferの書き込み
 			assert(m.element_buffer.size() == elements_size * num_vertices);
 			blob.write(m.element_buffer.data(), m.element_buffer.size());
-			// index data
+
+			// index dataの書き込み
 			const u32 index_buffer_size{ index_size * num_indices };
 			const u8* data{ (const u8*)m.indices.data() };
 			utl::vector<u16> indices;

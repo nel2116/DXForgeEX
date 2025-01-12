@@ -18,11 +18,20 @@ namespace dxforge::graphics::d3d12::d3dx
 	{
 		const D3D12_HEAP_PROPERTIES default_heap
 		{
-			D3D12_HEAP_TYPE_DEFAULT,			// Type;
-			D3D12_CPU_PAGE_PROPERTY_UNKNOWN,	// CPUPageProperty;
-			D3D12_MEMORY_POOL_UNKNOWN,			// MemoryPoolPreference;
-			0,									// CreationNodeMask;
-			0									// VisibleNodeMask;
+			D3D12_HEAP_TYPE_DEFAULT,			// Type: デフォルトヒープ
+			D3D12_CPU_PAGE_PROPERTY_UNKNOWN,	// CPUPageProperty: 不明
+			D3D12_MEMORY_POOL_UNKNOWN,			// MemoryPoolPreference: 不明
+			0,									// CreationNodeMask: 0
+			0									// VisibleNodeMask: 0
+		};
+
+		const D3D12_HEAP_PROPERTIES upload_heap
+		{
+			D3D12_HEAP_TYPE_UPLOAD,				// Type: アップロードヒープ
+			D3D12_CPU_PAGE_PROPERTY_UNKNOWN,	// CPUPageProperty: 不明
+			D3D12_MEMORY_POOL_UNKNOWN,			// MemoryPoolPreference: 不明
+			0,									// CreationNodeMask: 0
+			0									// VisibleNodeMask: 0
 		};
 
 	} heap_properties;
@@ -180,7 +189,7 @@ namespace dxforge::graphics::d3d12::d3dx
 			++_offset;
 		}
 
-		// バリアリストにUAVバリアを追加
+		// バリアリストにUAVバリアを追加する
 		constexpr void add(ID3D12Resource* resource, D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE)
 		{
 			assert(resource);
@@ -192,7 +201,7 @@ namespace dxforge::graphics::d3d12::d3dx
 			++_offset;
 		}
 
-		// add an aliasing barrier to the barriers.
+		// バリアにエイリアシングバリアを追加する。
 		constexpr void add(ID3D12Resource* resource_before, ID3D12Resource* resource_after, D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE)
 		{
 			assert(resource_before && resource_after);
@@ -206,6 +215,7 @@ namespace dxforge::graphics::d3d12::d3dx
 			++_offset;
 		}
 
+		// バリアリストを適用する
 		void apply(id3d12_graphics_command_list* cmd_list)
 		{
 			assert(_offset);
@@ -381,5 +391,19 @@ namespace dxforge::graphics::d3d12::d3dx
 
 	ID3D12PipelineState* create_pipeline_state(D3D12_PIPELINE_STATE_STREAM_DESC desc);
 	ID3D12PipelineState* create_pipeline_state(void* stream, u64 stream_size);
+
+	/// @brief バッファを作成する
+	/// @param buffer_size バッファのサイズ
+	/// @param data データ(省略可能)
+	/// @param is_cpu_accessible CPUからアクセス可能か(省略可能)
+	/// @param state リソースの状態(省略可能)
+	/// @param flags リソースのフラグ(省略可能)
+	/// @param heap ヒープ(省略可能)
+	/// @param heap_offset ヒープのオフセット(省略可能)
+	/// @return 作成されたリソース
+	ID3D12Resource* create_buffer(const void* data, u32 buffer_size, bool is_cpu_accessible = false,
+		D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON,
+		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE,
+		ID3D12Heap* heap = nullptr, u64 heap_offset = 0);
 
 }	// namespace dxforge::graphics::d3d12::d3dx

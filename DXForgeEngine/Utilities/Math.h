@@ -6,6 +6,7 @@
 //
 // 更新履歴
 // 2024/12/24 新規作成
+// 2025/01/12 align_size_up()とalign_size_down()の追加
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -52,6 +53,27 @@ namespace dxforge::math
 	{
 		assert(min < max);
 		return unpack_to_unit_float<bits>(i) * (max - min) + min;
+	}
+
+
+	// 四捨五入して整列する。 alignment' の倍数が 'size' 以上となる。
+	template<u64 alignment>
+	constexpr u64 align_size_up(u64 size)
+	{
+		static_assert(alignment, "Alignment must be non-zero.");
+		constexpr u64 mask{ alignment - 1 };
+		static_assert(!(alignment & mask), "Alignment should be a power of 2.");
+		return ((size + mask) & ~mask);
+	}
+
+	// 四捨五入して揃える。 alignment'の倍数が'size'以下になる。
+	template<u64 alignment>
+	constexpr u64 align_size_down(u64 size)
+	{
+		static_assert(alignment, "Alignment must be non-zero.");
+		constexpr u64 mask{ alignment - 1 };
+		static_assert(!(alignment & mask), "Alignment should be a power of 2.");
+		return (size & ~mask);
 	}
 
 }	// namespace dxforge::math

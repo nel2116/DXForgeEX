@@ -11,7 +11,7 @@
 #include "CommonHeaders.h"
 #include "OpenGLInterface.h"
 #include "OpenGLCore.h"
-#include "Graphics\GraphicsPlatformInterface.h"
+#include "Graphics/GraphicsPlatformInterface.h"
 
 namespace dxforge::graphics::opengl
 {

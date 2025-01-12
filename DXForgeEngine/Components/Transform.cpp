@@ -7,6 +7,7 @@
 // 更新履歴
 // 2024/11/11 新規作成
 // 2025/01/07 コメント修正
+// 2525/01/12 Orientationの計算を追加
 // /_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Transform.h"
@@ -17,8 +18,19 @@ namespace dxforge::transform
 	namespace
 	{
 		utl::vector<math::v4> rotations;	// 回転値
+		utl::vector<math::v3> orientations;	// 向き値
 		utl::vector<math::v3> positions;	// 位置値
 		utl::vector<math::v3> scales;		// スケール値
+
+		math::v3 calculate_orientation(math::v4 rotation)
+		{
+			using namespace DirectX;
+			XMVECTOR rotation_quat{ XMLoadFloat4(&rotation) };
+			XMVECTOR front{ XMVectorSet(0.0f,0.0f,1.0f,0.0f) };
+			math::v3 orientation;
+			XMStoreFloat3(&orientation, XMVector3Rotate(front, rotation_quat));
+			return orientation;
+		}
 
 	}	// 匿名名前空間
 
@@ -38,15 +50,18 @@ namespace dxforge::transform
 		{
 			// そのスロットを取得した新しい値で上書きする
 			// つまり再利用を行う
-			rotations[entity_index] = math::v4(info.rotation);
-			positions[entity_index] = math::v3(info.position);
-			scales[entity_index] = math::v3(info.scale);
+			math::v4 rotation{ info.rotation };
+			rotations[entity_index] = rotation;
+			orientations[entity_index] = calculate_orientation(rotation);
+			positions[entity_index] = math::v3{ info.position };
+			scales[entity_index] = math::v3{ info.scale };
 		}
 		else
 		{
 			// そうでない場合は新しい値を追加する
 			assert(positions.size() == entity_index);
 			rotations.emplace_back(info.rotation);
+			orientations.emplace_back(calculate_orientation(math::v4{ info.rotation }));
 			positions.emplace_back(info.position);
 			scales.emplace_back(info.scale);
 		}
@@ -65,6 +80,14 @@ namespace dxforge::transform
 	{
 		assert(is_valid());
 		return rotations[id::index(_id)];
+	}
+
+	/// @brief Transformコンポーネントの向き値を取得
+	/// @return math::v3
+	math::v3 component::orientation() const
+	{
+		assert(is_valid());
+		return orientations[id::index(_id)];
 	}
 
 	/// @brief Transformコンポーネントの位置値を取得

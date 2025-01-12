@@ -27,7 +27,7 @@ Global
 		ReleaseEditor|x64 = ReleaseEditor|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.Debug|x64.ActiveCfg = Debug|x64
+		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.Debug|x64.ActiveCfg = DebugEditor|x64
 		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.DebugEditor|x64.ActiveCfg = DebugEditor|x64
 		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.DebugEditor|x64.Build.0 = DebugEditor|x64
 		{9BE3E628-EF34-44E3-8C91-A35459C6CF69}.Release|x64.ActiveCfg = ReleaseEditor|x64

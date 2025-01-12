@@ -11,7 +11,7 @@
 #include "CommonHeaders.h"
 #include "VulkanInterface.h"
 #include "VulkanCore.h"
-#include "Graphics\GraphicsPlatformInterface.h"
+#include "Graphics/GraphicsPlatformInterface.h"
 
 
 namespace dxforge::graphics::vulkan

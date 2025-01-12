@@ -8,14 +8,68 @@
 // 2024/12/27 新規作成
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
-#include "..\Platform\PlatformType.h"
-#include "..\Platform\Platform.h"
-#include "..\Graphics\Renderer.h"
+#include "Platform/PlatformType.h"
+#include "Platform/Platform.h"
+#include "Graphics/Renderer.h"
+#include "Graphics/Direct3D12/D3D12Core.h"
+#include "Content/ContentToEngine.h"
+#include "Components/Entity.h"
+#include "Components/Transform.h"
 #include "TestRenderer.h"
 #include "ShaderCompilation.h"
+#include <filesystem>
+#include <fstream>
 #if TEST_RENDERER
 
 using namespace dxforge;
+
+// Multithreaded test worker spawn code _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+#define ENABLE_TEST_WORKERS 0
+
+constexpr u32 num_threads{ 8 };
+bool shutdown{ false };
+std::thread workers[num_threads];
+
+utl::vector<u8> buffer(1024 * 1024, 0);
+
+// Test worker for upload context
+void buffer_test_worker()
+{
+	while (!shutdown)
+	{
+		auto* resource = graphics::d3d12::d3dx::create_buffer(buffer.data(), (u32)buffer.size());
+		// NOTE: レンダリングにバッファを使わないので、core::release(resource)を使うこともできる。
+		//		しかし、これは deferred_release 機能の良いテストになります。
+		graphics::d3d12::core::deferred_release(resource);
+	}
+}
+
+template<class FnPtr, class... Args>
+void init_test_workers(FnPtr&& fnPtr, Args&&... args)
+{
+#if ENABLE_TEST_WORKERS
+	shutdown = false;
+	for (auto& w : workers)
+		w = std::thread{ std::forward<FnPtr>(fnPtr), std::forward<Args>(args)... };
+#endif	// !ENABLE_TEST_WORKERS
+}
+
+void joint_test_workers()
+{
+#if ENABLE_TEST_WORKERS
+	shutdown = true;
+	for (auto& w : workers) w.join();
+#endif	// !ENABLE_TEST_WORKERS
+}
+
+
+// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+
+
+// ====== グローバル変数 ======
+game_entity::entity entity{};
+id::id_type model_id{ id::invalid_id };
+graphics::camera camera{};
 
 graphics::render_surface _surfaces[4];
 time_it timer{};
@@ -105,6 +159,49 @@ LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	return DefWindowProc(hwnd, msg, wparam, lparam);
 }
 
+game_entity::entity create_one_game_entity()
+{
+	transform::init_info transform_info{};
+	math::v3a rot{ 0.0f, 3.14f, 0.0f };
+	DirectX::XMVECTOR quat{ DirectX::XMQuaternionRotationRollPitchYawFromVector(DirectX::XMLoadFloat3A(&rot)) };
+	math::v4a rot_quat;
+	DirectX::XMStoreFloat4A(&rot_quat, quat);
+	memcpy(&transform_info.rotation[0], &rot_quat.x, sizeof(transform_info.rotation));
+
+	game_entity::entity_info entity_info{};
+	entity_info.transform = &transform_info;
+	game_entity::entity ntt{ game_entity::create(entity_info) };
+	assert(ntt.is_valid());
+	return ntt;
+}
+
+/// @brief ファイルを読み込む
+/// @param path ファイルのパス
+/// @param data 読み込んだデータ
+/// @param size データのサイズ
+/// @return 読み込みに成功したらtrue
+bool read_file(std::filesystem::path path, std::unique_ptr<u8[]>& data, u64& size)
+{
+	// ファイルが存在しない場合はfalseを返す
+	if (!std::filesystem::exists(path)) return false;
+
+	// ファイルを読み込む
+	size = std::filesystem::file_size(path);
+	assert(size);
+	if (!size) return false;
+	data = std::make_unique<u8[]>(size);
+	std::ifstream file{ path, std::ios::in | std::ios::binary };
+	// ファイルが開けない場合はfalseを返す
+	if (!file || !file.read((char*)data.get(), size))
+	{
+		file.close();
+		return false;
+	}
+
+	file.close();
+	return true;
+}
+
 void create_render_surface(graphics::render_surface& surface, platform::window_init_info info)
 {
 	surface.window = platform::create_window(&info);
@@ -123,7 +220,7 @@ bool test_initialize()
 {
 	while (!compile_shaders())
 	{
-		// Pop up a message box allowing the user to retry compilation.
+		// コンパイルの再試行を許可するメッセージボックスをポップアップする。
 		if (MessageBox(nullptr, L"Failed to compile engine shaders.", L"Shader Compilation Error", MB_RETRYCANCEL) != IDRETRY)
 			return false;
 	}
@@ -142,12 +239,36 @@ bool test_initialize()
 	for (u32 i{ 0 }; i < _countof(_surfaces); ++i)
 		create_render_surface(_surfaces[i], info[i]);
 
+	// テストモデルを読み込む
+	std::unique_ptr<u8[]> model;
+	u64 size{ 0 };
+	if (!read_file("..\\..\\enginetest\\model.model", model, size)) return false;
+
+	model_id = content::create_resource(model.get(), content::asset_type::mesh);
+	if (!id::is_valid(model_id)) return false;
+
+	init_test_workers(buffer_test_worker);
+
+	entity = create_one_game_entity();
+	camera = graphics::create_camera(graphics::perspective_camera_init_info(entity.get_id()));
+	assert(camera.is_valid());
+
 	is_restarting = false;
 	return true;
 }
 
 void test_shutdown()
 {
+	if (camera.is_valid()) graphics::remove_camera(camera.get_id());
+	if (entity.is_valid()) game_entity::remove(entity.get_id());
+
+	joint_test_workers();
+
+	if (id::is_valid(model_id))
+	{
+		content::destroy_resource(model_id, content::asset_type::mesh);
+	}
+
 	for (u32 i{ 0 }; i < _countof(_surfaces); ++i)
 		destroy_render_surface(_surfaces[i]);
 

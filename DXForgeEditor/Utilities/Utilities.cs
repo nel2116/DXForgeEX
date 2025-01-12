@@ -1,6 +1,7 @@
 ﻿using Microsoft.VisualBasic;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -26,6 +27,23 @@ namespace DXForgeEditor.Utilities
         {
             if (!value.HasValue || !other.HasValue) return false;
             return Math.Abs(value.Value - other.Value) < Epsilon;
+        }
+
+        // 四捨五入して整列する。 alignment' の倍数が 'size' 以上となる。
+        public static long AlignSizeUp(long size, long alignment)
+        {
+            Debug.Assert(alignment > 0, "Alignment must be non-zero.");
+            long mask = alignment - 1;
+            Debug.Assert((alignment & mask) == 0, "Alignment should be a power of 2.");
+            return ((size + mask) & ~mask);
+        }
+        // 四捨五入して揃える。 alignment'の倍数が'size'以下になる。
+        public static long AlignSizeDown(long size, long alignment)
+        {
+            Debug.Assert(alignment > 0, "Alignment must be non-zero.");
+            long mask = alignment - 1;
+            Debug.Assert((alignment & mask) == 0, "Alignment should be a power of 2.");
+            return (size & ~mask);
         }
     }
 

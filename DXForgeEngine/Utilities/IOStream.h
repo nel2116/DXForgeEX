@@ -29,6 +29,8 @@ namespace dxforge::utl
 		template<typename T>
 		[[nodiscard]] T read()
 		{
+			// C++ にprimitve型というものがあるかどうかはわかりません。これは整数型、FLOAT、DOUBLE、BOOL に対する私の呼び名です。
+			static_assert(std::is_arithmetic_v<T>, "Template argument should be a primitve type.");
 			T value{ *((T*)_position) };
 			_position += sizeof(T);
 			return value;
@@ -76,6 +78,8 @@ namespace dxforge::utl
 		template<typename T>
 		void write(T value)
 		{
+			// C++ にprimitve型というものがあるかどうかはわかりません。これは整数型、FLOAT、DOUBLE、BOOL に対する私の呼び名です。
+			static_assert(std::is_arithmetic_v<T>, "Template argument should be a primitve type.");
 			assert(&_position[sizeof(T)] <= &_buffer[_buffer_size]);
 			*((T*)_position) = value;
 			_position += sizeof(T);

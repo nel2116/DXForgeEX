@@ -14,6 +14,7 @@
 #include "D3D12Shaders.h"
 #include "D3D12GPass.h"
 #include "D3D12PostProcess.h"
+#include "D3D12Upload.h"
 
 using namespace Microsoft::WRL;	// ComPtrを使うため
 
@@ -82,6 +83,7 @@ namespace dxforge::graphics::d3d12::core
 				// フェンスイベントを作成
 				_fence_event = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
 				assert(_fence_event);
+				if (!_fence_event) goto _error;
 
 				// 成功した場合はここで終了
 				return;
@@ -395,7 +397,7 @@ namespace dxforge::graphics::d3d12::core
 		if (!gfx_command.command_queue()) return failed_init();
 
 		// モジュールの初期化
-		if (!(shaders::initialize() && gpass::initialize() && fx::initialize())) return failed_init();
+		if (!(shaders::initialize() && gpass::initialize() && fx::initialize() && upload::initialize())) return failed_init();
 
 		// デバッグネームを設定
 		NAME_D3D12_OBJECT(main_device, L"Main D3D12 Device");
@@ -421,6 +423,7 @@ namespace dxforge::graphics::d3d12::core
 		}
 
 		// モジュールのシャットダウン
+		upload::shutdown();
 		fx::shutdown();
 		gpass::shutdown();
 		shaders::shutdown();

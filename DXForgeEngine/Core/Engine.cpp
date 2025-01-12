@@ -9,11 +9,11 @@
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // // ====== インクルード部 ======
 #if !defined(SHIPPING)
-#include "..\Content\ContentLoader.h"
-#include "..\Components\Script.h"
-#include "..\Platform\PlatformType.h"
-#include "..\Platform\Platform.h"
-#include "..\Graphics\Renderer.h"
+#include "Content/ContentLoader.h"
+#include "Components/Script.h"
+#include "Platform/PlatformType.h"
+#include "Platform/Platform.h"
+#include "Graphics/Renderer.h"
 #include <thread>
 
 using namespace dxforge;

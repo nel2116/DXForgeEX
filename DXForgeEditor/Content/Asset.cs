@@ -64,6 +64,7 @@ namespace DXForgeEditor.Content
         public abstract void Import(string file);
         public abstract void Load(string file);
         public abstract IEnumerable<string> Save(string file);
+        public abstract byte[] PackForEngine();
 
 
         private static AssetInfo GetAssetInfo(BinaryReader reader)

@@ -1,11 +1,128 @@
 {
   "version": 3,
   "targets": {
-    "net8.0-windows7.0": {}
+    "net6.0-windows7.0": {
+      "envdte/17.12.40391": {
+        "type": "package",
+        "dependencies": {
+          "Microsoft.VisualStudio.Interop": "17.12.40391"
+        },
+        "compile": {
+          "lib/netstandard2.0/envdte.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/netstandard2.0/envdte.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "envdte80/17.12.40391": {
+        "type": "package",
+        "dependencies": {
+          "Microsoft.VisualStudio.Interop": "17.12.40391"
+        },
+        "compile": {
+          "lib/netstandard2.0/envdte80.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/netstandard2.0/envdte80.dll": {
+            "related": ".xml"
+          }
+        }
+      },
+      "Microsoft.VisualStudio.Interop/17.12.40391": {
+        "type": "package",
+        "compile": {
+          "lib/netstandard2.0/Microsoft.VisualStudio.Interop.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/netstandard2.0/Microsoft.VisualStudio.Interop.dll": {
+            "related": ".xml"
+          }
+        }
+      }
+    }
   },
-  "libraries": {},
+  "libraries": {
+    "envdte/17.12.40391": {
+      "sha512": "kSYSMsjCOeDEbQhIZOjKlMQRxHLwA0xB+xyDrPU9xk6/to2wIJwgYD1zLhz2Dw0Ywmf0vqLW6nvEcmGjw4WWEg==",
+      "type": "package",
+      "path": "envdte/17.12.40391",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "LICENSE.txt",
+        "PackageIcon.png",
+        "envdte.17.12.40391.nupkg.sha512",
+        "envdte.nuspec",
+        "lib/net20/envdte.dll",
+        "lib/net20/envdte.xml",
+        "lib/net45/envdte.dll",
+        "lib/net45/envdte.xml",
+        "lib/net472/envdte.dll",
+        "lib/net472/envdte.xml",
+        "lib/net8.0/envdte.dll",
+        "lib/net8.0/envdte.xml",
+        "lib/netstandard2.0/envdte.dll",
+        "lib/netstandard2.0/envdte.xml"
+      ]
+    },
+    "envdte80/17.12.40391": {
+      "sha512": "GDJKuJz0SDDMRifMYrwiy9jt1HeUzLs1EqHi+aimNv+O9cjo2DyQHl1iMMx9CsxC9bLXPVi21N9Kcu1b5NhCyA==",
+      "type": "package",
+      "path": "envdte80/17.12.40391",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "LICENSE.txt",
+        "PackageIcon.png",
+        "envdte80.17.12.40391.nupkg.sha512",
+        "envdte80.nuspec",
+        "lib/net20/envdte80.dll",
+        "lib/net20/envdte80.xml",
+        "lib/net45/envdte80.dll",
+        "lib/net45/envdte80.xml",
+        "lib/net472/envdte80.dll",
+        "lib/net472/envdte80.xml",
+        "lib/net8.0/envdte80.dll",
+        "lib/net8.0/envdte80.xml",
+        "lib/netstandard2.0/envdte80.dll",
+        "lib/netstandard2.0/envdte80.xml"
+      ]
+    },
+    "Microsoft.VisualStudio.Interop/17.12.40391": {
+      "sha512": "rqFm1ldxTO1fY1jk9eMQYBy4YJNYrshy3BxLuOmQtAhGBilwySHRhNDcHulKaSOW7FTqlZ3FVKSdbLpjo8w2aA==",
+      "type": "package",
+      "path": "microsoft.visualstudio.interop/17.12.40391",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "LICENSE.txt",
+        "PackageIcon.png",
+        "lib/net20/Microsoft.VisualStudio.Interop.dll",
+        "lib/net20/Microsoft.VisualStudio.Interop.xml",
+        "lib/net472/Microsoft.VisualStudio.Interop.dll",
+        "lib/net472/Microsoft.VisualStudio.Interop.xml",
+        "lib/net8.0/Microsoft.VisualStudio.Interop.dll",
+        "lib/net8.0/Microsoft.VisualStudio.Interop.xml",
+        "lib/netstandard2.0/Microsoft.VisualStudio.Interop.dll",
+        "lib/netstandard2.0/Microsoft.VisualStudio.Interop.xml",
+        "microsoft.visualstudio.interop.17.12.40391.nupkg.sha512",
+        "microsoft.visualstudio.interop.nuspec"
+      ]
+    }
+  },
   "projectFileDependencyGroups": {
-    "net8.0-windows7.0": []
+    "net6.0-windows7.0": [
+      "envdte >= 17.12.40391",
+      "envdte80 >= 17.12.40391"
+    ]
   },
   "packageFolders": {
     "C:\\Users\\atame\\.nuget\\packages\\": {},
@@ -29,15 +146,15 @@
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
-        "net8.0-windows"
+        "net6.0-windows7.0"
       ],
       "sources": {
         "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
-        "net8.0-windows7.0": {
-          "targetAlias": "net8.0-windows",
+        "net6.0-windows7.0": {
+          "targetAlias": "net6.0-windows7.0",
           "projectReferences": {}
         }
       },
@@ -54,8 +171,18 @@
       "SdkAnalysisLevel": "9.0.100"
     },
     "frameworks": {
-      "net8.0-windows7.0": {
-        "targetAlias": "net8.0-windows",
+      "net6.0-windows7.0": {
+        "targetAlias": "net6.0-windows7.0",
+        "dependencies": {
+          "envdte": {
+            "target": "Package",
+            "version": "[17.12.40391, )"
+          },
+          "envdte80": {
+            "target": "Package",
+            "version": "[17.12.40391, )"
+          }
+        },
         "imports": [
           "net461",
           "net462",
@@ -67,6 +194,24 @@
         ],
         "assetTargetFallback": true,
         "warn": true,
+        "downloadDependencies": [
+          {
+            "name": "Microsoft.AspNetCore.App.Ref",
+            "version": "[6.0.36, 6.0.36]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Host.win-x64",
+            "version": "[6.0.36, 6.0.36]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Ref",
+            "version": "[6.0.36, 6.0.36]"
+          },
+          {
+            "name": "Microsoft.WindowsDesktop.App.Ref",
+            "version": "[6.0.36, 6.0.36]"
+          }
+        ],
         "frameworkReferences": {
           "Microsoft.NETCore.App": {
             "privateAssets": "all"
@@ -75,7 +220,7 @@
             "privateAssets": "none"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.101/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.101\\RuntimeIdentifierGraph.json"
       }
     }
   }

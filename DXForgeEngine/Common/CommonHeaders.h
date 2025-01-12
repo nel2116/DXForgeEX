@@ -51,9 +51,9 @@
 
 // ユーティリティ関数をまとめたファイル
 #include "PrimitiveTypes.h"
-#include "..\Utilities\Math.h"
-#include "..\Utilities\Utilities.h"
-#include "..\Utilities\MathType.h"
+#include "Utilities/Math.h"
+#include "Utilities/Utilities.h"
+#include "Utilities/MathType.h"
 
 // ID型を定義したファイル
 #include "Id.h"
