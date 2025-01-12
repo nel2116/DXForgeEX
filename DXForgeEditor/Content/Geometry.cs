@@ -25,18 +25,29 @@ namespace DXForgeEditor.Content
         Capsule
     }
 
+    enum ElementsType
+    {
+        Position = 0x00,
+        Normals = 0x01,
+        TSpace = 0x03,
+        Joints = 0x04,
+        Colors = 0x08,
+    }
+
     class Mesh : ViewModelBase
     {
-        private int _vertexSize;
-        public int VertexSize
+        public static int PositionSize = sizeof(float) * 3;
+
+        private int _elementSize;
+        public int ElementSize
         {
-            get => _vertexSize;
+            get => _elementSize;
             set
             {
-                if (_vertexSize != value)
+                if (_elementSize != value)
                 {
-                    _vertexSize = value;
-                    OnPropertyChanged(nameof(VertexSize));
+                    _elementSize = value;
+                    OnPropertyChanged(nameof(ElementSize));
                 }
             }
         }
@@ -83,7 +94,24 @@ namespace DXForgeEditor.Content
             }
         }
 
-        public byte[] Vertices { get; set; }
+        private string _name;
+        public string Name
+        {
+            get => _name;
+            set
+            {
+                if (_name != value)
+                {
+                    _name = value;
+                    OnPropertyChanged(nameof(Name));
+                }
+            }
+        }
+
+        public ElementsType ElementsType { get; set; }
+
+        public byte[] Positions { get; set; }
+        public byte[] Elements { get; set; }
         public byte[] Indices { get; set; }
     }
 
@@ -323,7 +351,7 @@ namespace DXForgeEditor.Content
 
         private static void ReadMeshes(BinaryReader reader, List<int> lodIds, List<MeshLOD> lodList)
         {
-            // get mesh's name
+            // メッシュの名前を取得
             var s = reader.ReadInt32();
             string meshName;
             if (s > 0)
@@ -336,19 +364,21 @@ namespace DXForgeEditor.Content
                 meshName = $"mesh_{ContentHelper.GetRandomString()}";
             }
 
-            var mesh = new Mesh();
+            var mesh = new Mesh() { Name = meshName };
 
             var lodId = reader.ReadInt32();
-            mesh.VertexSize = reader.ReadInt32();
+            mesh.ElementSize = reader.ReadInt32();
+            mesh.ElementsType = (ElementsType)reader.ReadInt32();
             mesh.VertexCount = reader.ReadInt32();
             mesh.IndexSize = reader.ReadInt32();
             mesh.IndexCount = reader.ReadInt32();
             var lodThreshold = reader.ReadSingle();
 
-            var vertexBufferSize = mesh.VertexSize * mesh.VertexCount;
+            var elementBufferSize = mesh.ElementSize * mesh.VertexCount;
             var indexBufferSize = mesh.IndexSize * mesh.IndexCount;
 
-            mesh.Vertices = reader.ReadBytes(vertexBufferSize);
+            mesh.Positions = reader.ReadBytes(Mesh.PositionSize * mesh.VertexCount);
+            mesh.Elements = reader.ReadBytes(elementBufferSize);
             mesh.Indices = reader.ReadBytes(indexBufferSize);
 
             MeshLOD lod;
@@ -463,12 +493,11 @@ namespace DXForgeEditor.Content
                 foreach (var lodGroup in _lodGroups)
                 {
                     Debug.Assert(lodGroup.LODs.Any());
-                    // Use the name of most detailed LOD for file name
-                    var meshFileName = ContentHelper.SanitizeFileName(_lodGroups.Count > 1 ?
-                        path + fileName + "_" + lodGroup.LODs[0].Name + AssetFileExtension :
-                        path + fileName + AssetFileExtension);
-                    // NOTE: we have to make a different id for each new asset file, but if a geometry asset file
-                    //       with the same name already exists then we use its guid instead.
+                    // 最も詳細なLODの名前をファイル名に使用する。
+                    var meshFileName = ContentHelper.SanitizeFileName(
+                        path + fileName + ((_lodGroups.Count > 1) ? "_" + ((lodGroup.LODs.Count > 1) ? lodGroup.Name : lodGroup.LODs[0].Name) : string.Empty)) + AssetFileExtension;
+                    // NOTE: 新しいアセットファイルごとに異なるidを作成する必要がありますが、
+                    //       同じ名前のジオメトリ・アセットファイルがすでに存在する場合は、代わりにそのguidを使用します。
                     Guid = TryGetAssetInfo(meshFileName) is AssetInfo info && info.Type == Type ? info.Guid : Guid.NewGuid();
                     byte[] data = null;
                     using (var writer = new BinaryWriter(new MemoryStream()))
@@ -520,11 +549,14 @@ namespace DXForgeEditor.Content
 
             foreach (var mesh in lod.Meshes)
             {
-                writer.Write(mesh.VertexSize);
+                writer.Write(mesh.Name);
+                writer.Write(mesh.ElementSize);
+                writer.Write((int)mesh.ElementsType);
                 writer.Write(mesh.VertexCount);
                 writer.Write(mesh.IndexSize);
                 writer.Write(mesh.IndexCount);
-                writer.Write(mesh.Vertices);
+                writer.Write(mesh.Positions);
+                writer.Write(mesh.Elements);
                 writer.Write(mesh.Indices);
             }
 
@@ -545,13 +577,16 @@ namespace DXForgeEditor.Content
             {
                 var mesh = new Mesh()
                 {
-                    VertexSize = reader.ReadInt32(),
+                    Name = reader.ReadString(),
+                    ElementSize = reader.ReadInt32(),
+                    ElementsType = (ElementsType)reader.ReadInt32(),
                     VertexCount = reader.ReadInt32(),
                     IndexSize = reader.ReadInt32(),
                     IndexCount = reader.ReadInt32()
                 };
 
-                mesh.Vertices = reader.ReadBytes(mesh.VertexSize * mesh.VertexCount);
+                mesh.Positions = reader.ReadBytes(Mesh.PositionSize * mesh.VertexCount);
+                mesh.Elements = reader.ReadBytes(mesh.ElementSize * mesh.VertexCount);
                 mesh.Indices = reader.ReadBytes(mesh.IndexSize * mesh.IndexCount);
 
                 lod.Meshes.Add(mesh);

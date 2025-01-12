@@ -6,10 +6,12 @@
 //
 // 更新履歴
 // 2024/12/26 新規作成
+// 2025/01/12 メッシュデータのパック処理の変更
+// 2025/01/12 IOStream.hのblob_stream_readerを使用するように変更
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Geometry.h"
-
+#include "../DXForgeEngine/Utilities/IOStream.h"
 
 namespace dxforge::tools
 {
@@ -162,24 +164,227 @@ namespace dxforge::tools
 			}
 		}
 
+		/// @brief 頂点のサイズを取得
+		/// @param elements_type 要素タイプ
+		/// @return 頂点のサイズ
+		u64 get_vertex_element_size(elements::elements_type::type elements_type)
+		{
+			using namespace elements;
+			switch (elements_type)
+			{
+			case elements_type::static_color:					return sizeof(static_color);
+			case elements_type::static_normal:					return sizeof(static_normal);
+			case elements_type::static_normal_texture:			return sizeof(static_normal_texture);
+			case elements_type::skeletal:						return sizeof(skeletal);
+			case elements_type::skeletal_color:					return sizeof(skeletal_color);
+			case elements_type::skeletal_normal:				return sizeof(skeletal_normal);
+			case elements_type::skeletal_normal_color:			return sizeof(skeletal_normal_color);
+			case elements_type::skeletal_normal_texture:		return sizeof(skeletal_normal_texture);
+			case elements_type::skeletal_normal_texture_color:	return sizeof(skeletal_normal_texture_color);
+			}
+			return 0;
+		}
+
 		/// @brief 頂点のパック
 		/// @param m メッシュデータの参照
-		void pack_vertices_static(mesh& m)
+		void pack_vertices(mesh& m)
 		{
 			const u32 num_vertices{ (u32)m.vertices.size() };
 			assert(num_vertices);
-			m.packed_vertices_static.reserve(num_vertices);
+
+			m.position_buffer.resize(num_vertices * sizeof(v3));
+			v3* const position_buffer{ (v3* const)m.position_buffer.data() };
+
 			for (u32 i{ 0 }; i < num_vertices; ++i)
 			{
-				vertex& v{ m.vertices[i] };
-				const u8 signs{ (u8)((v.normal.z > 0.0f) << 1) };
-				const u16 normal_x{ (u16)pack_float<16>(v.normal.x,-1.0f,1.0f) };
-				const u16 normal_y{ (u16)pack_float<16>(v.normal.y,-1.0f,1.0f) };
-				// TODO: 符号とx/y成分で接線を詰める
-
-				// 静的頂点の追加
-				m.packed_vertices_static.emplace_back(packed_vertex::vertex_static{ v.position, {0,0,0}, signs, {normal_x,normal_y}, {}, v.uv });
+				position_buffer[i] = m.vertices[i].position;
 			}
+
+			struct  u16v2 { u16 x, y; };
+			struct u16v3 { u16 x, y, z; };
+
+			utl::vector<u8> t_signs(num_vertices);
+			utl::vector<u16v2> normals(num_vertices);
+			utl::vector<u16v2> tangents(num_vertices);
+			utl::vector<u16v3> joint_weights(num_vertices);
+
+			if (m.elements_type & elements::elements_type::static_normal)
+			{
+				// normal only
+				for (u32 i{ 0 }; i < num_vertices; ++i)
+				{
+					vertex& v{ m.vertices[i] };
+					t_signs[i] = (u8)((v.normal.z > 0.0f) << 1);
+					normals[i] = { (u16)pack_float<16>(v.normal.x, -1.0f, 1.0f), (u16)pack_float<16>(v.normal.y, -1.0f, 1.0f) };
+				}
+
+				if (m.elements_type & elements::elements_type::static_normal_texture)
+				{
+					// full T-space
+					for (u32 i{ 0 }; i < num_vertices; ++i)
+					{
+						vertex& v{ m.vertices[i] };
+						t_signs[i] |= (u8)((v.tangent.w > 0.0f) && (v.tangent.z > 0.0f));
+						tangents[i] = { (u16)pack_float<16>(v.tangent.x, -1.0f, 1.0f), (u16)pack_float<16>(v.tangent.y, -1.0f, 1.0f) };
+					}
+				}
+			}
+
+			if (m.elements_type & elements::elements_type::skeletal)
+			{
+				for (u32 i{ 0 }; i < num_vertices; ++i)
+				{
+					vertex& v{ m.vertices[i] };
+					// pack joint weights (from [0.0,1.0] to [0...255])
+					joint_weights[i] =
+					{
+						(u8)pack_unit_float<8>(v.joint_weights.x),
+						(u8)pack_unit_float<8>(v.joint_weights.y),
+						(u8)pack_unit_float<8>(v.joint_weights.z)
+					};
+					// NOTE: w3はシェーダーで計算
+				}
+			}
+
+			m.element_buffer.resize(get_vertex_element_size(m.elements_type) * num_vertices);
+			using namespace elements;
+
+			switch (m.elements_type)
+			{
+			case elements_type::static_color:
+			{
+				static_color* const element_buffer{ (static_color* const)m.element_buffer.data() };
+				for (u32 i{ 0 }; i < num_vertices; ++i)
+				{
+					vertex& v{ m.vertices[i] };
+					element_buffer[i] = { {v.red,v.green,v.blue},{} };
+				}
+			}
+			break;
+			case elements_type::static_normal:
+			{
+				static_normal* const element_buffer{ (static_normal* const)m.element_buffer.data() };
+				for (u32 i{ 0 }; i < num_vertices; ++i)
+				{
+					vertex& v{ m.vertices[i] };
+					element_buffer[i] = { {v.red,v.green,v.blue},t_signs[i],{normals[i].x,normals[i].y} };
+				}
+			}
+			break;
+			case elements_type::static_normal_texture:
+			{
+				static_normal_texture* const element_buffer{ (static_normal_texture* const)m.element_buffer.data() };
+				for (u32 i{ 0 }; i < num_vertices; ++i)
+				{
+					vertex& v{ m.vertices[i] };
+					element_buffer[i] = { {v.red,v.green,v.blue},t_signs[i],
+										{normals[i].x,normals[i].y},{tangents[i].x,tangents[i].y},
+										v.uv };
+				}
+			}
+			break;
+			case elements_type::skeletal:
+			{
+				skeletal* const element_buffer{ (skeletal* const)m.element_buffer.data() };
+				for (u32 i{ 0 }; i < num_vertices; ++i)
+				{
+					vertex& v{ m.vertices[i] };
+					const u16 indices[4]{ (u16)v.joint_indices.x,(u16)v.joint_indices.y,(u16)v.joint_indices.z,(u16)v.joint_indices.w };
+					element_buffer[i] = { {(u8)joint_weights[i].x,(u8)joint_weights[i].y,(u8)joint_weights[i].z},{},
+						{indices[0],indices[1],indices[2],indices[3]} };
+				}
+			}
+			break;
+			case elements_type::skeletal_color:
+			{
+				skeletal_color* const element_buffer{ (skeletal_color* const)m.element_buffer.data() };
+				for (u32 i{ 0 }; i < num_vertices; ++i)
+				{
+					vertex& v{ m.vertices[i] };
+					const u16 indices[4]{ (u16)v.joint_indices.x,(u16)v.joint_indices.y,(u16)v.joint_indices.z,(u16)v.joint_indices.w };
+					element_buffer[i] = { {(u8)joint_weights[i].x,(u8)joint_weights[i].y,(u8)joint_weights[i].z},{},
+						{indices[0],indices[1],indices[2],indices[3]},
+						{v.red,v.green,v.blue},{} };
+				}
+			}
+			break;
+			case elements_type::skeletal_normal:
+			{
+				skeletal_normal* const element_buffer{ (skeletal_normal* const)m.element_buffer.data() };
+				for (u32 i{ 0 }; i < num_vertices; ++i)
+				{
+					vertex& v{ m.vertices[i] };
+					const u16 indices[4]{ (u16)v.joint_indices.x,(u16)v.joint_indices.y,(u16)v.joint_indices.z,(u16)v.joint_indices.w };
+					element_buffer[i] = { {(u8)joint_weights[i].x,(u8)joint_weights[i].y,(u8)joint_weights[i].z},t_signs[i],
+						{indices[0],indices[1],indices[2],indices[3]},
+						{normals[i].x,normals[i].y} };
+				}
+			}
+			break;
+			case elements_type::skeletal_normal_color:
+			{
+				skeletal_normal_color* const element_buffer{ (skeletal_normal_color* const)m.element_buffer.data() };
+				for (u32 i{ 0 }; i < num_vertices; ++i)
+				{
+					vertex& v{ m.vertices[i] };
+					const u16 indices[4]{ (u16)v.joint_indices.x,(u16)v.joint_indices.y,(u16)v.joint_indices.z,(u16)v.joint_indices.w };
+					element_buffer[i] = { {(u8)joint_weights[i].x,(u8)joint_weights[i].y,(u8)joint_weights[i].z},t_signs[i],
+						{indices[0],indices[1],indices[2],indices[3]},
+						{normals[i].x,normals[i].y},{v.red,v.green,v.blue},{} };
+				}
+			}
+			break;
+			case elements_type::skeletal_normal_texture:
+			{
+				skeletal_normal_texture* const element_buffer{ (skeletal_normal_texture* const)m.element_buffer.data() };
+				for (u32 i{ 0 }; i < num_vertices; ++i)
+				{
+					vertex& v{ m.vertices[i] };
+					const u16 indices[4]{ (u16)v.joint_indices.x,(u16)v.joint_indices.y,(u16)v.joint_indices.z,(u16)v.joint_indices.w };
+					element_buffer[i] = { {(u8)joint_weights[i].x,(u8)joint_weights[i].y,(u8)joint_weights[i].z},t_signs[i],
+						{indices[0],indices[1],indices[2],indices[3]},
+						{normals[i].x,normals[i].y}, {tangents[i].x, tangents[i].y}, v.uv };
+				}
+			}
+			break;
+			case elements_type::skeletal_normal_texture_color:
+			{
+				skeletal_normal_texture_color* const element_buffer{ (skeletal_normal_texture_color* const)m.element_buffer.data() };
+				for (u32 i{ 0 }; i < num_vertices; ++i)
+				{
+					vertex& v{ m.vertices[i] };
+					const u16 indices[4]{ (u16)v.joint_indices.x, (u16)v.joint_indices.y, (u16)v.joint_indices.z, (u16)v.joint_indices.w };
+					element_buffer[i] = { {(u8)joint_weights[i].x, (u8)joint_weights[i].y, (u8)joint_weights[i].z}, t_signs[i],
+						{indices[0], indices[1], indices[2], indices[3]},
+						{normals[i].x, normals[i].y}, {tangents[i].x, tangents[i].y}, v.uv,
+						{v.red, v.green, v.blue}, {} };
+				}
+			}
+			break;
+			}
+
+		}
+
+		void determine_elements_type(mesh& m)
+		{
+			using namespace elements;
+			if (m.normals.size())
+			{
+				if (m.uv_sets.size() && m.uv_sets[0].size())
+				{
+					m.elements_type = elements_type::static_normal_texture;
+				}
+				else
+				{
+					m.elements_type = elements_type::static_normal;
+				}
+			}
+			else if (m.colors.size())
+			{
+				m.elements_type = elements_type::static_color;
+			}
+
+			// TODO: 骨格メッシュのデータがない。 骨格メッシュについては後で拡張する。
 		}
 
 		/// @brief 頂点の処理
@@ -206,8 +411,9 @@ namespace dxforge::tools
 				process_uvs(m);
 			}
 
-			// 静的頂点のパック
-			pack_vertices_static(m);
+			// 頂点のパック
+			determine_elements_type(m);
+			pack_vertices(m);
 		}
 
 		/// @brief メッシュのサイズを取得
@@ -216,7 +422,10 @@ namespace dxforge::tools
 		u64 get_mesh_size(const mesh& m)
 		{
 			const u64 num_vertices{ m.vertices.size() };
-			const u64 vertex_buffer_size{ sizeof(packed_vertex::vertex_static) * num_vertices };
+			const u64 position_buffer_size{ m.position_buffer.size() };
+			assert(position_buffer_size == sizeof(v3) * num_vertices);
+			const u64 element_buffer_size{ m.element_buffer.size() };
+			assert(element_buffer_size == get_vertex_element_size(m.elements_type) * num_vertices);
 			const u64 index_size{ (num_vertices < (1 << 16)) ? sizeof(u16) : sizeof(u32) };
 			const u64 index_buffer_size{ index_size * m.indices.size() };
 			constexpr u64 su32{ sizeof(u32) };
@@ -224,12 +433,14 @@ namespace dxforge::tools
 			{
 				su32 + m.name.size() +	// メッシュ名の長さとメッシュ名文字列のスペース
 				su32 +					// LODID
-				su32 +					// 頂点サイズ
+				su32 +					// 頂点要素サイズ（位置要素を除いた頂点サイズ）
+				su32 +					// 要素タイプ列挙
 				su32 +					// 頂点数
 				su32 + 					// インデックスサイズ（16ビットまたは32ビット）
 				su32 +					// インデックス数
 				sizeof(f32) +			// LOD閾値
-				vertex_buffer_size +	// 頂点のスペース
+				position_buffer_size +	// 頂点位置のスペース
+				element_buffer_size +	// 頂点要素のスペース
 				index_buffer_size		// インデックスのスペース
 			};
 			return size;
@@ -270,60 +481,47 @@ namespace dxforge::tools
 		/// @param m メッシュデータの参照
 		/// @param buffer バッファ
 		/// @param at バッファの位置
-		void pack_mesh_data(const mesh& m, u8* const buffer, u64& at)
+		void pack_mesh_data(const mesh& m, utl::blob_stream_writer& blob)
 		{
-			constexpr u64 su32{ sizeof(u32) };
-			u32 s{ 0 };	// サイズ
-
-			// メッシュ名のコピー
-			s = (u32)m.name.size();						// メッシュ名の長さ
-			memcpy(&buffer[at], &s, su32); at += su32;	// メッシュ名の長さのコピーして位置を進める
-			memcpy(&buffer[at], m.name.c_str(), s); at += s;	// メッシュ名のコピーして位置を進める
-
-			// LODIDのコピー
-			s = m.lod_id;								// LODID
-			memcpy(&buffer[at], &s, su32); at += su32;	// LODIDのコピーして位置を進める
-
-			// 頂点サイズのコピー
-			constexpr u32 vertex_size{ sizeof(packed_vertex::vertex_static) };
-			s = vertex_size;							// 頂点サイズ
-			memcpy(&buffer[at], &s, su32); at += su32;	// 頂点サイズのコピーして位置を進める
-
-			// 頂点数のコピー
+			// mesh name
+			blob.write((u32)m.name.size());
+			blob.write(m.name.c_str(), m.name.size());
+			// lod id
+			blob.write(m.lod_id);
+			// vertex element size
+			const u32 elements_size{ (u32)get_vertex_element_size(m.elements_type) };
+			blob.write(elements_size);
+			// elements type enumeration
+			blob.write((u32)m.elements_type);
+			// number of vertices
 			const u32 num_vertices{ (u32)m.vertices.size() };
-			s = num_vertices;							// 頂点数
-			memcpy(&buffer[at], &s, su32); at += su32;	// 頂点数のコピーして位置を進める
-
-			// インデックスサイズのコピー
+			blob.write(num_vertices);
+			// index size (16 bit or 32 bit)
 			const u32 index_size{ (num_vertices < (1 << 16)) ? sizeof(u16) : sizeof(u32) };
-			s = index_size;								// インデックスサイズ
-			memcpy(&buffer[at], &s, su32); at += su32;	// インデックスサイズのコピーして位置を進める
-
-			// インデックス数のコピー
+			blob.write(index_size);
+			// number of indices
 			const u32 num_indices{ (u32)m.indices.size() };
-			s = num_indices;							// インデックス数
-			memcpy(&buffer[at], &s, su32); at += su32;	// インデックス数のコピーして位置を進める
-
-			// LOD閾値のコピー
-			memcpy(&buffer[at], &m.lod_threshold, sizeof(f32)); at += sizeof(f32);	// LOD閾値のコピーして位置を進める
-
-			// 頂点のコピー
-			s = vertex_size * num_vertices;				// 頂点のサイズ
-			memcpy(&buffer[at], m.packed_vertices_static.data(), s); at += s;	// 頂点のコピーして位置を進める
-
-			// インデックスのコピー
-			s = index_size * num_indices;				// インデックスのサイズ
-			void* data{ (void*)m.indices.data() };
+			blob.write(num_indices);
+			// LOD threshold
+			blob.write(m.lod_threshold);
+			// position buffer
+			assert(m.position_buffer.size() == sizeof(math::v3) * num_vertices);
+			blob.write(m.position_buffer.data(), m.position_buffer.size());
+			// element buffer
+			assert(m.element_buffer.size() == elements_size * num_vertices);
+			blob.write(m.element_buffer.data(), m.element_buffer.size());
+			// index data
+			const u32 index_buffer_size{ index_size * num_indices };
+			const u8* data{ (const u8*)m.indices.data() };
 			utl::vector<u16> indices;
 
 			if (index_size == sizeof(u16))
 			{
 				indices.resize(num_indices);
-				for (u32 i{ 0 }; i < num_indices; ++i)
-					indices[i] = (u16)m.indices[i];
-				data = (void*)indices.data();
+				for (u32 i{ 0 }; i < num_indices; ++i) indices[i] = (u16)m.indices[i];
+				data = (const u8*)indices.data();
 			}
-			memcpy(&buffer[at], data, s); at += s;		// インデックスのコピーして位置を進める
+			blob.write(data, index_buffer_size);
 		}
 
 		bool split_meshes_by_material(u32 material_index, mesh& m, mesh& submesh)
@@ -440,36 +638,30 @@ namespace dxforge::tools
 		data.buffer = (u8*)CoTaskMemAlloc(scene_size);
 		assert(data.buffer);
 
-		u8* const buffer{ data.buffer };						// バッファ
-		u64 at{ 0 };											// バッファの位置
-		u32 s{ 0 };												// サイズ
+		utl::blob_stream_writer blob{ data.buffer, data.buffer_size };
 
-		// シーン名のコピー
-		s = (u32)scene.name.size();								// 名前の長さ
-		memcpy(&buffer[at], &s, su32); at += su32;				// 名前の長さのコピーして位置を進める
-		memcpy(&buffer[at], scene.name.c_str(), s); at += s;	// 名前のコピーして位置を進める
+		// シーン名を書き込む
+		blob.write((u32)scene.name.size());
+		blob.write(scene.name.c_str(), scene.name.size());
 
-		// LOD数のコピー
-		s = (u32)scene.lod_groups.size();						// LOD数
-		memcpy(&buffer[at], &s, su32); at += su32;				// LOD数のコピーして位置を進める
+		// LOD数を書き込む
+		blob.write((u32)scene.lod_groups.size());
 
 		for (auto& lod : scene.lod_groups)
 		{
-			// LOD名のコピー
-			s = (u32)lod.name.size();							// LOD名の長さ
-			memcpy(&buffer[at], &s, su32); at += su32;			// LOD名の長さのコピーして位置を進める
-			memcpy(&buffer[at], lod.name.c_str(), s); at += s;	// LOD名のコピーして位置を進める
-
-			// このLODのメッシュ数
-			s = (u32)lod.meshes.size();							// このLODのメッシュ数
-			memcpy(&buffer[at], &s, su32); at += su32;			// このLODのメッシュ数のコピーして位置を進める
+			// LOD名を書き込む
+			blob.write((u32)lod.name.size());
+			blob.write(lod.name.c_str(), lod.name.size());
+			// このLODのメッシュ数を書き込む
+			blob.write((u32)lod.meshes.size());
 
 			for (auto& m : lod.meshes)
 			{
-				pack_mesh_data(m, buffer, at);
+				pack_mesh_data(m, blob);
 			}
 		}
-		assert(scene_size == at);
+
+		assert(scene_size == blob.offset());
 	}
 
 }	// namespace dxforge::tools

@@ -17,6 +17,36 @@ namespace DXForgeEditor.Editors
     // レンダラーができたら、このクラスとWPFビューアは廃止されます。
     class MeshRendererVertexData : ViewModelBase
     {
+
+        private bool _isHighlighted;
+        public bool IsHighlighted
+        {
+            get => _isHighlighted;
+            set
+            {
+                if (_isHighlighted != value)
+                {
+                    _isHighlighted = value;
+                    OnPropertyChanged(nameof(IsHighlighted));
+                    OnPropertyChanged(nameof(Diffuse));
+                }
+            }
+        }
+
+        private bool _isIsolated;
+        public bool IsIsolated
+        {
+            get => _isIsolated;
+            set
+            {
+                if (_isIsolated != value)
+                {
+                    _isIsolated = value;
+                    OnPropertyChanged(nameof(IsIsolated));
+                }
+            }
+        }
+
         private Brush _specular = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#ff111111"));
         public Brush Specular
         {
@@ -34,7 +64,7 @@ namespace DXForgeEditor.Editors
         private Brush _diffuse = Brushes.White;
         public Brush Diffuse
         {
-            get => _diffuse;
+            get => _isHighlighted ? Brushes.Orange : _diffuse;
             set
             {
                 if (_diffuse != value)
@@ -45,6 +75,7 @@ namespace DXForgeEditor.Editors
             }
         }
 
+        public string Name { get; set; }
         public Point3DCollection Positions { get; } = new Point3DCollection();
         public Vector3DCollection Normals { get; } = new Vector3DCollection();
         public PointCollection UVs { get; } = new PointCollection();
@@ -163,51 +194,67 @@ namespace DXForgeEditor.Editors
         public MeshRenderer(MeshLOD lod, MeshRenderer old)
         {
             Debug.Assert(lod?.Meshes.Any() == true);
-            // 頂点サイズから位置と法線ベクトルを引いたものを計算する
-            var offset = lod.Meshes[0].VertexSize - 3 * sizeof(float) - sizeof(int) - 2 * sizeof(short);
-            // カメラの位置と適切な設定を行うには、レンダリングするオブジェクトの大きさを把握する必要がある。
+            // カメラの位置とターゲットを適切に設定するには、レンダリングするオブジェクトの大きさを把握する必要がある。
             // したがって、バウンディングボックスを知る必要がある。
             double minX, minY, minZ; minX = minY = minZ = double.MaxValue;
             double maxX, maxY, maxZ; maxX = maxY = maxZ = double.MinValue;
             Vector3D avgNormal = new Vector3D();
-
-            // パックされた法線を解凍するためのスケーリングファクターを計算
+            // これは、パックされた法線を解凍するためである：
             var intervals = 2.0f / ((1 << 16) - 1);
 
             foreach (var mesh in lod.Meshes)
             {
-                var vertexData = new MeshRendererVertexData();
-                // すべての頂点を解凍
-                using (var reader = new BinaryReader(new MemoryStream(mesh.Vertices)))
+                var vertexData = new MeshRendererVertexData() { Name = mesh.Name };
+                // すべての頂点を解凍する
+                using (var reader = new BinaryReader(new MemoryStream(mesh.Positions)))
                     for (int i = 0; i < mesh.VertexCount; ++i)
                     {
-                        // 位置情報を取得
+                        // Positionを読む
                         var posX = reader.ReadSingle();
                         var posY = reader.ReadSingle();
                         var posZ = reader.ReadSingle();
-                        var signs = (reader.ReadUInt32() >> 24) & 0x000000ff;
                         vertexData.Positions.Add(new Point3D(posX, posY, posZ));
 
-                        // バウンディングボックスの調整
+                        // バウンディングボックスを調整する
                         minX = Math.Min(minX, posX); maxX = Math.Max(maxX, posX);
                         minY = Math.Min(minY, posY); maxY = Math.Max(maxY, posY);
                         minZ = Math.Min(minZ, posZ); maxZ = Math.Max(maxZ, posZ);
-
-                        // 法線情報を取得
-                        var nrmX = reader.ReadUInt16() * intervals - 1.0f;
-                        var nrmY = reader.ReadUInt16() * intervals - 1.0f;
-                        var nrmZ = Math.Sqrt(Math.Clamp(1f - (nrmX * nrmX + nrmY * nrmY), 0f, 1f)) * ((signs & 0x2) - 1f);
-                        var normal = new Vector3D(nrmX, nrmY, nrmZ);
-                        normal.Normalize();
-                        vertexData.Normals.Add(normal);
-                        avgNormal += normal;
-
-                        // UV情報を取得(タンジェントとジョイントデータをスキップ)
-                        reader.BaseStream.Position += (offset - sizeof(float) * 2);
-                        var u = reader.ReadSingle();
-                        var v = reader.ReadSingle();
-                        vertexData.UVs.Add(new Point(u, v));
                     }
+
+                if (mesh.ElementsType.HasFlag(ElementsType.Normals))
+                {
+                    var tSpaceOffset = 0;
+                    if (mesh.ElementsType.HasFlag(ElementsType.Joints)) tSpaceOffset = sizeof(short) * 4; // joint indicesの読み込みを飛ばす
+                    // タンジェント空間を読み込む
+                    using (var reader = new BinaryReader(new MemoryStream(mesh.Elements)))
+                        for (int i = 0; i < mesh.VertexCount; ++i)
+                        {
+                            var signs = (reader.ReadUInt32() >> 24) & 0x000000ff;
+                            reader.BaseStream.Position += tSpaceOffset;
+                            // normalを読み込む
+                            var nrmX = reader.ReadUInt16() * intervals - 1.0f;
+                            var nrmY = reader.ReadUInt16() * intervals - 1.0f;
+                            var nrmZ = Math.Sqrt(Math.Clamp(1f - (nrmX * nrmX + nrmY * nrmY), 0f, 1f)) * ((signs & 0x2) - 1f);
+                            var normal = new Vector3D(nrmX, nrmY, nrmZ);
+                            normal.Normalize();
+                            vertexData.Normals.Add(normal);
+                            avgNormal += normal;
+
+                            // UVを読み込む
+                            if (mesh.ElementsType.HasFlag(ElementsType.TSpace))
+                            {
+                                reader.BaseStream.Position += sizeof(short) * 2; // tangentの読み込みを飛ばす
+                                var u = reader.ReadSingle();
+                                var v = reader.ReadSingle();
+                                vertexData.UVs.Add(new Point(u, v));
+                            }
+
+                            if (mesh.ElementsType.HasFlag(ElementsType.Joints) && mesh.ElementsType.HasFlag(ElementsType.Colors))
+                            {
+                                reader.BaseStream.Position += 4; // 色の読み込みを飛ばす
+                            }
+                        }
+                }
 
                 using (var reader = new BinaryReader(new MemoryStream(mesh.Indices)))
                     if (mesh.IndexSize == sizeof(short))
@@ -222,15 +269,26 @@ namespace DXForgeEditor.Editors
                 Meshes.Add(vertexData);
             }
 
-            // カメラのターゲットと位置を設定
+            // カメラのターゲットと位置を設定する
             if (old != null)
             {
                 CameraTarget = old.CameraTarget;
                 CameraPosition = old.CameraPosition;
+
+                // NOTE: これは複数のLODを持つプリミティブメッシュの場合のみで、テクスチャで表示されるからだ
+                foreach (var mesh in old.Meshes)
+                {
+                    mesh.IsHighlighted = false;
+                }
+
+                foreach (var mesh in Meshes)
+                {
+                    mesh.Diffuse = old.Meshes.First().Diffuse;
+                }
             }
             else
             {
-                // バウンディングボックスの寸法を計算
+                // バウンディングボックスの寸法を計算する
                 var width = maxX - minX;
                 var height = maxY - minY;
                 var depth = maxZ - minZ;
