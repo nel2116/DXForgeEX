@@ -11,9 +11,9 @@
 #include "Common.h"
 #include "CommonHeaders.h"
 #include "Id.h"
-#include "..\DXForgeEngine\Components\Entity.h"
-#include "..\DXForgeEngine\Components\Transform.h"
-#include "..\DXForgeEngine\Components\Script.h"
+#include "Components/Entity.h"
+#include "Components/Transform.h"
+#include "Components/Script.h"
 
 using namespace dxforge;
 

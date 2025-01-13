@@ -10,10 +10,10 @@
 // ====== インクルード部 ======
 #include "Common.h"
 #include "CommonHeaders.h"
-#include "..\DXForgeEngine\Components\Script.h"
-#include "..\Graphics\Renderer.h"
-#include "..\Platform\PlatformType.h"
-#include "..\Platform\Platform.h"
+#include "Components/Script.h"
+#include "Graphics/Renderer.h"
+#include "Platform/PlatformType.h"
+#include "Platform/Platform.h"
 
 #ifdef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -69,7 +69,7 @@ EDITOR_INTERFACE LPSAFEARRAY GetScriptNames()
 EDITOR_INTERFACE u32 CreateRenderSurface(HWND host, s32 width, s32 height)
 {
 	assert(host);
-	platform::window_init_info info{ nullptr,host,nullptr,0,0,width,height };
+	platform::window_init_info info{ nullptr,host,nullptr,0,0,(u32)width,(u32)height };
 	graphics::render_surface surface{ platform::create_window(&info),{} };
 	assert(surface.window.is_valid());
 	surfaces.emplace_back(surface);

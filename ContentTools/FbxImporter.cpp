@@ -111,7 +111,7 @@ namespace dxforge::tools
 
 		if (const s32 num_attributes{ node->GetNodeAttributeCount() })
 		{
-			for (u32 i{ 0 }; i < num_attributes; ++i)
+			for (s32 i{ 0 }; i < num_attributes; ++i)
 			{
 				FbxNodeAttribute* attribute{ node->GetNodeAttributeByIndex(i) };
 				const FbxNodeAttribute::EType attribute_type{ attribute->GetAttributeType() };

@@ -520,7 +520,7 @@ namespace dxforge::graphics::d3d12::core
 		surfaces.remove(id);
 	}
 
-	void resize_surface(surface_id id, u32 width, u32 height)
+	void resize_surface(surface_id id, u32/* width*/, u32/* height*/)
 	{
 		gfx_command.flush();
 		surfaces[id].resize();

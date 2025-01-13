@@ -183,7 +183,7 @@ namespace dxforge::graphics::d3d12::gpass
 		}
 	}
 
-	void depth_prepass(id3d12_graphics_command_list* cmd_list, const d3d12_frame_info& info)
+	void depth_prepass(id3d12_graphics_command_list* /*cmd_list*/, const d3d12_frame_info& /*info*/)
 	{
 	}
 

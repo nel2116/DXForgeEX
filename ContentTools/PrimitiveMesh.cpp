@@ -292,7 +292,7 @@ namespace dxforge::tools
 		}
 
 		// —§•û‘Ì
-		void create_cube(scene& scene, const primitive_init_info& info)
+		void create_cube(scene& /*scene*/, const primitive_init_info& /*info*/)
 		{
 		}
 
@@ -306,17 +306,17 @@ namespace dxforge::tools
 		}
 
 		// ICO‹…
-		void create_ico_sphere(scene& scene, const primitive_init_info& info)
+		void create_ico_sphere(scene& /*scene*/, const primitive_init_info& /*info*/)
 		{
 		}
 
 		// ‰~’Œ
-		void create_cylinder(scene& scene, const primitive_init_info& info)
+		void create_cylinder(scene& /*scene*/, const primitive_init_info& /*info*/)
 		{
 		}
 
 		// ƒJƒvƒZƒ‹
-		void create_capsule(scene& scene, const primitive_init_info& info)
+		void create_capsule(scene& /*scene*/, const primitive_init_info& /*info*/)
 		{
 		}
 
