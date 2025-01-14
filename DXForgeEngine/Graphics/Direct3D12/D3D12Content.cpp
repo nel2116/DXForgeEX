@@ -35,6 +35,15 @@ namespace dxforge::graphics::d3d12::content
 			u32 elements_type{};
 		};
 
+		struct d3d12_render_item
+		{
+			id::id_type entity_id;
+			id::id_type submesh_gpu_id;
+			id::id_type material_id;
+			id::id_type pso_id;
+			id::id_type depth_pso_id;
+		};
+
 		utl::free_list<ID3D12Resource*> submesh_buffers{};				// サブメッシュバッファー
 		utl::free_list<submesh_view> submesh_views{};					// サブメッシュビュー
 		std::mutex submesh_mutex{};										// サブメッシュミューテックス
@@ -48,7 +57,7 @@ namespace dxforge::graphics::d3d12::content
 		utl::free_list<std::unique_ptr<u8[]>> materials;				// マテリアル
 		std::mutex material_mutex;										// マテリアルミューテックス
 
-		utl::free_list<render_item::d3d12_render_item> render_items;	// レンダーアイテム
+		utl::free_list<d3d12_render_item> render_items;	// レンダーアイテム
 		utl::free_list<std::unique_ptr<id::id_type[]>> render_item_ids;	// レンダーアイテムID
 		utl::vector<ID3D12PipelineState*> pipeline_states;				// パイプラインステート
 		std::unordered_map<u64, id::id_type> pso_map;					// パイプラインステートマップ

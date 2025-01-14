@@ -6,11 +6,15 @@
 // Direct3D12のリソース管理
 // 更新履歴
 // 2024/12/30 新規作成
+// 2025/01/02 d3d12_textureクラスの追加
+// 2025/01/02 d3d12_render_textureクラスの追加
+// 2025/01/02 d3d12_depth_bufferクラスの追加
+// 2025/01/14 d3d12_bufferクラスの追加
+// 2025/01/14 constant_bufferクラスの追加
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
 #include "D3D12CommonHeaders.h"
-
 
 namespace dxforge::graphics::d3d12
 {
@@ -75,6 +79,134 @@ namespace dxforge::graphics::d3d12
 		u32                                 _size{ 0 };										// サイズ
 		u32                                 _descriptor_size{};								// ディスクリプタサイズ
 		const D3D12_DESCRIPTOR_HEAP_TYPE    _type{};										// ヒープの種類
+	};
+
+	struct d3d12_buffer_init_info
+	{
+		ID3D12Heap1* heap{ nullptr };														// ヒープ
+		const void* data{ nullptr };														// データ
+		D3D12_RESOURCE_ALLOCATION_INFO1 allocation_info{ };									// リソースのアロケーション情報
+		D3D12_RESOURCE_STATES initial_state{};												// 初期状態
+		D3D12_RESOURCE_FLAGS flags{ D3D12_RESOURCE_FLAG_NONE };								// フラグ
+		u32 size{ 0 };																		// サイズ
+		u32 stride{ 0 };																	// ストライド
+		s32 element_count{ 0 };																// 要素数
+		u32 alignment{ 0 };																	// アライメント
+		bool create_uav{ false };															// UAVを作成するかどうか
+	};
+
+	class d3d12_buffer
+	{
+	public:		// パブリック関数
+		d3d12_buffer() = default;
+		explicit d3d12_buffer(d3d12_buffer_init_info info, bool is_cpu_accessible);
+		DISABLE_COPY(d3d12_buffer);
+		constexpr d3d12_buffer(d3d12_buffer&& o)
+			: _buffer{ o._buffer }, _gpu_address{ o._gpu_address }, _size{ o._size }
+		{
+			o.reset();
+		}
+
+		constexpr d3d12_buffer& operator=(d3d12_buffer&& o)
+		{
+			assert(this != &o);
+			if (this != &o)
+			{
+				release();
+				move(o);
+			}
+			return *this;
+		}
+
+		~d3d12_buffer() { release(); }
+
+		void release();
+		// ------ アクセサ ------
+		[[nodiscard]] constexpr ID3D12Resource* const buffer() const { return _buffer; }
+		[[nodiscard]] constexpr D3D12_GPU_VIRTUAL_ADDRESS gpu_address() const { return _gpu_address; }
+		[[nodiscard]] constexpr u32 size() const { return _size; }
+
+	private:	// プライベート関数
+
+		constexpr void move(d3d12_buffer& o)
+		{
+			_buffer = o._buffer;
+			_gpu_address = o._gpu_address;
+			_size = o._size;
+			o.reset();
+		}
+
+		constexpr void reset()
+		{
+			_buffer = nullptr;
+			_gpu_address = 0;
+			_size = 0;
+		}
+
+	private:	// メンバ変数
+		ID3D12Resource* _buffer{ nullptr };												// バッファ
+		D3D12_GPU_VIRTUAL_ADDRESS _gpu_address{ 0 };									// GPUアドレス
+		u32 _size{ 0 };																	// サイズ
+	};
+
+	class constant_buffer
+	{
+	public:		// パブリック関数
+		constant_buffer() = default;
+		explicit constant_buffer(d3d12_buffer_init_info info);
+		DISABLE_COPY_AND_MOVE(constant_buffer);
+		~constant_buffer() { release(); }
+
+		void release()
+		{
+			_buffer.release();
+			_cpu_address = nullptr;
+			_cpu_offset = 0;
+		}
+
+		constexpr void clear() { _cpu_offset = 0; }
+		[[nodiscard]] u8* const allocate(u32 size);
+
+		template<typename T>
+		[[nodiscard]] T* allocate()
+		{
+			return (T* const)(allocate(sizeof(T)));
+		}
+
+		// ------ アクセサ ------
+		[[nodiscard]] constexpr ID3D12Resource* const buffer() const { return _buffer.buffer(); }
+		[[nodiscard]] constexpr D3D12_GPU_VIRTUAL_ADDRESS gpu_address() const { return _buffer.gpu_address(); }
+		[[nodiscard]] constexpr u32 size() const { return _buffer.size(); }
+		[[nodiscard]] constexpr u8* cpu_address() const { return _cpu_address; }
+		[[nodiscard]] constexpr u32 offset() const { return _cpu_offset; }
+
+		template<typename T>
+		[[nodiscard]] constexpr D3D12_GPU_VIRTUAL_ADDRESS gpu_address(T* const allocation)
+		{
+			std::lock_guard lock{ _mutex };
+			assert(_cpu_address);
+			if (!_cpu_address)return {};
+			const u8* const address{ (const u8* const)allocation };
+			assert(address <= _cpu_address + _cpu_offset);
+			assert(address >= _cpu_address);
+			const u64 offset{ (u64)(address - _cpu_address) };
+			return _buffer.gpu_address() + offset;
+		}
+
+		[[nodiscard]] constexpr static d3d12_buffer_init_info get_default_init_info(u32 size)
+		{
+			assert(size);
+			d3d12_buffer_init_info info{};
+			info.size = size;
+			info.alignment = D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT;
+			return info;
+		}
+
+	private:	// メンバ変数
+		d3d12_buffer _buffer{};															// バッファ
+		u8* _cpu_address{ nullptr };													// CPUアドレス
+		u32 _cpu_offset{ 0 };															// CPUオフセット
+		std::mutex _mutex{};															// ミューテックス
 	};
 
 	struct d3d12_texture_init_info
