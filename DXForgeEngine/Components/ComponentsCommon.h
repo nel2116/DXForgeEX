@@ -9,5 +9,5 @@
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
-#include "Common/CommonHeaders.h"
-#include "EngineAPI/GameEntity.h"
+#include "../Common/CommonHeaders.h"
+#include "../EngineAPI/GameEntity.h"

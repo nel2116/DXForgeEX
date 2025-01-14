@@ -8,16 +8,21 @@
 // 2024/08/12 新規作成
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
+// ====== プリプロセッサ定義 ======
+#ifdef _WIN64
 #pragma warning(disable: 4530) // 例外警告を無効にする
+#endif // _WIN64
+
 // ====== インクルード部 ======
 // C/C++標準ライブラリ
 // NOTE: std::vectorやstd::dequeをインクルードするヘッダーはここに書かないでください。
-#include <stdint.h>
+#include <cstdint>
 #include <assert.h>
 #include <typeinfo>
 #include <memory>
 #include <unordered_map>
 #include <mutex>
+#include <cstring>
 
 #if defined(_WIN64)
 #include <DirectXMath.h>
@@ -51,9 +56,9 @@
 
 // ユーティリティ関数をまとめたファイル
 #include "PrimitiveTypes.h"
-#include "Utilities/Math.h"
-#include "Utilities/Utilities.h"
-#include "Utilities/MathType.h"
+#include "../Utilities/Math.h"
+#include "../Utilities/Utilities.h"
+#include "../Utilities/MathType.h"
 
 // ID型を定義したファイル
 #include "Id.h"

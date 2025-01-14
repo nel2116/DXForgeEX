@@ -16,7 +16,7 @@ namespace dxforge::graphics::d3d12::gpass
 {
 	namespace
 	{
-		struct gpass_pram_indices
+		struct gpass_root_param_indices
 		{
 			enum : u32
 			{
@@ -26,9 +26,6 @@ namespace dxforge::graphics::d3d12::gpass
 			};
 		};
 
-
-		constexpr DXGI_FORMAT main_buffer_format{ DXGI_FORMAT_R16G16B16A16_FLOAT };	// メインバッファのフォーマット
-		constexpr DXGI_FORMAT depth_buffer_format{ DXGI_FORMAT_D32_FLOAT };			// デプスバッファのフォーマット
 		constexpr math::u32v2 initial_dimensions{ 100, 100 };						// 初期サイズ
 
 		d3d12_render_texture gpass_main_buffer{};									// GPassのメインバッファ
@@ -105,17 +102,17 @@ namespace dxforge::graphics::d3d12::gpass
 			assert(!gpass_pso && !gpass_root_sig);
 
 			// GPassのrootsignatureの作成
-			using idx = gpass_pram_indices;
+			using idx = gpass_root_param_indices;
 			d3dx::d3d12_root_parameter parameters[idx::count]{};
 			parameters[0].as_constants(3, D3D12_SHADER_VISIBILITY_PIXEL, 1);
-			const d3dx::d3d12_root_signature_desc root_signature{ &parameters[0],idx::count };
+			d3dx::d3d12_root_signature_desc root_signature{ &parameters[0], idx::count };
+			root_signature.Flags &= ~D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
 			gpass_root_sig = root_signature.create();
 			assert(gpass_root_sig);
 			NAME_D3D12_OBJECT(gpass_root_sig, L"GPass Root Signature");
 
 			// GPassのPSOの作成
-			struct
-			{
+			struct {
 				d3dx::d3d12_pipeline_state_subobject_root_signature         root_signature{ gpass_root_sig };
 				d3dx::d3d12_pipeline_state_subobject_vs                     vs{ shaders::get_engine_shader(shaders::engine_shader::fullscreen_triangle_vs) };
 				d3dx::d3d12_pipeline_state_subobject_ps                     ps{ shaders::get_engine_shader(shaders::engine_shader::fill_color_ps) };
@@ -135,7 +132,7 @@ namespace dxforge::graphics::d3d12::gpass
 			gpass_pso = d3dx::create_pipeline_state(&stream, sizeof(stream));
 			NAME_D3D12_OBJECT(gpass_pso, L"GPass Pipeline State Object");
 
-			return gpass_pso && gpass_root_sig;
+			return gpass_root_sig && gpass_pso;
 		}
 
 	}	// 匿名名前空間
@@ -199,7 +196,7 @@ namespace dxforge::graphics::d3d12::gpass
 			f32 height;
 			u32 frame;
 		}constants{ (f32)info.surface_width, (f32)info.surface_height, ++frame };
-		using idx = gpass_pram_indices;
+		using idx = gpass_root_param_indices;
 		cmd_list->SetGraphicsRoot32BitConstants(idx::root_constants, 3, &constants, 0);
 
 		cmd_list->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

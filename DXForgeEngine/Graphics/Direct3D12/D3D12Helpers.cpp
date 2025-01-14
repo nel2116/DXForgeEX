@@ -59,7 +59,7 @@ namespace dxforge::graphics::d3d12::d3dx
 		if (FAILED(hr = D3D12SerializeVersionedRootSignature(&versioned_desc, &signature_blob, &error_blob)))
 		{
 			// エラーメッセージを出力
-			DEBUG_OP(const char* error_msg{ error_blob ? static_cast<const char*>(error_blob->GetBufferPointer()) : "" });
+			DEBUG_OP(const char* error_msg{ error_blob ? (const char*)error_blob->GetBufferPointer() : "" });
 			DEBUG_OP(OutputDebugStringA(error_msg));
 			return nullptr;
 		}
@@ -85,6 +85,7 @@ namespace dxforge::graphics::d3d12::d3dx
 		assert(desc.pPipelineStateSubobjectStream && desc.SizeInBytes);
 		ID3D12PipelineState* pso{ nullptr };
 		DXCall(core::device()->CreatePipelineState(&desc, IID_PPV_ARGS(&pso)));
+		assert(pso);
 		return pso;
 	}
 

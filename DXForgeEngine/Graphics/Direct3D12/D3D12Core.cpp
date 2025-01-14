@@ -15,6 +15,7 @@
 #include "D3D12GPass.h"
 #include "D3D12PostProcess.h"
 #include "D3D12Upload.h"
+#include "D3D12Content.h"
 
 using namespace Microsoft::WRL;	// ComPtrを使うため
 
@@ -397,7 +398,12 @@ namespace dxforge::graphics::d3d12::core
 		if (!gfx_command.command_queue()) return failed_init();
 
 		// モジュールの初期化
-		if (!(shaders::initialize() && gpass::initialize() && fx::initialize() && upload::initialize())) return failed_init();
+		if (!(shaders::initialize() &&
+			gpass::initialize() &&
+			fx::initialize() &&
+			upload::initialize() &&
+			content::initialize()))
+			return failed_init();
 
 		// デバッグネームを設定
 		NAME_D3D12_OBJECT(main_device, L"Main D3D12 Device");
@@ -423,6 +429,7 @@ namespace dxforge::graphics::d3d12::core
 		}
 
 		// モジュールのシャットダウン
+		content::shutdown();
 		upload::shutdown();
 		fx::shutdown();
 		gpass::shutdown();

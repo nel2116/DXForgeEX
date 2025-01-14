@@ -57,22 +57,22 @@ __debugbreak();								\
 #endif // _DEBUG
 
 #ifdef _DEBUG
-// COM オブジェクトの名前を設定し、デバッグ文字列を Visual Studio* の出力ウィンドウに出力
-#define NAME_D3D12_OBJECT(obj,name) obj->SetName(name); OutputDebugString(L"::D3D12 Object Created: "); OutputDebugString(name); OutputDebugString(L"\n");
-// COM オブジェクトの名前をインデックス付きで設定し、デバッグ文字列を Visual Studio* の出力ウィンドウに出力
-#define NAME_D3D12_OBJECT_INDEXED(obj, n, name)			\
-{														\
-wchar_t full_name[128];									\
-if (swprintf_s(full_name, L"%s[%u]", name, n) > 0){		\
-	obj->SetName(full_name);							\
-	OutputDebugString(L"::D3D12 Object Created: ");		\
-	OutputDebugString(full_name);						\
-	OutputDebugString(L"\n");							\
+// COM オブジェクトの名前を設定し、Visual Studio* の出力パネルにデバッグ文字列を出力します。
+#define NAME_D3D12_OBJECT(obj, name) obj->SetName(name); OutputDebugString(L"::D3D12 Object Created: "); OutputDebugString(name); OutputDebugString(L"\n");
+// インデックス付きバリアントは、オブジェクトの名前にインデックスを含む。
+#define NAME_D3D12_OBJECT_INDEXED(obj, n, name)            \
+{                                                          \
+wchar_t full_name[128];                                    \
+if (swprintf_s(full_name, L"%s[%llu]", name, (u64)n) >0 ){ \
+    obj->SetName(full_name);                               \
+    OutputDebugString(L"::D3D12 Object Created: ");        \
+    OutputDebugString(full_name);                          \
+    OutputDebugString(L"\n");                              \
 }}
 #else
-#define NAME_D3D12_OBJECT(obj,name)
-#define NAME_D3D12_OBJECT_INDEXED(obj,n,name)
-#endif // !_DEBUG
+#define NAME_D3D12_OBJECT(x, name)
+#define NAME_D3D12_OBJECT_INDEXED(x, n, name)
+#endif // _DEBUG
 
 #include "D3D12Helpers.h"
 #include "D3D12Resource.h"

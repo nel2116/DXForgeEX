@@ -10,7 +10,7 @@
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
-#include "Components/ComponentsCommon.h"
+#include "../Components/ComponentsCommon.h"
 #include "TransformComponent.h"
 #include "ScriptComponent.h"
 

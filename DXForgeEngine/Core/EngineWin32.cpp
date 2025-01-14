@@ -1,5 +1,5 @@
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// [Engine.cpp]
+// [EngineWin32.cpp]
 // 作成日 : 2024/12/20
 // 作成者 : 田中ミノル
 // 概要
@@ -8,7 +8,7 @@
 // 2024/12/20 新規作成
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // // ====== インクルード部 ======
-#if !defined(SHIPPING)
+#if !defined(SHIPPING) && defined(_WIN64)
 #include "Content/ContentLoader.h"
 #include "Components/Script.h"
 #include "Platform/PlatformType.h"

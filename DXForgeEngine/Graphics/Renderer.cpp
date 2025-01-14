@@ -8,6 +8,7 @@
 // 2024/12/27 新規作成
 // 2025/01/12 add_submesh()、remove_submesh()の追加
 // 2025/01/12 カメラ関連の処理の追加
+// 2025/01/13 add_material()、remove_material()の追加
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Renderer.h"
@@ -256,6 +257,26 @@ namespace dxforge::graphics
 	void remove_submesh(id::id_type id)
 	{
 		gfx.resources.remove_submesh(id);
+	}
+
+	id::id_type add_material(const material_init_info& info)
+	{
+		return gfx.resources.add_material(info);
+	}
+
+	void remove_material(id::id_type id)
+	{
+		gfx.resources.remove_material(id);
+	}
+
+	id::id_type add_render_item(id::id_type entitiy_id, id::id_type geometry_content_id, u32 material_count, const id::id_type* const material_ids)
+	{
+		return gfx.resources.add_render_item(entitiy_id, geometry_content_id, material_count, material_ids);
+	}
+
+	void remove_render_item(id::id_type id)
+	{
+		gfx.resources.remove_render_item(id);
 	}
 
 }	// namespace dxforge::graphics

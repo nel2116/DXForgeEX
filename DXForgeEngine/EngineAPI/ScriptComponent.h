@@ -9,7 +9,7 @@
 // // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
-#include "Components/ComponentsCommon.h"
+#include "../Components/ComponentsCommon.h"
 
 namespace dxforge::script
 {

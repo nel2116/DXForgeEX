@@ -8,10 +8,10 @@
 // 2024/12/2 新規作成
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // // ====== インクルード部 ======
+#ifdef  _WIN64
 #include "CommonHeaders.h"
 #include <filesystem>
 
-#ifdef  _WIN64
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif // !WIN32_LEAN_AND_MEAN

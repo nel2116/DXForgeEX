@@ -3,8 +3,8 @@ F:\HAL\Self\DXForgeEX\DXForgeEngine\Components\Script.cpp;F:\HAL\Self\DXForgeEX\
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Components\Transform.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\Transform.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Content\ContentLoader.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\ContentLoader.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Content\ContentToEngine.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\ContentToEngine.obj
-F:\HAL\Self\DXForgeEX\DXForgeEngine\Core\Engine.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\Engine.obj
-F:\HAL\Self\DXForgeEX\DXForgeEngine\Core\Main.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\Main.obj
+F:\HAL\Self\DXForgeEX\DXForgeEngine\Core\EngineWin32.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\EngineWin32.obj
+F:\HAL\Self\DXForgeEX\DXForgeEngine\Core\MainWin32.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\MainWin32.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\EngineAPI\Camera.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\Camera.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Camera.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\D3D12Camera.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Content.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\D3D12Content.obj

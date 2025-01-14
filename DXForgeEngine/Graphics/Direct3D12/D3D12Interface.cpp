@@ -6,6 +6,8 @@
 // 　Direct3D12のインターフェース
 // 更新履歴
 // 2024/12/27 新規作成
+// 2025/01/13 マテリアルの追加と削除の関数を追加
+// 2025/01/14 レンダーアイテムの追加と削除の関数を追加
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "CommonHeaders.h"
@@ -36,6 +38,10 @@ namespace dxforge::graphics::d3d12
 
 		pi.resources.add_submesh = content::submesh::add;
 		pi.resources.remove_submesh = content::submesh::remove;
+		pi.resources.add_material = content::material::add;
+		pi.resources.remove_material = content::material::remove;
+		pi.resources.add_render_item = content::render_item::add;
+		pi.resources.remove_render_item = content::render_item::remove;
 
 		pi.platform = graphics_platform::direct3d12;
 	}

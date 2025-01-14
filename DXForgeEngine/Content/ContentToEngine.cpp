@@ -6,6 +6,8 @@
 // Direct3D12のコンテンツからエンジンへの変換
 // 更新履歴
 // 2025/01/12 新規作成
+// 2025/01/13 シェーダーの追加と削除の関数を追加
+// 2025/01/13 マテリアルの追加と削除の関数を追加
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ===
@@ -19,13 +21,6 @@ namespace dxforge::content
 
 		class geometry_hierarchy_stream
 		{
-		public:	// 構造体定義
-			struct lod_offset
-			{
-				u16 offset;
-				u16 count;
-			};
-
 		public:	// パブリック関数
 
 			DISABLE_COPY_AND_MOVE(geometry_hierarchy_stream);
@@ -54,6 +49,7 @@ namespace dxforge::content
 			u32 lod_from_threshold(f32 threshold)
 			{
 				assert(threshold > 0);
+				if (_lod_count == 1) return 0;
 
 				for (u32 i{ _lod_count - 1 }; i > 0; --i)
 				{
@@ -95,7 +91,7 @@ namespace dxforge::content
 			const u32 lod_count{ blob.read<u32>() };
 			assert(lod_count);
 			// lod_count、threshold、lod offsetsのサイズを階層のサイズに追加する。
-			u32 size{ sizeof(u32) + (sizeof(f32) + sizeof(geometry_hierarchy_stream::lod_offset)) * lod_count };
+			u32 size{ sizeof(u32) + (sizeof(f32) + sizeof(lod_offset)) * lod_count };
 
 			for (u32 lod_idx{ 0 }; lod_idx < lod_count; ++lod_idx)
 			{
@@ -267,6 +263,25 @@ namespace dxforge::content
 			geometry_hierarchies.remove(id);
 		}
 
+		// NOTE: 'data'に含まれることを期待する
+		// struct
+		// {
+		// 	material_type::type type,
+		// 	u32 texture_count,
+		// 	id::id_type shader_ids[shader_type::count],
+		// 	id::id_type* texture_ids;
+		// } material_init_info
+		id::id_type create_material_resource(const void* const data)
+		{
+			assert(data);
+			return graphics::add_material(*(const graphics::material_init_info* const)data);
+		}
+
+		void destroy_material_resource(id::id_type id)
+		{
+			graphics::remove_material(id);
+		}
+
 	} //  匿名名前空間
 
 	id::id_type create_resource(const void* const data, asset_type::type type)
@@ -278,7 +293,7 @@ namespace dxforge::content
 		{
 		case asset_type::animation: break;
 		case asset_type::audio:	break;
-		case asset_type::material: break;
+		case asset_type::material: id = create_material_resource(data); break;
 		case asset_type::mesh:	id = create_geometry_resource(data); break;
 		case asset_type::skeleton: break;
 		case asset_type::texture: break;
@@ -295,7 +310,7 @@ namespace dxforge::content
 		{
 		case asset_type::animation: break;
 		case asset_type::audio:	break;
-		case asset_type::material: break;
+		case asset_type::material: destroy_material_resource(id); break;
 		case asset_type::mesh:	destroy_geometry_resource(id); break;
 		case asset_type::skeleton: break;
 		case asset_type::texture: break;
@@ -327,6 +342,51 @@ namespace dxforge::content
 		std::lock_guard lock{ shader_mutex };
 		assert(id::is_valid(id));
 		return (const compiled_shader_ptr)(shaders[id].get());
+	}
+
+	void get_submesh_gpu_ids(id::id_type geometry_content_id, u32 id_count, id::id_type* const gpu_ids)
+	{
+		std::lock_guard lock{ geometry_mutex };
+		u8* const pointer{ geometry_hierarchies[geometry_content_id] };
+		if ((uintptr_t)pointer & single_mesh_marker)
+		{
+			assert(id_count == 1);
+			*gpu_ids = gpu_id_from_fake_pointer(pointer);
+		}
+		else
+		{
+			geometry_hierarchy_stream stream{ pointer };
+			assert([&]() {
+				const u32 lod_count{ stream.lod_count() };
+				const lod_offset lod_offset{ stream.lod_offsets()[lod_count - 1] };
+				const u32 gpu_id_count{ (u32)lod_offset.offset + (u32)lod_offset.count };
+				return gpu_id_count == id_count;
+				}());
+
+			memcpy(gpu_ids, stream.gpu_ids(), sizeof(id::id_type) * id_count);
+		}
+	}
+
+	void get_lod_offsets(const id::id_type* const geometry_ids, const f32* const thresholds, u32 id_count, utl::vector<lod_offset>& offsets)
+	{
+		assert(geometry_ids && thresholds && id_count);
+		assert(offsets.empty());
+		std::lock_guard lock{ geometry_mutex };
+		for (u32 i{ 0 }; i < id_count; ++i)
+		{
+			u8* const pointer{ geometry_hierarchies[geometry_ids[i]] };
+			if ((uintptr_t)pointer & single_mesh_marker)
+			{
+				assert(id_count == 1);
+				offsets.emplace_back(lod_offset{ 0, 1 });
+			}
+			else
+			{
+				geometry_hierarchy_stream stream{ pointer };
+				const u32 lod{ stream.lod_from_threshold(thresholds[i]) };
+				offsets.emplace_back(stream.lod_offsets()[lod]);
+			}
+		}
 	}
 
 }	// namespace dxforge::content

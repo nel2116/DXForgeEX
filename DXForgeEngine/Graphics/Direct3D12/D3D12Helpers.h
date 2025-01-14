@@ -167,6 +167,85 @@ namespace dxforge::graphics::d3d12::d3dx
 		};
 	} depth_state;
 
+	constexpr struct {
+		const D3D12_BLEND_DESC disabled{
+			0,                                              // AlphaToCoverageEnable
+			0,                                              // IndependentBlendEnable
+			{
+				{
+				   0,                                       // BlendEnable
+				   0,                                       // LogicOpEnable
+				   D3D12_BLEND_SRC_ALPHA,                   // SrcBlend
+				   D3D12_BLEND_INV_SRC_ALPHA,               // DestBlend
+				   D3D12_BLEND_OP_ADD,                      // BlendOp
+				   D3D12_BLEND_ONE,                         // SrcBlendAlpha
+				   D3D12_BLEND_ONE,                         // DestBlendAlpha
+				   D3D12_BLEND_OP_ADD,                      // BlendOpAlpha
+				   D3D12_LOGIC_OP_NOOP,                     // LogicOp
+				   D3D12_COLOR_WRITE_ENABLE_ALL,            // RenderTargetWriteMask
+				},
+				{},{},{},{},{},{},{}
+			}
+		};
+		const D3D12_BLEND_DESC alpha_blend{
+			0,                                              // AlphaToCoverageEnable
+			0,                                              // IndependentBlendEnable
+			{
+				{
+				   1,                                       // BlendEnable
+				   0,                                       // LogicOpEnable
+				   D3D12_BLEND_SRC_ALPHA,                   // SrcBlend
+				   D3D12_BLEND_INV_SRC_ALPHA,               // DestBlend
+				   D3D12_BLEND_OP_ADD,                      // BlendOp
+				   D3D12_BLEND_ONE,                         // SrcBlendAlpha
+				   D3D12_BLEND_ONE,                         // DestBlendAlpha
+				   D3D12_BLEND_OP_ADD,                      // BlendOpAlpha
+				   D3D12_LOGIC_OP_NOOP,                     // LogicOp
+				   D3D12_COLOR_WRITE_ENABLE_ALL,            // RenderTargetWriteMask
+				},
+				{},{},{},{},{},{},{}
+			}
+		};
+		const D3D12_BLEND_DESC additive{
+			0,                                              // AlphaToCoverageEnable
+			0,                                              // IndependentBlendEnable
+			{
+				{
+				   1,                                       // BlendEnable
+				   0,                                       // LogicOpEnable
+				   D3D12_BLEND_ONE,                         // SrcBlend
+				   D3D12_BLEND_ONE,                         // DestBlend
+				   D3D12_BLEND_OP_ADD,                      // BlendOp
+				   D3D12_BLEND_ONE,                         // SrcBlendAlpha
+				   D3D12_BLEND_ONE,                         // DestBlendAlpha
+				   D3D12_BLEND_OP_ADD,                      // BlendOpAlpha
+				   D3D12_LOGIC_OP_NOOP,                     // LogicOp
+				   D3D12_COLOR_WRITE_ENABLE_ALL,            // RenderTargetWriteMask
+				},
+				{},{},{},{},{},{},{}
+			}
+		};
+		const D3D12_BLEND_DESC premultiplied{
+			0,                                              // AlphaToCoverageEnable
+			0,                                              // IndependentBlendEnable
+			{
+				{
+				   0,                                       // BlendEnable
+				   0,                                       // LogicOpEnable
+				   D3D12_BLEND_ONE,                         // SrcBlend
+				   D3D12_BLEND_INV_SRC_ALPHA,               // DestBlend
+				   D3D12_BLEND_OP_ADD,                      // BlendOp
+				   D3D12_BLEND_ONE,                         // SrcBlendAlpha
+				   D3D12_BLEND_ONE,                         // DestBlendAlpha
+				   D3D12_BLEND_OP_ADD,                      // BlendOpAlpha
+				   D3D12_LOGIC_OP_NOOP,                     // LogicOp
+				   D3D12_COLOR_WRITE_ENABLE_ALL,            // RenderTargetWriteMask
+				},
+				{},{},{},{},{},{},{}
+			}
+		};
+	} blend_state;
+
 	class d3d12_resource_barrier
 	{
 	public:
@@ -186,10 +265,11 @@ namespace dxforge::graphics::d3d12::d3dx
 			barrier.Transition.StateBefore = before;
 			barrier.Transition.StateAfter = after;
 			barrier.Transition.Subresource = subresource;
+
 			++_offset;
 		}
 
-		// バリアリストにUAVバリアを追加する
+		// バリアのリストにUAVバリアを追加する。
 		constexpr void add(ID3D12Resource* resource, D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE)
 		{
 			assert(resource);
@@ -198,10 +278,11 @@ namespace dxforge::graphics::d3d12::d3dx
 			barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
 			barrier.Flags = flags;
 			barrier.UAV.pResource = resource;
+
 			++_offset;
 		}
 
-		// バリアにエイリアシングバリアを追加する。
+		// Add an aliasing barrier to the list of barriers.
 		constexpr void add(ID3D12Resource* resource_before, ID3D12Resource* resource_after, D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE)
 		{
 			assert(resource_before && resource_after);
@@ -214,6 +295,7 @@ namespace dxforge::graphics::d3d12::d3dx
 
 			++_offset;
 		}
+
 
 		// バリアリストを適用する
 		void apply(id3d12_graphics_command_list* cmd_list)
@@ -246,7 +328,6 @@ namespace dxforge::graphics::d3d12::d3dx
 			: D3D12_DESCRIPTOR_RANGE1{ range_type, descriptor_count, shader_register, space, flags, offset_from_table_start }
 		{
 		}
-
 	};
 
 	struct d3d12_root_parameter : public D3D12_ROOT_PARAMETER1
@@ -325,16 +406,23 @@ namespace dxforge::graphics::d3d12::d3dx
 	// static sampler = 0 DWORDs. (シェーダにコンパイルされる)
 	struct  d3d12_root_signature_desc : public D3D12_ROOT_SIGNATURE_DESC1
 	{
-		constexpr explicit d3d12_root_signature_desc(const d3d12_root_parameter* parameters,
-			u32 parameter_count,
-			const D3D12_STATIC_SAMPLER_DESC* static_samplers = nullptr,
-			u32 sampler_count = 0, D3D12_ROOT_SIGNATURE_FLAGS flags =
+		constexpr static D3D12_ROOT_SIGNATURE_FLAGS default_flags{
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS |
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS |
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
-			D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS)
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
+			D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED
+		};
+
+		constexpr explicit d3d12_root_signature_desc(const d3d12_root_parameter* parameters,
+			u32 parameter_count,
+			D3D12_ROOT_SIGNATURE_FLAGS flags = default_flags,
+			const D3D12_STATIC_SAMPLER_DESC* static_samplers = nullptr,
+			u32 sampler_count = 0)
 			: D3D12_ROOT_SIGNATURE_DESC1{ parameter_count, parameters, sampler_count, static_samplers, flags }
 		{
 		}
@@ -346,7 +434,7 @@ namespace dxforge::graphics::d3d12::d3dx
 	};
 
 #pragma warning(push)
-#pragma warning(disable: 4323)	// パディング警告を無効にする
+#pragma warning(disable : 4324) // パディングの警告を無効にする
 	template<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type, typename T>
 	class alignas(void*) d3d12_pipeline_state_subobject
 	{
@@ -362,6 +450,7 @@ namespace dxforge::graphics::d3d12::d3dx
 
 	// パイプライン・ステート・サブオブジェクト（PSS）マクロ
 #define PSS(name, ...) using d3d12_pipeline_state_subobject_##name = d3d12_pipeline_state_subobject<__VA_ARGS__>;
+
 	PSS(root_signature, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE, ID3D12RootSignature*);
 	PSS(vs, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_VS, D3D12_SHADER_BYTECODE);
 	PSS(ps, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_PS, D3D12_SHADER_BYTECODE);
@@ -388,6 +477,34 @@ namespace dxforge::graphics::d3d12::d3dx
 	PSS(as, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_AS, D3D12_SHADER_BYTECODE);
 	PSS(ms, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_MS, D3D12_SHADER_BYTECODE);
 #undef PSS
+
+	struct d3d12_pipeline_state_subobject_stream
+	{
+		d3d12_pipeline_state_subobject_root_signature           root_signature{ nullptr };
+		d3d12_pipeline_state_subobject_vs                       vs{};
+		d3d12_pipeline_state_subobject_ps                       ps{};
+		d3d12_pipeline_state_subobject_ds                       ds{};
+		d3d12_pipeline_state_subobject_hs                       hs{};
+		d3d12_pipeline_state_subobject_gs                       gs{};
+		d3d12_pipeline_state_subobject_cs                       cs{};
+		d3d12_pipeline_state_subobject_stream_output            stream_output{};
+		d3d12_pipeline_state_subobject_blend                    blend{ blend_state.disabled };
+		d3d12_pipeline_state_subobject_sample_mask              sample_mask{ UINT_MAX };
+		d3d12_pipeline_state_subobject_rasterizer               rasterizer{ rasterizer_state.no_cull };
+		d3d12_pipeline_state_subobject_input_layout             input_layout{};
+		d3d12_pipeline_state_subobject_ib_strip_cut_value       ib_strip_cut_value{};
+		d3d12_pipeline_state_subobject_primitive_topology       primitive_topology{};
+		d3d12_pipeline_state_subobject_render_target_formats    render_target_formats{};
+		d3d12_pipeline_state_subobject_depth_stencil_format     depth_stencil_format{};
+		d3d12_pipeline_state_subobject_sample_desc              sample_desc{ {1, 0} };
+		d3d12_pipeline_state_subobject_node_mask                node_mask{};
+		d3d12_pipeline_state_subobject_cached_pso               cached_pso{};
+		d3d12_pipeline_state_subobject_flags                    flags{};
+		d3d12_pipeline_state_subobject_depth_stencil1           depth_stencil1{ depth_state.disabled };
+		d3d12_pipeline_state_subobject_view_instancing          view_instancing{};
+		d3d12_pipeline_state_subobject_as                       as{};
+		d3d12_pipeline_state_subobject_ms                       ms{};
+	};
 
 	ID3D12PipelineState* create_pipeline_state(D3D12_PIPELINE_STATE_STREAM_DESC desc);
 	ID3D12PipelineState* create_pipeline_state(void* stream, u64 stream_size);

@@ -7,6 +7,8 @@
 // 更新履歴
 // 2024/12/27 新規作成
 // 2025/01/12 カメラ関連の構造体を追加
+// 2025/01/12 マテリアル関連の構造体を追加
+// 2025/01/14 render_item関連の処理をresources構造体に追加
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -42,6 +44,10 @@ namespace dxforge::graphics
 		{
 			id::id_type(*add_submesh)(const u8*&);
 			void(*remove_submesh)(id::id_type);
+			id::id_type(*add_material)(material_init_info);
+			void(*remove_material)(id::id_type);
+			id::id_type(*add_render_item)(id::id_type, id::id_type, u32, const id::id_type* const);
+			void(*remove_render_item)(id::id_type);
 		} resources;
 
 		graphics_platform platform = (graphics_platform)-1;

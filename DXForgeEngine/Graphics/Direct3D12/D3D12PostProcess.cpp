@@ -21,10 +21,8 @@ namespace dxforge::graphics::d3d12::fx
 	{
 		struct fx_root_param_indices
 		{
-			enum : u32
-			{
-				root_constans,
-				descriptor_table,
+			enum : u32 {
+				root_constants,
 
 				count
 			};
@@ -37,28 +35,20 @@ namespace dxforge::graphics::d3d12::fx
 		/// @return 作成に成功したらtrue
 		bool create_fx_pso_and_root_signature()
 		{
-			assert(!fx_pso && !fx_root_sig);
-			// PostProcessのrootsignatureの作成
-			d3dx::d3d12_descriptor_range range
-			{
-				D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
-				D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND, 0, 0,
-				D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE
-			};
-
+			assert(!fx_root_sig && !fx_pso);
+			// FXルートシグネチャー作成
 			using idx = fx_root_param_indices;
 			d3dx::d3d12_root_parameter parameters[idx::count]{};
-			parameters[idx::root_constans].as_constants(1, D3D12_SHADER_VISIBILITY_PIXEL, 1);
-			parameters[idx::descriptor_table].as_descriptor_table(D3D12_SHADER_VISIBILITY_PIXEL, &range, 1);
+			parameters[idx::root_constants].as_constants(1, D3D12_SHADER_VISIBILITY_PIXEL, 1);
 
-			const d3dx::d3d12_root_signature_desc root_signature{ &parameters[0],idx::count };
+			d3dx::d3d12_root_signature_desc root_signature{ &parameters[0], _countof(parameters) };
+			root_signature.Flags &= ~D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
 			fx_root_sig = root_signature.create();
 			assert(fx_root_sig);
 			NAME_D3D12_OBJECT(fx_root_sig, L"Post-process FX Root Signature");
 
-			// PostProcessのPSOの作成
-			struct
-			{
+			// Create FX PSO
+			struct {
 				d3dx::d3d12_pipeline_state_subobject_root_signature         root_signature{ fx_root_sig };
 				d3dx::d3d12_pipeline_state_subobject_vs                     vs{ shaders::get_engine_shader(shaders::engine_shader::fullscreen_triangle_vs) };
 				d3dx::d3d12_pipeline_state_subobject_ps                     ps{ shaders::get_engine_shader(shaders::engine_shader::post_process_ps) };
@@ -76,7 +66,7 @@ namespace dxforge::graphics::d3d12::fx
 			fx_pso = d3dx::create_pipeline_state(&stream, sizeof(stream));
 			NAME_D3D12_OBJECT(fx_pso, L"Post-process FX Pipeline State Object");
 
-			return fx_pso && fx_root_sig;
+			return fx_root_sig && fx_pso;
 		}
 
 	}	// 匿名名前空間
@@ -101,11 +91,10 @@ namespace dxforge::graphics::d3d12::fx
 		cmd_list->SetPipelineState(fx_pso);
 
 		using idx = fx_root_param_indices;
-		cmd_list->SetGraphicsRoot32BitConstant(idx::root_constans, gpass::main_buffer().srv().index, 0);
-		cmd_list->SetGraphicsRootDescriptorTable(idx::descriptor_table, core::srv_heap().gpu_start());
+		cmd_list->SetGraphicsRoot32BitConstant(idx::root_constants, gpass::main_buffer().srv().index, 0);
 		cmd_list->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		// NOTE: 各ピクセルはgpassメインバッファからのピクセルで上書きされるので、レンダーターゲットをクリアする必要はない。
-		// また、深度バッファも必要ありません。
+		// NOTE: 各ピクセルはgpassメインバッファからのピクセルで上書きされるので、
+		//		レンダーターゲットをクリアする必要ありません。 また、深度バッファも必要ありません。
 		cmd_list->OMSetRenderTargets(1, &target_rtv, 1, nullptr);
 		cmd_list->DrawInstanced(3, 1, 0, 0);
 	}

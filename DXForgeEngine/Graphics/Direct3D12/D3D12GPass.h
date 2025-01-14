@@ -18,6 +18,24 @@ namespace dxforge::graphics::d3d12
 
 namespace dxforge::graphics::d3d12::gpass
 {
+
+	constexpr DXGI_FORMAT main_buffer_format{ DXGI_FORMAT_R16G16B16A16_FLOAT };	// メインバッファのフォーマット
+	constexpr DXGI_FORMAT depth_buffer_format{ DXGI_FORMAT_D32_FLOAT };			// デプスバッファのフォーマット
+
+	struct opaque_root_parameter
+	{
+		enum parameter : u32
+		{
+			per_frame_data,
+			position_buffer,
+			element_buffer,
+			srv_indices,
+			per_object_data,
+
+			count
+		};
+	};
+
 	bool initialize();
 	void shutdown();
 
