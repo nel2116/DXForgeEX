@@ -101,8 +101,7 @@ namespace dxforge::graphics::d3d12::d3dx
 
 	constexpr struct
 	{
-		const D3D12_DEPTH_STENCIL_DESC1 disabled
-		{
+		const D3D12_DEPTH_STENCIL_DESC1 disabled{
 			0,                                              // DepthEnable
 			D3D12_DEPTH_WRITE_MASK_ZERO,                    // DepthWriteMask
 			D3D12_COMPARISON_FUNC_LESS_EQUAL,               // DepthFunc
@@ -114,8 +113,7 @@ namespace dxforge::graphics::d3d12::d3dx
 			0                                               // DepthBoundsTestEnable
 		};
 
-		const D3D12_DEPTH_STENCIL_DESC1 enabled
-		{
+		const D3D12_DEPTH_STENCIL_DESC1 enabled{
 			1,                                              // DepthEnable
 			D3D12_DEPTH_WRITE_MASK_ALL,                     // DepthWriteMask
 			D3D12_COMPARISON_FUNC_LESS_EQUAL,               // DepthFunc
@@ -127,8 +125,7 @@ namespace dxforge::graphics::d3d12::d3dx
 			0                                               // DepthBoundsTestEnable
 		};
 
-		const D3D12_DEPTH_STENCIL_DESC1 enabled_readonly
-		{
+		const D3D12_DEPTH_STENCIL_DESC1 enabled_readonly{
 			1,                                              // DepthEnable
 			D3D12_DEPTH_WRITE_MASK_ZERO,                    // DepthWriteMask
 			D3D12_COMPARISON_FUNC_LESS_EQUAL,               // DepthFunc
@@ -140,8 +137,7 @@ namespace dxforge::graphics::d3d12::d3dx
 			0                                               // DepthBoundsTestEnable
 		};
 
-		const D3D12_DEPTH_STENCIL_DESC1 reversed
-		{
+		const D3D12_DEPTH_STENCIL_DESC1 reversed{
 			1,                                              // DepthEnable
 			D3D12_DEPTH_WRITE_MASK_ALL,                     // DepthWriteMask
 			D3D12_COMPARISON_FUNC_GREATER_EQUAL,            // DepthFunc
@@ -153,8 +149,7 @@ namespace dxforge::graphics::d3d12::d3dx
 			0                                               // DepthBoundsTestEnable
 		};
 
-		const D3D12_DEPTH_STENCIL_DESC1 reversed_readonly
-		{
+		const D3D12_DEPTH_STENCIL_DESC1 reversed_readonly{
 			1,                                              // DepthEnable
 			D3D12_DEPTH_WRITE_MASK_ZERO,                    // DepthWriteMask
 			D3D12_COMPARISON_FUNC_GREATER_EQUAL,            // DepthFunc
@@ -167,7 +162,8 @@ namespace dxforge::graphics::d3d12::d3dx
 		};
 	} depth_state;
 
-	constexpr struct {
+	constexpr struct
+	{
 		const D3D12_BLEND_DESC disabled{
 			0,                                              // AlphaToCoverageEnable
 			0,                                              // IndependentBlendEnable
@@ -250,6 +246,7 @@ namespace dxforge::graphics::d3d12::d3dx
 	{
 		return math::align_size_up<D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT>(size);
 	}
+
 	constexpr u64 align_size_for_texture(u64 size)
 	{
 		return math::align_size_up<D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT>(size);

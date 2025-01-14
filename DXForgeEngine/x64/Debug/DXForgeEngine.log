@@ -1,12 +1,4 @@
-﻿  Entity.cpp
-  Script.cpp
-  Transform.cpp
-  ContentLoader.cpp
-  ContentToEngine.cpp
-  EngineWin32.cpp
-  MainWin32.cpp
-  Camera.cpp
-  D3D12Camera.cpp
+﻿  D3D12Camera.cpp
   D3D12Content.cpp
   D3D12Core.cpp
   D3D12GPass.cpp
@@ -17,13 +9,6 @@
   D3D12Shaders.cpp
   D3D12Surface.cpp
   D3D12Upload.cpp
-  OpenGLCore.cpp
-  OpenGLInterface.cpp
-  Renderer.cpp
-  VulkanCore.cpp
-  VulkanInterface.cpp
-  Platform.cpp
-F:\HAL\Self\DXForgeEX\DXForgeEngine\Content\ContentLoader.cpp(142,14): warning C4189: 'entity_type': ローカル変数が初期化されましたが、参照されていません
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12PostProcess.cpp(87,84): warning C4100: 'd3d12_info': 引数は関数の本体部で 1 度も参照されません。
-F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Content.cpp(329,95): warning C4100: 'elements_type': 引数は関数の本体部で 1 度も参照されません。
+F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Content.cpp(338,95): warning C4100: 'elements_type': 引数は関数の本体部で 1 度も参照されません。
   DXForgeEngine.vcxproj -> F:\HAL\Self\DXForgeEX\x64\Debug\DXForgeEngine.lib

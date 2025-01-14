@@ -9,19 +9,24 @@
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Script.h"
-
-#include <Windows.h>
-
 #include "Entity.h"
+#include "Transform.h"
+
+#define USE_TRANSFORM_CACHE_MAP 1
 
 namespace dxforge::script
 {
 	namespace
 	{
-		utl::vector<detail::script_ptr> entity_scripts;
-		utl::vector<id::id_type> id_mapping;
-		utl::vector<id::generation_type> generations;
-		utl::deque<script_id> free_ids;
+		utl::vector<detail::script_ptr> entity_scripts;				///< エンティティスクリプトのベクター
+		utl::vector<id::id_type> id_mapping;						///< IDマッピング
+		utl::vector<id::generation_type> generations;				///< 世代情報
+		utl::deque<script_id> free_ids;								///< 解放されたID
+
+		utl::vector<transform::component_cache> transform_cache;	///< Transformコンポーネントのキャッシュ
+#if USE_TRANSFORM_CACHE_MAP
+		std::unordered_map<id::id_type, u32> cache_map;				///< キャッシュマップ
+#endif // !USE_TRANSFORM_CACHE_MAP
 
 		using script_registry = std::unordered_map<size_t, detail::script_creator>;
 
@@ -55,7 +60,53 @@ namespace dxforge::script
 			return (generations[index] == id::generation(id)) && entity_scripts[id_mapping[index]] && entity_scripts[id_mapping[index]]->is_valid();
 		}
 
-	}// anonymous namespace
+#if USE_TRANSFORM_CACHE_MAP
+		transform::component_cache* get_cache_ptr(const game_entity::entity* const entity)
+		{
+			assert(game_entity::is_alive((+entity)->get_id()));
+			const transform::transform_id id{ (*entity).transform().get_id() };
+
+			u32 index{ u32_invalid_id };
+			auto pair = cache_map.try_emplace(id, id::invalid_id);
+
+			// cache_mapにこのidのエントリーがなかったため、新しいエントリーを挿入した。
+			if (pair.second)
+			{
+				index = (u32)transform_cache.size();
+				transform_cache.emplace_back();
+				transform_cache.back().id = id;
+				cache_map[id] = index;
+			}
+			else
+			{
+				index = cache_map[id];
+			}
+
+			assert(index < transform_cache.size());
+			return &transform_cache[index];
+		}
+#else
+		transform::component_cache* const get_cache_ptr(const game_entity::entity* const entity)
+		{
+			assert(game_entity::is_alive((*entity).get_id()));
+			const transform::transform_id id{ (*entity).transform().get_id() };
+
+			for (auto& cache : transform_cache)
+			{
+				if (cache.id == id)
+				{
+					return &cache;
+				}
+			}
+
+			transform_cache.emplace_back();
+			transform_cache.back().id = id;
+
+			return &transform_cache.back();
+		}
+#endif // !USE_TRANSFORM_CACHE_MAP
+
+	}// 匿名名前空間
 
 	namespace detail
 	{
@@ -131,7 +182,46 @@ namespace dxforge::script
 		{
 			ptr->update(dt);
 		}
+
+		if (transform_cache.size())
+		{
+			transform::update(transform_cache.data(), (u32)transform_cache.size());
+			transform_cache.clear();
+
+#if USE_TRANSFORM_CACHE_MAP
+			cache_map.clear();
+#endif // !USE_TRANSFORM_CACHE_MAP
+		}
 	}
+
+	void entity_script::set_rotation(const game_entity::entity* const entity, math::v4 rotation_quaretnion)
+	{
+		transform::component_cache& cache{ *get_cache_ptr(entity) };
+		cache.flags |= transform::component_flags::rotation;
+		cache.rotation = rotation_quaretnion;
+	}
+
+	void entity_script::set_orientation(const game_entity::entity* const entity, math::v3 orientation_vector)
+	{
+		transform::component_cache& cache{ *get_cache_ptr(entity) };
+		cache.flags |= transform::component_flags::orientation;
+		cache.orientation = orientation_vector;
+	}
+
+	void entity_script::set_position(const game_entity::entity* const entity, math::v3 position)
+	{
+		transform::component_cache& cache{ *get_cache_ptr(entity) };
+		cache.flags |= transform::component_flags::position;
+		cache.position = position;
+	}
+
+	void entity_script::set_scale(const game_entity::entity* const entity, math::v3 scale)
+	{
+		transform::component_cache& cache{ *get_cache_ptr(entity) };
+		cache.flags |= transform::component_flags::scale;
+		cache.scale = scale;
+	}
+
 }	// namespace dxforge::script
 
 #ifdef USE_WITH_EDITOR

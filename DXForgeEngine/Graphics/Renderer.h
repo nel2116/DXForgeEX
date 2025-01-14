@@ -105,8 +105,8 @@ namespace dxforge::graphics
 			up = { 0.0f, 1.0f, 0.0f };
 			field_of_view = 0.25f;
 			aspect_ratio = 16.0f / 9.0f;
-			near_z = 0.001f;
-			far_z = 100000.0f;
+			near_z = 0.01f;
+			far_z = 1000.0f;
 		};
 	};
 
@@ -120,8 +120,8 @@ namespace dxforge::graphics
 			up = { 0.0f, 1.0f, 0.0f };
 			view_width = 1920;
 			view_height = 1080;
-			near_z = 0.001f;
-			far_z = 100000.0f;
+			near_z = 0.01f;
+			far_z = 1000.0f;
 		};
 	};
 

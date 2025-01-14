@@ -139,7 +139,9 @@ namespace dxforge::content
 		{
 			// エンティティの情報を読み込む
 			game_entity::entity_info info{};
-			const u32 entity_type{ *at }; at += su32;		// エンティティの種類
+			//const u32 entity_type{ *at };
+			// エンティティ・タイプは（今のところ）スキップする：
+			at += su32;
 			const u32 num_components{ *at }; at += su32;	// コンポーネント数
 			if (!num_components) return false;				// コンポーネント数が0ならエラー
 

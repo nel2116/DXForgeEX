@@ -17,22 +17,17 @@
 namespace dxforge::transform
 {
 	// 匿名名前空間に各種ベクターを定義
-	namespace {
-
-		// ワールド行列を格納するベクター
-		utl::vector<math::m4x4> to_world;
-		// ワールド行列の逆行列を格納するベクター
-		utl::vector<math::m4x4> inv_world;
-		// 各エンティティの回転情報を格納するベクター
-		utl::vector<math::v4> rotations;
-		// 各エンティティの向きを格納するベクター
-		utl::vector<math::v3> orientations;
-		// 各エンティティの位置を格納するベクター
-		utl::vector<math::v3> positions;
-		// 各エンティティのスケール情報を格納するベクター
-		utl::vector<math::v3> scales;
-		// 計算済みかどうかを示すフラグ (0: 未計算, 1: 計算済み)
-		utl::vector<u8> has_transform;
+	namespace
+	{
+		utl::vector<math::m4x4> to_world;				///< ワールド行列を格納するベクター
+		utl::vector<math::m4x4> inv_world;				///< ワールド行列の逆行列を格納するベクター
+		utl::vector<math::v4> rotations;				///< 各エンティティの回転情報を格納するベクター
+		utl::vector<math::v3> orientations;				///< 各エンティティの向きを格納するベクター
+		utl::vector<math::v3> positions;				///< 各エンティティの位置を格納するベクター
+		utl::vector<math::v3> scales;					///< 各エンティティのスケール情報を格納するベクター
+		utl::vector<u8> has_transform;					///< 計算済みかどうかを示すフラグ (0: 未計算, 1: 計算済み)
+		utl::vector<u8> changes_from_previous_frame;	///< 前回のフレームからの変更を示すフラグ (0: 変更なし, 1: 変更あり)
+		u8 read_write_flags;							///< 読み書きフラグ
 
 		/// @brief 指定されたインデックスのTransform行列を計算
 		/// @param index 計算対象のエンティティインデックス
@@ -76,6 +71,36 @@ namespace dxforge::transform
 
 	} // 匿名名前空間
 
+	void set_rotation(transform_id id, const math::v4& rotation_quaternion)
+	{
+		const u32 index{ id::index(id) };
+		rotations[index] = rotation_quaternion;
+		orientations[index] = calculate_orientation(rotation_quaternion);
+		has_transform[index] = 0;
+		changes_from_previous_frame[index] |= (u8)component_flags::rotation;
+	}
+
+	void set_orientation(transform_id id, const math::v3& orientation_vector)
+	{
+	}
+
+	void set_position(transform_id id, const math::v3& position)
+	{
+		const u32 index{ id::index(id) };
+		positions[index] = position;
+		has_transform[index] = 0;
+		changes_from_previous_frame[index] |= (u8)component_flags::position;
+	}
+
+	void set_scale(transform_id id, const math::v3& scale)
+	{
+		const u32 index{ id::index(id) };
+		scales[index] = scale;
+		has_transform[index] = 0;
+		changes_from_previous_frame[index] |= (u8)component_flags::scale;
+	}
+
+
 	/// @brief Transformコンポーネントを作成
 	/// @param info 初期化情報
 	/// @param entity 関連付けるエンティティ
@@ -94,6 +119,7 @@ namespace dxforge::transform
 			positions[entity_index] = math::v3{ info.position };
 			scales[entity_index] = math::v3{ info.scale };
 			has_transform[entity_index] = 0;
+			changes_from_previous_frame[entity_index] = (u8)component_flags::all;
 		}
 		else
 		{
@@ -105,6 +131,7 @@ namespace dxforge::transform
 			positions.emplace_back(info.position);
 			scales.emplace_back(info.scale);
 			has_transform.emplace_back((u8)0);
+			changes_from_previous_frame.emplace_back((u8)component_flags::all);
 		}
 
 		// NOTE: 各エンティティはトランスフォームコンポーネントを持つ。
@@ -136,6 +163,56 @@ namespace dxforge::transform
 
 		world = to_world[entity_index];
 		inverse_world = inv_world[entity_index];
+	}
+
+	void get_update_component_flags(const game_entity::entity_id* const ids, u32 count, u8* const flags)
+	{
+		assert(ids && count && flags);
+		read_write_flags = 1;
+
+		for (u32 i{ 0 }; i < count; ++i)
+		{
+			assert(game_entity::entity{ ids[i] }.is_valid());
+			flags[i] = changes_from_previous_frame[id::index(ids[i])];
+		}
+	}
+
+	void update(const component_cache* const cache, u32 count)
+	{
+		assert(cache && count);
+
+		// NOTE: "changes_from_previous_frame"をクリアするのは、読み込みがなく、
+		//		この関数を呼び出すことで変更が適用されようとしているとき
+		//		（つまり、現在のフレームの残りは書き込みのみ）に、フレームごとに一度だけ起こる。
+		if (read_write_flags)
+		{
+			memset(changes_from_previous_frame.data(), 0, changes_from_previous_frame.size());
+			read_write_flags = 0;
+		}
+
+		for (u32 i{ 0 }; i < count; ++i)
+		{
+			const component_cache& c{ cache[i] };
+			assert(component{ c.id }.is_valid());
+
+			if (c.flags & component_flags::rotation)
+			{
+				set_rotation(c.id, c.rotation);
+			}
+			if (c.flags & component_flags::orientation)
+			{
+				set_orientation(c.id, c.orientation);
+			}
+			if (c.flags & component_flags::position)
+			{
+				set_position(c.id, c.position);
+			}
+			if (c.flags & component_flags::scale)
+			{
+				set_scale(c.id, c.scale);
+			}
+		}
+
 	}
 
 	/// @brief コンポーネントの回転を取得

@@ -29,25 +29,35 @@ namespace dxforge
 			constexpr explicit entity(entity_id id) : _id(id) {}
 			constexpr entity() : _id(id::invalid_id) {}
 
+
+			// ------ アクセサ関数 ------
 			/// @brief ゲームエンティティのIDを取得する
 			/// @return ゲームエンティティのID
-			constexpr entity_id get_id() const { return _id; }
-
+			[[nodiscard]] constexpr entity_id get_id() const { return _id; }
 			/// @brief ゲームエンティティが有効かどうかを判定する
 			/// @return 有効ならtrue, そうでなければfalse
-			constexpr bool is_valid() const { return id::is_valid(_id); }
-
+			[[nodiscard]] constexpr bool is_valid() const { return id::is_valid(_id); }
 			/// @brief ゲームエンティティのTransformコンポーネントを取得する
 			/// @return Transformコンポーネント
-			transform::component transform() const;
-
+			[[nodiscard]] transform::component transform() const;
 			/// @brief ゲームエンティティのScriptコンポーネントを取得する
 			/// @return Scriptコンポーネント
-			script::component script() const;
+			[[nodiscard]] script::component script() const;
+			/// @brief ゲームエンテティの回転値を取得する
+			/// @return 回転値
+			[[nodiscard]] math::v4 rotation() const { return transform().rotation(); }
+			/// @brief ゲームエンテティの向きを取得する
+			/// @return 向き
+			[[nodiscard]] math::v3 orientation() const { return transform().orientation(); }
+			/// @brief ゲームエンテティの位置を取得する
+			/// @return 位置
+			[[nodiscard]] math::v3 position() const { return transform().position(); }
+			/// @brief ゲームエンテティの拡大率を取得する
+			/// @return 拡大率
+			[[nodiscard]] math::v3 scale() const { return transform().scale(); }
 
 		private:	// メンバ変数
-			/// @brief ゲームエンティティのID
-			entity_id _id;
+			entity_id _id;	///< ゲームエンティティのID
 		};
 	}	// namespace game_entity
 
@@ -65,6 +75,16 @@ namespace dxforge
 		protected:	// プロテクト関数
 			constexpr explicit entity_script(game_entity::entity entity)
 				: game_entity::entity{ entity.get_id() }{}
+
+			void set_rotation(math::v4 rotation_quaternion) const { set_rotation(this, rotation_quaternion); }
+			void set_orientation(math::v3 orientation_vector) const { set_orientation(this, orientation_vector); }
+			void set_position(math::v3 position) const { set_position(this, position); }
+			void set_scale(math::v3 scale) const { set_scale(this, scale); }
+
+			static void set_rotation(const game_entity::entity* const entity, math::v4 rotation_quaternion);
+			static void set_orientation(const game_entity::entity* const entity, math::v3 orientation_venctor);
+			static void set_position(const game_entity::entity* const entity, math::v3 position);
+			static void set_scale(const game_entity::entity* const entity, math::v3 scale);
 		};
 
 		namespace detail

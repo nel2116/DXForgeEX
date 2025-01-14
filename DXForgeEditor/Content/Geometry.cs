@@ -482,7 +482,7 @@ namespace DXForgeEditor.Content
                 }
 
                 // For Testing. Remove later!
-                // PackForEngine();
+                PackForEngine();
                 // For Testing. Remove later!
             }
             catch (Exception ex)
