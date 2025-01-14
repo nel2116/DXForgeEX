@@ -16,6 +16,8 @@
 #include "D3D12PostProcess.h"
 #include "D3D12Upload.h"
 #include "D3D12Content.h"
+#include "D3D12Camera.h"
+#include "Shaders/SharedTypes.h"
 
 using namespace Microsoft::WRL;	// ComPtrを使うため
 
@@ -316,6 +318,39 @@ namespace dxforge::graphics::d3d12::core
 
 		}
 
+		d3d12_frame_info get_d3d12_frame_info(const frame_info& info, constant_buffer& cbuffer, const d3d12_surface& surface, u32 frame_idx, f32 delta_time)
+		{
+			camera::d3d12_camera& camera{ camera::get(info.camera_id) };
+			camera.update();
+			hlsl::GlobalShaderData data{};
+			using namespace DirectX;
+			XMStoreFloat4x4A(&data.View, camera.view());
+			XMStoreFloat4x4A(&data.Projection, camera.projection());
+			XMStoreFloat4x4A(&data.InvProjection, camera.inverse_projection());
+			XMStoreFloat4x4A(&data.ViewProjection, camera.view_projection());
+			XMStoreFloat4x4A(&data.InvViewProjection, camera.inverse_view_projection());
+			XMStoreFloat3(&data.CameraPosition, camera.position());
+			XMStoreFloat3(&data.CameraDirection, camera.direction());
+			data.ViewWidth = surface.width();
+			data.ViewHeight = surface.height();
+			data.DeltaTime = delta_time;
+			// NOTE: このバッファから読み込まないように注意すること。 読み込みは本当に遅い。
+			hlsl::GlobalShaderData* const shader_data{ cbuffer.allocate<hlsl::GlobalShaderData>() };
+			// TODO: cbufferが一杯になった場合の処理。
+			memcpy(shader_data, &data, sizeof(hlsl::GlobalShaderData));
+			d3d12_frame_info d3d12_info
+			{
+				&info,
+				&camera,
+				cbuffer.gpu_address(shader_data),
+				data.ViewWidth,
+				data.ViewHeight,
+				frame_idx,
+				delta_time
+			};
+			return d3d12_info;
+		}
+
 	}	// 匿名名前空間
 
 	namespace detail
@@ -563,21 +598,19 @@ namespace dxforge::graphics::d3d12::core
 	}
 
 	/// @brief レンダリング処理
-	void render_surface(surface_id id)
+	void render_surface(surface_id id, frame_info info)
 	{
-		// GPUがコマンド・アロケータを終了するのを待ち、GPUがコマンド・アロケータを終了したら、アロケータをリセットする。
+		// GPUがコマンドアロケータを終了するのを待ち、GPUがコマンドアロケータを終了したら、アロケータをリセットする。
 		// これにより、コマンドの保存に使われていたメモリが解放される。
 		gfx_command.begin_frame();
 		id3d12_graphics_command_list* cmd_list{ gfx_command.command_list() };
 
-		// 現在のフレームインデックスを取得
 		const u32 frame_idx{ current_frame_index() };
 
 		// 現在のフレームのグローバル定数バッファをリセット（クリア）する。
 		constant_buffer& cbuffer{ constant_buffers[frame_idx] };
 		cbuffer.clear();
 
-		// 遅延解放を処理する
 		if (deferred_releases_flag[frame_idx])
 		{
 			process_deferred_releases(frame_idx);
@@ -586,16 +619,14 @@ namespace dxforge::graphics::d3d12::core
 		const d3d12_surface& surface{ surfaces[id] };
 		ID3D12Resource* const current_back_buffer{ surface.back_buffer() };
 
-		d3d12_frame_info frame_info
-		{
-			surface.width(),
-			surface.height()
-		};
+		const d3d12_frame_info d3d12_info{
+			get_d3d12_frame_info(info, cbuffer, surface, frame_idx, 16.7f) };
 
-		gpass::set_size({ frame_info.surface_width, frame_info.surface_height });
+
+		gpass::set_size({ d3d12_info.surface_width, d3d12_info.surface_height });
 		d3dx::d3d12_resource_barrier& barriers{ resource_barriers };
 
-		// コマンドの記録
+		// Record commands
 		ID3D12DescriptorHeap* const heaps[]{ srv_desc_heap.heap() };
 		cmd_list->SetDescriptorHeaps(1, &heaps[0]);
 
@@ -610,13 +641,13 @@ namespace dxforge::graphics::d3d12::core
 		gpass::add_transitions_for_depth_prepass(barriers);
 		barriers.apply(cmd_list);
 		gpass::set_render_targets_for_depth_prepass(cmd_list);
-		gpass::depth_prepass(cmd_list, frame_info);
+		gpass::depth_prepass(cmd_list, d3d12_info);
 
 		// Geometry and lighting pass
 		gpass::add_transitions_for_gpass(barriers);
 		barriers.apply(cmd_list);
 		gpass::set_render_targets_for_gpass(cmd_list);
-		gpass::render(cmd_list, frame_info);
+		gpass::render(cmd_list, d3d12_info);
 
 		// Post-process
 		barriers.add(current_back_buffer,
@@ -626,14 +657,15 @@ namespace dxforge::graphics::d3d12::core
 		gpass::add_transitions_for_post_process(barriers);
 		barriers.apply(cmd_list);
 		// 現在のバックバッファに書き込むので、バックバッファはレンダリングターゲットになる
-		fx::post_process(cmd_list, surface.rtv());
+		fx::post_process(cmd_list, d3d12_info, surface.rtv());
+
 		// after post process
 		d3dx::transition_resource(cmd_list, current_back_buffer,
 			D3D12_RESOURCE_STATE_RENDER_TARGET,
 			D3D12_RESOURCE_STATE_PRESENT);
 
-		// コマンドの録音が終わった。 コマンドを実行してください、
-		// 信号を受信し、次のフレームのフェンス値をインクリメントする。
+		// コマンドの録音が終わった。
+		// コマンドを実行し、シグナルを送り、次のフレームのフェンス値をインクリメントする。
 		gfx_command.end_frame(surface);
 	}
 

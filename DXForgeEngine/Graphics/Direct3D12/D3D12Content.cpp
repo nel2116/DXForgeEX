@@ -8,6 +8,7 @@
 // 2025/01/12 新規作成
 // 2025/01/13 マテリアルの追加と削除の関数を追加
 // 2025/01/13 テクスチャの追加と削除の関数を追加
+// 2025/01/14 コメントの追加
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Content.h"
@@ -20,68 +21,81 @@ namespace dxforge::graphics::d3d12::content
 {
 	namespace
 	{
+		/// @brief パイプラインステートオブジェクトのID構造体
 		struct pso_id
 		{
-			id::id_type gpass_pso_id{ id::invalid_id };
-			id::id_type depth_pso_id{ id::invalid_id };
+			id::id_type gpass_pso_id{ id::invalid_id };							///< GPass用パイプラインステートオブジェクトのID
+			id::id_type depth_pso_id{ id::invalid_id };							///< Depth用パイプラインステートオブジェクトのID
 		};
 
+		/// @brief サブメッシュビューを表す構造体
 		struct submesh_view
 		{
-			D3D12_VERTEX_BUFFER_VIEW position_buffer_view{};			// 位置バッファービュー
-			D3D12_VERTEX_BUFFER_VIEW element_buffer_view{};				// エレメントバッファービュー
-			D3D12_INDEX_BUFFER_VIEW index_buffer_view{};				// インデックスバッファービュー
-			D3D_PRIMITIVE_TOPOLOGY primitive_topology;					// プリミティブトポロジー
-			u32 elements_type{};
+			D3D12_VERTEX_BUFFER_VIEW position_buffer_view{};					///< 頂点バッファビュー（位置）
+			D3D12_VERTEX_BUFFER_VIEW element_buffer_view{};						///< 頂点バッファビュー（要素）
+			D3D12_INDEX_BUFFER_VIEW index_buffer_view{};						///< インデックスバッファビュー
+			D3D_PRIMITIVE_TOPOLOGY primitive_topology;							///< プリミティブトポロジー
+			u32 elements_type{};												///< 要素の種類を表す型
 		};
 
+		/// @brief Direct3D12の描画アイテムを表す構造体
 		struct d3d12_render_item
 		{
-			id::id_type entity_id;
-			id::id_type submesh_gpu_id;
-			id::id_type material_id;
-			id::id_type pso_id;
-			id::id_type depth_pso_id;
+			id::id_type entity_id;												///< エンティティのID
+			id::id_type submesh_gpu_id;											///< サブメッシュのGPU ID
+			id::id_type material_id;											///< materialのID
+			id::id_type pso_id;													///< パイプラインステートオブジェクトのID
+			id::id_type depth_pso_id;											///< Depth用パイプラインステートオブジェクトのID
 		};
 
-		utl::free_list<ID3D12Resource*> submesh_buffers{};				// サブメッシュバッファー
-		utl::free_list<submesh_view> submesh_views{};					// サブメッシュビュー
-		std::mutex submesh_mutex{};										// サブメッシュミューテックス
+		utl::free_list<ID3D12Resource*>                 submesh_buffers{};		///< サブメッシュ用のリソースバッファ
+		utl::free_list<submesh_view>                    submesh_views{};		///< サブメッシュビュー
+		std::mutex                                      submesh_mutex{};		///< サブメッシュ用ミューテックス
 
-		utl::free_list<d3d12_texture*> textures;						// テクスチャ
-		std::mutex texture_mutex;										// テクスチャミューテックス
+		utl::free_list<d3d12_texture>                   textures;				///< テクスチャ用のリソースバッファ
+		std::mutex                                      texture_mutex{};		///< テクスチャ用ミューテックス
 
-		utl::vector<ID3D12RootSignature*> root_signatures;				// ルートシグネチャ
-		// マテリアルのタイプとシェーダーフラグを、ルートシグネチャの配列のインデックスにマッピングする。
-		std::unordered_map<u64, id::id_type> mtl_rs_map;				// マテリアルルートシグネチャマップ
-		utl::free_list<std::unique_ptr<u8[]>> materials;				// マテリアル
-		std::mutex material_mutex;										// マテリアルミューテックス
+		utl::vector<ID3D12RootSignature*>               root_signatures;		///< ルートシグネチャのリスト
+		std::unordered_map<u64, id::id_type>            mtl_rs_map;				///< materialとルートシグネチャのマップ
+		utl::free_list<std::unique_ptr<u8[]>>           materials;				///< material
+		std::mutex                                      material_mutex{};		///< material用ミューテックス
 
-		utl::free_list<d3d12_render_item> render_items;	// レンダーアイテム
-		utl::free_list<std::unique_ptr<id::id_type[]>> render_item_ids;	// レンダーアイテムID
-		utl::vector<ID3D12PipelineState*> pipeline_states;				// パイプラインステート
-		std::unordered_map<u64, id::id_type> pso_map;					// パイプラインステートマップ
-		std::mutex render_item_mutex;									// レンダーアイテムミューテックス
+		utl::free_list<d3d12_render_item>               render_items;			///< 描画アイテムのリスト
+		utl::free_list<std::unique_ptr<id::id_type[]>>  render_item_ids;		///< 描画アイテムIDのリスト
+		utl::vector<ID3D12PipelineState*>               pipeline_states;		///< パイプラインステートオブジェクト
+		std::unordered_map<u64, id::id_type>            pso_map;				///< パイプラインステートオブジェクトとIDのマップ
+		std::mutex                                      render_item_mutex{};	///< 描画アイテム用ミューテックス
 
+		/// @brief フレームキャッシュ
 		struct
 		{
-			utl::vector<dxforge::content::lod_offset> lod_offsets;
-			utl::vector<id::id_type> geometry_ids;
-		}frame_cache;
+			utl::vector<dxforge::content::lod_offset>    lod_offsets;			///< LODオフセット
+			utl::vector<id::id_type>                    geometry_ids;			///< ジオメトリID
+		} frame_cache;
 
+		/// @brief ルートシグネチャを作成する関数
+		/// @param type materialの種類
+		/// @param flags シェーダーフラグ
+		/// @return 生成されたルートシグネチャのID
 		id::id_type create_root_signature(material_type::type type, shader_flags::flags flags);
 
-		// ====== d3d12_material_stream ======
+		/// @brief materialのストリームを表すクラス
 		class d3d12_material_stream
 		{
 		public:		// パブリック関数
+			/// クラスの移動とコピーを禁止
 			DISABLE_COPY_AND_MOVE(d3d12_material_stream);
+			/// @brief コンストラクタ
+			/// @param material_buffer materialのバッファ
 			explicit d3d12_material_stream(u8* const material_buffer)
-				: _buffer{ material_buffer }
+				:_buffer{ material_buffer }
 			{
 				initialize();
 			}
 
+			/// @brief コンストラクタ
+			/// @param material_buffer materialのバッファ
+			/// @param info materialの初期化情報
 			explicit d3d12_material_stream(std::unique_ptr<u8[]>& material_buffer, material_init_info info)
 			{
 				assert(!material_buffer);
@@ -93,36 +107,36 @@ namespace dxforge::graphics::d3d12::content
 					if (id::is_valid(info.shader_ids[i]))
 					{
 						++shader_count;
-						flags |= 1 << i;
+						flags |= (1 << i);
 					}
 				}
 
 				assert(shader_count && flags);
 
-				const u32 buffer_size
-				{
-					sizeof(material_type::type) +								// マテリアルタイプ
-					sizeof(shader_flags::flags) +								// シェーダーフラグ
-					sizeof(id::id_type) +										// ルートシグネチャID
-					sizeof(u32) +												// テクスチャカウント
-					sizeof(id::id_type) * shader_count +						// shader ids
-					(sizeof(id::id_type) + sizeof(u32)) * info.texture_count	// テクスチャIDとディスクリプタのインデックス（テクスチャを使用しない場合は0かもしれない）。
+				const u32 buffer_size{
+					sizeof(material_type::type) +								// materialの種類
+					sizeof(shader_flags::flags) +								// shaderのフラグ
+					sizeof(id::id_type) +										// ルートシグネチャーのID
+					sizeof(u32) +												// textureの数
+					sizeof(id::id_type) * shader_count +						// shaderのID
+					(sizeof(id::id_type) + sizeof(u32)) * info.texture_count	// textureのIDとディスクリプタのインデックス（textureを使用しない場合は0かもしれない）
 				};
 
 				material_buffer = std::make_unique<u8[]>(buffer_size);
 				_buffer = material_buffer.get();
+				u8* const buffer{ _buffer };
 
-				*(material_type::type*)_buffer = info.type;
-				*(shader_flags::flags*)(&_buffer[shader_flags_index]) = (shader_flags::flags)flags;
-				*(id::id_type*)(&_buffer[root_signature_index]) = create_root_signature(info.type, (shader_flags::flags)flags);
-				*(u32*)(&_buffer[texture_count_index]) = info.texture_count;
+				*(material_type::type*)buffer = info.type;
+				*(shader_flags::flags*)(&buffer[shader_flags_index]) = (shader_flags::flags)flags;
+				*(id::id_type*)(&buffer[root_signature_index]) = create_root_signature(info.type, (shader_flags::flags)flags);
+				*(u32*)(&buffer[texture_count_index]) = info.texture_count;
 
 				initialize();
 
 				if (info.texture_count)
 				{
 					memcpy(_texture_ids, info.texture_ids, info.texture_count * sizeof(id::id_type));
-					texture::get_descriptor_indices(_texture_ids, info.texture_count, _discripter_indices);
+					texture::get_descriptor_indices(_texture_ids, info.texture_count, _descriptor_indices);
 				}
 
 				u32 shader_index{ 0 };
@@ -138,17 +152,17 @@ namespace dxforge::graphics::d3d12::content
 				assert(shader_index == (u32)_mm_popcnt_u32(_shader_flags));
 			}
 
-			// ====== アクセサ ======
+			// ------ アクセサ関数 ------
 			[[nodiscard]] constexpr u32 texture_count() const { return _texture_count; }
 			[[nodiscard]] constexpr material_type::type material_type() const { return _type; }
 			[[nodiscard]] constexpr shader_flags::flags shader_flags() const { return _shader_flags; }
 			[[nodiscard]] constexpr id::id_type root_signature_id() const { return _root_signature_id; }
 			[[nodiscard]] constexpr id::id_type* texture_ids() const { return _texture_ids; }
-			[[nodiscard]] constexpr u32* discripter_indices() const { return _discripter_indices; }
+			[[nodiscard]] constexpr u32* dectriptor_indices() const { return _descriptor_indices; }
 			[[nodiscard]] constexpr id::id_type* shader_ids() const { return _shader_ids; }
 
-
 		private:	// プライベート関数
+			/// @brief 初期化関数
 			void initialize()
 			{
 				assert(_buffer);
@@ -161,27 +175,24 @@ namespace dxforge::graphics::d3d12::content
 
 				_shader_ids = (id::id_type*)(&buffer[texture_count_index + sizeof(u32)]);
 				_texture_ids = _texture_count ? &_shader_ids[_mm_popcnt_u32(_shader_flags)] : nullptr;
-				_discripter_indices = _texture_count ? (u32*)(&_texture_ids[_texture_count]) : nullptr;
+				_descriptor_indices = _texture_count ? (u32*)(&_texture_ids[_texture_count]) : nullptr;
 			}
 
-		private:	// メンバ変数
 			constexpr static u32 shader_flags_index{ sizeof(material_type::type) };
 			constexpr static u32 root_signature_index{ shader_flags_index + sizeof(shader_flags::flags) };
 			constexpr static u32 texture_count_index{ root_signature_index + sizeof(id::id_type) };
 
-			u8* _buffer;						// バッファー
-			id::id_type* _texture_ids;			// テクスチャID
-			u32* _discripter_indices;			// ディスクリプタインデックス
-			id::id_type* _shader_ids;			// シェーダーID
-			id::id_type _root_signature_id;		// ルートシグネチャID
-			u32 _texture_count;					// テクスチャカウント
-			material_type::type _type;			// マテリアルタイプ
-			shader_flags::flags _shader_flags;	// シェーダーフラグ
+			u8* _buffer;									///< バッファ
+			id::id_type* _texture_ids;						///< textureのID
+			u32* _descriptor_indices;						///< ディスクリプタのインデックス
+			id::id_type* _shader_ids;						///< shaderのID
+			id::id_type             _root_signature_id;		///< ルートシグネチャーのID
+			u32                     _texture_count;			///< textureの数
+			material_type::type     _type;					///< materialの種類
+			shader_flags::flags     _shader_flags;			///< shaderのフラグ
 		};
 
-		// ====== !d3d12_material_stream ======
-
-		D3D_PRIMITIVE_TOPOLOGY get_d3d_primitive_topology(primitve_topology::type type)
+		constexpr D3D_PRIMITIVE_TOPOLOGY get_d3d_primitive_topology(primitve_topology::type type)
 		{
 			assert(type < primitve_topology::count);
 
@@ -207,19 +218,21 @@ namespace dxforge::graphics::d3d12::content
 			case D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST:
 			case D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP: return D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 			}
+
 			return D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED;
 		}
+
 
 		constexpr D3D12_ROOT_SIGNATURE_FLAGS get_root_signature_flags(shader_flags::flags flags)
 		{
 			D3D12_ROOT_SIGNATURE_FLAGS default_flags{ d3dx::d3d12_root_signature_desc::default_flags };
-			if (flags & shader_flags::vertex)default_flags &= ~D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS;
-			if (flags & shader_flags::hull)default_flags &= ~D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
-			if (flags & shader_flags::domain)default_flags &= ~D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS;
-			if (flags & shader_flags::geometry)default_flags &= ~D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
-			if (flags & shader_flags::pixel)default_flags &= ~D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
-			if (flags & shader_flags::amplification)default_flags &= ~D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS;
-			if (flags & shader_flags::mesh)default_flags &= ~D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS;
+			if (flags & shader_flags::vertex)           default_flags &= ~D3D12_ROOT_SIGNATURE_FLAG_DENY_VERTEX_SHADER_ROOT_ACCESS;
+			if (flags & shader_flags::hull)             default_flags &= ~D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS;
+			if (flags & shader_flags::domain)           default_flags &= ~D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS;
+			if (flags & shader_flags::geometry)         default_flags &= ~D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+			if (flags & shader_flags::pixel)            default_flags &= ~D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS;
+			if (flags & shader_flags::amplification)    default_flags &= ~D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS;
+			if (flags & shader_flags::mesh)             default_flags &= ~D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS;
 			return default_flags;
 		}
 
@@ -243,7 +256,7 @@ namespace dxforge::graphics::d3d12::content
 			{
 				using params = gpass::opaque_root_parameter;
 				d3dx::d3d12_root_parameter parameters[params::count]{};
-				parameters[params::per_frame_data].as_cbv(D3D12_SHADER_VISIBILITY_ALL, 0);
+				parameters[params::global_shader_data].as_cbv(D3D12_SHADER_VISIBILITY_ALL, 0);
 
 				D3D12_SHADER_VISIBILITY buffer_visibility{};
 				D3D12_SHADER_VISIBILITY data_visibility{};
@@ -259,7 +272,8 @@ namespace dxforge::graphics::d3d12::content
 					data_visibility = D3D12_SHADER_VISIBILITY_MESH;
 				}
 
-				if ((flags & shader_flags::hull) || (flags & shader_flags::geometry) || (flags & shader_flags::amplification))
+				if ((flags & shader_flags::hull) || (flags & shader_flags::geometry) ||
+					(flags & shader_flags::amplification))
 				{
 					buffer_visibility = D3D12_SHADER_VISIBILITY_ALL;
 					data_visibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -272,7 +286,7 @@ namespace dxforge::graphics::d3d12::content
 
 				parameters[params::position_buffer].as_srv(buffer_visibility, 0);
 				parameters[params::element_buffer].as_srv(buffer_visibility, 1);
-				parameters[params::srv_indices].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 2);	// TODO: これは、サンプルテクスチャを必要とするすべてのステージから見える必要があります。
+				parameters[params::srv_indices].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 2); // TODO: これは、テクスチャをサンプリングする必要のあるすべてのステージから見えるようにする必要があります。
 				parameters[params::per_object_data].as_cbv(data_visibility, 1);
 
 				root_signature = d3dx::d3d12_root_signature_desc{ &parameters[0], _countof(parameters), get_root_signature_flags(flags) }.create();
@@ -284,15 +298,16 @@ namespace dxforge::graphics::d3d12::content
 			const id::id_type id{ (id::id_type)root_signatures.size() };
 			root_signatures.emplace_back(root_signature);
 			mtl_rs_map[key] = id;
-			NAME_D3D12_OBJECT_INDEXED(root_signature, key, L"Gpass Root Signature - key");
+			NAME_D3D12_OBJECT_INDEXED(root_signature, key, L"GPass Root Signature - key");
 
 			return id;
 		}
 
 		id::id_type create_pso_if_needed(const u8* const stream_ptr, u64 aligned_stream_size, [[maybe_unused]] bool is_depth)
 		{
-			const u64 key{ math::calc_crc32_u64(stream_ptr,aligned_stream_size) };
+			const u64 key{ math::calc_crc32_u64(stream_ptr, aligned_stream_size) };
 			auto pair = pso_map.find(key);
+
 
 			if (pair != pso_map.end())
 			{
@@ -303,7 +318,8 @@ namespace dxforge::graphics::d3d12::content
 			const id::id_type id{ (u32)pipeline_states.size() };
 			d3dx::d3d12_pipeline_state_subobject_stream* const stream{ (d3dx::d3d12_pipeline_state_subobject_stream* const)stream_ptr };
 			pipeline_states.emplace_back(d3dx::create_pipeline_state(stream, sizeof(d3dx::d3d12_pipeline_state_subobject_stream)));
-			NAME_D3D12_OBJECT_INDEXED(pipeline_states.back(), key, is_depth ? L"Depth-only Pipeline State Object - key" : L"GPass Pipeline State Object - key");
+			NAME_D3D12_OBJECT_INDEXED(pipeline_states.back(), key,
+				is_depth ? L"Depth-only Pipeline State Object - key" : L"GPass Pipeline State Object - key");
 
 			assert(id::is_valid(id));
 			pso_map[key] = id;
@@ -350,16 +366,16 @@ namespace dxforge::graphics::d3d12::content
 			}
 
 			stream.vs = shaders[shader_type::vertex];
-			stream.hs = shaders[shader_type::hull];
-			stream.ds = shaders[shader_type::domain];
-			stream.gs = shaders[shader_type::geometry];
 			stream.ps = shaders[shader_type::pixel];
+			stream.ds = shaders[shader_type::domain];
+			stream.hs = shaders[shader_type::hull];
+			stream.gs = shaders[shader_type::geometry];
 			stream.cs = shaders[shader_type::compute];
 			stream.as = shaders[shader_type::amplification];
 			stream.ms = shaders[shader_type::mesh];
 
 			pso_id id_pair{};
-			id_pair.depth_pso_id = create_pso_if_needed(stream_ptr, aligned_stream_size, false);
+			id_pair.gpass_pso_id = create_pso_if_needed(stream_ptr, aligned_stream_size, false);
 
 			stream.ps = D3D12_SHADER_BYTECODE{};
 			stream.depth_stencil1 = d3dx::depth_state.enabled;
@@ -368,10 +384,7 @@ namespace dxforge::graphics::d3d12::content
 			return id_pair;
 		}
 
-	}	// 匿名名前空間
-
-
-	// ====== グローバル関数 ======
+	} // 匿名名前空間
 
 	bool initialize()
 	{
@@ -380,13 +393,15 @@ namespace dxforge::graphics::d3d12::content
 
 	void shutdown()
 	{
-		// NOTE: この関数では、リソースを追加する際の副作用として作成されたデータのみを解放します。
+		// NOTE: このモジュールでは、リソースを追加する際の副作用として作成されたデータのみを解放します。
 		// 残りのデータは、レンダラーをシャットダウンする前に、ユーザーが「remove」関数を呼び出して解放する必要があります。
 		// そうすることで、コンテンツの帳簿管理が正しく行われるようになります。
+
 		for (auto& item : root_signatures)
 		{
 			core::release(item);
 		}
+
 		mtl_rs_map.clear();
 		root_signatures.clear();
 
@@ -394,24 +409,29 @@ namespace dxforge::graphics::d3d12::content
 		{
 			core::release(item);
 		}
+
 		pso_map.clear();
 		pipeline_states.clear();
 	}
 
-	// ====== submesh ======
 	namespace submesh
 	{
+
 		// NOTE: data'に含まれることを期待する：
+		//
 		//     u32 element_size, u32 vertex_count,
 		//     u32 index_count, u32 elements_type, u32 primitive_topology
-		//     u8 positions[sizeof(f32) * 3 * vertex_count],     // sizeof(positions)は4バイトの倍数でなければならない。 必要ならパディングしてください
-		//     u8 elements[sizeof(element_size) * vertex_count], // sizeof(elements)は4バイトの倍数でなければならない。 必要ならパディングしてください
+		//     u8 positions[sizeof(f32) * 3 * vertex_count],     // sizeof(positions)は4バイトの倍数でなければならない。 必要であればパディングしてください。
+		//     u8 elements[sizeof(element_size) * vertex_count], // sizeof(elements)は4バイトの倍数でなければならない。 必要であればパディングしてください。
 		//     u8 indices[index_size * index_count],
 		//
-		// 備考:
+		// Remarks:
 		// - データポインタを進める
 		// - ポジションとエレメントのバッファーは、4バイトの倍数になるようにパディングされるべきである。
-		//   この4バイトはD3D12_STANDARD_MAXIMUM_ELEMENT_ALIGNMENT_BYTE_MULTIPLEとして定義される。
+		//   この16バイトはD3D12_STANDARD_MAXIMUM_ELEMENT_ALIGNMENT_BYTE_MULTIPLEとして定義される。
+		/// @brief サブメッシュを追加する関数
+		/// @param data サブメッシュのデータ
+		/// @return サブメッシュのGPU ID
 		id::id_type add(const u8*& data)
 		{
 			utl::blob_stream_reader blob{ (const u8*)data };
@@ -454,6 +474,8 @@ namespace dxforge::graphics::d3d12::content
 			view.index_buffer_view.SizeInBytes = index_buffer_size;
 			view.index_buffer_view.Format = (index_size == sizeof(u16)) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
 
+
+
 			view.primitive_topology = get_d3d_primitive_topology((primitve_topology::type)primitive_topology);
 			view.elements_type = elements_type;
 
@@ -462,6 +484,8 @@ namespace dxforge::graphics::d3d12::content
 			return submesh_views.add(view);
 		}
 
+		/// @brief サブメッシュを削除する関数
+		/// @param id 削除するサブメッシュのGPU ID
 		void remove(id::id_type id)
 		{
 			std::lock_guard lock{ submesh_mutex };
@@ -471,6 +495,10 @@ namespace dxforge::graphics::d3d12::content
 			submesh_buffers.remove(id);
 		}
 
+		/// @brief サブメッシュのビューを取得する関数
+		/// @param gpu_ids サブメッシュのGPU ID
+		/// @param id_count IDの数
+		/// @param cache キャッシュ
 		void get_views(const id::id_type* const gpu_ids, u32 id_count, const views_cache& cache)
 		{
 			assert(gpu_ids && id_count);
@@ -488,27 +516,41 @@ namespace dxforge::graphics::d3d12::content
 				cache.elements_types[i] = view.elements_type;
 			}
 		}
+	} // namespace submesh
 
-	}	// namespace submesh
-
-	// ====== texture ======
 	namespace texture
 	{
+		/// @brief テクスチャを追加する関数
+		/// @param texture_ids テクスチャのID
+		/// @param id_count IDの数
+		/// @param indices ディスクリプタのインデックス
 		void get_descriptor_indices(const id::id_type* const texture_ids, u32 id_count, u32* const indices)
 		{
 			assert(texture_ids && id_count && indices);
 			std::lock_guard lock{ texture_mutex };
 			for (u32 i{ 0 }; i < id_count; ++i)
 			{
-				indices[i] = textures[i]->srv().index;
+				indices[i] = textures[i].srv().index;
 			}
 		}
+	} // namespace texture
 
-	}	// namespace texture
-
-	// ====== material ======
 	namespace material
 	{
+		// 出力フォーマット：
+		//
+		// struct {
+		// material_type::type  type,
+		// shader_flags::flags  flags,
+		// id::id_type          root_signature_id,
+		// u32                  texture_count,
+		// id::id_type          shader_ids[shader_count],
+		// id::id_type          texture_ids[texture_count],
+		// u32*                 descriptor_indices[texture_count]
+		// } d3d12_material
+		/// @brief マテリアルを追加する関数
+		/// @param info マテリアルの初期化情報
+		/// @return マテリアルのID
 		id::id_type add(material_init_info info)
 		{
 			std::unique_ptr<u8[]> buffer;
@@ -518,13 +560,19 @@ namespace dxforge::graphics::d3d12::content
 			return materials.add(std::move(buffer));
 		}
 
+		/// @brief マテリアルを削除する関数
+		/// @param id 削除するマテリアルのID
 		void remove(id::id_type id)
 		{
 			std::lock_guard lock{ material_mutex };
 			materials.remove(id);
 		}
 
-		void get_materials(const id::id_type* const material_ids, u32 material_count, const material_cache& cache)
+		/// @brief マテリアルを取得する関数
+		/// @param material_ids マテリアルのID
+		/// @param material_count IDの数
+		/// @param cache キャッシュ
+		void get_materials(const id::id_type* const material_ids, u32 material_count, const materials_cache& cache)
 		{
 			assert(material_ids && material_count);
 			assert(cache.root_signatures && cache.material_types);
@@ -537,15 +585,21 @@ namespace dxforge::graphics::d3d12::content
 				cache.material_types[i] = stream.material_type();
 			}
 		}
-	}	// namespace material
 
-	// ====== render_item ======
+	} // namespace material
+
 	namespace render_item
 	{
 		// 基本的に id::id_types の配列であるバッファを作成する。
 		// buffer[0] = geometry_content_id
 		// buffer[1 .. n] = d3d12_render_item_ids (nは低レベルのレンダーアイテムのID数で、サブメッシュ/マテリアルのID数と等しくなければならない）。
 		// buffer[n + 1] = id::invalid_id (これはsubmesh_gpu_id配列の終わりを示す）。
+		/// @brief 描画アイテムを追加する関数
+		/// @param entity_id エンティティのID
+		/// @param geometry_content_id ジオメトリのコンテンツID
+		/// @param material_count マテリアルの数
+		/// @param material_ids マテリアルのID
+		/// @return 描画アイテムのID
 		id::id_type add(id::id_type entity_id, id::id_type geometry_content_id, u32 material_count, const id::id_type* const material_ids)
 		{
 			assert(id::is_valid(entity_id) && id::is_valid(geometry_content_id));
@@ -564,7 +618,7 @@ namespace dxforge::graphics::d3d12::content
 
 			submesh::get_views(gpu_ids, material_count, views_cache);
 
-			// NOTE: idのリストはジオメトリidで始まり、リストの終わりを示す無効なidで終わる。
+			// NOTE: idのリストはgeomtery idで始まり、リストの終わりを示す無効なidで終わる。
 			std::unique_ptr<id::id_type[]> items{ std::make_unique<id::id_type[]>(sizeof(id::id_type) * (1 + (u64)material_count + 1)) };
 
 			items[0] = geometry_content_id;
@@ -582,28 +636,35 @@ namespace dxforge::graphics::d3d12::content
 				item.pso_id = id_pair.gpass_pso_id;
 				item.depth_pso_id = id_pair.depth_pso_id;
 
-				assert(id::is_valid(item.submesh_gpu_id && id::is_valid(item.material_id)));
+				assert(id::is_valid(item.submesh_gpu_id) && id::is_valid(item.material_id));
 				item_ids[i] = render_items.add(item);
 			}
 
-			// IDリストの最後をマーク
+			// IDリストの終わりを示す。
 			item_ids[material_count] = id::invalid_id;
 
 			return render_item_ids.add(std::move(items));
 		}
 
+		/// @brief 描画アイテムを削除する関数
+		/// @param id 削除する描画アイテムのID
 		void remove(id::id_type id)
 		{
 			std::lock_guard lock{ render_item_mutex };
-			const id::id_type* const item_ids{ &render_item_ids[id][1] };	// 最初のidはジオメトリid
+			const id::id_type* const item_ids{ &render_item_ids[id][1] };
+
 			// NOTE: idのリストの最後の要素は常に無効なidである。
 			for (u32 i{ 0 }; item_ids[i] != id::invalid_id; ++i)
 			{
 				render_items.remove(item_ids[i]);
 			}
+
 			render_item_ids.remove(id);
 		}
 
+		/// @brief 描画アイテムのIDを取得する関数
+		/// @param info フレーム情報
+		/// @param d3d12_render_item_ids D3D12の描画アイテムのID
 		void get_d3d12_render_item_ids(const frame_info& info, utl::vector<id::id_type>& d3d12_render_item_ids)
 		{
 			assert(info.render_item_ids && info.thresholds && info.render_item_count);
@@ -646,24 +707,30 @@ namespace dxforge::graphics::d3d12::content
 			assert(item_index <= d3d12_render_item_count);
 		}
 
+		/// @brief 描画アイテムを取得する関数
+		/// @param d3d12_render_item_ids D3D12の描画アイテムのID
+		/// @param id_count IDの数
+		/// @param cache キャッシュ
 		void get_items(const id::id_type* const d3d12_render_item_ids, u32 id_count, const items_cache& cache)
 		{
 			assert(d3d12_render_item_ids && id_count);
 			assert(cache.entity_ids && cache.submesh_gpu_ids && cache.material_ids &&
-				cache.psos && cache.depth_psos);
+				cache.gpass_psos && cache.depth_psos);
+
 			std::lock_guard lock{ render_item_mutex };
+
 			for (u32 i{ 0 }; i < id_count; ++i)
 			{
 				const d3d12_render_item& item{ render_items[d3d12_render_item_ids[i]] };
 				cache.entity_ids[i] = item.entity_id;
 				cache.submesh_gpu_ids[i] = item.submesh_gpu_id;
 				cache.material_ids[i] = item.material_id;
-				cache.psos[i] = pipeline_states[item.pso_id];
+				cache.gpass_psos[i] = pipeline_states[item.pso_id];
 				cache.depth_psos[i] = pipeline_states[item.depth_pso_id];
 			}
 		}
 
-	}	// namespace render_item
+	} // namespace render_item
 
 }	// namespace dxforge::graphics::d3d12::content
 

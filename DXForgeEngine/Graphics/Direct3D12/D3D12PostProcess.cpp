@@ -84,7 +84,7 @@ namespace dxforge::graphics::d3d12::fx
 		core::release(fx_root_sig);
 	}
 
-	void post_process(id3d12_graphics_command_list* cmd_list, D3D12_CPU_DESCRIPTOR_HANDLE target_rtv)
+	void post_process(id3d12_graphics_command_list* cmd_list, const d3d12_frame_info& d3d12_info, D3D12_CPU_DESCRIPTOR_HANDLE target_rtv)
 	{
 		// ポストプロセスのPSOとルートシグネチャを設定
 		cmd_list->SetGraphicsRootSignature(fx_root_sig);

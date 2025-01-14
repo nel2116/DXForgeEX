@@ -44,7 +44,7 @@ namespace dxforge::graphics::d3d12::content
 
 	namespace material
 	{
-		struct material_cache
+		struct materials_cache
 		{
 			ID3D12RootSignature** const root_signatures;
 			material_type::type* const material_types;
@@ -52,7 +52,7 @@ namespace dxforge::graphics::d3d12::content
 
 		id::id_type add(material_init_info info);
 		void remove(id::id_type id);
-		void get_materials(const id::id_type* const material_ids, u32 material_count, const material_cache& cache);
+		void get_materials(const id::id_type* const material_ids, u32 material_count, const materials_cache& cache);
 	}	// namespace material
 
 	namespace render_item
@@ -62,7 +62,7 @@ namespace dxforge::graphics::d3d12::content
 			id::id_type* const entity_ids;
 			id::id_type* const submesh_gpu_ids;
 			id::id_type* const material_ids;
-			ID3D12PipelineState** const psos;
+			ID3D12PipelineState** const gpass_psos;
 			ID3D12PipelineState** const depth_psos;
 		};
 

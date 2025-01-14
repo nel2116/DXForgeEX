@@ -11,13 +11,19 @@
 // ====== インクルード部 ======
 #include "D3D12CommonHeaders.h"
 
-
 namespace dxforge::graphics::d3d12
 {
+	namespace camera { class d3d12_camera; }
+
 	struct d3d12_frame_info
 	{
-		u32 surface_width{};
-		u32 surface_height{};
+		const frame_info* info;							///< フレーム情報
+		camera::d3d12_camera* camera;					///< カメラ
+		D3D12_GPU_VIRTUAL_ADDRESS global_shader_data;	///< シェーダデータ
+		u32 surface_width;								///< サーフェスの幅
+		u32 surface_height;								///< サーフェスの高さ
+		u32 frame_index;								///< フレームインデックス
+		f32 delta_time;									///< デルタタイム
 	};
 }	// namespace dxforge::graphics::d3d12
 
@@ -72,5 +78,5 @@ namespace dxforge::graphics::d3d12::core
 	void resize_surface(surface_id id, u32 width, u32 height);		// サーフェスのリサイズ
 	[[nodiscard]] u32 surface_width(surface_id id);					// サーフェスの幅
 	[[nodiscard]] u32 surface_height(surface_id id);				// サーフェスの高さ
-	void render_surface(surface_id id);								// サーフェスのレンダリング
+	void render_surface(surface_id id, frame_info info);			// サーフェスのレンダリング
 }	// namespace dxforge::graphics

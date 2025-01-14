@@ -1,14 +1,11 @@
-// Copyright (c) Arash Khatami
-// Distributed under the MIT license. See the LICENSE file in the project root for more information.
-
-// Mandelbrot fractal constants
+// マンデルブロ・フラクタル定数
 #define M_RE_START -2.8f
 #define M_RE_END 1.f
 #define M_IM_START -1.5f
 #define M_IM_END 1.5f
 #define M_MAX_ITERATION 1000
 
-// Julia set constants
+// ジュリア集合定数
 #define J_RE_START -2.f
 #define J_RE_END 2.f
 #define J_IM_START -1.5f

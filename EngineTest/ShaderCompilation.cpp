@@ -31,7 +31,7 @@ using namespace Microsoft::WRL;
 
 namespace
 {
-	constexpr const char* shaders_source_path{ "../../DXForgeEngine/Graphics/Direct3D12/Sbaders/" };
+	constexpr const char* shaders_source_path{ "../../DXForgeEngine/Graphics/Direct3D12/Shaders/" };
 
 	struct engine_shader_info
 	{

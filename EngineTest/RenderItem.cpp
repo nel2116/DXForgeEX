@@ -72,22 +72,22 @@ namespace
 
 id::id_type create_render_item(id::id_type entity_id)
 {
-	// load a model, pretend it belongs to entity_id
+	// モデルを読み込み、entity_idに属しているふりをする。
 	auto _1 = std::thread{ [] {load_model(); } };
 
-	// load a material:
+	// materialを読み込む
 	// 1. load textures, oh noooooo we don't have any, but that't ok.
 	// 2. load shaders for that material
 	auto _2 = std::thread{ [] {load_shaders(); } };
 
 	_1.join();
 	_2.join();
-	// add a render item using the model and its materials.
+	// モデルとそのマテリアルを使ってレンダーアイテムを追加します。
 	create_material();
 	id::id_type materials[]{ mtl_id,mtl_id,mtl_id,mtl_id,mtl_id };
 
 	// TODO: add add_render_item in renderer.
-	id::id_type item_id{ graphics::add_render_item(0,model_id,_countof(materials),&materials[0]) };
+	id::id_type item_id{ graphics::add_render_item(entity_id,model_id,_countof(materials),&materials[0]) };
 
 	render_item_entity_map[item_id] = entity_id;
 	return { 0 };
