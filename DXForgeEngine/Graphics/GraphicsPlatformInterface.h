@@ -9,6 +9,7 @@
 // 2025/01/12 カメラ関連の構造体を追加
 // 2025/01/12 マテリアル関連の構造体を追加
 // 2025/01/14 render_item関連の処理をresources構造体に追加
+// 2025/01/18 light構造体を追加
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -31,6 +32,14 @@ namespace dxforge::graphics
 			u32(*height)(surface_id);
 			void(*render)(surface_id, frame_info);
 		} surface;
+
+		struct
+		{
+			light(*create)(light_init_info);
+			void(*remove)(light_id, u64);
+			void(*set_parameter)(light_id, u64, light_parameter::parameter, const void* const, u32);
+			void(*get_parameter)(light_id, u64, light_parameter::parameter, void* const, u32);
+		}light;
 
 		struct
 		{

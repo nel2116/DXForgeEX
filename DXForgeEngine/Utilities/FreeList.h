@@ -115,7 +115,7 @@ namespace dxforge::utl
 
 	private:	// ====== プライベート関数 ======
 
-		constexpr bool already_removed(u32 id)
+		constexpr bool already_removed(u32 id) const
 		{
 			// NOTE: sizeof(T)==sizeof(u32)の場合、アイテムがすでに削除されているかどうかをテストできない。
 			if constexpr (sizeof(T) > sizeof(u32))

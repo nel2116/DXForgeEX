@@ -114,6 +114,8 @@ bool test_initialize();
 void test_shutdown();
 id::id_type create_render_item(id::id_type entity_id);
 void destroy_render_item(id::id_type item_id);
+void generate_lights();
+void remove_lights();
 
 LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
@@ -195,7 +197,7 @@ LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	return DefWindowProc(hwnd, msg, wparam, lparam);
 }
 
-game_entity::entity create_one_game_entity(math::v3 position, math::v3a rotation, bool rotates)
+game_entity::entity create_one_game_entity(math::v3 position, math::v3a rotation, const char* script_name)
 {
 	transform::init_info transform_info{};
 	DirectX::XMVECTOR quat{ DirectX::XMQuaternionRotationRollPitchYawFromVector(DirectX::XMLoadFloat3A(&rotation)) };
@@ -205,9 +207,9 @@ game_entity::entity create_one_game_entity(math::v3 position, math::v3a rotation
 	memcpy(&transform_info.position[0], &position.x, sizeof(transform_info.position));
 
 	script::init_info script_info{};
-	if (rotates)
+	if (script_name)
 	{
-		script_info.script_creator = script::detail::get_script_creator(script::detail::string_hash()("rotator_script"));
+		script_info.script_creator = script::detail::get_script_creator(script::detail::string_hash()(script_name));
 	}
 
 	game_entity::entity_info entity_info{};
@@ -254,7 +256,7 @@ void create_camera_surface(camera_surface& surface, platform::window_init_info i
 {
 	surface.surface.window = platform::create_window(&info);
 	surface.surface.surface = graphics::create_surface(surface.surface.window);
-	surface.entity = create_one_game_entity({ 0.0f,1.0f, 3.0f }, { 0.0f, 3.14f, 0.0f }, false);
+	surface.entity = create_one_game_entity({ 0.0f,1.0f, 3.0f }, { 0.0f, 3.14f, 0.0f }, nullptr);
 	surface.camera = graphics::create_camera(graphics::perspective_camera_init_info(surface.entity.get_id()));
 	surface.camera.aspect_ratio((f32)surface.surface.window.width() / (f32)surface.surface.window.height());
 }
@@ -302,7 +304,9 @@ bool test_initialize()
 
 	init_test_workers(buffer_test_worker);
 
-	item_id = create_render_item(create_one_game_entity({}, {}, true).get_id());
+	item_id = create_render_item(create_one_game_entity({}, {}, "rotator_script").get_id());
+
+	generate_lights();
 
 	is_restarting = false;
 	return true;
@@ -310,6 +314,7 @@ bool test_initialize()
 
 void test_shutdown()
 {
+	remove_lights();
 	destroy_render_item(item_id);
 	joint_test_workers();
 
@@ -343,6 +348,8 @@ void engine_test::run()
 			info.render_item_ids = &item_id;
 			info.render_item_count = 1;
 			info.thresholds = &threshold;
+			info.light_set_key = 0;
+			info.average_frame_time = timer.dt_avg();
 			info.camera_id = _surfaces[i].camera.get_id();
 
 			_surfaces[i].surface.surface.render(info);

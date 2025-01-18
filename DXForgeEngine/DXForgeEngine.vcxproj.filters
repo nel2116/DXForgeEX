@@ -42,6 +42,8 @@
     <ClInclude Include="EngineAPI\Camera.h" />
     <ClInclude Include="Graphics\Direct3D12\D3D12Camera.h" />
     <ClInclude Include="Graphics\Direct3D12\Shaders\SharedTypes.h" />
+    <ClInclude Include="EngineAPI\Light.h" />
+    <ClInclude Include="Graphics\Direct3D12\D3D12Light.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Components\Entity.cpp" />
@@ -69,5 +71,6 @@
     <ClCompile Include="Content\ContentToEngine.cpp" />
     <ClCompile Include="EngineAPI\Camera.cpp" />
     <ClCompile Include="Graphics\Direct3D12\D3D12Camera.cpp" />
+    <ClCompile Include="Graphics\Direct3D12\D3D12Light.cpp" />
   </ItemGroup>
 </Project>

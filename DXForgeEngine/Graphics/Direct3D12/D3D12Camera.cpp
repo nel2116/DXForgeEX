@@ -37,7 +37,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 設定対象のカメラ
 		/// @param data 視野角のデータ
 		/// @param size データサイズ
-		void set_field_of_view(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
+		constexpr void set_field_of_view(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::perspective);
 			f32 fov{ *(f32*)data };
@@ -49,7 +49,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 設定対象のカメラ
 		/// @param data アスペクト比のデータ
 		/// @param size データサイズ
-		void set_aspect_ratio(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
+		constexpr void set_aspect_ratio(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::perspective);
 			f32 aspect_ratio{ *(f32*)data };
@@ -61,7 +61,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 設定対象のカメラ
 		/// @param data ビュー幅のデータ
 		/// @param size データサイズ
-		void set_view_width(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
+		constexpr void set_view_width(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::orthographic);
 			f32 view_width{ *(f32*)data };
@@ -73,7 +73,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 設定対象のカメラ
 		/// @param data ビュー高さのデータ
 		/// @param size データサイズ
-		void set_view_height(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
+		constexpr void set_view_height(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::orthographic);
 			f32 view_height{ *(f32*)data };
@@ -85,7 +85,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 設定対象のカメラ
 		/// @param data 近クリップ面のデータ
 		/// @param size データサイズ
-		void set_near_z(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
+		constexpr void set_near_z(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
 		{
 			f32 near_z{ *(f32*)data };
 			assert(sizeof(near_z) == size);
@@ -96,7 +96,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 設定対象のカメラ
 		/// @param data 遠クリップ面のデータ
 		/// @param size データサイズ
-		void set_far_z(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
+		constexpr void set_far_z(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
 		{
 			f32 far_z{ *(f32*)data };
 			assert(sizeof(far_z) == size);
@@ -173,7 +173,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data 視野角のデータ
 		/// @param size データサイズ
-		void get_field_of_view(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_field_of_view(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::perspective);
 			f32* const fov{ (f32* const)data };
@@ -185,7 +185,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data アスペクト比のデータ
 		/// @param size データサイズ
-		void get_aspect_ratio(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_aspect_ratio(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::perspective);
 			f32* const aspect_ratio{ (f32* const)data };
@@ -197,7 +197,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data ビュー幅のデータ
 		/// @param size データサイズ
-		void get_view_width(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_view_width(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::orthographic);
 			f32* const view_width{ (f32* const)data };
@@ -209,7 +209,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data ビュー高さのデータ
 		/// @param size データサイズ
-		void get_view_height(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_view_height(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::orthographic);
 			f32* const view_height{ (f32* const)data };
@@ -221,7 +221,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data 近クリップ面のデータ
 		/// @param size データサイズ
-		void get_near_z(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_near_z(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			f32* const near_z{ (f32* const)data };
 			assert(sizeof(f32) == size);
@@ -232,7 +232,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data 遠クリップ面のデータ
 		/// @param size データサイズ
-		void get_far_z(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_far_z(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			f32* const far_z{ (f32* const)data };
 			assert(sizeof(f32) == size);
@@ -243,7 +243,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data ビュー行列のデータ
 		/// @param size データサイズ
-		void get_projection_type(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_projection_type(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			graphics::camera::type* const type{ (graphics::camera::type* const)data };
 			assert(sizeof(graphics::camera::type) == size);
@@ -254,14 +254,14 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data エンティティIDのデータ
 		/// @param size データサイズ
-		void get_entity_id(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_entity_id(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			id::id_type* const entity_id{ (id::id_type* const)data };
 			assert(sizeof(id::id_type) == size);
 			*entity_id = camera.entity_id();
 		}
 
-		void dummy_set(d3d12_camera&, const void* const, u32)
+		constexpr void dummy_set(d3d12_camera&, const void* const, u32)
 		{
 		}
 
@@ -357,7 +357,7 @@ namespace dxforge::graphics::d3d12::camera
 
 	/// @brief カメラの視野角を設定する関数
 	/// @param fov 視野角
-	void d3d12_camera::field_of_view(f32 fov)
+	constexpr void d3d12_camera::field_of_view(f32 fov)
 	{
 		assert(_projection_type == graphics::camera::perspective);
 		_field_of_view = fov;
@@ -366,7 +366,7 @@ namespace dxforge::graphics::d3d12::camera
 
 	/// @brief カメラのアスペクト比を設定する関数
 	/// @param aspect_ratio アスペクト比
-	void d3d12_camera::aspect_ratio(f32 aspect_ratio)
+	constexpr void d3d12_camera::aspect_ratio(f32 aspect_ratio)
 	{
 		assert(_projection_type == graphics::camera::perspective);
 		_aspect_ratio = aspect_ratio;
@@ -375,7 +375,7 @@ namespace dxforge::graphics::d3d12::camera
 
 	/// @brief カメラのビュー幅を設定する関数
 	/// @param width ビュー幅
-	void d3d12_camera::view_width(f32 width)
+	constexpr void d3d12_camera::view_width(f32 width)
 	{
 		assert(width);
 		assert(_projection_type == graphics::camera::orthographic);
@@ -385,7 +385,7 @@ namespace dxforge::graphics::d3d12::camera
 
 	/// @brief カメラのビュー高さを設定する関数
 	/// @param height ビュー高さ
-	void d3d12_camera::view_height(f32 height)
+	constexpr void d3d12_camera::view_height(f32 height)
 	{
 		assert(height);
 		assert(_projection_type == graphics::camera::orthographic);
@@ -395,7 +395,7 @@ namespace dxforge::graphics::d3d12::camera
 
 	/// @brief カメラの近クリップ面を設定する関数
 	/// @param near_z 近クリップ面
-	void d3d12_camera::near_z(f32 near_z)
+	constexpr void d3d12_camera::near_z(f32 near_z)
 	{
 		_near_z = near_z;
 		_is_dirty = true;
@@ -403,7 +403,7 @@ namespace dxforge::graphics::d3d12::camera
 
 	/// @brief カメラの遠クリップ面を設定する関数
 	/// @param far_z 遠クリップ面
-	void d3d12_camera::far_z(f32 far_z)
+	constexpr void d3d12_camera::far_z(f32 far_z)
 	{
 		_far_z = far_z;
 		_is_dirty = true;

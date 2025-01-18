@@ -289,6 +289,7 @@ namespace dxforge::graphics::d3d12::content
 				parameters[params::position_buffer].as_srv(buffer_visibility, 0);
 				parameters[params::element_buffer].as_srv(buffer_visibility, 1);
 				parameters[params::srv_indices].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 2); // TODO: これは、テクスチャをサンプリングする必要のあるすべてのステージから見えるようにする必要があります。
+				parameters[params::directional_lights].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 3);
 				parameters[params::per_object_data].as_cbv(data_visibility, 1);
 
 				root_signature = d3dx::d3d12_root_signature_desc{ &parameters[0], _countof(parameters), get_root_signature_flags(flags) }.create();

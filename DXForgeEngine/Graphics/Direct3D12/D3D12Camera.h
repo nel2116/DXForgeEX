@@ -29,22 +29,22 @@ namespace dxforge::graphics::d3d12::camera
 		void up(math::v3 up);
 		/// @brief 視野角を設定する (パースペクティブカメラ用)
 		/// @param fov 新しい視野角
-		void field_of_view(f32 fov);
+		constexpr void field_of_view(f32 fov);
 		/// @brief アスペクト比を設定する (パースペクティブカメラ用)
 		/// @param aspect_ratio 新しいアスペクト比
-		void aspect_ratio(f32 aspect_ratio);
+		constexpr void aspect_ratio(f32 aspect_ratio);
 		/// @brief ビュー幅を設定する (オーソグラフィックカメラ用)
 		/// @param width 新しいビュー幅
-		void view_width(f32 width);
+		constexpr void view_width(f32 width);
 		/// @brief ビュー高さを設定する (オーソグラフィックカメラ用)
 		/// @param height 新しいビュー高さ
-		void view_height(f32 height);
+		constexpr void view_height(f32 height);
 		/// @brief 近クリッピング平面を設定する
 		/// @param near_z 新しい近クリッピング平面距離
-		void near_z(f32 near_z);
+		constexpr void near_z(f32 near_z);
 		/// @brief 遠クリッピング平面を設定する
 		/// @param far_z 新しい遠クリッピング平面距離
-		void far_z(f32 far_z);
+		constexpr void far_z(f32 far_z);
 
 		// ------ アクセサ関数 ------
 		[[nodiscard]] constexpr DirectX::XMMATRIX view() const { return _view; }

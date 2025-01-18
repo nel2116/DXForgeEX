@@ -59,7 +59,7 @@ namespace dxforge::graphics::d3d12
 		~d3d12_surface() { release(); }
 
 		/// @brief スワップチェインの作成
-		void create_swap_chain(IDXGIFactory7* factory, ID3D12CommandQueue* cmd_queue, DXGI_FORMAT format = default_back_buffer_format);
+		void create_swap_chain(IDXGIFactory7* factory, ID3D12CommandQueue* cmd_queue);
 
 		/// @brief サーフェスの表示
 		void present() const;
@@ -122,10 +122,11 @@ namespace dxforge::graphics::d3d12
 		};
 
 		// ------ 変数 ------
+			// NOTE: ここに新しいメンバー・データを追加する場合は、移動コンストラクタを更新し、移動()関数とリセット()関数を更新することを忘れないでください。
+			//		これは、（STLから）std::vectorを使用する際に正しい動作をさせるためです。
 		IDXGISwapChain4* _swap_chain{ nullptr };						// スワップチェイン
 		render_target_data _render_target_data[buffer_count]{};			// レンダーターゲットデータ
 		platform::window _window{};										// ウィンドウ
-		DXGI_FORMAT _format{ default_back_buffer_format };				// バックバッファフォーマット
 		mutable u32 _current_bb_index{ 0 };								// 現在のバックバッファインデックス
 		u32 _allow_tearing{ 0 };										// ティアリングを許可するかどうか
 		u32 _present_flags{ 0 };										// プレゼントフラグ

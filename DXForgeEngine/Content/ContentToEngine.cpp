@@ -75,6 +75,7 @@ namespace dxforge::content
 		};
 
 		// ====== ローカル変数 ======
+		// NOTE: これはSTLとの互換性を維持するために必要である。
 		struct noexcept_map
 		{
 			std::unordered_map<u32, std::unique_ptr<u8[]>> map;
@@ -340,7 +341,7 @@ namespace dxforge::content
 		{
 			assert(shaders[i]);
 			const compiled_shader_ptr shader_ptr{ (const compiled_shader_ptr)shaders[i] };
-			const u64 size{ compiled_shader::buffer_size(shader_ptr->byte_code_size()) };
+			const u64 size{ shader_ptr->buffer_size() };
 			std::unique_ptr<u8[]> shader{ std::make_unique<u8[]>(size) };
 			memcpy(shader.get(), shaders[i], size);
 			group.map[keys[i]] = std::move(shader);

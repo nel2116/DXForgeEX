@@ -1,0 +1,53 @@
+// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+// [Light.h]
+// 作成日 : 2025/01/18
+// 作成者 : 田中ミノル
+// 概要 :
+// ライトのインターフェース
+// 更新履歴
+// 2025/01/18 新規作成
+// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+#pragma once
+// ====== インクルード部 ======
+#include "CommonHeaders.h"
+
+namespace dxforge::graphics
+{
+	DEFINE_TYPED_ID(light_id);
+
+	class light
+	{
+	public:		// パブリック関数
+		enum type : u32
+		{
+			directional,
+			point,
+			spot,
+
+			count
+		};
+
+		constexpr explicit light(light_id id, u64 light_set_key) : _light_set_key{ light_set_key }, _id{ id } {}
+		constexpr light() = default;
+		constexpr light_id get_id() const { return _id; }
+		constexpr u64 light_set_key() const { return _light_set_key; }
+		constexpr bool is_valid() const { return id::is_valid(_id); }
+
+		void is_enabled(bool is_enabled) const;
+		void intensity(f32 intensity) const;
+		void color(math::v3 color) const;
+
+		bool is_enabled() const;
+		f32 intensity() const;
+		math::v3 color() const;
+		type light_type() const;
+		id::id_type entity_id() const;
+
+	private:	// メンバ変数
+		u64 _light_set_key{ 0 };
+		light_id _id{ id::invalid_id };
+	};
+
+}	// namespace dxforge::graphics
+
+
