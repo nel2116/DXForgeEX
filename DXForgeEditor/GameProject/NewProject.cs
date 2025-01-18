@@ -112,7 +112,7 @@ namespace DXForgeEditor.GameProject
             {
                 ErrorMsg = "プロジェクト名を入力してください";
             }
-            else if (!nameRegex.IsMatch(ProjectName))
+            else if (nameRegex.IsMatch(ProjectName))
             {
                 ErrorMsg = "プロジェクト名に使用できない文字が含まれています";
             }

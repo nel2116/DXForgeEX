@@ -75,13 +75,23 @@ namespace dxforge::content
 		};
 
 		// ====== ローカル変数 ======
+		struct noexcept_map
+		{
+			std::unordered_map<u32, std::unique_ptr<u8[]>> map;
+			noexcept_map() = default;
+			noexcept_map(const noexcept_map&) = default;
+			noexcept_map(noexcept_map&&) noexcept = default;
+			noexcept_map& operator=(const noexcept_map&) = default;
+			noexcept_map& operator=(noexcept_map&&) noexcept = default;
+		};
+
 		// この定数は、geometry_hierarchiesの要素がポインタではなくgpu_idであることを示す。
 		constexpr uintptr_t single_mesh_marker{ (uintptr_t)0x01 };
-		utl::free_list<u8*> geometry_hierarchies;					// ジオメトリ階層
-		std::mutex geometry_mutex;									// ジオメトリミューテックス
+		utl::free_list<u8*> geometry_hierarchies;	// ジオメトリ階層
+		std::mutex geometry_mutex;					// ジオメトリミューテックス
 
-		utl::free_list<std::unique_ptr<u8[]>> shaders;				// シェーダー
-		std::mutex shader_mutex;									// シェーダーミューテックス
+		utl::free_list<noexcept_map> shader_groups;	// シェーダー
+		std::mutex shader_mutex;					// シェーダーミューテックス
 
 		// NOTE: create_geometry_resource() と同じデータを期待する。
 		u32 get_geometry_hierarchy_buffer_size(const void* const data)
@@ -320,28 +330,45 @@ namespace dxforge::content
 		}
 	}
 
-	id::id_type add_shader(const u8* data)
+	// NOTE: シェーダーはcompiled_shadersへのポインターの配列であることを期待する。
+	// NOTE: エディターは、シェーダーの重複がないことを確認する責任があります。 もしあれば、喜んで追加します！
+	id::id_type add_shader_group(const u8* const* shaders, u32 num_shaders, const u32* const keys)
 	{
-		const compiled_shader_ptr shader_ptr{ (const compiled_shader_ptr)data };
-		const u64 size{ sizeof(u64) + compiled_shader::hash_length + shader_ptr->byte_code_size() };
-		std::unique_ptr<u8[]> shader{ std::make_unique<u8[]>(size) };
-		memcpy(shader.get(), data, size);
+		assert(shaders && num_shaders && keys);
+		noexcept_map group;
+		for (u32 i{ 0 }; i < num_shaders; ++i)
+		{
+			assert(shaders[i]);
+			const compiled_shader_ptr shader_ptr{ (const compiled_shader_ptr)shaders[i] };
+			const u64 size{ compiled_shader::buffer_size(shader_ptr->byte_code_size()) };
+			std::unique_ptr<u8[]> shader{ std::make_unique<u8[]>(size) };
+			memcpy(shader.get(), shaders[i], size);
+			group.map[keys[i]] = std::move(shader);
+		}
 		std::lock_guard lock{ shader_mutex };
-		return shaders.add(std::move(shader));
+		return shader_groups.add(std::move(group));
 	}
 
-	void remove_shader(id::id_type id)
+	void remove_shader_group(id::id_type id)
 	{
 		std::lock_guard lock{ shader_mutex };
 		assert(id::is_valid(id));
-		shaders.remove(id);
+
+		shader_groups[id].map.clear();
+		shader_groups.remove(id);
 	}
 
-	compiled_shader_ptr get_shader(id::id_type id)
+	compiled_shader_ptr get_shader(id::id_type id, u32 shader_key)
 	{
 		std::lock_guard lock{ shader_mutex };
 		assert(id::is_valid(id));
-		return (const compiled_shader_ptr)(shaders[id].get());
+
+		for (const auto& [key, value] : shader_groups[id].map)
+		{
+			if (key == shader_key) return (const compiled_shader_ptr)value.get();
+		}
+		assert(false);
+		return nullptr;
 	}
 
 	void get_submesh_gpu_ids(id::id_type geometry_content_id, u32 id_count, id::id_type* const gpu_ids)

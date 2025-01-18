@@ -112,16 +112,18 @@ namespace dxforge::utl
 			emplace_back(std::move(value));
 		}
 
+		/// @brief ”z—ñ‚Ì––”ö‚É—v‘f‚ğ‘}“ü‚·‚éB
+		/// @param value ‘}“ü‚·‚é’l
 		template<typename... params>
-		constexpr decltype(auto) emplace_back(params&&... args)
+		constexpr decltype(auto) emplace_back(params&&... p)
 		{
 			if (_size == _capacity)
 			{
-				reserve(((_capacity + 1) * 3) >> 1); // 50“‘‚µ
+				reserve(((_capacity + 1) * 3) >> 1); // reserve 50% more
 			}
 			assert(_size < _capacity);
 
-			T* const item{ new(std::addressof(_data[_size])) T(std::forward<params>(args)...) };
+			T* const item{ new (std::addressof(_data[_size])) T(std::forward<params>(p)...) };
 			++_size;
 			return *item;
 		}

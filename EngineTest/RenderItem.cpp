@@ -13,6 +13,7 @@
 #include "Graphics/Renderer.h"
 #include "ShaderCompilation.h"
 #include "Components/Entity.h"
+#include "../ContentTools/Geometry.h"
 
 using namespace dxforge;
 
@@ -38,7 +39,7 @@ namespace
 
 	void load_shaders()
 	{
-		// Let's say our material uses a vertex shader and a pixel shader
+		// マテリアルがバーテックスシェーダーとピクセルシェーダーを使うとしよう。
 		shader_file_info info;
 		info.file_name = "TestShader.hlsl";
 		info.function = "TestShaderVS";
@@ -46,17 +47,33 @@ namespace
 
 		const char* sharder_path{ "..\\..\\enginetest\\" };
 
-		auto vertex_shader = compile_shader(info, sharder_path);
-		assert(vertex_shader.get());
+		std::wstring defines[]{ L"ELEMENTS_TYPE=1", L"ELEMENTS_TYPE=3" };
+		utl::vector<u32> keys;
+		keys.emplace_back(tools::elements::elements_type::static_normal);
+		keys.emplace_back(tools::elements::elements_type::static_normal_texture);
+
+		utl::vector<std::wstring> extra_args{};
+		utl::vector<std::unique_ptr<u8[]>> vertex_shader;
+		utl::vector<const u8*> vertex_shader_pointers;
+		for (u32 i{ 0 }; i < _countof(defines); ++i)
+		{
+			extra_args.clear();
+			extra_args.emplace_back(L"-D");
+			extra_args.emplace_back(defines[i]);
+			vertex_shader.emplace_back(std::move(compile_shader(info, sharder_path, extra_args)));
+			assert(vertex_shader.back().get());
+			vertex_shader_pointers.emplace_back(vertex_shader.back().get());
+		}
 
 		info.function = "TestShaderPS";
 		info.type = shader_type::pixel;
 
-		auto pixel_shader = compile_shader(info, sharder_path);
+		auto pixel_shader = compile_shader(info, sharder_path, extra_args);
 		assert(pixel_shader.get());
 
-		vs_id = content::add_shader(vertex_shader.get());
-		ps_id = content::add_shader(pixel_shader.get());
+		vs_id = content::add_shader_group(vertex_shader_pointers.data(), (u32)vertex_shader_pointers.size(), keys.data());
+		const u8* pixel_shaders[]{ pixel_shader.get() };
+		ps_id = content::add_shader_group(&pixel_shaders[0], 1, &u32_invalid_id);
 	}
 
 	void create_material()
@@ -115,11 +132,11 @@ void destroy_render_item(id::id_type item_id)
 	// remove shaders and textures
 	if (id::is_valid(vs_id))
 	{
-		content::remove_shader(vs_id);
+		content::remove_shader_group(vs_id);
 	}
 	if (id::is_valid(ps_id))
 	{
-		content::remove_shader(ps_id);
+		content::remove_shader_group(ps_id);
 	}
 
 	// remove model
