@@ -1,6 +1,2 @@
-﻿  D3D12Core.cpp
-F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Core.cpp(348,23): warning C4838: 'f32' から 'u32' への変換には縮小変換が必要です
-F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Core.cpp(348,23): warning C4244: '初期化中': 'f32' から 'u32' への変換です。データが失われる可能性があります。
-F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Core.cpp(349,24): warning C4838: 'f32' から 'u32' への変換には縮小変換が必要です
-F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12Core.cpp(349,24): warning C4244: '初期化中': 'f32' から 'u32' への変換です。データが失われる可能性があります。
+﻿  ContentToEngine.cpp
   DXForgeEngine.vcxproj -> F:\HAL\Self\DXForgeEX\x64\Debug\DXForgeEngine.lib

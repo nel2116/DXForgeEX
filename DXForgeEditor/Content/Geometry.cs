@@ -608,7 +608,7 @@ namespace DXForgeEditor.Content
             var data = (writer.BaseStream as MemoryStream)?.ToArray();
             Debug.Assert(data?.Length > 0);
             // For Testing. Remove later!
-            using (var fs = new FileStream(@"..\..\EngineTest\model.model", FileMode.Create))
+            using (var fs = new FileStream(@"..\..\x64\model.model", FileMode.Create))
             {
                 fs.Write(data, 0, data.Length);
             }

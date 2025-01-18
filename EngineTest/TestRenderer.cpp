@@ -25,30 +25,6 @@
 
 using namespace dxforge;
 
-class rotator_script;
-REGISTER_SCRIPT(rotator_script);
-class rotator_script : public script::entity_script
-{
-public:
-	constexpr explicit rotator_script(game_entity::entity entity)
-		: script::entity_script{ entity } {}
-
-	void begin_play() override {}
-	void update(float dt) override
-	{
-		_angle += 0.25f * dt * math::two_pi;
-		if (_angle > math::two_pi) _angle -= math::two_pi;
-		math::v3a rot{ 0.0f,_angle, 0.0f };
-		DirectX::XMVECTOR quat{ DirectX::XMQuaternionRotationRollPitchYawFromVector(DirectX::XMLoadFloat3A(&rot)) };
-		math::v4 rot_quat;
-		DirectX::XMStoreFloat4(&rot_quat, quat);
-		set_rotation(rot_quat);
-	}
-
-private:
-	f32 _angle{ 0.f };
-};
-
 // Multithreaded test worker spawn code _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #define ENABLE_TEST_WORKERS 0
 
@@ -112,8 +88,9 @@ bool is_restarting{ false };
 void destroy_camera_surface(camera_surface& surface);
 bool test_initialize();
 void test_shutdown();
-id::id_type create_render_item(id::id_type entity_id);
-void destroy_render_item(id::id_type item_id);
+void create_render_items();
+void destroy_render_items();
+void get_render_items(id::id_type* items, u32 count);
 void generate_lights();
 void remove_lights();
 
@@ -256,7 +233,7 @@ void create_camera_surface(camera_surface& surface, platform::window_init_info i
 {
 	surface.surface.window = platform::create_window(&info);
 	surface.surface.surface = graphics::create_surface(surface.surface.window);
-	surface.entity = create_one_game_entity({ 0.0f,1.0f, 3.0f }, { 0.0f, 3.14f, 0.0f }, nullptr);
+	surface.entity = create_one_game_entity({ 13.76f,3.0f, -1.1f }, { -0.117f, -2.1f, 0.0f }, nullptr);
 	surface.camera = graphics::create_camera(graphics::perspective_camera_init_info(surface.entity.get_id()));
 	surface.camera.aspect_ratio((f32)surface.surface.window.width() / (f32)surface.surface.window.height());
 }
@@ -304,7 +281,7 @@ bool test_initialize()
 
 	init_test_workers(buffer_test_worker);
 
-	item_id = create_render_item(create_one_game_entity({}, {}, "rotator_script").get_id());
+	create_render_items();
 
 	generate_lights();
 
@@ -315,7 +292,7 @@ bool test_initialize()
 void test_shutdown()
 {
 	remove_lights();
-	destroy_render_item(item_id);
+	destroy_render_items();
 	joint_test_workers();
 
 	if (id::is_valid(model_id))
@@ -344,8 +321,12 @@ void engine_test::run()
 		if (_surfaces[i].surface.surface.is_valid())
 		{
 			f32 threshold{ 10 };
+
+			id::id_type render_items[3]{};
+			get_render_items(&render_items[0], 3);
+
 			graphics::frame_info info{};
-			info.render_item_ids = &item_id;
+			info.render_item_ids = &render_items[0];
 			info.render_item_count = 1;
 			info.thresholds = &threshold;
 			info.light_set_key = 0;

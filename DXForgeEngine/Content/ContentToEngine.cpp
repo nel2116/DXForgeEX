@@ -405,7 +405,6 @@ namespace dxforge::content
 			u8* const pointer{ geometry_hierarchies[geometry_ids[i]] };
 			if ((uintptr_t)pointer & single_mesh_marker)
 			{
-				assert(id_count == 1);
 				offsets.emplace_back(lod_offset{ 0, 1 });
 			}
 			else
