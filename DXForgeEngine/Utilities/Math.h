@@ -7,6 +7,7 @@
 // 更新履歴
 // 2024/12/24 新規作成
 // 2025/01/12 align_size_up()とalign_size_down()の追加
+// 2025/01/19 is_equal()の追加
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -15,6 +16,13 @@
 
 namespace dxforge::math
 {
+	constexpr bool is_equal(f32 a, f32 b, f32 eps = epsilon)
+	{
+		f32 diff{ a - b };
+		if (diff < 0.0f) diff = -diff;
+		return diff < eps;
+	}
+
 	template<typename T>
 	[[nodiscard]] constexpr T clamp(T value, T min, T max)
 	{

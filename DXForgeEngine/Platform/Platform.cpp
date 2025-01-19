@@ -6,16 +6,16 @@
 // 　プラットフォームの実装
 // 更新履歴
 // 2024/12/20 新規作成
+// 2025/01/19 入力処理の追加
 // // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
+#ifdef  _WIN64
 #include "Platform.h"
 #include "PlatformType.h"
+#include "Input/InputWin32.h"
 
 namespace dxforge::platform
 {
-
-#ifdef  _WIN64
-
 	namespace
 	{
 		/// @brief ウィンドウ情報
@@ -87,7 +87,9 @@ namespace dxforge::platform
 				break;
 			}
 
-			if (resized && GetAsyncKeyState(VK_LBUTTON) >= 0)
+			input::process_input_message(hwnd, msg, wparam, lparam);
+
+			if (resized && GetKeyState(VK_LBUTTON) >= 0)
 			{
 				window_info& info{ get_from_handle(hwnd) };
 				assert(info.hwnd);
@@ -291,58 +293,58 @@ namespace dxforge::platform
 #error "must implementat least one platform"
 #endif // ! _WIN64
 
-	void window::set_fullscrean(bool is_fullscreen) const
-	{
-		assert(is_valid());
-		set_window_fullscreen(_id, is_fullscreen);
-	}
+void window::set_fullscrean(bool is_fullscreen) const
+{
+	assert(is_valid());
+	set_window_fullscreen(_id, is_fullscreen);
+}
 
-	bool window::is_fullscreen() const
-	{
-		assert(is_valid());
-		return is_window_fullscreen(_id);
-	}
+bool window::is_fullscreen() const
+{
+	assert(is_valid());
+	return is_window_fullscreen(_id);
+}
 
-	void* window::handle() const
-	{
-		assert(is_valid());
-		return get_window_handle(_id);
-	}
+void* window::handle() const
+{
+	assert(is_valid());
+	return get_window_handle(_id);
+}
 
-	void window::set_caption(const wchar_t* caption) const
-	{
-		assert(is_valid());
-		set_window_caption(_id, caption);
-	}
+void window::set_caption(const wchar_t* caption) const
+{
+	assert(is_valid());
+	set_window_caption(_id, caption);
+}
 
-	math::u32v4 window::size() const
-	{
-		assert(is_valid());
-		return get_window_size(_id);
-	}
+math::u32v4 window::size() const
+{
+	assert(is_valid());
+	return get_window_size(_id);
+}
 
-	void window::resize(u32 width, u32 height) const
-	{
-		assert(is_valid());
-		resize_window(_id, width, height);
-	}
+void window::resize(u32 width, u32 height) const
+{
+	assert(is_valid());
+	resize_window(_id, width, height);
+}
 
-	u32 window::width() const
-	{
-		math::u32v4 s{ size() };
-		return s.z - s.x;
-	}
+u32 window::width() const
+{
+	math::u32v4 s{ size() };
+	return s.z - s.x;
+}
 
-	u32 window::height() const
-	{
-		math::u32v4 s{ size() };
-		return s.w - s.y;
-	}
+u32 window::height() const
+{
+	math::u32v4 s{ size() };
+	return s.w - s.y;
+}
 
-	bool window::is_closed() const
-	{
-		assert(is_valid());
-		return is_window_closed(_id);
-	}
+bool window::is_closed() const
+{
+	assert(is_valid());
+	return is_window_closed(_id);
+}
 }
 

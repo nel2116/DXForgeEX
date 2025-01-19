@@ -11,9 +11,9 @@
 #include "Components/Entity.h"
 #include "Components/Transform.h"
 #include "Components/Script.h"
+#include "EngineAPI/Input.h"
 
 using namespace dxforge;
-
 
 class rotator_script;
 REGISTER_SCRIPT(rotator_script);
@@ -24,7 +24,7 @@ public:
 		: script::entity_script{ entity } {}
 
 	void begin_play() override {}
-	void update(float dt) override
+	void update(f32 dt) override
 	{
 		_angle += 0.25f * dt * math::two_pi;
 		if (_angle > math::two_pi) _angle -= math::two_pi;
@@ -48,7 +48,7 @@ public:
 		: script::entity_script{ entity } {}
 
 	void begin_play() override {}
-	void update(float dt) override
+	void update(f32 dt) override
 	{
 		_angle -= 1.0f * dt * math::two_pi;
 		if (_angle > math::two_pi) _angle += math::two_pi;
@@ -63,7 +63,6 @@ private:
 	f32 _angle{ 0.f };
 };
 
-
 class wibbly_wobbly_script;
 REGISTER_SCRIPT(wibbly_wobbly_script);
 class wibbly_wobbly_script : public script::entity_script
@@ -73,7 +72,7 @@ public:
 		: script::entity_script{ entity } {}
 
 	void begin_play() override {}
-	void update(float dt) override
+	void update(f32 dt) override
 	{
 		_angle -= 0.01f * dt * math::two_pi;
 		if (_angle > math::two_pi) _angle += math::two_pi;
@@ -96,3 +95,134 @@ private:
 	f32 _angle{ 0.f };
 };
 
+class camera_script;
+REGISTER_SCRIPT(camera_script);
+class camera_script : public script::entity_script
+{
+public:
+	explicit camera_script(game_entity::entity entity)
+		: script::entity_script{ entity }
+	{
+		_input_system.add_handler(input::input_source::mouse, this, &camera_script::mouse_move);
+
+		math::v3 pos{ position() };
+		_desired_position = _position = DirectX::XMLoadFloat3(&pos);
+
+		math::v3 dir{ orientation() };
+		f32 theta{ DirectX::XMScalarACos(dir.y) };
+		f32 phi{ std::atan2(-dir.z, dir.x) };
+		math::v3 rot{ theta - math::half_pi, phi + math::half_pi, 0.0f };
+		_desired_spherical = _spherical = DirectX::XMLoadFloat3(&rot);
+	}
+
+	void begin_play() override {}
+	void update(f32 dt) override
+	{
+		_dt = dt;
+
+		math::v3 move{};
+		input::input_value value{};
+		/*constexpr input::input_source::type kb{input::input_source::keyboard};
+		input::get(kb, input::input_code::key_w, value); move.z += value.current.x;
+		input::get(kb, input::input_code::key_s, value); move.z -= value.current.x;
+		input::get(kb, input::input_code::key_a, value); move.x += value.current.x;
+		input::get(kb, input::input_code::key_d, value); move.x -= value.current.x;
+		input::get(kb, input::input_code::key_q, value); move.y -= value.current.x;
+		input::get(kb, input::input_code::key_e, value); move.y += value.current.x;*/
+
+		static u64 binding{ std::hash<std::string>()("move") };
+		input::get(binding, value);
+		move = value.current;
+
+		if (!(math::is_equal(move.x, 0.0f) && math::is_equal(move.y, 0.0f) && math::is_equal(move.z, 0.0f)))
+		{
+			using namespace DirectX;
+			const f32 fps_scale{ dt / 0.016667f };
+			math::v4 rot{ rotation() };
+			XMVECTOR d{ XMVector3Rotate(XMLoadFloat3(&move) * 0.05f * fps_scale,XMLoadFloat4(&rot)) };
+			if (_position_acceleration < 1.0f) _position_acceleration += (0.02f * fps_scale);
+			_desired_position += (d * _position_acceleration);
+			_move_position = true;
+		}
+		else if (_move_position)
+		{
+			_position_acceleration = 0.0f;
+		}
+
+		if (_move_rotation || _move_position)
+		{
+			seek_camera();
+		}
+	}
+
+private:	// プライベート関数
+
+	void mouse_move(input::input_source::type type, input::input_code::code code, const input::input_value& mouse_pos)
+	{
+		if (code == input::input_code::mouse_position)
+		{
+			input::input_value value{};
+			input::get(input::input_source::mouse, input::input_code::mouse_left, value);
+			if (value.current.z == 0.0f) return;
+
+			const f32 scale{ 0.002f };
+			const f32 dx{ (mouse_pos.current.x - mouse_pos.previous.x) * scale };
+			const f32 dy{ (mouse_pos.current.y - mouse_pos.previous.y) * scale };
+
+			math::v3 spherical;
+			DirectX::XMStoreFloat3(&spherical, _desired_spherical);
+			spherical.x += dy;
+			spherical.y -= dx;
+			spherical.x = math::clamp(spherical.x, 0.0001f - math::half_pi, math::half_pi - 0.0001f);
+
+			_desired_spherical = DirectX::XMLoadFloat3(&spherical);
+			_move_rotation = true;
+		}
+	}
+	void seek_camera()
+	{
+		using namespace DirectX;
+
+		XMVECTOR p{ _desired_position - _position };
+		XMVECTOR o{ _desired_spherical - _spherical };
+
+		_move_position = (XMVectorGetX(XMVector3Length(p)) > 1e-4f);
+		_move_rotation = (XMVectorGetX(XMVector3Length(o)) > 1e-4f);
+
+		const f32 scale{ 0.2f * _dt / 0.016667f };
+
+		if (_move_position)
+		{
+			_position += (p * scale);
+			math::v3 new_pos;
+			XMStoreFloat3(&new_pos, _position);
+			set_position(new_pos);
+		}
+
+		if (_move_rotation)
+		{
+			_spherical += (o * scale);
+			math::v3 new_rot;
+			XMStoreFloat3(&new_rot, _spherical);
+			new_rot.x = math::clamp(new_rot.x, 0.0001f - math::half_pi, math::half_pi - 0.0001f);
+			_spherical = XMLoadFloat3(&new_rot);
+
+			XMVECTOR quat{ XMQuaternionRotationRollPitchYawFromVector(_spherical) };
+			math::v4 rot_quat;
+			XMStoreFloat4(&rot_quat, quat);
+			set_rotation(rot_quat);
+		}
+	}
+
+private:	// メンバ変数
+	input::input_system<camera_script> _input_system{};
+
+	DirectX::XMVECTOR _desired_position{};
+	DirectX::XMVECTOR _desired_spherical{};
+	DirectX::XMVECTOR _position{};
+	DirectX::XMVECTOR _spherical{};
+	f32 _dt{ 0.0f };
+	f32 _position_acceleration{ 0.0f };
+	bool _move_position{ false };
+	bool _move_rotation{ false };
+};

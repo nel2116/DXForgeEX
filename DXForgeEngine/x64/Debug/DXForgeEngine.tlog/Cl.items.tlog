@@ -23,4 +23,6 @@ F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\OpenGL\OpenGLInterface.cpp;F:\HAL\S
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Renderer.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\Renderer.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Vulkan\VulkanCore.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\VulkanCore.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Vulkan\VulkanInterface.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\VulkanInterface.obj
+F:\HAL\Self\DXForgeEX\DXForgeEngine\Input\Input.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\Input.obj
+F:\HAL\Self\DXForgeEX\DXForgeEngine\Input\InputWin32.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\InputWin32.obj
 F:\HAL\Self\DXForgeEX\DXForgeEngine\Platform\Platform.cpp;F:\HAL\Self\DXForgeEX\DXForgeEngine\x64\Debug\Platform.obj

@@ -130,17 +130,16 @@ namespace
 
 void create_render_items()
 {
-	// モデルを読み込み、entity_idに属しているふりをする。
+	// NOTE: これらのモデルは、Primal Engineのパトロンサポーターであれば購入できる。
+	// あなたが入手可能なものであれば、どれでも代用できる。
 	auto _1 = std::thread{ [] {lab_model_id = load_model("..\\..\\x64\\lab_model.model"); } };
 	auto _2 = std::thread{ [] {fan_model_id = load_model("..\\..\\x64\\fan_model.model"); } };
 	auto _3 = std::thread{ [] {int_model_id = load_model("..\\..\\x64\\int_model.model"); } };
 	auto _4 = std::thread{ [] {load_shaders(); } };
 
 	lab_entity_id = create_one_game_entity({}, {}, nullptr).get_id();
-	fan_entity_id = create_one_game_entity({}, {}, nullptr).get_id();
-	int_entity_id = create_one_game_entity({}, {}, nullptr).get_id();
-	//	fan_entity_id = create_one_game_entity({ -10.47f, 5.93f, -6.7f }, {}, "fan_script").get_id();
-	//	int_entity_id = create_one_game_entity({ 0.0f, 1.3f, -6.6f }, {}, "wibbly_wobbly_script").get_id();
+	fan_entity_id = create_one_game_entity({ -10.47f, 5.93f, -6.7f }, {}, "fan_script").get_id();
+	int_entity_id = create_one_game_entity({ 0.0f, 1.3f, -6.6f }, {}, "wibbly_wobbly_script").get_id();
 
 	_1.join();
 	_2.join();

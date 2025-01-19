@@ -17,6 +17,7 @@
 #include "Components/Entity.h"
 #include "Components/Transform.h"
 #include "Components/Script.h"
+#include "Input/Input.h"
 #include "TestRenderer.h"
 #include "ShaderCompilation.h"
 #include <filesystem>
@@ -125,7 +126,7 @@ LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	}
 	break;
 	case WM_SIZE:
-		resized = (wparam != SIZE_MAXIMIZED);
+		resized = (wparam != SIZE_MINIMIZED);
 		break;
 	case WM_SYSCHAR:
 		toggle_fullscreen = (wparam == VK_RETURN && (HIWORD(lparam) & KF_ALTDOWN));
@@ -142,7 +143,6 @@ LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 			test_shutdown();
 			test_initialize();
 		}
-		break;
 	}
 
 	if ((resized && GetAsyncKeyState(VK_LBUTTON) >= 0) || toggle_fullscreen)
@@ -150,25 +150,26 @@ LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		platform::window win{ platform::window_id{(id::id_type)GetWindowLongPtr(hwnd, GWLP_USERDATA)} };
 		for (u32 i{ 0 }; i < _countof(_surfaces); ++i)
 		{
-			if (_surfaces[i].surface.window.get_id() == win.get_id())
+			if (win.get_id() == _surfaces[i].surface.window.get_id())
 			{
 				if (toggle_fullscreen)
 				{
 					win.set_fullscrean(!win.is_fullscreen());
-					// デフォルトのウィンドウプロシージャでは、WM_SCHARが処理されない場合、Alt+Enterキーボードの組み合わせが押されると、
-					// システム通知音が再生される。 0を返すことで、このメッセージを処理したことをシステムに伝えることができる。
+					// デフォルトのウィンドウプロシージャでは、WM_SYSCHARが処理されない場合、
+					// Alt+Enterキーボードの組み合わせを押したときにシステム通知音が再生される。
+					// 0を返すことで、このメッセージを処理したことをシステムに伝えることができる。
 					return 0;
 				}
 				else
 				{
 					_surfaces[i].surface.surface.resize(win.width(), win.height());
-					_surfaces[i].camera.aspect_ratio((f32)win.width() / (f32)win.height());
+					_surfaces[i].camera.aspect_ratio((f32)win.width() / win.height());
+
 					resized = false;
 				}
 				break;
 			}
 		}
-
 	}
 
 	return DefWindowProc(hwnd, msg, wparam, lparam);
@@ -233,7 +234,7 @@ void create_camera_surface(camera_surface& surface, platform::window_init_info i
 {
 	surface.surface.window = platform::create_window(&info);
 	surface.surface.surface = graphics::create_surface(surface.surface.window);
-	surface.entity = create_one_game_entity({ 13.76f,3.0f, -1.1f }, { -0.117f, -2.1f, 0.0f }, nullptr);
+	surface.entity = create_one_game_entity({ 13.76f,3.0f, -1.1f }, { -0.117f, -2.1f, 0.0f }, "camera_script");
 	surface.camera = graphics::create_camera(graphics::perspective_camera_init_info(surface.entity.get_id()));
 	surface.camera.aspect_ratio((f32)surface.surface.window.width() / (f32)surface.surface.window.height());
 }
@@ -285,12 +286,45 @@ bool test_initialize()
 
 	generate_lights();
 
+	input::input_source source{};
+	source.binding = std::hash<std::string>()("move");
+	source.source_type = input::input_source::type::keyboard;
+	source.code = input::input_code::code::key_a;
+	source.multiplier = 1.0f;
+	source.axis = input::axis::x;
+	input::bind(source);
+
+	source.code = input::input_code::code::key_d;
+	source.multiplier = -1.0f;
+	input::bind(source);
+
+	source.code = input::input_code::code::key_w;
+	source.multiplier = 1.0f;
+	source.axis = input::axis::z;
+	input::bind(source);
+
+	source.code = input::input_code::code::key_s;
+	source.multiplier = -1.0f;
+	input::bind(source);
+
+	source.code = input::input_code::code::key_q;
+	source.multiplier = -1.0f;
+	source.axis = input::axis::y;
+	input::bind(source);
+
+	source.code = input::input_code::code::key_e;
+	source.multiplier = 1.0f;
+	input::bind(source);
+
+
 	is_restarting = false;
 	return true;
 }
 
 void test_shutdown()
 {
+	input::unbind(std::hash<std::string>()("move"));
+
 	remove_lights();
 	destroy_render_items();
 	joint_test_workers();
@@ -327,7 +361,7 @@ void engine_test::run()
 
 			graphics::frame_info info{};
 			info.render_item_ids = &render_items[0];
-			info.render_item_count = 1;
+			info.render_item_count = 3;
 			info.thresholds = &threshold;
 			info.light_set_key = 0;
 			info.average_frame_time = timer.dt_avg();
