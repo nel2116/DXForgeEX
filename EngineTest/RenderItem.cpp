@@ -19,7 +19,7 @@ using namespace dxforge;
 
 bool read_file(std::filesystem::path, std::unique_ptr<u8[]>&, u64&);
 
-game_entity::entity create_one_game_entity(math::v3 position, math::v3a rotation, const char* script_name);
+game_entity::entity create_one_game_entity(math::v3 position, math::v3 rotation, const char* script_name);
 void remove_game_entity(game_entity::entity_id id);
 
 namespace

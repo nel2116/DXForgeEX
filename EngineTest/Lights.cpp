@@ -1,0 +1,151 @@
+// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+// [Lights.cpp]
+// 作成日 : 2025/01/18
+// 作成者 : 田中ミノル
+// 概要 :
+// 更新履歴
+// 2025/01/18 新規作成
+// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+// ====== インクルード部 ======
+#include "EngineAPI/GameEntity.h"
+#include "EngineAPI/Light.h"
+#include "EngineAPI/TransformComponent.h"
+#include "Graphics/Renderer.h"
+
+#define RANDOM_LIGHTS 1
+
+using namespace dxforge;
+
+game_entity::entity create_one_game_entity(math::v3 position, math::v3 rotation, const char* script_name);
+void remove_game_entity(game_entity::entity_id id);
+
+namespace
+{
+	const u64 left_set{ 0 };
+	const u64 right_set{ 1 };
+	constexpr f32 inv_rand_max{ 1.0f / RAND_MAX };
+
+	utl::vector<graphics::light> lights;
+
+	constexpr math::v3 rgb_to_color(u8 r, u8 g, u8 b) { return { r / 255.0f,g / 255.0f, b / 255.0f }; }
+
+	f32 random(f32 min = 0.0f) { return std::max(min, rand() * inv_rand_max); }
+
+	void create_light(math::v3 position, math::v3 rotation, graphics::light::type type, u64 light_set_key)
+	{
+		game_entity::entity_id entity_id{ create_one_game_entity(position, rotation, nullptr).get_id() };
+
+		graphics::light_init_info info{};
+		info.entity_id = entity_id;
+		info.type = type;
+		info.light_set_key = light_set_key;
+		info.intensity = 1.0f;
+
+		info.color = { random(0.2f),random(0.2f), random(0.2f) };
+
+#if RANDOM_LIGHTS
+		if (type == graphics::light::point)
+		{
+			info.point_params.range = random(0.5f) * 2.0f;
+			info.point_params.attenuation = { 1, 1, 1 };
+		}
+		else if (type == graphics::light::spot)
+		{
+			info.point_params.range = random(0.5f) * 2.0f;
+			info.spot_params.umbra = (random(0.5f) - 0.4f) * math::pi;
+			info.spot_params.penumbra = info.spot_params.umbra + (0.1f * math::pi);
+			info.point_params.attenuation = { 1, 1, 1 };
+		}
+#else
+		if (type == graphics::light::point)
+		{
+			info.point_params.range = 1.0f;
+			info.point_params.attenuation = { 1, 1, 1 };
+		}
+		else if (type == graphics::light::spot)
+		{
+			info.point_params.range = 2.0f;
+			info.spot_params.umbra = 0.1f * math::pi;
+			info.spot_params.penumbra = info.spot_params.umbra + (0.1f * math::pi);
+			info.point_params.attenuation = { 1, 1, 1 };
+		}
+#endif
+
+		graphics::light light{ graphics::create_light(info) };
+		assert(light.is_valid());
+		lights.push_back(light);
+	}
+
+}	// 匿名名前空間
+
+void generate_lights()
+{
+	// LEFT_SET
+	graphics::light_init_info info{};
+	info.entity_id = create_one_game_entity({}, { 0.0f, 0.0f, 0.0f }, nullptr).get_id();
+	info.type = graphics::light::directional;
+	info.light_set_key = left_set;
+	info.intensity = 1.0f;
+	info.color = rgb_to_color(174, 174, 174);
+
+	lights.emplace_back(graphics::create_light(info));
+
+	info.entity_id = create_one_game_entity({}, { math::pi * 0.5f, 0.0f, 0.0f }, nullptr).get_id();
+	info.color = rgb_to_color(17, 27, 48);
+	lights.emplace_back(graphics::create_light(info));
+
+	info.entity_id = create_one_game_entity({}, { -math::pi * 0.5f, 0.0f, 0.0f }, nullptr).get_id();
+	info.color = rgb_to_color(63, 47, 30);
+	lights.emplace_back(graphics::create_light(info));
+
+	// RIGHT_SET
+	info.entity_id = create_one_game_entity({}, { 0.0f, 0.0f, 0.0f }, nullptr).get_id();
+	info.light_set_key = right_set;
+	info.color = rgb_to_color(150, 100, 200);
+	lights.emplace_back(graphics::create_light(info));
+
+	info.entity_id = create_one_game_entity({}, { math::pi * 0.5f, 0.0f, 0.0f }, nullptr).get_id();
+	info.color = rgb_to_color(17, 27, 48);
+	lights.emplace_back(graphics::create_light(info));
+
+	info.entity_id = create_one_game_entity({}, { -math::pi * 0.5f, 0.0f, 0.0f }, nullptr).get_id();
+	info.color = rgb_to_color(163, 47, 30);
+	lights.emplace_back(graphics::create_light(info));
+
+#if !RANDOM_LIGHTS
+	create_light({ 0, -3, 0 }, {}, graphics::light::point, left_set);
+	create_light({ 0, 0, 1 }, {}, graphics::light::point, left_set);
+	create_light({ 0, 3, 2.5f }, {}, graphics::light::point, left_set);
+	create_light({ 0, 0, 7 }, { 0, 3.14f, 0 }, graphics::light::spot, left_set);
+#else
+	srand(37);
+
+	constexpr math::v3 scale{ 1.0f, 0.5f, 1.0f };
+	constexpr s32 dim{ 5 };
+	for (s32 x{ -dim }; x < dim; ++x)
+		for (s32 y{ 0 }; y < 2 * dim; ++y)
+			for (s32 z{ -dim }; z < dim; ++z)
+			{
+				create_light({ (f32)(x * scale.x),(f32)(y * scale.y), (f32)(z * scale.z) },
+					{ 3.14f,random(),0.0f }, random() > 0.5f ? graphics::light::spot : graphics::light::point, left_set);
+				create_light({ (f32)(x * scale.x),(f32)(y * scale.y), (f32)(z * scale.z) },
+					{ 3.14f,random(),0.0f }, random() > 0.5f ? graphics::light::spot : graphics::light::point, right_set);
+			}
+
+#endif
+}
+
+void remove_lights()
+{
+	for (auto& light : lights)
+	{
+		const game_entity::entity_id id{ light.entity_id() };
+		graphics::remove_light(light.get_id(), light.light_set_key());
+		remove_game_entity(id);
+	}
+
+	lights.clear();
+}
+
+
+

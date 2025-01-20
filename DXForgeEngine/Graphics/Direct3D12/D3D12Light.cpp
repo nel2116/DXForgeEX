@@ -12,16 +12,36 @@
 #include "D3D12Core.h"
 #include "Shaders/SharedTypes.h"
 #include "EngineAPI/GameEntity.h"
+#include "Components/Transform.h"
 
 namespace dxforge::graphics::d3d12::light
 {
 	namespace
 	{
+
+		template<u32 n>
+		struct u32_set_bits
+		{
+			static_assert(n > 0 && n <= 32);
+			constexpr static const u32 bits{ u32_set_bits<n - 1>::bits | (1 << (n - 1)) };
+		};
+
+		template<>
+		struct u32_set_bits<0>
+		{
+			constexpr static const u32 bits{ 0 };
+		};
+
+		// フレームバッファの数が8未満であることを確認
+		static_assert(u32_set_bits<frame_buffer_count>::bits < (1 << 8), "That's quite a large frame buffer count!");
+
+		constexpr u8 dirty_bits_mask{ (u8)u32_set_bits<frame_buffer_count>::bits };
+
 		/// @brief ライトの所有者
-		struct light_owener
+		struct light_owner
 		{
 			game_entity::entity_id entity_id{ id::invalid_id };
-			u32 data_index{ 0 };
+			u32 data_index{ u32_invalid_id };
 			graphics::light::type type;
 			bool is_enabled;
 		};
@@ -67,7 +87,7 @@ namespace dxforge::graphics::d3d12::light
 					params.Color = info.color;
 					params.Intensity = info.intensity;
 
-					light_owener owner{ game_entity::entity_id{info.entity_id },index,info.type,info.is_enabled };
+					light_owner owner{ game_entity::entity_id{info.entity_id },index,info.type,info.is_enabled };
 					const light_id id{ _owners.add(owner) };
 					_non_cullable_owners[index] = id;
 
@@ -75,8 +95,43 @@ namespace dxforge::graphics::d3d12::light
 				}
 				else
 				{
-					// TODO: その他のライトの処理
-					return {};
+					u32 index{ u32_invalid_id };
+
+					// 空きスロットを探す
+					for (u32 i{ _enabled_light_count }; i < _cullable_owners.size(); ++i)
+					{
+						if (!id::is_valid(_cullable_owners[i]))
+						{
+							index = i;
+							break;
+						}
+					}
+
+					// 空のスロットが見つからなければ、新しいアイテムを追加する。
+					if (index == u32_invalid_id)
+					{
+						index = (u32)_cullable_owners.size();
+						_cullable_lights.emplace_back();
+						_culling_info.emplace_back();
+						_cullable_entity_ids.emplace_back();
+						_cullable_owners.emplace_back();
+						_dirty_bits.emplace_back();
+						assert(_cullable_owners.size() == _cullable_lights.size());
+						assert(_cullable_owners.size() == _culling_info.size());
+						assert(_cullable_owners.size() == _cullable_entity_ids.size());
+						assert(_cullable_owners.size() == _dirty_bits.size());
+					}
+
+					add_cullable_light_paramaters(info, index);
+					add_light_culing_info(info, index);
+					const light_id id{ _owners.add(light_owner{game_entity::entity_id{info.entity_id},index,info.type,info.is_enabled}) };
+					_cullable_entity_ids[index] = _owners[id].entity_id;
+					_cullable_owners[index] = id;
+					_dirty_bits[index] = dirty_bits_mask;
+					enable(id, info.is_enabled);
+					update_transform(index);
+
+					return graphics::light{ id, info.light_set_key };
 				}
 			}
 
@@ -85,7 +140,7 @@ namespace dxforge::graphics::d3d12::light
 			constexpr void remove(light_id id)
 			{
 				enable(id, false);
-				const light_owener& owner{ _owners[id] };
+				const light_owner& owner{ _owners[id] };
 
 				if (owner.type == graphics::light::directional)
 				{
@@ -93,19 +148,22 @@ namespace dxforge::graphics::d3d12::light
 				}
 				else
 				{
-					// TODO: その他のライトの処理
+					// その他のライトの処理
+					assert(_owners[_cullable_owners[owner.data_index]].data_index == owner.data_index);
+					_cullable_owners[owner.data_index] = light_id{ u32_invalid_id };
 				}
 				_owners.remove(id);
 			}
 
+			/// @brief ライトのtransformを更新する
 			void uptdate_transforms()
 			{
-				//Update direction for non-cullable lights
+				// カリング不能でないライトのtransformを更新
 				for (const auto& id : _non_cullable_owners)
 				{
 					if (!id::is_valid(id))continue;
 
-					const light_owener& owner{ _owners[id] };
+					const light_owner& owner{ _owners[id] };
 					if (owner.is_enabled)
 					{
 						const game_entity::entity entity{ game_entity::entity_id{owner.entity_id } };
@@ -113,7 +171,22 @@ namespace dxforge::graphics::d3d12::light
 						params.Direction = entity.orientation();
 					}
 				}
-				// TODO: その他のライトの処理
+
+				// カリング不能でないライトの位置と方向を更新
+				const u32 count{ _enabled_light_count };
+				if (!count)return;
+
+				assert(_cullable_entity_ids.size() <= count);
+				_transform_flags_cache.resize(count);
+				transform::get_update_component_flags(_cullable_entity_ids.data(), count, _transform_flags_cache.data());
+
+				for (u32 i{ 0 }; i < count; ++i)
+				{
+					if (_transform_flags_cache[i])
+					{
+						update_transform(i);
+					}
+				}
 			}
 
 			/// @brief ライトの有効無効を設定する
@@ -127,7 +200,39 @@ namespace dxforge::graphics::d3d12::light
 					return;
 				}
 
-				// TODO: その他のライトの処理
+				// その他のライトの処理
+				const u32 data_index{ _owners[id].data_index };
+
+				// NOTE: これは_enabled_light_countへの参照であり、その値を変更する。
+				u32& count{ _enabled_light_count };
+
+				// NOTE: dirty_bitsはswap_cullable_lightsによって設定されるので、ここでは設定しない。
+				if (is_enabled)
+				{
+					if (data_index > count)
+					{
+						assert(count < _cullable_lights.size());
+						swap_cullable_lights(data_index, count);
+						++count;
+					}
+					else if (data_index == count)
+					{
+						++count;
+					}
+				}
+				else if (count > 0)
+				{
+					const u32 last{ count - 1 };
+					if (data_index < last)
+					{
+						swap_cullable_lights(data_index, last);
+						--count;
+					}
+					else if (data_index == last)
+					{
+						--count;
+					}
+				}
 			}
 
 			/// @brief ライトの強度を設定する
@@ -136,7 +241,7 @@ namespace dxforge::graphics::d3d12::light
 			constexpr void Intensity(light_id id, f32 intensity)
 			{
 				if (intensity < 0.0f)intensity = 0.0f;
-				const light_owener& owner{ _owners[id] };
+				const light_owner& owner{ _owners[id] };
 				const u32 index{ owner.data_index };
 
 				if (owner.type == graphics::light::directional)
@@ -146,7 +251,10 @@ namespace dxforge::graphics::d3d12::light
 				}
 				else
 				{
-					// TODO: その他のライトの処理
+					assert(_owners[_cullable_owners[index]].data_index == index);
+					assert(index < _cullable_lights.size());
+					_cullable_lights[index].Intensity = intensity;
+					_dirty_bits[index] = dirty_bits_mask;
 				}
 			}
 
@@ -158,7 +266,7 @@ namespace dxforge::graphics::d3d12::light
 				assert(color.x >= 0.0f && color.y >= 0.0f && color.z >= 0.0f);
 				assert(color.x <= 1.0f && color.y <= 1.0f && color.z <= 1.0f);
 
-				const light_owener& owner{ _owners[id] };
+				const light_owner& owner{ _owners[id] };
 				const u32 index{ owner.data_index };
 
 				if (owner.type == graphics::light::directional)
@@ -168,8 +276,84 @@ namespace dxforge::graphics::d3d12::light
 				}
 				else
 				{
-					// TODO: その他のライトの処理
+					assert(_owners[_cullable_owners[index]].data_index == index);
+					assert(index < _cullable_lights.size());
+					_cullable_lights[index].Color = color;
+					_dirty_bits[index] = dirty_bits_mask;
 				}
+			}
+
+			/// @brief ライトの減衰を設定する
+			/// @param id ライトID
+			CONSTEXPR void attenuation(light_id id, math::v3 attenuation)
+			{
+				assert(attenuation.x >= 0.0f && attenuation.y >= 0.0f && attenuation.z >= 0.0f);
+				const light_owner& owner{ _owners[id] };
+				const u32 index{ owner.data_index };
+				assert(_owners[_cullable_owners[index]].data_index == index);
+				assert(owner.type != graphics::light::directional);
+				assert(index < _cullable_lights.size());
+				_cullable_lights[index].Attenuation = attenuation;
+				_dirty_bits[index] = dirty_bits_mask;
+			}
+
+			/// @brief ライトの範囲を設定する
+			/// @param id ライトID
+			CONSTEXPR void range(light_id id, f32 range)
+			{
+				assert(range > 0.0f);
+				const light_owner& owner{ _owners[id] };
+				const u32 index{ owner.data_index };
+				assert(_owners[_cullable_owners[index]].data_index == index);
+				assert(owner.type != graphics::light::directional);
+				assert(index < _cullable_lights.size());
+				_cullable_lights[index].Range = range;
+				_culling_info[index].Range = range;
+				_dirty_bits[index] = dirty_bits_mask;
+
+				if (owner.type == graphics::light::spot)
+				{
+					_culling_info[index].ConeRadius = calculate_cone_radius(range, _cullable_lights[index].CosPenumbra);
+				}
+			}
+
+			/// @brief ライトの光錐の角度を設定する
+			/// @param id ライトID
+			/// @param umbra ライトの光錐の角度
+			void umbra(light_id id, f32 umbra)
+			{
+				const light_owner& owner{ _owners[id] };
+				const u32 index{ owner.data_index };
+				assert(_owners[_cullable_owners[index]].data_index == index);
+				assert(owner.type == graphics::light::spot);
+				assert(index < _cullable_lights.size());
+
+				umbra = std::clamp(umbra, 0.0f, math::pi);
+				_cullable_lights[index].CosUmbra = DirectX::XMScalarCos(umbra * 0.5f);
+				_dirty_bits[index] = dirty_bits_mask;
+
+				if (penumbra(id) < umbra)
+				{
+					penumbra(id, umbra);
+				}
+			}
+
+			/// @brief ライトのペナンブラの角度を設定する
+			/// @param id ライトID
+			/// @param penumbra ライトのペナンブラの角度
+			void penumbra(light_id id, f32 penumbra)
+			{
+				const light_owner& owner{ _owners[id] };
+				const u32 index{ owner.data_index };
+				assert(_owners[_cullable_owners[index]].data_index == index);
+				assert(owner.type == graphics::light::spot);
+				assert(index < _cullable_lights.size());
+
+				penumbra = std::clamp(penumbra, umbra(id), math::pi);
+				_cullable_lights[index].CosPenumbra = DirectX::XMScalarCos(penumbra * 0.5f);
+
+				_culling_info[index].ConeRadius = calculate_cone_radius(range(id), _cullable_lights[index].CosPenumbra);
+				_dirty_bits[index] = dirty_bits_mask;
 			}
 
 			/// @brief ライトが有効かどうかを取得する
@@ -185,7 +369,7 @@ namespace dxforge::graphics::d3d12::light
 			/// @return ライトの強度
 			constexpr f32 intensity(light_id id) const
 			{
-				const light_owener& owner{ _owners[id] };
+				const light_owner& owner{ _owners[id] };
 				const u32 index{ owner.data_index };
 
 				if (owner.type == graphics::light::directional)
@@ -194,8 +378,9 @@ namespace dxforge::graphics::d3d12::light
 					return _non_cullable_lights[index].Intensity;
 				}
 
-				// TODO: その他のライトの処理
-				return 0.0f;
+				assert(_owners[_cullable_owners[index]].data_index == index);
+				assert(index < _cullable_lights.size());
+				return _cullable_lights[index].Intensity;
 			}
 
 			/// @brief ライトの色を取得する
@@ -203,7 +388,7 @@ namespace dxforge::graphics::d3d12::light
 			/// @return ライトの色
 			constexpr math::v3 color(light_id id) const
 			{
-				const light_owener& owner{ _owners[id] };
+				const light_owner& owner{ _owners[id] };
 				const u32 index{ owner.data_index };
 
 				if (owner.type == graphics::light::directional)
@@ -212,8 +397,61 @@ namespace dxforge::graphics::d3d12::light
 					return _non_cullable_lights[index].Color;
 				}
 
-				// TODO: その他のライトの処理
-				return {};
+				assert(_owners[_cullable_owners[index]].data_index == index);
+				assert(index < _cullable_lights.size());
+				return _cullable_lights[index].Color;
+			}
+
+			/// @brief ライトの減衰を取得する
+			/// @param id ライトID
+			/// @return ライトの減衰
+			CONSTEXPR math::v3 attenuation(light_id id) const
+			{
+				const light_owner& owner{ _owners[id] };
+				const u32 index{ owner.data_index };
+				assert(_owners[_cullable_owners[index]].data_index == index);
+				assert(owner.type != graphics::light::directional);
+				assert(index < _cullable_lights.size());
+				return _cullable_lights[index].Attenuation;
+			}
+
+			/// @brief ライトの範囲を取得する
+			/// @param id ライトID
+			/// @return ライトの範囲
+			CONSTEXPR f32 range(light_id id) const
+			{
+				const light_owner& owner{ _owners[id] };
+				const u32 index{ owner.data_index };
+				assert(_owners[_cullable_owners[index]].data_index == index);
+				assert(owner.type != graphics::light::directional);
+				assert(index < _cullable_lights.size());
+				return _cullable_lights[index].Range;
+			}
+
+			/// @brief ライトの光錐の角度を取得する
+			/// @param id ライトID
+			/// @return ライトの光錐の角度
+			f32 umbra(light_id id) const
+			{
+				const light_owner& owner{ _owners[id] };
+				const u32 index{ owner.data_index };
+				assert(_owners[_cullable_owners[index]].data_index == index);
+				assert(owner.type == graphics::light::spot);
+				assert(index < _cullable_lights.size());
+				return DirectX::XMScalarACos(_cullable_lights[index].CosUmbra) * 2.0f;
+			}
+
+			/// @brief ライトのペナンブラの角度を取得する
+			/// @param id ライトID
+			/// @return ライトのペナンブラの角度
+			f32 penumbra(light_id id) const
+			{
+				const light_owner& owner{ _owners[id] };
+				const u32 index{ owner.data_index };
+				assert(_owners[_cullable_owners[index]].data_index == index);
+				assert(owner.type == graphics::light::spot);
+				assert(index < _cullable_lights.size());
+				return DirectX::XMScalarACos(_cullable_lights[index].CosPenumbra) * 2.0f;
 			}
 
 			/// @brief ライトの種類を取得する
@@ -253,7 +491,7 @@ namespace dxforge::graphics::d3d12::light
 				{
 					if (!id::is_valid(_non_cullable_owners[i]))continue;
 
-					const light_owener& owner{ _owners[_non_cullable_owners[i]] };
+					const light_owner& owner{ _owners[_non_cullable_owners[i]] };
 					if (owner.is_enabled)
 					{
 						assert(_owners[_non_cullable_owners[i]].data_index == i);
@@ -263,16 +501,160 @@ namespace dxforge::graphics::d3d12::light
 				}
 			}
 
+			constexpr u32 cullable_light_count() const
+			{
+				return _enabled_light_count;
+			}
+
 			constexpr bool has_light() const
 			{
 				return _owners.size() > 0;
 			}
 
+		private:	// プライベート関数
+
+			f32 calculate_cone_radius(f32 range, f32 cos_penumbra)
+			{
+				const f32 sin_penumbra{ sqrt(1.0f - cos_penumbra * cos_penumbra) };
+				return sin_penumbra * range;
+			}
+
+			void update_transform(u32 index)
+			{
+				const game_entity::entity entity{ game_entity::entity_id{_cullable_entity_ids[index]} };
+				hlsl::LightParameters& params{ _cullable_lights[index] };
+				params.Position = entity.position();
+
+				hlsl::LightCullingLightInfo& culling_info{ _culling_info[index] };
+				culling_info.Position = params.Position;
+
+				if (params.Type == graphics::light::spot)
+				{
+					culling_info.Direction = params.Direction = entity.orientation();
+				}
+
+				_dirty_bits[index] = dirty_bits_mask;
+			}
+
+			CONSTEXPR void add_cullable_light_paramaters(const light_init_info& info, u32 index)
+			{
+				using graphics::light;
+				assert(info.type != light::directional && index < _cullable_lights.size());
+
+				hlsl::LightParameters& params{ _cullable_lights[index] };
+				params.Type = info.type;
+				assert(params.Type <= light::count);
+				params.Color = info.color;
+				params.Intensity = info.intensity;
+
+				if (params.Type == light::point)
+				{
+					const point_light_params& p{ info.point_params };
+					params.Attenuation = p.attenuation;
+					params.Range = p.range;
+				}
+				else if (params.Type == light::spot)
+				{
+					const spot_light_params& s{ info.spot_params };
+					params.Attenuation = s.attenuation;
+					params.Range = s.range;
+					params.CosUmbra = DirectX::XMScalarCos(s.umbra * 0.5f);
+					params.CosPenumbra = DirectX::XMScalarCos(s.penumbra * 0.5f);
+				}
+			}
+
+			CONSTEXPR void add_light_culing_info(const light_init_info& info, u32 index)
+			{
+				using graphics::light;
+				assert(info.type != light::directional && index < _culling_info.size());
+
+				hlsl::LightParameters& params{ _cullable_lights[index] };
+				assert(params.Type == info.type);
+
+				hlsl::LightCullingLightInfo& culling_info{ _culling_info[index] };
+				culling_info.Range = params.Range;
+				culling_info.Type = params.Type;
+
+				if (info.type == light::spot)
+				{
+					culling_info.ConeRadius = calculate_cone_radius(params.Range, params.CosPenumbra);
+				}
+			}
+
+			void swap_cullable_lights(u32 index1, u32 index2)
+			{
+				assert(index1 != index2);
+				assert(index1 < _cullable_owners.size());
+				assert(index2 < _cullable_owners.size());
+				assert(index1 < _cullable_lights.size());
+				assert(index2 < _cullable_lights.size());
+				assert(index1 < _culling_info.size());
+				assert(index2 < _culling_info.size());
+				assert(index1 < _cullable_entity_ids.size());
+				assert(index2 < _cullable_entity_ids.size());
+				assert(id::is_valid(_cullable_owners[index1]) || id::is_valid(_cullable_owners[index2]));
+
+				if (!id::is_valid(_cullable_owners[index2]))
+				{
+					std::swap(index1, index2);
+				}
+
+				if (!id::is_valid(_cullable_owners[index1]))
+				{
+					light_owner& owner2{ _owners[_cullable_owners[index2]] };
+					assert(owner2.data_index == index2);
+					owner2.data_index = index1;
+
+					_cullable_lights[index1] = _cullable_lights[index2];
+					_culling_info[index1] = _culling_info[index2];
+					_cullable_entity_ids[index1] = _cullable_entity_ids[index2];
+					std::swap(_cullable_owners[index1], _cullable_owners[index2]);
+					_dirty_bits[index1] = dirty_bits_mask;
+					assert(_owners[_cullable_owners[index1]].entity_id == _cullable_entity_ids[index1]);
+					assert(id::is_valid(_cullable_owners[index2]));
+				}
+				else
+				{
+					light_owner& owner1{ _owners[_cullable_owners[index1]] };
+					light_owner& owner2{ _owners[_cullable_owners[index2]] };
+					assert(owner1.data_index == index1);
+					assert(owner2.data_index == index2);
+					owner1.data_index = index2;
+					owner2.data_index = index1;
+
+					std::swap(_cullable_lights[index1], _cullable_lights[index2]);
+					std::swap(_culling_info[index1], _culling_info[index2]);
+					std::swap(_cullable_entity_ids[index1], _cullable_entity_ids[index2]);
+					std::swap(_cullable_owners[index1], _cullable_owners[index2]);
+
+					assert(_owners[_cullable_owners[index1]].entity_id == _cullable_entity_ids[index1]);
+					assert(_owners[_cullable_owners[index2]].entity_id == _cullable_entity_ids[index2]);
+
+					// dirty bitsを設定
+					assert(index1 < _dirty_bits.size());
+					assert(index2 < _dirty_bits.size());
+					_dirty_bits[index1] = dirty_bits_mask;
+					_dirty_bits[index2] = dirty_bits_mask;
+				}
+			}
+
+
 		private:	// メンバ変数
 			// NOTE: これはパッキングされていない
-			utl::free_list<light_owener> _owners;								///< ライトの所有者
+			utl::free_list<light_owner> _owners;								///< ライトの所有者
 			utl::vector<hlsl::DirectionalLightParameters> _non_cullable_lights;	///< 並行光源
 			utl::vector<light_id> _non_cullable_owners;							///< カリングされていないライトの所有者
+
+			// NOTE: パッキングされている
+			utl::vector<hlsl::LightParameters> _cullable_lights;				///< カリングされたライト
+			utl::vector<hlsl::LightCullingLightInfo> _culling_info;				///< ライトのカリング情報
+			utl::vector<game_entity::entity_id> _cullable_entity_ids;			///< カリングされたライトのエンティティID
+			utl::vector<light_id> _cullable_owners;								///< カリングされたライトの所有者
+			utl::vector<u8> _dirty_bits;										///< ライトの更新フラグ
+			utl::vector<u8> _transform_flags_cache;								///< ライトのtransformの更新フラグ
+			u32 _enabled_light_count{ 0 };										///< 有効なライトの数
+
+			friend class d3d12_light_buffer;
 		};
 
 		class d3d12_light_buffer
@@ -283,9 +665,13 @@ namespace dxforge::graphics::d3d12::light
 			{
 				u32 sizes[light_buffer::count]{};
 				sizes[light_buffer::non_cullable_light] = set.non_cullable_light_count() * sizeof(hlsl::DirectionalLightParameters);
+				sizes[light_buffer::cullable_light] = set.cullable_light_count() * sizeof(hlsl::LightParameters);
+				sizes[light_buffer::culling_info] = set.cullable_light_count() * sizeof(hlsl::LightCullingLightInfo);
 
 				u32 current_sizes[light_buffer::count]{};
 				current_sizes[light_buffer::non_cullable_light] = _buffers[light_buffer::non_cullable_light].buffer.size();
+				current_sizes[light_buffer::cullable_light] = _buffers[light_buffer::cullable_light].buffer.size();
+				current_sizes[light_buffer::culling_info] = _buffers[light_buffer::culling_info].buffer.size();
 
 				if (current_sizes[light_buffer::non_cullable_light] < sizes[light_buffer::non_cullable_light])
 				{
@@ -295,7 +681,52 @@ namespace dxforge::graphics::d3d12::light
 				set.non_cullable_lights((hlsl::DirectionalLightParameters* const)_buffers[light_buffer::non_cullable_light].cpu_address,
 					_buffers[light_buffer::non_cullable_light].buffer.size());
 
-				// TODO: その他のライトの処理
+				// カリング不能でないライトバッファの更新
+				bool buffers_resized{ false };
+				if (current_sizes[light_buffer::cullable_light] < sizes[light_buffer::culling_info])
+				{
+					assert(current_sizes[light_buffer::culling_info] < sizes[light_buffer::culling_info]);
+					resize_buffer(light_buffer::cullable_light, sizes[light_buffer::cullable_light], frame_index);
+					resize_buffer(light_buffer::culling_info, sizes[light_buffer::culling_info], frame_index);
+					buffers_resized = true;
+				}
+
+				bool all_lights_updated{ false };
+				if (buffers_resized || _current_light_set_key != light_set_key)
+				{
+					memcpy(_buffers[light_buffer::cullable_light].cpu_address, set._cullable_lights.data(), sizes[light_buffer::cullable_light]);
+					memcpy(_buffers[light_buffer::culling_info].cpu_address, set._culling_info.data(), sizes[light_buffer::culling_info]);
+					_current_light_set_key = light_set_key;
+					all_lights_updated = true;
+				}
+
+				assert(_current_light_set_key == light_set_key);
+				const u32 index_mask{ 1UL << frame_index };
+
+				if (all_lights_updated)
+				{
+					for (u32 i{ 0 }; i < set.cullable_light_count(); ++i)
+					{
+						set._dirty_bits[i] &= ~dirty_bits_mask;
+					}
+				}
+				else
+				{
+					for (u32 i{ 0 }; i < set.cullable_light_count(); ++i)
+					{
+						if (set._dirty_bits[i] & index_mask)
+						{
+							assert(i * sizeof(hlsl::LightParameters) < sizes[light_buffer::cullable_light]);
+							assert(i * sizeof(hlsl::LightCullingLightInfo) < sizes[light_buffer::culling_info]);
+							u8* const light_dst{ _buffers[light_buffer::cullable_light].cpu_address + (i * sizeof(hlsl::LightParameters)) };
+							u8* const culling_dst{ _buffers[light_buffer::culling_info].cpu_address + (i * sizeof(hlsl::LightCullingLightInfo)) };
+							memcpy(light_dst, &set._cullable_lights[i], sizeof(hlsl::LightParameters));
+							memcpy(culling_dst, &set._culling_info[i], sizeof(hlsl::LightCullingLightInfo));
+							set._dirty_bits[i] &= ~index_mask;
+						}
+					}
+
+				}
 			}
 
 			constexpr void release()
@@ -310,6 +741,16 @@ namespace dxforge::graphics::d3d12::light
 			constexpr D3D12_GPU_VIRTUAL_ADDRESS non_cullable_lights() const
 			{
 				return _buffers[light_buffer::non_cullable_light].buffer.gpu_address();
+			}
+
+			constexpr D3D12_GPU_VIRTUAL_ADDRESS cullable_lights() const
+			{
+				return _buffers[light_buffer::cullable_light].buffer.gpu_address();
+			}
+
+			constexpr D3D12_GPU_VIRTUAL_ADDRESS culling_info() const
+			{
+				return _buffers[light_buffer::culling_info].buffer.gpu_address();
 			}
 
 		private:	// 構造体定義
@@ -350,11 +791,11 @@ namespace dxforge::graphics::d3d12::light
 			u64 _current_light_set_key{ 0 };
 		};
 
-#undef		CONSTEXPR
-
+		// ====== 変数宣言 ======
 		std::unordered_map<u64, light_set> light_sets;			///< ライトセット
 		d3d12_light_buffer light_buffers[frame_buffer_count];	///< ライトバッファ
 
+		// ====== 関数定義 ======
 		constexpr void set_is_enabled(light_set& set, light_id id, const void* const data, [[maybe_unused]] u32 size)
 		{
 			bool is_enabled{ *(bool*)data };
@@ -376,6 +817,34 @@ namespace dxforge::graphics::d3d12::light
 			set.color(id, color);
 		}
 
+		CONSTEXPR void set_attenuation(light_set& set, light_id id, const void* const data, [[maybe_unused]] u32 size)
+		{
+			math::v3 attenuation{ *(math::v3*)data };
+			assert(size == sizeof(attenuation));
+			set.attenuation(id, attenuation);
+		}
+
+		CONSTEXPR void set_range(light_set& set, light_id id, const void* const data, [[maybe_unused]] u32 size)
+		{
+			f32 range{ *(f32*)data };
+			assert(size == sizeof(range));
+			set.range(id, range);
+		}
+
+		void set_umbra(light_set& set, light_id id, const void* const data, [[maybe_unused]] u32 size)
+		{
+			f32 umbra{ *(f32*)data };
+			assert(size == sizeof(umbra));
+			set.umbra(id, umbra);
+		}
+
+		void set_penumbra(light_set& set, light_id id, const void* const data, [[maybe_unused]] u32 size)
+		{
+			f32 penumbra{ *(f32*)data };
+			assert(size == sizeof(penumbra));
+			set.penumbra(id, penumbra);
+		}
+
 		constexpr void get_is_enabled(light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
 		{
 			bool* const is_enabled{ (bool* const)data };
@@ -395,6 +864,34 @@ namespace dxforge::graphics::d3d12::light
 			math::v3* const color{ (math::v3* const)data };
 			assert(sizeof(math::v3) == size);
 			*color = set.color(id);
+		}
+
+		CONSTEXPR void get_attenuation(light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
+		{
+			math::v3* const attenuation{ (math::v3* const)data };
+			assert(sizeof(math::v3) == size);
+			*attenuation = set.attenuation(id);
+		}
+
+		CONSTEXPR void get_range(light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
+		{
+			f32* const range{ (f32* const)data };
+			assert(sizeof(f32) == size);
+			*range = set.range(id);
+		}
+
+		void get_umbra(light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
+		{
+			f32* const umbra{ (f32* const)data };
+			assert(sizeof(f32) == size);
+			*umbra = set.umbra(id);
+		}
+
+		void get_penumbra(light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
+		{
+			f32* const penumbra{ (f32* const)data };
+			assert(sizeof(f32) == size);
+			*penumbra = set.penumbra(id);
 		}
 
 		constexpr void get_type(light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
@@ -425,6 +922,10 @@ namespace dxforge::graphics::d3d12::light
 			set_is_enabled,
 			set_intensity,
 			set_color,
+			set_attenuation,
+			set_range,
+			set_umbra,
+			set_penumbra,
 			dummy_set,
 			dummy_set,
 		};
@@ -437,11 +938,17 @@ namespace dxforge::graphics::d3d12::light
 			get_is_enabled,
 			get_intensity,
 			get_color,
+			get_attenuation,
+			get_range,
+			get_umbra,
+			get_penumbra,
 			get_type,
 			get_entity_id,
 		};
 
 		static_assert(_countof(get_functions) == light_parameter::count);
+
+#undef		CONSTEXPR
 
 	}	// 匿名名前空間
 

@@ -1,0 +1,48 @@
+#include "Common.hlsli"
+
+ConstantBuffer<GlobalShaderData> GlobalData : register(b0, space0);
+ConstantBuffer<LightCullingDispatchParameters> ShaderParams : register(b1, space0);
+RWStructuredBuffer<Frustum> Frustums : register(u0, space0);
+
+// グリッド・フラストラム・シェーダーの実装は、以下のものに基づいている。
+// "Forward vs Deferred vs Forward+ Rendering with DirectX 11" (2015) by Jeremiah van Oosten.
+// https://www.3dgep.com/forward-plus/#grid-frustums-compute-shader
+
+// NOTE: TILE_SIZEはコンパイル時にエンジンによって定義される。
+[numthreads(TILE_SIZE, TILE_SIZE, 1)]
+void ComputeGridFrustumsCS(uint3 DispatchThreadID : SV_DispatchThreadID)
+{
+    const uint x = DispatchThreadID.x;
+    const uint y = DispatchThreadID.y;
+
+    // スレッドIDがグリッドの範囲内にない場合に戻る
+    if (x >= ShaderParams.NumThreads.x || y >= ShaderParams.NumThreads.y)
+        return;
+
+    // フラストラム頂点として使用する遠方クリッピング平面の4つのコーナー点を計算する。
+    float4 screenSpace[4];
+    screenSpace[0] = float4(float2(x, y) * TILE_SIZE, 0.f, 1.f);
+    screenSpace[1] = float4(float2(x + 1, y) * TILE_SIZE, 0.f, 1.f);
+    screenSpace[2] = float4(float2(x, y + 1) * TILE_SIZE, 0.f, 1.f);
+    screenSpace[3] = float4(float2(x + 1, y + 1) * TILE_SIZE, 0.f, 1.f);
+    const float2 invViewDimensions = 1.f / float2(GlobalData.ViewWidth, GlobalData.ViewHeight);
+    float3 viewSpace[4];
+
+    // ここで、スクリーン空間のポイントをビュー空間に変換する。
+    viewSpace[0] = ScreenToView(screenSpace[0], invViewDimensions, GlobalData.InvProjection).xyz;
+    viewSpace[1] = ScreenToView(screenSpace[1], invViewDimensions, GlobalData.InvProjection).xyz;
+    viewSpace[2] = ScreenToView(screenSpace[2], invViewDimensions, GlobalData.InvProjection).xyz;
+    viewSpace[3] = ScreenToView(screenSpace[3], invViewDimensions, GlobalData.InvProjection).xyz;
+
+    // ビュー空間の点からフラストラムプレーンを構築する。
+    const float3 eyePos = (float3) 0;
+    Frustum frustum;
+    // Left, right, top, bottom
+    frustum.Planes[0] = ComputePlane(viewSpace[0], eyePos, viewSpace[2]);
+    frustum.Planes[1] = ComputePlane(viewSpace[3], eyePos, viewSpace[1]);
+    frustum.Planes[2] = ComputePlane(viewSpace[1], eyePos, viewSpace[0]);
+    frustum.Planes[3] = ComputePlane(viewSpace[2], eyePos, viewSpace[3]);
+
+    // グリッドの境界内にあるスレッドIDに対して、計算されたフラストラムをグローバルメモリに格納する。
+    Frustums[x + (y * ShaderParams.NumThreads.x)] = frustum;
+}

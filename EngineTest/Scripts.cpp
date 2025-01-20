@@ -108,6 +108,9 @@ public:
 		math::v3 pos{ position() };
 		_desired_position = _position = DirectX::XMLoadFloat3(&pos);
 
+		const u64 binding{ std::hash<std::string>()("move") };
+		_input_system.add_handler(binding, this, &camera_script::on_move);
+
 		math::v3 dir{ orientation() };
 		f32 theta{ DirectX::XMScalarACos(dir.y) };
 		f32 phi{ std::atan2(-dir.z, dir.x) };
@@ -118,28 +121,14 @@ public:
 	void begin_play() override {}
 	void update(f32 dt) override
 	{
-		_dt = dt;
+		using namespace DirectX;
 
-		math::v3 move{};
-		input::input_value value{};
-		/*constexpr input::input_source::type kb{input::input_source::keyboard};
-		input::get(kb, input::input_code::key_w, value); move.z += value.current.x;
-		input::get(kb, input::input_code::key_s, value); move.z -= value.current.x;
-		input::get(kb, input::input_code::key_a, value); move.x += value.current.x;
-		input::get(kb, input::input_code::key_d, value); move.x -= value.current.x;
-		input::get(kb, input::input_code::key_q, value); move.y -= value.current.x;
-		input::get(kb, input::input_code::key_e, value); move.y += value.current.x;*/
-
-		static u64 binding{ std::hash<std::string>()("move") };
-		input::get(binding, value);
-		move = value.current;
-
-		if (!(math::is_equal(move.x, 0.0f) && math::is_equal(move.y, 0.0f) && math::is_equal(move.z, 0.0f)))
+		if (_move_magnitude > math::epsilon)
 		{
 			using namespace DirectX;
 			const f32 fps_scale{ dt / 0.016667f };
 			math::v4 rot{ rotation() };
-			XMVECTOR d{ XMVector3Rotate(XMLoadFloat3(&move) * 0.05f * fps_scale,XMLoadFloat4(&rot)) };
+			XMVECTOR d{ XMVector3Rotate(_move * 0.05f * fps_scale,XMLoadFloat4(&rot)) };
 			if (_position_acceleration < 1.0f) _position_acceleration += (0.02f * fps_scale);
 			_desired_position += (d * _position_acceleration);
 			_move_position = true;
@@ -151,11 +140,19 @@ public:
 
 		if (_move_rotation || _move_position)
 		{
-			seek_camera();
+			seek_camera(dt);
 		}
 	}
 
 private:	// プライベート関数
+
+	void on_move(u64 binding, const input::input_value& value)
+	{
+		using namespace DirectX;
+
+		_move = XMLoadFloat3(&value.current);
+		_move_magnitude = XMVectorGetX(XMVector3LengthSq(_move));
+	}
 
 	void mouse_move(input::input_source::type type, input::input_code::code code, const input::input_value& mouse_pos)
 	{
@@ -179,17 +176,18 @@ private:	// プライベート関数
 			_move_rotation = true;
 		}
 	}
-	void seek_camera()
+
+	void seek_camera(f32 dt)
 	{
 		using namespace DirectX;
 
 		XMVECTOR p{ _desired_position - _position };
 		XMVECTOR o{ _desired_spherical - _spherical };
 
-		_move_position = (XMVectorGetX(XMVector3Length(p)) > 1e-4f);
-		_move_rotation = (XMVectorGetX(XMVector3Length(o)) > 1e-4f);
+		_move_position = (XMVectorGetX(XMVector3LengthSq(p)) > math::epsilon);
+		_move_rotation = (XMVectorGetX(XMVector3LengthSq(o)) > math::epsilon);
 
-		const f32 scale{ 0.2f * _dt / 0.016667f };
+		const f32 scale{ 0.2f * dt / 0.016667f };
 
 		if (_move_position)
 		{
@@ -221,7 +219,8 @@ private:	// メンバ変数
 	DirectX::XMVECTOR _desired_spherical{};
 	DirectX::XMVECTOR _position{};
 	DirectX::XMVECTOR _spherical{};
-	f32 _dt{ 0.0f };
+	DirectX::XMVECTOR _move{};
+	f32 _move_magnitude{ 0.0f };
 	f32 _position_acceleration{ 0.0f };
 	bool _move_position{ false };
 	bool _move_rotation{ false };
