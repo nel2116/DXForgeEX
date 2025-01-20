@@ -56,7 +56,7 @@
     <ClCompile Include="Core\MainWin32.cpp" />
     <ClCompile Include="Core\EngineWin32.cpp" />
     <ClCompile Include="Content\ContentLoader.cpp" />
-    <ClCompile Include="Platform\Platform.cpp" />
+    <ClCompile Include="Platform\PlatformWin32.cpp" />
     <ClCompile Include="Graphics\Renderer.cpp" />
     <ClCompile Include="Graphics\Direct3D12\D3D12Interface.cpp" />
     <ClCompile Include="Graphics\OpenGL\OpenGLInterface.cpp" />

@@ -26,6 +26,8 @@
 
 using namespace dxforge;
 
+constexpr u32 num_render_items{ 4 };
+
 // Multithreaded test worker spawn code _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #define ENABLE_TEST_WORKERS 0
 
@@ -80,7 +82,7 @@ struct camera_surface
 id::id_type item_id{ id::invalid_id };
 id::id_type model_id{ id::invalid_id };
 
-camera_surface _surfaces[4];
+camera_surface _surfaces[1];
 time_it timer{};
 
 // ====== プロトタイプ宣言 ======
@@ -145,7 +147,7 @@ LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		}
 	}
 
-	if ((resized && GetAsyncKeyState(VK_LBUTTON) >= 0) || toggle_fullscreen)
+	if ((resized && GetKeyState(VK_LBUTTON) >= 0) || toggle_fullscreen)
 	{
 		platform::window win{ platform::window_id{(id::id_type)GetWindowLongPtr(hwnd, GWLP_USERDATA)} };
 		for (u32 i{ 0 }; i < _countof(_surfaces); ++i)
@@ -263,9 +265,9 @@ bool test_initialize()
 	platform::window_init_info info[]
 	{
 		{&win_proc, nullptr, L"Render window 1", 100, 100, 400, 800},
-		{&win_proc, nullptr, L"Render window 2", 150, 150, 800, 400},
-		{&win_proc, nullptr, L"Render window 3", 200, 200, 400, 400},
-		{&win_proc, nullptr, L"Render window 4", 250, 250, 800, 600},
+		//		{&win_proc, nullptr, L"Render window 2", 150, 150, 800, 400},
+		//		{&win_proc, nullptr, L"Render window 3", 200, 200, 400, 400},
+		//		{&win_proc, nullptr, L"Render window 4", 250, 250, 800, 600},
 	};
 	static_assert(_countof(info) == _countof(_surfaces));
 
@@ -350,8 +352,8 @@ void engine_test::run()
 	static u32 counter{ 0 };
 	static u32 light_set_key{ 0 };
 
-	++counter;
-	if ((counter % 90) == 0) light_set_key = (light_set_key + 1) % 2;
+	// ++counter;
+	// if ((counter % 90) == 0) light_set_key = (light_set_key + 1) % 2;
 
 	timer.begin();
 	// std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -360,14 +362,14 @@ void engine_test::run()
 	{
 		if (_surfaces[i].surface.surface.is_valid())
 		{
-			f32 thresholds[3]{};
+			f32 thresholds[num_render_items]{};
 
-			id::id_type render_items[3]{};
-			get_render_items(&render_items[0], 3);
+			id::id_type render_items[num_render_items]{};
+			get_render_items(&render_items[0], num_render_items);
 
 			graphics::frame_info info{};
 			info.render_item_ids = &render_items[0];
-			info.render_item_count = 3;
+			info.render_item_count = num_render_items;
 			info.thresholds = &thresholds[0];
 			info.light_set_key = light_set_key;
 			info.average_frame_time = timer.dt_avg();

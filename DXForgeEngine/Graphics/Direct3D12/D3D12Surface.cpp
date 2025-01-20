@@ -10,6 +10,7 @@
 // ====== インクルード部 ======
 #include "D3D12Surface.h"
 #include "D3D12Core.h"
+#include "D3D12LightCulling.h"
 
 namespace dxforge::graphics::d3d12
 {
@@ -45,18 +46,25 @@ namespace dxforge::graphics::d3d12
 		desc.Scaling = DXGI_SCALING_STRETCH;
 		desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 		desc.Stereo = false;
+
 		IDXGISwapChain1* swap_chain;
 		HWND hwnd{ (HWND)_window.handle() };
 		DXCall(factory->CreateSwapChainForHwnd(cmd_queue, hwnd, &desc, nullptr, nullptr, &swap_chain));
 		DXCall(factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER));
 		DXCall(swap_chain->QueryInterface(IID_PPV_ARGS(&_swap_chain)));
 		core::release(swap_chain);
+
 		_current_bb_index = _swap_chain->GetCurrentBackBufferIndex();
+
 		for (u32 i{ 0 }; i < buffer_count; ++i)
 		{
 			_render_target_data[i].rtv = core::rtv_heap().allocate();
 		}
+
 		finalize();
+
+		assert(!id::is_valid(_light_culling_id));
+		_light_culling_id = delight::add_culler();
 	}
 
 	void d3d12_surface::present() const
@@ -116,6 +124,12 @@ namespace dxforge::graphics::d3d12
 
 	void d3d12_surface::release()
 	{
+		if (id::is_valid(_light_culling_id))
+		{
+			delight::remove_culler(_light_culling_id);
+			_light_culling_id = id::invalid_id;
+		}
+
 		for (u32 i{ 0 }; i < buffer_count; ++i)
 		{
 			render_target_data& data{ _render_target_data[i] };

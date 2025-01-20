@@ -1,5 +1,3 @@
 ﻿  D3D12LightCulling.cpp
-F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12LightCulling.cpp(30,131): warning C4100: 'barriers': 引数は関数の本体部で 1 度も参照されません。
-F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12LightCulling.cpp(30,89): warning C4100: 'd3d12_info': 引数は関数の本体部で 1 度も参照されません。
-F:\HAL\Self\DXForgeEX\DXForgeEngine\Graphics\Direct3D12\D3D12LightCulling.cpp(30,55): warning C4100: 'cmd_list': 引数は関数の本体部で 1 度も参照されません。
-  DXForgeEngine.vcxproj -> F:\HAL\Self\DXForgeEX\x64\Debug\DXForgeEngine.lib
+  PlatformWin32.cpp
+  DXForgeEngine.vcxproj -> F:\HAL\ThirdYear\DXForgeEX\x64\Debug\DXForgeEngine.lib

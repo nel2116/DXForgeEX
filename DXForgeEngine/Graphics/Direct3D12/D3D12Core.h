@@ -17,13 +17,14 @@ namespace dxforge::graphics::d3d12
 
 	struct d3d12_frame_info
 	{
-		const frame_info* info;							///< フレーム情報
-		camera::d3d12_camera* camera;					///< カメラ
-		D3D12_GPU_VIRTUAL_ADDRESS global_shader_data;	///< シェーダデータ
-		u32 surface_width;								///< サーフェスの幅
-		u32 surface_height;								///< サーフェスの高さ
-		u32 frame_index;								///< フレームインデックス
-		f32 delta_time;									///< デルタタイム
+		const frame_info* info{ nullptr };					///< フレーム情報
+		camera::d3d12_camera* camera{ nullptr };			///< カメラ
+		D3D12_GPU_VIRTUAL_ADDRESS global_shader_data{ 0 };	///< シェーダデータ
+		u32 surface_width{ 0 };								///< サーフェスの幅
+		u32 surface_height{ 0 };							///< サーフェスの高さ
+		id::id_type light_culling_id{ id::invalid_id };		///< ライトカリングID
+		u32 frame_index{ 0 };								///< フレームインデックス
+		f32 delta_time{ 16.7f };							///< デルタタイム
 	};
 }	// namespace dxforge::graphics::d3d12
 

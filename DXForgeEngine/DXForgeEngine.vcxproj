@@ -96,7 +96,7 @@
     <ClCompile Include="Graphics\Vulkan\VulkanInterface.cpp" />
     <ClCompile Include="Input\Input.cpp" />
     <ClCompile Include="Input\InputWin32.cpp" />
-    <ClCompile Include="Platform\Platform.cpp" />
+    <ClCompile Include="Platform\PlatformWin32.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

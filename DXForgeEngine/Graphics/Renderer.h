@@ -147,8 +147,8 @@ namespace dxforge::graphics
 			f32 aspect_ratio;						// アスペクト比
 			f32 view_height;						// 視野の高さ
 		};
-		f32 near_z;									// 近クリップ面
-		f32 far_z;									// 遠クリップ面
+		f32 near_z{ 0.0f };							// 近クリップ面
+		f32 far_z{ 0.0f };							// 遠クリップ面
 	};
 
 	struct perspective_camera_init_info : public camera_init_info

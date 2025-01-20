@@ -36,7 +36,7 @@ public:
 	}
 
 private:
-	f32 _angle{ 0.f };
+	f32 _angle{ 0.0f };
 };
 
 class fan_script;
@@ -60,7 +60,7 @@ public:
 	}
 
 private:
-	f32 _angle{ 0.f };
+	f32 _angle{ 0.0f };
 };
 
 class wibbly_wobbly_script;
@@ -81,7 +81,7 @@ public:
 		x = _angle;
 		const f32 s2{ 0.05f * std::sin(x) * std::sin(std::sin(x / 1.62f) + std::sin(1.62f * x) + std::sin(3.24f * x)) };
 
-		math::v3a rot{ s1, 0.f, s2 };
+		math::v3a rot{ s1, 0.0f, s2 };
 		DirectX::XMVECTOR quat{ DirectX::XMQuaternionRotationRollPitchYawFromVector(DirectX::XMLoadFloat3A(&rot)) };
 		math::v4 rot_quat{};
 		DirectX::XMStoreFloat4(&rot_quat, quat);
@@ -92,7 +92,7 @@ public:
 	}
 
 private:
-	f32 _angle{ 0.f };
+	f32 _angle{ 0.0f };
 };
 
 class camera_script;

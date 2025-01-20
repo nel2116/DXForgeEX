@@ -27,14 +27,17 @@ namespace
 	id::id_type fan_model_id{ id::invalid_id };
 	id::id_type int_model_id{ id::invalid_id };
 	id::id_type lab_model_id{ id::invalid_id };
+	id::id_type player_model_id{ id::invalid_id };
 
 	id::id_type fan_item_id{ id::invalid_id };
 	id::id_type int_item_id{ id::invalid_id };
 	id::id_type lab_item_id{ id::invalid_id };
+	id::id_type player_item_id{ id::invalid_id };
 
 	game_entity::entity_id fan_entity_id{ id::invalid_id };
 	game_entity::entity_id int_entity_id{ id::invalid_id };
 	game_entity::entity_id lab_entity_id{ id::invalid_id };
+	game_entity::entity_id player_entity_id{ id::invalid_id };
 
 	id::id_type vs_id{ id::invalid_id };
 	id::id_type ps_id{ id::invalid_id };
@@ -135,16 +138,19 @@ void create_render_items()
 	auto _1 = std::thread{ [] {lab_model_id = load_model("..\\..\\x64\\lab_model.model"); } };
 	auto _2 = std::thread{ [] {fan_model_id = load_model("..\\..\\x64\\fan_model.model"); } };
 	auto _3 = std::thread{ [] {int_model_id = load_model("..\\..\\x64\\int_model.model"); } };
-	auto _4 = std::thread{ [] {load_shaders(); } };
+	auto _4 = std::thread{ [] {player_model_id = load_model("..\\..\\x64\\Player.model"); } };
+	auto _5 = std::thread{ [] {load_shaders(); } };
 
 	lab_entity_id = create_one_game_entity({}, {}, nullptr).get_id();
 	fan_entity_id = create_one_game_entity({ -10.47f, 5.93f, -6.7f }, {}, "fan_script").get_id();
 	int_entity_id = create_one_game_entity({ 0.0f, 1.3f, -6.6f }, {}, "wibbly_wobbly_script").get_id();
+	player_entity_id = create_one_game_entity({}, {}, nullptr).get_id();
 
 	_1.join();
 	_2.join();
 	_3.join();
 	_4.join();
+	_5.join();
 
 	// NOTE: マテリアルを作成する前に、シェーダーを準備する必要があります。
 	create_material();
@@ -153,10 +159,12 @@ void create_render_items()
 	lab_item_id = graphics::add_render_item(lab_entity_id, lab_model_id, _countof(materials), &materials[0]);
 	fan_item_id = graphics::add_render_item(fan_entity_id, fan_model_id, _countof(materials), &materials[0]);
 	int_item_id = graphics::add_render_item(int_entity_id, int_model_id, _countof(materials), &materials[0]);
+	player_item_id = graphics::add_render_item(player_entity_id, player_model_id, _countof(materials), &materials[0]);
 
 	render_item_entity_map[lab_item_id] = lab_entity_id;
 	render_item_entity_map[fan_item_id] = fan_entity_id;
 	render_item_entity_map[int_item_id] = int_entity_id;
+	render_item_entity_map[player_item_id] = player_entity_id;
 }
 
 void destroy_render_items()
@@ -164,6 +172,7 @@ void destroy_render_items()
 	remove_item(lab_item_id, lab_model_id);
 	remove_item(fan_item_id, fan_model_id);
 	remove_item(int_item_id, int_model_id);
+	remove_item(player_item_id, player_model_id);
 
 	// remove material
 	if (id::is_valid(mtl_id))
@@ -184,8 +193,9 @@ void destroy_render_items()
 
 void get_render_items(id::id_type* items, [[maybe_unused]] u32 count)
 {
-	assert(count == 3);
+	assert(count == 4);
 	items[0] = lab_item_id;
 	items[1] = fan_item_id;
 	items[2] = int_item_id;
+	items[3] = player_item_id;
 }
