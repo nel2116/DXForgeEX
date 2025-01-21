@@ -107,7 +107,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data ビュー行列のデータ
 		/// @param size データサイズ
-		void get_view(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		void get_view(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			math::m4x4* const matrix{ (math::m4x4* const)data };
 			assert(sizeof(math::m4x4) == size);
@@ -118,7 +118,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data 射影行列のデータ
 		/// @param size データサイズ
-		void get_projection(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		void get_projection(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			math::m4x4* const matrix{ (math::m4x4* const)data };
 			assert(sizeof(math::m4x4) == size);
@@ -129,7 +129,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data 逆射影行列のデータ
 		/// @param size データサイズ
-		void get_inverse_projection(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		void get_inverse_projection(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			math::m4x4* const matrix{ (math::m4x4* const)data };
 			assert(sizeof(math::m4x4) == size);
@@ -140,7 +140,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data ビュー射影行列のデータ
 		/// @param size データサイズ
-		void get_view_projection(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		void get_view_projection(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			math::m4x4* const matrix{ (math::m4x4* const)data };
 			assert(sizeof(math::m4x4) == size);
@@ -151,7 +151,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data 逆ビュー射影行列のデータ
 		/// @param size データサイズ
-		void get_inverse_view_projection(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		void get_inverse_view_projection(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			math::m4x4* const matrix{ (math::m4x4* const)data };
 			assert(sizeof(math::m4x4) == size);
@@ -162,7 +162,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data "上方向"ベクトルのデータ
 		/// @param size データサイズ
-		void get_up_vector(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		void get_up_vector(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			math::v3* const up_vector{ (math::v3* const)data };
 			assert(sizeof(math::v3) == size);
@@ -173,7 +173,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data 視野角のデータ
 		/// @param size データサイズ
-		constexpr void get_field_of_view(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_field_of_view(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::perspective);
 			f32* const fov{ (f32* const)data };
@@ -185,7 +185,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data アスペクト比のデータ
 		/// @param size データサイズ
-		constexpr void get_aspect_ratio(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_aspect_ratio(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::perspective);
 			f32* const aspect_ratio{ (f32* const)data };
@@ -197,7 +197,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data ビュー幅のデータ
 		/// @param size データサイズ
-		constexpr void get_view_width(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_view_width(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::orthographic);
 			f32* const view_width{ (f32* const)data };
@@ -209,7 +209,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data ビュー高さのデータ
 		/// @param size データサイズ
-		constexpr void get_view_height(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_view_height(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::orthographic);
 			f32* const view_height{ (f32* const)data };
@@ -221,7 +221,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data 近クリップ面のデータ
 		/// @param size データサイズ
-		constexpr void get_near_z(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_near_z(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			f32* const near_z{ (f32* const)data };
 			assert(sizeof(f32) == size);
@@ -232,7 +232,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data 遠クリップ面のデータ
 		/// @param size データサイズ
-		constexpr void get_far_z(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_far_z(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			f32* const far_z{ (f32* const)data };
 			assert(sizeof(f32) == size);
@@ -243,7 +243,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data ビュー行列のデータ
 		/// @param size データサイズ
-		constexpr void get_projection_type(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_projection_type(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			graphics::camera::type* const type{ (graphics::camera::type* const)data };
 			assert(sizeof(graphics::camera::type) == size);
@@ -254,7 +254,7 @@ namespace dxforge::graphics::d3d12::camera
 		/// @param camera 取得対象のカメラ
 		/// @param data エンティティIDのデータ
 		/// @param size データサイズ
-		constexpr void get_entity_id(d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_entity_id(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			id::id_type* const entity_id{ (id::id_type* const)data };
 			assert(sizeof(id::id_type) == size);
@@ -268,7 +268,7 @@ namespace dxforge::graphics::d3d12::camera
 		// カメラのパラメータ設定関数
 		using set_function = void(*)(d3d12_camera&, const void* const, u32);
 		// カメラのパラメータ取得関数
-		using get_function = void(*)(d3d12_camera&, void* const, u32);
+		using get_function = void(*)(const d3d12_camera&, void* const, u32);
 		// カメラのパラメータ設定関数配列
 		constexpr set_function set_functions[]
 		{

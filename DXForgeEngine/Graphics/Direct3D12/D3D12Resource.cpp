@@ -198,6 +198,18 @@ namespace dxforge::graphics::d3d12
 		return nullptr;
 	}
 
+	//_/_/_/_/_/_/_/_/ STRUCTURED BUFFER _/_/_/_/_/_/_/_/
+	structured_buffer::structured_buffer(const d3d12_buffer_init_info& info)
+		: _buffer{ info,false }, _stride{ info.stride }
+	{
+
+
+		NAME_D3D12_OBJECT_INDEXED(buffer(), size(), L"Structured Buffer - size");
+	}
+
+
+
+
 	//_/_/_/_/_/_/_/_/ D3D12 TEXTURE _/_/_/_/_/_/_/_/
 	/// @brief コンストラクタ
 	/// @param info テクスチャ初期化情報

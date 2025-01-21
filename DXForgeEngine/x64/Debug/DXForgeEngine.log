@@ -1,3 +1,2 @@
-﻿  D3D12LightCulling.cpp
-  PlatformWin32.cpp
+﻿  D3D12Core.cpp
   DXForgeEngine.vcxproj -> F:\HAL\ThirdYear\DXForgeEX\x64\Debug\DXForgeEngine.lib

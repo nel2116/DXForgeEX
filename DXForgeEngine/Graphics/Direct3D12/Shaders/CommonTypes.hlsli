@@ -40,6 +40,30 @@ struct Frustum
     Plane Planes[4];
 };
 
+struct Sphere
+{
+    float3 Center;
+    float Radius;
+};
+
+struct Cone
+{
+    float3 Tip;
+    float Height;
+    float3 Direction;
+    float Radius;
+};
+
+#ifndef __cplusplus
+struct ComputeShaderInput
+{
+    uint3 GroupID : SV_GroupID; // ディスパッチ内のスレッドグループの3Dインデックス。
+    uint3 GroupThreadID : SV_GroupThreadID; // スレッドグループ内のローカルスレッドIDの3Dインデックス。
+    uint3 DispatchThreadID : SV_DispatchThreadID; // ディスパッチ内のグローバルスレッドIDの3Dインデックス。
+    uint GroupIndex : SV_GroupIndex; // スレッドグループ内のスレッドの平坦化されたローカルインデックス。
+};
+#endif
+
 struct LightCullingDispatchParameters
 {
     // 派遣されたグループの数。 (このパラメータはHLSLのシステム値としては使用できません！)
