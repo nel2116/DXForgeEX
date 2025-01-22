@@ -1,12 +1,16 @@
 {
   "version": 2,
-  "dgSpecHash": "2nN9PvhQXXw=",
+  "dgSpecHash": "OKqNnM3oeOc=",
   "success": true,
-  "projectFilePath": "F:\\HAL\\ThirdYear\\DXForgeEX\\DXForgeEditor\\DXForgeEditor.csproj",
+  "projectFilePath": "F:\\HAL\\Self\\DXForgeEX\\DXForgeEditor\\DXForgeEditor.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\atame\\.nuget\\packages\\envdte\\17.12.40391\\envdte.17.12.40391.nupkg.sha512",
     "C:\\Users\\atame\\.nuget\\packages\\envdte80\\17.12.40391\\envdte80.17.12.40391.nupkg.sha512",
-    "C:\\Users\\atame\\.nuget\\packages\\microsoft.visualstudio.interop\\17.12.40391\\microsoft.visualstudio.interop.17.12.40391.nupkg.sha512"
+    "C:\\Users\\atame\\.nuget\\packages\\microsoft.visualstudio.interop\\17.12.40391\\microsoft.visualstudio.interop.17.12.40391.nupkg.sha512",
+    "C:\\Users\\atame\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\6.0.36\\microsoft.windowsdesktop.app.ref.6.0.36.nupkg.sha512",
+    "C:\\Users\\atame\\.nuget\\packages\\microsoft.netcore.app.ref\\6.0.36\\microsoft.netcore.app.ref.6.0.36.nupkg.sha512",
+    "C:\\Users\\atame\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\6.0.36\\microsoft.aspnetcore.app.ref.6.0.36.nupkg.sha512",
+    "C:\\Users\\atame\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\6.0.36\\microsoft.netcore.app.host.win-x64.6.0.36.nupkg.sha512"
   ],
   "logs": []
 }

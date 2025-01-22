@@ -76,7 +76,7 @@ namespace dxforge::utl
 			T& item{ _array[id] };
 			item.~T();
 			DEBUG_OP(memset(std::addressof(_array[id]), 0xcc, sizeof(T)));
-			*(u32*)std::addressof(_array[id]) = _next_free_index;
+			*(u32* const)std::addressof(_array[id]) = _next_free_index;
 			_next_free_index = id;
 			--_size;
 		}

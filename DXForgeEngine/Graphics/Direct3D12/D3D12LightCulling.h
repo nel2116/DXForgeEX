@@ -30,4 +30,6 @@ namespace dxforge::graphics::d3d12::delight
 
 	// TODO: ライトのカリングを視覚化するための一時的なもの。 後で取り除く。
 	D3D12_GPU_VIRTUAL_ADDRESS frustums(id::id_type id, u32 frame_index);
+	D3D12_GPU_VIRTUAL_ADDRESS light_grid_opaque(id::id_type light_culling_id, u32 frame_index);
+	D3D12_GPU_VIRTUAL_ADDRESS light_index_list_opaque(id::id_type light_culling_id, u32 frame_index);
 }	// namespace dxforge::graphics::d3d12::delight

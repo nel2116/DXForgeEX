@@ -62,6 +62,6 @@ namespace dxforge::transform
 	/// @param inverse_world ¢ŠEs—ñ‚Ì‹ts—ñ (o—Í)
 	void get_transform_matrices(const game_entity::entity_id id, math::m4x4& world, math::m4x4& inverse_world);
 
-	void get_update_component_flags(const game_entity::entity_id* const ids, u32 count, u8* const flags);
+	void get_updated_component_flags(const game_entity::entity_id* const ids, u32 count, u8* const flags);
 	void update(const component_cache* const cache, u32 count);
 }

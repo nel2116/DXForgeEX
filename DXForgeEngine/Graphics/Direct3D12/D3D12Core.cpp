@@ -419,6 +419,7 @@ namespace dxforge::graphics::d3d12::core
 		{
 			ComPtr<ID3D12InfoQueue> info_queue;
 			DXCall(main_device->QueryInterface(IID_PPV_ARGS(&info_queue)));
+
 			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
 			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
 			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);

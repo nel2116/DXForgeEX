@@ -125,20 +125,16 @@ namespace dxforge::graphics::d3d12
 	/// @param handle ディスクリプタハンドル
 	void descriptor_heap::free(descriptor_handle& handle)
 	{
-		// ハンドルが有効か確認
 		if (!handle.is_valid()) return;
 		std::lock_guard lock{ _mutex };
-		// ヒープがあるか確認
 		assert(_heap && _size);
 		assert(handle.container == this);
 		assert(handle.cpu.ptr >= _cpu_start.ptr);
 		assert((handle.cpu.ptr - _cpu_start.ptr) % _descriptor_size == 0);
 		assert(handle.index < _capacity);
-		// インデックスを取得
 		const u32 index{ (u32)(handle.cpu.ptr - _cpu_start.ptr) / _descriptor_size };
 		assert(handle.index == index);
 
-		// 遅延解放
 		const u32 frame_idx{ core::current_frame_index() };
 		_deferred_free_indices[frame_idx].push_back(index);
 		core::set_deferred_releases_flag();
@@ -198,17 +194,35 @@ namespace dxforge::graphics::d3d12
 		return nullptr;
 	}
 
-	//_/_/_/_/_/_/_/_/ STRUCTURED BUFFER _/_/_/_/_/_/_/_/
-	structured_buffer::structured_buffer(const d3d12_buffer_init_info& info)
-		: _buffer{ info,false }, _stride{ info.stride }
+	//_/_/_/_/_/_/_/_/ UAV CLEARABLE BUFFER _/_/_/_/_/_/_/_/
+	uav_clearble_buffer::uav_clearble_buffer(const d3d12_buffer_init_info& info)
+		: _buffer{ info,false }
 	{
-
-
+		assert(info.size && info.alignment);
 		NAME_D3D12_OBJECT_INDEXED(buffer(), size(), L"Structured Buffer - size");
+
+		assert(info.flags && D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		_uav = core::uav_heap().allocate();
+		_uav_shader_visible = core::srv_heap().allocate();
+		D3D12_UNORDERED_ACCESS_VIEW_DESC desc{};
+		desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+		desc.Format = DXGI_FORMAT_R32_UINT;
+		desc.Buffer.CounterOffsetInBytes = 0;
+		desc.Buffer.FirstElement = 0;
+		desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+		desc.Buffer.NumElements = _buffer.size() / sizeof(u32);
+
+		core::device()->CreateUnorderedAccessView(buffer(), nullptr, &desc, _uav.cpu);
+		core::device()->CopyDescriptorsSimple(1, _uav_shader_visible.cpu, _uav.cpu, core::srv_heap().type());
+
 	}
 
-
-
+	void uav_clearble_buffer::release()
+	{
+		core::srv_heap().free(_uav_shader_visible);
+		core::uav_heap().free(_uav);
+		_buffer.release();
+	}
 
 	//_/_/_/_/_/_/_/_/ D3D12 TEXTURE _/_/_/_/_/_/_/_/
 	/// @brief コンストラクタ

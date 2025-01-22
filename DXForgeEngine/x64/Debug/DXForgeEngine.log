@@ -1,2 +1,5 @@
 ﻿  D3D12Core.cpp
-  DXForgeEngine.vcxproj -> F:\HAL\ThirdYear\DXForgeEX\x64\Debug\DXForgeEngine.lib
+  D3D12GPass.cpp
+  D3D12Light.cpp
+  D3D12LightCulling.cpp
+  DXForgeEngine.vcxproj -> F:\HAL\Self\DXForgeEX\x64\Debug\DXForgeEngine.lib

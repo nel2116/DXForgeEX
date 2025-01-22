@@ -113,11 +113,13 @@ namespace dxforge::graphics::d3d12::light
 						index = (u32)_cullable_owners.size();
 						_cullable_lights.emplace_back();
 						_culling_info.emplace_back();
+						_bounding_spheres.emplace_back();
 						_cullable_entity_ids.emplace_back();
 						_cullable_owners.emplace_back();
 						_dirty_bits.emplace_back();
 						assert(_cullable_owners.size() == _cullable_lights.size());
 						assert(_cullable_owners.size() == _culling_info.size());
+						assert(_cullable_owners.size() == _bounding_spheres.size());
 						assert(_cullable_owners.size() == _cullable_entity_ids.size());
 						assert(_cullable_owners.size() == _dirty_bits.size());
 					}
@@ -127,7 +129,7 @@ namespace dxforge::graphics::d3d12::light
 					const light_id id{ _owners.add(light_owner{game_entity::entity_id{info.entity_id},index,info.type,info.is_enabled}) };
 					_cullable_entity_ids[index] = _owners[id].entity_id;
 					_cullable_owners[index] = id;
-					_dirty_bits[index] = dirty_bits_mask;
+					make_dirty(index);
 					enable(id, info.is_enabled);
 					update_transform(index);
 
@@ -158,27 +160,27 @@ namespace dxforge::graphics::d3d12::light
 			/// @brief ライトのtransformを更新する
 			void uptdate_transforms()
 			{
-				// カリング不能でないライトのtransformを更新
+				// カリング不能ライトの方向性を更新
 				for (const auto& id : _non_cullable_owners)
 				{
-					if (!id::is_valid(id))continue;
+					if (!id::is_valid(id)) continue;
 
 					const light_owner& owner{ _owners[id] };
 					if (owner.is_enabled)
 					{
-						const game_entity::entity entity{ game_entity::entity_id{owner.entity_id } };
+						const game_entity::entity entity{ game_entity::entity_id{owner.entity_id} };
 						hlsl::DirectionalLightParameters& params{ _non_cullable_lights[owner.data_index] };
 						params.Direction = entity.orientation();
 					}
 				}
 
-				// カリング不能でないライトの位置と方向を更新
+				// カリング可能なライトの位置と方向を更新
 				const u32 count{ _enabled_light_count };
-				if (!count)return;
+				if (!count) return;
 
-				assert(_cullable_entity_ids.size() <= count);
+				assert(_cullable_entity_ids.size() >= count);
 				_transform_flags_cache.resize(count);
-				transform::get_update_component_flags(_cullable_entity_ids.data(), count, _transform_flags_cache.data());
+				transform::get_updated_component_flags(_cullable_entity_ids.data(), count, _transform_flags_cache.data());
 
 				for (u32 i{ 0 }; i < count; ++i)
 				{
@@ -254,7 +256,7 @@ namespace dxforge::graphics::d3d12::light
 					assert(_owners[_cullable_owners[index]].data_index == index);
 					assert(index < _cullable_lights.size());
 					_cullable_lights[index].Intensity = intensity;
-					_dirty_bits[index] = dirty_bits_mask;
+					make_dirty(index);
 				}
 			}
 
@@ -279,7 +281,7 @@ namespace dxforge::graphics::d3d12::light
 					assert(_owners[_cullable_owners[index]].data_index == index);
 					assert(index < _cullable_lights.size());
 					_cullable_lights[index].Color = color;
-					_dirty_bits[index] = dirty_bits_mask;
+					make_dirty(index);
 				}
 			}
 
@@ -294,7 +296,7 @@ namespace dxforge::graphics::d3d12::light
 				assert(owner.type != graphics::light::directional);
 				assert(index < _cullable_lights.size());
 				_cullable_lights[index].Attenuation = attenuation;
-				_dirty_bits[index] = dirty_bits_mask;
+				make_dirty(index);
 			}
 
 			/// @brief ライトの範囲を設定する
@@ -309,11 +311,22 @@ namespace dxforge::graphics::d3d12::light
 				assert(index < _cullable_lights.size());
 				_cullable_lights[index].Range = range;
 				_culling_info[index].Range = range;
-				_dirty_bits[index] = dirty_bits_mask;
+
+#if USE_BOUNDING_SPHERES
+				_culling_info[index].CosPenumbra = -1.0f;
+#endif
+
+				_bounding_spheres[index].Radius = range;
+				make_dirty(index);
 
 				if (owner.type == graphics::light::spot)
 				{
+					calculate_cone_bounding_sphere(_cullable_lights[index], _bounding_spheres[index]);
+#if USE_BOUNDING_SPHERES
+					_culling_info[index].CosPenumbra = _cullable_lights[index].CosPenumbra;
+#else
 					_culling_info[index].ConeRadius = calculate_cone_radius(range, _cullable_lights[index].CosPenumbra);
+#endif
 				}
 			}
 
@@ -330,7 +343,7 @@ namespace dxforge::graphics::d3d12::light
 
 				umbra = std::clamp(umbra, 0.0f, math::pi);
 				_cullable_lights[index].CosUmbra = DirectX::XMScalarCos(umbra * 0.5f);
-				_dirty_bits[index] = dirty_bits_mask;
+				make_dirty(index);
 
 				if (penumbra(id) < umbra)
 				{
@@ -351,9 +364,14 @@ namespace dxforge::graphics::d3d12::light
 
 				penumbra = std::clamp(penumbra, umbra(id), math::pi);
 				_cullable_lights[index].CosPenumbra = DirectX::XMScalarCos(penumbra * 0.5f);
+				calculate_cone_bounding_sphere(_cullable_lights[index], _bounding_spheres[index]);
 
+#if USE_BOUNDING_SPHERES
+				_culling_info[index].CosPenumbra = _cullable_lights[index].CosPenumbra;
+#else
 				_culling_info[index].ConeRadius = calculate_cone_radius(range(id), _cullable_lights[index].CosPenumbra);
-				_dirty_bits[index] = dirty_bits_mask;
+#endif
+				make_dirty(index);
 			}
 
 			/// @brief ライトが有効かどうかを取得する
@@ -482,9 +500,9 @@ namespace dxforge::graphics::d3d12::light
 				return count;
 			}
 
-			CONSTEXPR void non_cullable_lights(hlsl::DirectionalLightParameters* const lights, [[maybe_unused]] u32 buffer_size)
+			CONSTEXPR void non_cullable_lights(hlsl::DirectionalLightParameters* const lights, [[maybe_unused]] u32 buffer_size) const
 			{
-				assert(buffer_size == math::align_size_up<D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT>(non_cullable_light_count() * sizeof(hlsl::DirectionalLightParameters)));
+				assert(buffer_size >= math::align_size_up<D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT>(non_cullable_light_count() * sizeof(hlsl::DirectionalLightParameters)));
 				const u32 count{ (u32)_non_cullable_owners.size() };
 				u32 index{ 0 };
 				for (u32 i{ 0 }; i < count; ++i)
@@ -519,6 +537,28 @@ namespace dxforge::graphics::d3d12::light
 				return sin_penumbra * range;
 			}
 
+			void calculate_cone_bounding_sphere(const hlsl::LightParameters& params, hlsl::Sphere& sphere)
+			{
+				using namespace DirectX;
+
+				XMVECTOR tip{ XMLoadFloat3(&params.Position) };
+				XMVECTOR direction{ XMLoadFloat3(&params.Direction) };
+				const f32 cone_cos{ params.CosPenumbra };
+				assert(cone_cos >= 0.0f);
+
+				if (cone_cos >= 0.707107f)
+				{
+					sphere.Radius = params.Range / (2.0f * cone_cos);
+					XMStoreFloat3(&sphere.Center, tip + sphere.Radius * direction);
+				}
+				else
+				{
+					XMStoreFloat3(&sphere.Center, tip + cone_cos * params.Range * direction);
+					const f32 cone_sin{ sqrt(1.0f - cone_cos * cone_cos) };
+					sphere.Radius = cone_sin * params.Range;
+				}
+			}
+
 			void update_transform(u32 index)
 			{
 				const game_entity::entity entity{ game_entity::entity_id{_cullable_entity_ids[index]} };
@@ -526,14 +566,15 @@ namespace dxforge::graphics::d3d12::light
 				params.Position = entity.position();
 
 				hlsl::LightCullingLightInfo& culling_info{ _culling_info[index] };
-				culling_info.Position = params.Position;
+				culling_info.Position = _bounding_spheres[index].Center = params.Position;
 
-				if (params.Type == graphics::light::spot)
+				if (_owners[_cullable_owners[index]].type == graphics::light::spot)
 				{
 					culling_info.Direction = params.Direction = entity.orientation();
+					calculate_cone_bounding_sphere(params, _bounding_spheres[index]);
 				}
 
-				_dirty_bits[index] = dirty_bits_mask;
+				make_dirty(index);
 			}
 
 			CONSTEXPR void add_cullable_light_paramaters(const light_init_info& info, u32 index)
@@ -542,18 +583,20 @@ namespace dxforge::graphics::d3d12::light
 				assert(info.type != light::directional && index < _cullable_lights.size());
 
 				hlsl::LightParameters& params{ _cullable_lights[index] };
+#if !USE_BOUNDING_SPHERES
 				params.Type = info.type;
 				assert(params.Type <= light::count);
+#endif
 				params.Color = info.color;
 				params.Intensity = info.intensity;
 
-				if (params.Type == light::point)
+				if (info.type == light::point)
 				{
 					const point_light_params& p{ info.point_params };
 					params.Attenuation = p.attenuation;
 					params.Range = p.range;
 				}
-				else if (params.Type == light::spot)
+				else if (info.type == light::spot)
 				{
 					const spot_light_params& s{ info.spot_params };
 					params.Attenuation = s.attenuation;
@@ -568,16 +611,22 @@ namespace dxforge::graphics::d3d12::light
 				using graphics::light;
 				assert(info.type != light::directional && index < _culling_info.size());
 
-				hlsl::LightParameters& params{ _cullable_lights[index] };
-				assert(params.Type == info.type);
-
+				const hlsl::LightParameters& params{ _cullable_lights[index] };
 				hlsl::LightCullingLightInfo& culling_info{ _culling_info[index] };
-				culling_info.Range = params.Range;
+				culling_info.Range = _bounding_spheres[index].Radius = params.Range;
+#if USE_BOUNDING_SPHERES
+				culling_info.CosPenumbra = -1.f;
+#else
 				culling_info.Type = params.Type;
+#endif
 
 				if (info.type == light::spot)
 				{
+#if USE_BOUNDING_SPHERES
+					culling_info.CosPenumbra = params.CosPenumbra;
+#else
 					culling_info.ConeRadius = calculate_cone_radius(params.Range, params.CosPenumbra);
+#endif
 				}
 			}
 
@@ -590,6 +639,8 @@ namespace dxforge::graphics::d3d12::light
 				assert(index2 < _cullable_lights.size());
 				assert(index1 < _culling_info.size());
 				assert(index2 < _culling_info.size());
+				assert(index1 < _bounding_spheres.size());
+				assert(index2 < _bounding_spheres.size());
 				assert(index1 < _cullable_entity_ids.size());
 				assert(index2 < _cullable_entity_ids.size());
 				assert(id::is_valid(_cullable_owners[index1]) || id::is_valid(_cullable_owners[index2]));
@@ -607,11 +658,12 @@ namespace dxforge::graphics::d3d12::light
 
 					_cullable_lights[index1] = _cullable_lights[index2];
 					_culling_info[index1] = _culling_info[index2];
+					_bounding_spheres[index1] = _bounding_spheres[index2];
 					_cullable_entity_ids[index1] = _cullable_entity_ids[index2];
 					std::swap(_cullable_owners[index1], _cullable_owners[index2]);
-					_dirty_bits[index1] = dirty_bits_mask;
+					make_dirty(index1);
 					assert(_owners[_cullable_owners[index1]].entity_id == _cullable_entity_ids[index1]);
-					assert(id::is_valid(_cullable_owners[index2]));
+					assert(!id::is_valid(_cullable_owners[index2]));
 				}
 				else
 				{
@@ -624,6 +676,7 @@ namespace dxforge::graphics::d3d12::light
 
 					std::swap(_cullable_lights[index1], _cullable_lights[index2]);
 					std::swap(_culling_info[index1], _culling_info[index2]);
+					std::swap(_bounding_spheres[index1], _bounding_spheres[index2]);
 					std::swap(_cullable_entity_ids[index1], _cullable_entity_ids[index2]);
 					std::swap(_cullable_owners[index1], _cullable_owners[index2]);
 
@@ -631,13 +684,16 @@ namespace dxforge::graphics::d3d12::light
 					assert(_owners[_cullable_owners[index2]].entity_id == _cullable_entity_ids[index2]);
 
 					// dirty bitsを設定
-					assert(index1 < _dirty_bits.size());
-					assert(index2 < _dirty_bits.size());
-					_dirty_bits[index1] = dirty_bits_mask;
-					_dirty_bits[index2] = dirty_bits_mask;
+					make_dirty(index1);
+					make_dirty(index2);
 				}
 			}
 
+			CONSTEXPR void make_dirty(u32 index)
+			{
+				assert(index < _dirty_bits.size());
+				_something_is_dirty = _dirty_bits[index] = dirty_bits_mask;
+			}
 
 		private:	// メンバ変数
 			// NOTE: これはパッキングされていない
@@ -648,11 +704,13 @@ namespace dxforge::graphics::d3d12::light
 			// NOTE: パッキングされている
 			utl::vector<hlsl::LightParameters> _cullable_lights;				///< カリングされたライト
 			utl::vector<hlsl::LightCullingLightInfo> _culling_info;				///< ライトのカリング情報
+			utl::vector<hlsl::Sphere> _bounding_spheres;						///< ライトのカリング用の球
 			utl::vector<game_entity::entity_id> _cullable_entity_ids;			///< カリングされたライトのエンティティID
 			utl::vector<light_id> _cullable_owners;								///< カリングされたライトの所有者
 			utl::vector<u8> _dirty_bits;										///< ライトの更新フラグ
 			utl::vector<u8> _transform_flags_cache;								///< ライトのtransformの更新フラグ
 			u32 _enabled_light_count{ 0 };										///< 有効なライトの数
+			u8 _something_is_dirty{ 0 };										///< ライトが更新されたかどうか
 
 			friend class d3d12_light_buffer;
 		};
@@ -663,69 +721,78 @@ namespace dxforge::graphics::d3d12::light
 			d3d12_light_buffer() = default;
 			CONSTEXPR void update_light_buffers(light_set& set, u64 light_set_key, u32 frame_index)
 			{
-				u32 sizes[light_buffer::count]{};
-				sizes[light_buffer::non_cullable_light] = set.non_cullable_light_count() * sizeof(hlsl::DirectionalLightParameters);
-				sizes[light_buffer::cullable_light] = set.cullable_light_count() * sizeof(hlsl::LightParameters);
-				sizes[light_buffer::culling_info] = set.cullable_light_count() * sizeof(hlsl::LightCullingLightInfo);
+				const u32 non_cullable_light_count{ set.non_cullable_light_count() };
 
-				u32 current_sizes[light_buffer::count]{};
-				current_sizes[light_buffer::non_cullable_light] = _buffers[light_buffer::non_cullable_light].buffer.size();
-				current_sizes[light_buffer::cullable_light] = _buffers[light_buffer::cullable_light].buffer.size();
-				current_sizes[light_buffer::culling_info] = _buffers[light_buffer::culling_info].buffer.size();
-
-				if (current_sizes[light_buffer::non_cullable_light] < sizes[light_buffer::non_cullable_light])
+				if (non_cullable_light_count)
 				{
-					resize_buffer(light_buffer::non_cullable_light, sizes[light_buffer::non_cullable_light], frame_index);
-				}
+					const u32 needed_size{ non_cullable_light_count * sizeof(hlsl::DirectionalLightParameters) };
+					const u32 current_size{ _buffers[light_buffer::non_cullable_light].buffer.size() };
 
-				set.non_cullable_lights((hlsl::DirectionalLightParameters* const)_buffers[light_buffer::non_cullable_light].cpu_address,
-					_buffers[light_buffer::non_cullable_light].buffer.size());
-
-				// カリング不能でないライトバッファの更新
-				bool buffers_resized{ false };
-				if (current_sizes[light_buffer::cullable_light] < sizes[light_buffer::culling_info])
-				{
-					assert(current_sizes[light_buffer::culling_info] < sizes[light_buffer::culling_info]);
-					resize_buffer(light_buffer::cullable_light, sizes[light_buffer::cullable_light], frame_index);
-					resize_buffer(light_buffer::culling_info, sizes[light_buffer::culling_info], frame_index);
-					buffers_resized = true;
-				}
-
-				bool all_lights_updated{ false };
-				if (buffers_resized || _current_light_set_key != light_set_key)
-				{
-					memcpy(_buffers[light_buffer::cullable_light].cpu_address, set._cullable_lights.data(), sizes[light_buffer::cullable_light]);
-					memcpy(_buffers[light_buffer::culling_info].cpu_address, set._culling_info.data(), sizes[light_buffer::culling_info]);
-					_current_light_set_key = light_set_key;
-					all_lights_updated = true;
-				}
-
-				assert(_current_light_set_key == light_set_key);
-				const u32 index_mask{ 1UL << frame_index };
-
-				if (all_lights_updated)
-				{
-					for (u32 i{ 0 }; i < set.cullable_light_count(); ++i)
+					if (current_size < needed_size)
 					{
-						set._dirty_bits[i] &= ~dirty_bits_mask;
+						resize_buffer(light_buffer::non_cullable_light, needed_size, frame_index);
 					}
+
+					set.non_cullable_lights((hlsl::DirectionalLightParameters* const)_buffers[light_buffer::non_cullable_light].cpu_address,
+						_buffers[light_buffer::non_cullable_light].buffer.size());
 				}
-				else
+
+				// カリング可能なライトのバッファを更新する
+				const u32 cullable_light_count{ set.cullable_light_count() };
+
+				if (cullable_light_count)
 				{
-					for (u32 i{ 0 }; i < set.cullable_light_count(); ++i)
+					const u32 needed_light_buffer_size{ cullable_light_count * sizeof(hlsl::LightParameters) };
+					const u32 needed_culling_buffer_size{ cullable_light_count * sizeof(hlsl::LightCullingLightInfo) };
+					const u32 needed_spheres_buffer_size{ cullable_light_count * sizeof(hlsl::Sphere) };
+					const u32 current_light_buffer_size{ _buffers[light_buffer::cullable_light].buffer.size() };
+
+					bool buffers_resized{ false };
+					if (current_light_buffer_size < needed_light_buffer_size)
 					{
-						if (set._dirty_bits[i] & index_mask)
+						// NOTE: 数個のライトが追加されるたびに再作成されるのを避けるため
+						//		必要なバッファーの150％ほどの大きさのバッファーを作成する。
+						resize_buffer(light_buffer::cullable_light, (needed_light_buffer_size * 3) >> 1, frame_index);
+						resize_buffer(light_buffer::culling_info, (needed_culling_buffer_size * 3) >> 1, frame_index);
+						resize_buffer(light_buffer::bounding_spheres, (needed_spheres_buffer_size * 3) >> 1, frame_index);
+						buffers_resized = true;
+					}
+
+					const u32 index_mask{ 1UL << frame_index };
+
+					if (buffers_resized || _current_light_set_key != light_set_key)
+					{
+						memcpy(_buffers[light_buffer::cullable_light].cpu_address, set._cullable_lights.data(), needed_light_buffer_size);
+						memcpy(_buffers[light_buffer::culling_info].cpu_address, set._culling_info.data(), needed_culling_buffer_size);
+						memcpy(_buffers[light_buffer::bounding_spheres].cpu_address, set._bounding_spheres.data(), needed_spheres_buffer_size);
+						_current_light_set_key = light_set_key;
+
+						for (u32 i{ 0 }; i < cullable_light_count; ++i)
 						{
-							assert(i * sizeof(hlsl::LightParameters) < sizes[light_buffer::cullable_light]);
-							assert(i * sizeof(hlsl::LightCullingLightInfo) < sizes[light_buffer::culling_info]);
-							u8* const light_dst{ _buffers[light_buffer::cullable_light].cpu_address + (i * sizeof(hlsl::LightParameters)) };
-							u8* const culling_dst{ _buffers[light_buffer::culling_info].cpu_address + (i * sizeof(hlsl::LightCullingLightInfo)) };
-							memcpy(light_dst, &set._cullable_lights[i], sizeof(hlsl::LightParameters));
-							memcpy(culling_dst, &set._culling_info[i], sizeof(hlsl::LightCullingLightInfo));
 							set._dirty_bits[i] &= ~index_mask;
 						}
 					}
+					else if (set._something_is_dirty)
+					{
+						for (u32 i{ 0 }; i < cullable_light_count; ++i)
+						{
+							if (set._dirty_bits[i] & index_mask)
+							{
+								assert(i * sizeof(hlsl::LightParameters) < needed_light_buffer_size);
+								assert(i * sizeof(hlsl::LightCullingLightInfo) < needed_culling_buffer_size);
+								u8* const light_dst{ _buffers[light_buffer::cullable_light].cpu_address + (i * sizeof(hlsl::LightParameters)) };
+								u8* const culling_dst{ _buffers[light_buffer::culling_info].cpu_address + (i * sizeof(hlsl::LightCullingLightInfo)) };
+								u8* const sphere_dst{ _buffers[light_buffer::bounding_spheres].cpu_address + (i * sizeof(hlsl::Sphere)) };
+								memcpy(light_dst, &set._cullable_lights[i], sizeof(hlsl::LightParameters));
+								memcpy(culling_dst, &set._culling_info[i], sizeof(hlsl::LightCullingLightInfo));
+								memcpy(sphere_dst, &set._bounding_spheres[i], sizeof(hlsl::Sphere));
+								set._dirty_bits[i] &= ~index_mask;
+							}
+						}
+					}
 
+					set._something_is_dirty &= ~index_mask;
+					assert(_current_light_set_key == light_set_key);
 				}
 			}
 
@@ -753,6 +820,11 @@ namespace dxforge::graphics::d3d12::light
 				return _buffers[light_buffer::culling_info].buffer.gpu_address();
 			}
 
+			constexpr D3D12_GPU_VIRTUAL_ADDRESS bounding_spheres() const
+			{
+				return _buffers[light_buffer::bounding_spheres].buffer.gpu_address();
+			}
+
 		private:	// 構造体定義
 			struct light_buffer
 			{
@@ -761,6 +833,7 @@ namespace dxforge::graphics::d3d12::light
 					non_cullable_light,
 					cullable_light,
 					culling_info,
+					bounding_spheres,
 
 					count
 				};
@@ -773,13 +846,13 @@ namespace dxforge::graphics::d3d12::light
 			void resize_buffer(light_buffer::type type, u32 size, [[maybe_unused]] u32 frame_index)
 			{
 				assert(type < light_buffer::count);
-				if (!size) return;
+				if (!size || _buffers[type].buffer.size() >= math::align_size_up<D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT>(size)) return;
 
-				_buffers[type].buffer.release();
 				_buffers[type].buffer = d3d12_buffer{ constant_buffer::get_default_init_info(size),true };
 				NAME_D3D12_OBJECT_INDEXED(_buffers[type].buffer.buffer(), frame_index,
 					type == light_buffer::non_cullable_light ? L"Non-cullable Light Buffer" :
-					type == light_buffer::cullable_light ? L"Cullable Light Buffer" : L"Light Culling Info Buffer");
+					type == light_buffer::cullable_light ? L"Cullable Light Buffer" :
+					type == light_buffer::culling_info ? L"Light Culling Info Buffer" : L"Bounding Spheres Buffer");
 
 				D3D12_RANGE range{};
 				DXCall(_buffers[type].buffer.buffer()->Map(0, &range, (void**)(&_buffers[type].cpu_address)));
@@ -787,8 +860,8 @@ namespace dxforge::graphics::d3d12::light
 			}
 
 		private:	// メンバ変数
-			light_buffer _buffers[light_buffer::count];
-			u64 _current_light_set_key{ 0 };
+			light_buffer _buffers[light_buffer::count]{};	///< ライトバッファ
+			u64 _current_light_set_key{ 0 };				///< 現在のライトセットのキー
 		};
 
 		// ====== 変数宣言 ======
@@ -845,63 +918,63 @@ namespace dxforge::graphics::d3d12::light
 			set.penumbra(id, penumbra);
 		}
 
-		constexpr void get_is_enabled(light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_is_enabled(const light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
 		{
 			bool* const is_enabled{ (bool* const)data };
 			assert(sizeof(bool) == size);
 			*is_enabled = set.is_enabled(id);
 		}
 
-		constexpr void get_intensity(light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_intensity(const light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
 		{
 			f32* const intensity{ (f32* const)data };
 			assert(sizeof(f32) == size);
 			*intensity = set.intensity(id);
 		}
 
-		constexpr void get_color(light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_color(const light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
 		{
 			math::v3* const color{ (math::v3* const)data };
 			assert(sizeof(math::v3) == size);
 			*color = set.color(id);
 		}
 
-		CONSTEXPR void get_attenuation(light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
+		CONSTEXPR void get_attenuation(const light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
 		{
 			math::v3* const attenuation{ (math::v3* const)data };
 			assert(sizeof(math::v3) == size);
 			*attenuation = set.attenuation(id);
 		}
 
-		CONSTEXPR void get_range(light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
+		CONSTEXPR void get_range(const light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
 		{
 			f32* const range{ (f32* const)data };
 			assert(sizeof(f32) == size);
 			*range = set.range(id);
 		}
 
-		void get_umbra(light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
+		void get_umbra(const light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
 		{
 			f32* const umbra{ (f32* const)data };
 			assert(sizeof(f32) == size);
 			*umbra = set.umbra(id);
 		}
 
-		void get_penumbra(light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
+		void get_penumbra(const light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
 		{
 			f32* const penumbra{ (f32* const)data };
 			assert(sizeof(f32) == size);
 			*penumbra = set.penumbra(id);
 		}
 
-		constexpr void get_type(light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_type(const light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
 		{
 			graphics::light::type* const type{ (graphics::light::type* const)data };
 			assert(sizeof(graphics::light::type) == size);
 			*type = set.type(id);
 		}
 
-		constexpr void get_entity_id(light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
+		constexpr void get_entity_id(const light_set& set, light_id id, void* const data, [[maybe_unused]] u32 size)
 		{
 			id::id_type* const entity_id{ (id::id_type* const)data };
 			assert(sizeof(id::id_type) == size);
@@ -915,7 +988,7 @@ namespace dxforge::graphics::d3d12::light
 		// ライトのパラメータ設定関数
 		using set_function = void(*)(light_set&, light_id, const void* const, u32);
 		// ライトのパラメータ取得関数
-		using get_function = void(*)(light_set&, light_id, void* const, u32);
+		using get_function = void(*)(const light_set&, light_id, void* const, u32);
 		// ライトのパラメータ設定関数配列
 		constexpr set_function set_functions[]
 		{
@@ -1022,10 +1095,34 @@ namespace dxforge::graphics::d3d12::light
 		return light_buffer.non_cullable_lights();
 	}
 
+	D3D12_GPU_VIRTUAL_ADDRESS cullable_light_buffer(u32 frame_index)
+	{
+		const d3d12_light_buffer& light_buffer{ light_buffers[frame_index] };
+		return light_buffer.cullable_lights();
+	}
+
+	D3D12_GPU_VIRTUAL_ADDRESS culling_info_buffer(u32 frame_index)
+	{
+		const d3d12_light_buffer& light_buffer{ light_buffers[frame_index] };
+		return light_buffer.culling_info();
+	}
+
+	D3D12_GPU_VIRTUAL_ADDRESS bounding_spheres_buffer(u32 frame_index)
+	{
+		const d3d12_light_buffer& light_buffer{ light_buffers[frame_index] };
+		return light_buffer.bounding_spheres();
+	}
+
 	u32 non_cullable_light_count(u64 light_set_key)
 	{
 		assert(light_sets.count(light_set_key));
 		return light_sets[light_set_key].non_cullable_light_count();
+	}
+
+	u32 cullable_light_count(u64 light_set_key)
+	{
+		assert(light_sets.count(light_set_key));
+		return light_sets[light_set_key].cullable_light_count();
 	}
 
 }	// namespace dxforge::graphics::d3d12::light

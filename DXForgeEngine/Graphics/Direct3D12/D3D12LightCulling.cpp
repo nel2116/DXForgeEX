@@ -23,13 +23,14 @@ namespace dxforge::graphics::d3d12::delight
 		// ====== 構造体定義 ======
 		struct light_culling_root_parameter
 		{
-			enum : u32
+			enum parameter : u32
 			{
 				global_shader_data,
 				constants,
 				frustums_out_or_index_counter,
 				frustums_in,
 				culling_info,
+				bounding_spheres,
 				light_grid_opaque,
 				light_index_list_opaque,
 
@@ -41,7 +42,7 @@ namespace dxforge::graphics::d3d12::delight
 		{
 			d3d12_buffer frustums;
 			d3d12_buffer light_grid_and_index_list;
-			// TODO: ライトインデックスカウンターを追加
+			uav_clearble_buffer light_index_counter;
 			hlsl::LightCullingDispatchParameters grid_frustums_dispatch_params{};
 			hlsl::LightCullingDispatchParameters light_culling_dispatch_params{};
 			u32 frustum_count{ 0 };
@@ -77,6 +78,7 @@ namespace dxforge::graphics::d3d12::delight
 			parameters[param::frustums_out_or_index_counter].as_uav(D3D12_SHADER_VISIBILITY_ALL, 0);
 			parameters[param::frustums_in].as_srv(D3D12_SHADER_VISIBILITY_ALL, 0);
 			parameters[param::culling_info].as_srv(D3D12_SHADER_VISIBILITY_ALL, 1);
+			parameters[param::bounding_spheres].as_srv(D3D12_SHADER_VISIBILITY_ALL, 2);
 			parameters[param::light_grid_opaque].as_uav(D3D12_SHADER_VISIBILITY_ALL, 1);
 			parameters[param::light_index_list_opaque].as_uav(D3D12_SHADER_VISIBILITY_ALL, 3);
 
@@ -88,10 +90,9 @@ namespace dxforge::graphics::d3d12::delight
 
 		bool create_psos()
 		{
-			{	// grid_frustum_pso
+			{	// grid frustums
 				assert(!grid_frustum_pso);
-				struct
-				{
+				struct {
 					d3dx::d3d12_pipeline_state_subobject_root_signature root_signature{ light_culling_root_signature };
 					d3dx::d3d12_pipeline_state_subobject_cs cs{ shaders::get_engine_shader(shaders::engine_shader::grid_frustums_cs) };
 				} stream;
@@ -100,17 +101,16 @@ namespace dxforge::graphics::d3d12::delight
 				NAME_D3D12_OBJECT(grid_frustum_pso, L"Grid Frustums PSO");
 			}
 
-			{	// light_culling_pso
+			{	// light culling
 				assert(!light_culling_pso);
-				struct
-				{
+				struct {
 					d3dx::d3d12_pipeline_state_subobject_root_signature root_signature{ light_culling_root_signature };
 					d3dx::d3d12_pipeline_state_subobject_cs cs{ shaders::get_engine_shader(shaders::engine_shader::light_culling_cs) };
 				} stream;
+
 				light_culling_pso = d3dx::create_pipeline_state(&stream, sizeof(stream));
 				NAME_D3D12_OBJECT(light_culling_pso, L"Light Culling PSO");
 			}
-
 			return grid_frustum_pso != nullptr && light_culling_pso != nullptr;
 		}
 
@@ -118,18 +118,18 @@ namespace dxforge::graphics::d3d12::delight
 		{
 			const u32 frustum_count{ culler.frustum_count };
 
-			const u32 frustum_buffer_size{ sizeof(hlsl::Frustum) * frustum_count };
+			const u32 frustums_buffer_size{ sizeof(hlsl::Frustum) * frustum_count };
 			const u32 light_grid_buffer_size{ (u32)math::align_size_up<sizeof(math::v4)>(sizeof(math::u32v2) * frustum_count) };
-			const u32 light_index_buffer_size{ (u32)math::align_size_up<sizeof(math::v4)>(sizeof(u32) * max_lights_per_tile * frustum_count) };
-			const u32 light_grid_and_index_list_buffer_size{ light_grid_buffer_size + light_index_buffer_size };
+			const u32 light_index_list_buffer_size{ (u32)math::align_size_up<sizeof(math::v4)>(sizeof(u32) * max_lights_per_tile * frustum_count) };
+			const u32 light_grid_and_index_list_buffer_size{ light_grid_buffer_size + light_index_list_buffer_size };
 
 			d3d12_buffer_init_info info{};
 			info.alignment = sizeof(math::v4);
 			info.flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-			if (frustum_buffer_size > culler.frustums.size())
+			if (frustums_buffer_size > culler.frustums.size())
 			{
-				info.size = frustum_buffer_size;
+				info.size = frustums_buffer_size;
 				culler.frustums = d3d12_buffer{ info, false };
 				NAME_D3D12_OBJECT_INDEXED(culler.frustums.buffer(), frustum_count, L"Light Grid Frustums Buffer - count");
 			}
@@ -142,6 +142,13 @@ namespace dxforge::graphics::d3d12::delight
 				const D3D12_GPU_VIRTUAL_ADDRESS light_grid_opaque_buffer{ culler.light_grid_and_index_list.gpu_address() };
 				culler.light_index_list_opaque_buffer = light_grid_opaque_buffer + light_grid_buffer_size;
 				NAME_D3D12_OBJECT_INDEXED(culler.light_grid_and_index_list.buffer(), light_grid_and_index_list_buffer_size, L"Light Grid and Index List Buffer - size");
+
+				if (!culler.light_index_counter.buffer())
+				{
+					info = uav_clearble_buffer::get_default_init_info(1);
+					culler.light_index_counter = uav_clearble_buffer{ info };
+					NAME_D3D12_OBJECT_INDEXED(culler.light_index_counter.buffer(), core::current_frame_index(), L"Light Index Counter Buffer");
+				}
 			}
 		}
 
@@ -165,10 +172,18 @@ namespace dxforge::graphics::d3d12::delight
 				params.NumThreadGroups.y = (u32)math::align_size_up<tile_size>(tile_count.y) / tile_size;
 			}
 
+			// Dispatch parameters for light culling
+			{
+				hlsl::LightCullingDispatchParameters& params{ culler.light_culling_dispatch_params };
+				params.NumThreads.x = tile_count.x * tile_size;
+				params.NumThreads.y = tile_count.y * tile_size;
+				params.NumThreadGroups = tile_count;
+			}
+
 			resize_buffers(culler);
 		}
 
-		void calculate_grid_frustums(culling_parameters& culler, id3d12_graphics_command_list* const cmd_list, const d3d12_frame_info& d3d12_info, d3dx::d3d12_resource_barrier& barriers)
+		void calculate_grid_frustums(const culling_parameters& culler, id3d12_graphics_command_list* const cmd_list, const d3d12_frame_info& d3d12_info, d3dx::d3d12_resource_barrier& barriers)
 		{
 
 			constant_buffer& cbuffer{ core::cbuffer() };
@@ -239,13 +254,52 @@ namespace dxforge::graphics::d3d12::delight
 		const id::id_type id{ d3d12_info.light_culling_id };
 		assert(id::is_valid(id));
 		culling_parameters& culler{ light_cullers[id].cullers[d3d12_info.frame_index] };
+
 		if (d3d12_info.surface_width != culler.view_width ||
 			d3d12_info.surface_height != culler.view_height ||
 			!math::is_equal(d3d12_info.camera->field_of_view(), culler.camera_fov))
 		{
 			resize_and_calculate_grid_frustums(culler, cmd_list, d3d12_info, barriers);
 		}
-		//barriers.apply(cmd_list);
+
+		hlsl::LightCullingDispatchParameters& params{ culler.light_culling_dispatch_params };
+		params.NumLights = light::cullable_light_count(d3d12_info.info->light_set_key);
+		params.DepthBufferSrvIndex = gpass::depth_buffer().srv().index;
+
+		// NOTE: このステートメントの後にculler.has_lightsを更新しているので、
+		//		ライトがないときにバッファをクリアするためにライトカリングシェーダが一度実行されます。
+		if (!params.NumLights && !culler.has_lights) return;
+
+		culler.has_lights = params.NumLights > 0;
+
+		constant_buffer& cbuffer{ core::cbuffer() };
+		hlsl::LightCullingDispatchParameters* const buffer{ cbuffer.allocate<hlsl::LightCullingDispatchParameters>() };
+		memcpy(buffer, &params, sizeof(hlsl::LightCullingDispatchParameters));
+
+		// ライトグリッドとライトインデックスバッファを書き込み可能にする
+		barriers.add(culler.light_grid_and_index_list.buffer(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		barriers.apply(cmd_list);
+
+		const math::u32v4 clear_value{ 0, 0, 0, 0 };
+		culler.light_index_counter.clear_uav(cmd_list, &clear_value.x);
+
+		cmd_list->SetComputeRootSignature(light_culling_root_signature);
+		cmd_list->SetPipelineState(light_culling_pso);
+		using param = light_culling_root_parameter;
+		cmd_list->SetComputeRootConstantBufferView(param::global_shader_data, d3d12_info.global_shader_data);
+		cmd_list->SetComputeRootConstantBufferView(param::constants, cbuffer.gpu_address(buffer));
+		cmd_list->SetComputeRootUnorderedAccessView(param::frustums_out_or_index_counter, culler.light_index_counter.gpu_address());
+		cmd_list->SetComputeRootShaderResourceView(param::frustums_in, culler.frustums.gpu_address());
+		cmd_list->SetComputeRootShaderResourceView(param::culling_info, light::culling_info_buffer(d3d12_info.frame_index));
+		cmd_list->SetComputeRootShaderResourceView(param::bounding_spheres, light::bounding_spheres_buffer(d3d12_info.frame_index));
+		cmd_list->SetComputeRootUnorderedAccessView(param::light_grid_opaque, culler.light_grid_and_index_list.gpu_address());
+		cmd_list->SetComputeRootUnorderedAccessView(param::light_index_list_opaque, culler.light_index_list_opaque_buffer);
+
+		cmd_list->Dispatch(params.NumThreadGroups.x, params.NumThreadGroups.y, 1);
+
+		// ライトグリッドとライトインデックスバッファを読み取り可能にする
+		// NOTE: このトランジション・バリアは、この関数の呼び出し元によって適用される。
+		barriers.add(culler.light_grid_and_index_list.buffer(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	}
 
 	// TODO: ライトのカリングを視覚化するための一時的なもの。 後で取り除く。
@@ -254,4 +308,17 @@ namespace dxforge::graphics::d3d12::delight
 		assert(frame_index < frame_buffer_count && id::is_valid(id));
 		return light_cullers[id].cullers[frame_index].frustums.gpu_address();
 	}
+
+	D3D12_GPU_VIRTUAL_ADDRESS light_grid_opaque(id::id_type light_culling_id, u32 frame_index)
+	{
+		assert(frame_index < frame_buffer_count && id::is_valid(light_culling_id));
+		return light_cullers[light_culling_id].cullers[frame_index].light_grid_and_index_list.gpu_address();
+	}
+
+	D3D12_GPU_VIRTUAL_ADDRESS light_index_list_opaque(id::id_type light_culling_id, u32 frame_index)
+	{
+		assert(frame_index < frame_buffer_count && id::is_valid(light_culling_id));
+		return light_cullers[light_culling_id].cullers[frame_index].light_index_list_opaque_buffer;
+	}
+
 }	// namespace dxforge::graphics::d3d12::delight

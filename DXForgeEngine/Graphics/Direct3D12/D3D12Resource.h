@@ -89,10 +89,7 @@ namespace dxforge::graphics::d3d12
 		D3D12_RESOURCE_STATES initial_state{};												// 初期状態
 		D3D12_RESOURCE_FLAGS flags{ D3D12_RESOURCE_FLAG_NONE };								// フラグ
 		u32 size{ 0 };																		// サイズ
-		u32 stride{ 0 };																	// ストライド
-		s32 element_count{ 0 };																// 要素数
 		u32 alignment{ 0 };																	// アライメント
-		bool create_uav{ false };															// UAVを作成するかどうか
 	};
 
 	class d3d12_buffer
@@ -209,20 +206,19 @@ namespace dxforge::graphics::d3d12
 		std::mutex _mutex{};															// ミューテックス
 	};
 
-	class structured_buffer
+	class uav_clearble_buffer
 	{
 	public:		// パブリック関数
-		structured_buffer() = default;
-		explicit structured_buffer(const d3d12_buffer_init_info& info);
-		DISABLE_COPY(structured_buffer);
-		constexpr structured_buffer(structured_buffer&& o)
+		uav_clearble_buffer() = default;
+		explicit uav_clearble_buffer(const d3d12_buffer_init_info& info);
+		DISABLE_COPY(uav_clearble_buffer);
+		constexpr uav_clearble_buffer(uav_clearble_buffer&& o)
 			: _buffer{ std::move(o._buffer) }, _uav{ o._uav }, _uav_shader_visible{ o._uav_shader_visible }
-			, _stride{ o._stride }
 		{
 			o.reset();
 		}
 
-		constexpr structured_buffer& operator=(structured_buffer&& o)
+		constexpr uav_clearble_buffer& operator=(uav_clearble_buffer&& o)
 		{
 			assert(this != &o);
 			if (this != &o)
@@ -233,17 +229,21 @@ namespace dxforge::graphics::d3d12
 			return *this;
 		}
 
-		~structured_buffer() { release(); }
+		~uav_clearble_buffer() { release(); }
 
 		void release();
 
 		void clear_uav(id3d12_graphics_command_list* const cmd_list, const u32* const values) const
 		{
+			assert(buffer());
+			assert(_uav.is_valid() && _uav_shader_visible.is_valid() && _uav_shader_visible.is_shader_visible());
 			cmd_list->ClearUnorderedAccessViewUint(_uav_shader_visible.gpu, _uav.cpu, buffer(), values, 0, nullptr);
 		}
 
 		void clear_uav(id3d12_graphics_command_list* const cmd_list, const f32* const values) const
 		{
+			assert(buffer());
+			assert(_uav.is_valid() && _uav_shader_visible.is_valid() && _uav_shader_visible.is_shader_visible());
 			cmd_list->ClearUnorderedAccessViewFloat(_uav_shader_visible.gpu, _uav.cpu, buffer(), values, 0, nullptr);
 		}
 
@@ -253,25 +253,22 @@ namespace dxforge::graphics::d3d12
 		[[nodiscard]] constexpr descriptor_handle uav() const { return _uav; }
 		[[nodiscard]] constexpr descriptor_handle uav_shader_visible() const { return _uav_shader_visible; }
 
-		[[nodiscard]] constexpr static d3d12_buffer_init_info get_default_init_info(u32 stride, u32 element_count)
+		[[nodiscard]] constexpr static d3d12_buffer_init_info get_default_init_info(u32 size)
 		{
-			assert(stride && element_count);
+			assert(size);
 			d3d12_buffer_init_info info{};
-			info.size = stride * element_count;
-			info.stride = stride;
-			info.element_count = element_count;
-			info.alignment = stride;
+			info.size = size;
+			info.alignment = sizeof(math::v4);
 			info.flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 			return info;
 		}
 
 	private:	// プライベート関数
-		constexpr void move(structured_buffer& o)
+		constexpr void move(uav_clearble_buffer& o)
 		{
 			_buffer = std::move(o._buffer);
 			_uav = o._uav;
 			_uav_shader_visible = o._uav_shader_visible;
-			_stride = o._stride;
 			o.reset();
 		}
 
@@ -279,14 +276,12 @@ namespace dxforge::graphics::d3d12
 		{
 			_uav = {};
 			_uav_shader_visible = {};
-			_stride = 0;
 		}
 
 	private:	// メンバ変数
 		d3d12_buffer _buffer{};
 		descriptor_handle _uav{};
 		descriptor_handle _uav_shader_visible{};
-		u32 _stride{ 0 };
 	};
 
 

@@ -165,7 +165,7 @@ namespace dxforge::transform
 		inverse_world = inv_world[entity_index];
 	}
 
-	void get_update_component_flags(const game_entity::entity_id* const ids, u32 count, u8* const flags)
+	void get_updated_component_flags(const game_entity::entity_id* const ids, u32 count, u8* const flags)
 	{
 		assert(ids && count && flags);
 		read_write_flags = 1;

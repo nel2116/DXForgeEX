@@ -2,6 +2,8 @@
 #error Do not include this header directly in shader files. Only include this file via Common.hlsli.
 #endif
 
+#define USE_BOUNDING_SPHERES 1
+
 struct GlobalShaderData
 {
     float4x4 View;
@@ -32,6 +34,16 @@ struct Plane
     float3 Normal;
     float Distance;
 };
+
+#if USE_BOUNDING_SPHERES
+// ビュースペースのフルスタムコーン
+struct Frustum
+{
+    float3 ConeDirection;
+    float UnitRadius;
+};
+
+#else
 // ビュー・フラストゥム・プレーン（ビュー空間内）
 // 面順：左、右、上、下
 // フロントプレーンとバックプレーンは、ライトカリングコンピュートシェーダで計算される。
@@ -39,6 +51,7 @@ struct Frustum
 {
     Plane Planes[4];
 };
+#endif
 
 struct Sphere
 {
@@ -85,10 +98,14 @@ struct LightCullingLightInfo
     float Range;
 
     float3 Direction;
+#if USE_BOUNDING_SPHERES
+    // これが-1に設定されている場合、ライトは点光源となる。
+    float CosPenumbra;
+#else
     float ConeRadius;
-
     uint Type;
     float3 _pad;
+#endif
 };
 
 // フォーマットされ、D3D定数/構造化バッファに連続したチャンクとしてコピーする準備ができているライトデータが含まれています。
@@ -98,16 +115,18 @@ struct LightParameters
     float Intensity;
 
     float3 Direction;
-    uint Type;
-
-    float3 Color;
     float Range;
 
-    float3 Attenuation;
+    float3 Color;
     float CosUmbra;
 
+    float3 Attenuation;
     float CosPenumbra;
+
+#if !USE_BOUNDING_SPHERES
+    uint Type;
     float3 _pad;
+#endif
 };
 
 struct DirectionalLightParameters

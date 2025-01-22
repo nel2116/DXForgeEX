@@ -44,6 +44,7 @@ bool ConeInsidePlane(Cone cone, Plane plane)
     return PointInsidePlane(cone.Tip, plane) && PointInsidePlane(Q, plane);
 }
 
+#if !USE_BOUNDING_SPHERES
 // ライトの一部がフラストラムに収まっているか確認する。
 bool SphereInsideFrustum(Sphere sphere, Frustum frustum, float zNear, float zFar)
 {
@@ -80,14 +81,31 @@ bool ConeInsideFrustum(Cone cone, Frustum frustum, float zNear, float zFar)
 
     return result;
 }
+#endif
+
+// "inverse" パラメータによって、正規化されたスクリーン空間の位置を3D座標に変換する。
+// uvはピクセルのスクリーン空間uv座標。
+// 深さはZバッファの深さ
+// 逆パラメータは
+//      - 逆投影→スクリーン→ビュー空間
+//      - 逆映像→スクリーン→ワールドスペース
+//      - 逆世界観投影→スクリーン→オブジェクト空間
+float4 UnprojectUV(float2 uv, float depth, float4x4 inverse)
+{
+    // クリップスペースに変換
+    float4 clip = float4(float2(uv.x, 1.f - uv.y) * 2.f - 1.f, depth, 1.f);
+    // 3D空間の位置（パースペクティブ分割前）。
+    float4 position = mul(inverse, clip);
+    // wで割って3D空間の位置を得る。
+    return position / position.w;
+}
 
 float4 ClipToView(float4 clip, float4x4 inverseProjection)
 {
     // View space position
     float4 view = mul(inverseProjection, clip);
     // Perspective (un)projection
-    view /= view.w;
-    return view;
+    return view / view.w;
 }
 
 float4 ScreenToView(float4 screen, float2 invViewDimensions, float4x4 inverseProjection)

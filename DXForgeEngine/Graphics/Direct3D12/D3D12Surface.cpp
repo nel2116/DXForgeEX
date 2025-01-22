@@ -127,7 +127,6 @@ namespace dxforge::graphics::d3d12
 		if (id::is_valid(_light_culling_id))
 		{
 			delight::remove_culler(_light_culling_id);
-			_light_culling_id = id::invalid_id;
 		}
 
 		for (u32 i{ 0 }; i < buffer_count; ++i)
@@ -136,6 +135,7 @@ namespace dxforge::graphics::d3d12
 			core::release(data.resource);
 			core::rtv_heap().free(data.rtv);
 		}
+
 		core::release(_swap_chain);
 	}
 }

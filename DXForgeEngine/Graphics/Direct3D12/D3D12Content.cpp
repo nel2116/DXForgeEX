@@ -258,7 +258,6 @@ namespace dxforge::graphics::d3d12::content
 			{
 				using params = gpass::opaque_root_parameter;
 				d3dx::d3d12_root_parameter parameters[params::count]{};
-				parameters[params::global_shader_data].as_cbv(D3D12_SHADER_VISIBILITY_ALL, 0);
 
 				D3D12_SHADER_VISIBILITY buffer_visibility{};
 				D3D12_SHADER_VISIBILITY data_visibility{};
@@ -286,11 +285,15 @@ namespace dxforge::graphics::d3d12::content
 					data_visibility = D3D12_SHADER_VISIBILITY_ALL;
 				}
 
+				parameters[params::global_shader_data].as_cbv(D3D12_SHADER_VISIBILITY_ALL, 0);
+				parameters[params::per_object_data].as_cbv(data_visibility, 1);
 				parameters[params::position_buffer].as_srv(buffer_visibility, 0);
 				parameters[params::element_buffer].as_srv(buffer_visibility, 1);
 				parameters[params::srv_indices].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 2); // TODO: これは、テクスチャをサンプリングする必要のあるすべてのステージから見えるようにする必要があります。
 				parameters[params::directional_lights].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 3);
-				parameters[params::per_object_data].as_cbv(data_visibility, 1);
+				parameters[params::cullable_lights].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 4);
+				parameters[params::light_grid].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 5);
+				parameters[params::light_index_list].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 6);
 
 				root_signature = d3dx::d3d12_root_signature_desc{ &parameters[0], _countof(parameters), get_root_signature_flags(flags) }.create();
 			}
@@ -310,7 +313,7 @@ namespace dxforge::graphics::d3d12::content
 		{
 			const u64 key{ math::calc_crc32_u64(stream_ptr, aligned_stream_size) };
 
-			{	// スコープをロックして、PSOがすでに存在するかどうかをチェックする。
+			{ // スコープをロックし、PSOがすでに存在するかどうかをチェックする
 				std::lock_guard lock{ pso_mutex };
 				auto pair = pso_map.find(key);
 
@@ -321,15 +324,16 @@ namespace dxforge::graphics::d3d12::content
 				}
 			}
 
-			// Creating a new PSO is lock-free
+			// 新しいPSOの作成はロックフリー
 			d3dx::d3d12_pipeline_state_subobject_stream* const stream{ (d3dx::d3d12_pipeline_state_subobject_stream* const)stream_ptr };
 			ID3D12PipelineState* pso{ d3dx::create_pipeline_state(stream, sizeof(d3dx::d3d12_pipeline_state_subobject_stream)) };
 
-			{
+			{ // スコープをロックして、新しいPSOのポインターとidを追加する。
 				std::lock_guard lock{ pso_mutex };
 				const id::id_type id{ (u32)pipeline_states.size() };
 				pipeline_states.emplace_back(pso);
-				NAME_D3D12_OBJECT_INDEXED(pipeline_states.back(), key, is_depth ? L"Depth-only Pipeline State Object - key" : L"GPass Pipeline State Object - key");
+				NAME_D3D12_OBJECT_INDEXED(pipeline_states.back(), key,
+					is_depth ? L"Depth-only Pipeline State Object - key" : L"GPass Pipeline State Object - key");
 
 				pso_map[key] = id;
 				return id;
@@ -354,7 +358,7 @@ namespace dxforge::graphics::d3d12::content
 
 			d3dx::d3d12_pipeline_state_subobject_stream& stream{ *(d3dx::d3d12_pipeline_state_subobject_stream* const)stream_ptr };
 
-			{
+			{ // materialsをロックして、materialの情報を取得する
 				std::lock_guard lock{ material_mutex };
 				const d3d12_material_stream material{ materials[material_id].get() };
 
@@ -380,7 +384,7 @@ namespace dxforge::graphics::d3d12::content
 						// NOTE: 各タイプのシェーダは、submeshまたはmaterialの異なるプロパティから生成されるキーを持つことがあります。
 						//		現時点では、elements_typeによって異なる種類の頂点シェーダーしかありません。
 						const u32 key{ get_shader_type(flags & (1 << i)) == shader_type::vertex ? elements_type : u32_invalid_id };
-						dxforge::content::compiled_shader_ptr shader{ dxforge::content::get_shader(material.shader_ids()[shader_index],key) };
+						dxforge::content::compiled_shader_ptr shader{ dxforge::content::get_shader(material.shader_ids()[shader_index], key) };
 						assert(shader);
 						shaders[i].pShaderBytecode = shader->byte_code();
 						shaders[i].BytecodeLength = shader->byte_code_size();
@@ -397,7 +401,6 @@ namespace dxforge::graphics::d3d12::content
 				stream.as = shaders[shader_type::amplification];
 				stream.ms = shaders[shader_type::mesh];
 			}
-
 			pso_id id_pair{};
 			id_pair.gpass_pso_id = create_pso_if_needed(stream_ptr, aligned_stream_size, false);
 
