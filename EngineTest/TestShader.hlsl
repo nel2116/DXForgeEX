@@ -1,5 +1,3 @@
-// Copyright (c) Arash Khatami
-// Distributed under the MIT license. See the LICENSE file in the project root for more information.
 #include "Common.hlsli"
 
 struct VertexOut
@@ -104,7 +102,7 @@ VertexOut TestShaderVS(in uint VertexIdx : SV_VertexID)
 }
 
 #define TILE_SIZE 16
-#define NO_LIGHT_ATTENUATION 1
+#define NO_LIGHT_ATTENUATION 0
 
 float3 CalculateLighting(float3 N, float3 L, float3 V, float3 lightColor)
 {

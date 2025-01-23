@@ -1,5 +1,20 @@
-﻿  D3D12Core.cpp
+﻿  ContentLoader.cpp
+  ContentToEngine.cpp
+  EngineWin32.cpp
+  D3D12Camera.cpp
+  D3D12Content.cpp
+  D3D12Core.cpp
   D3D12GPass.cpp
+  D3D12Helpers.cpp
+  D3D12Interface.cpp
   D3D12Light.cpp
   D3D12LightCulling.cpp
+  D3D12PostProcess.cpp
+  D3D12Resource.cpp
+  D3D12Shaders.cpp
+  D3D12Surface.cpp
+  D3D12Upload.cpp
+  OpenGLInterface.cpp
+  Renderer.cpp
+  VulkanInterface.cpp
   DXForgeEngine.vcxproj -> F:\HAL\ThirdYear\DXForgeEX\x64\Debug\DXForgeEngine.lib

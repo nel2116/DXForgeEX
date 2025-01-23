@@ -41,7 +41,7 @@ namespace
 		info.entity_id = entity_id;
 		info.type = type;
 		info.light_set_key = light_set_key;
-		info.intensity = 1.0f;
+		info.intensity = 5.0f;
 
 		info.color = { random(0.2f),random(0.2f), random(0.2f) };
 
@@ -82,6 +82,8 @@ namespace
 
 void generate_lights()
 {
+	graphics::create_light_set(left_set);
+	graphics::create_light_set(right_set);
 	// LEFT_SET
 	graphics::light_init_info info{};
 	info.entity_id = create_one_game_entity({}, { 0.0f, 0.0f, 0.0f }, nullptr).get_id();
@@ -147,7 +149,18 @@ void remove_lights()
 		remove_game_entity(id);
 	}
 
+	for (auto& light : disabled_lights)
+	{
+		const game_entity::entity_id id{ light.entity_id() };
+		graphics::remove_light(light.get_id(), light.light_set_key());
+		remove_game_entity(id);
+	}
+
 	lights.clear();
+	disabled_lights.clear();
+
+	graphics::remove_light_set(left_set);
+	graphics::remove_light_set(right_set);
 }
 
 void test_lights(f32 dt)

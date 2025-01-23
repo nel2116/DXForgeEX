@@ -1032,16 +1032,7 @@ namespace dxforge::graphics::d3d12::light
 
 	void shutdown()
 	{
-		// グラフィックスをシャットダウンする前に、すべてのライトを削除することを確認してください。
-
-		assert([] {
-			bool has_light{ false };
-			for (const auto& it : light_sets)
-			{
-				has_light |= it.second.has_light();
-			}
-			return !has_light;
-			}());
+		assert(light_sets.empty());
 
 		for (u32 i{ 0 }; i < frame_buffer_count; ++i)
 		{
@@ -1049,8 +1040,22 @@ namespace dxforge::graphics::d3d12::light
 		}
 	}
 
+	void create_light_set(u64 key)
+	{
+		assert(!light_sets.count(key));
+		light_sets[key] = {};
+	}
+
+	void remove_light_set(u64 key)
+	{
+		assert(light_sets.count(key));
+		assert(!light_sets[key].has_light());
+		light_sets.erase(key);
+	}
+
 	graphics::light create(light_init_info info)
 	{
+		assert(light_sets.count(info.light_set_key));
 		assert(id::is_valid(info.entity_id));
 		return light_sets[info.light_set_key].add(info);
 	}
