@@ -1,3 +1,5 @@
+// Copyright (c) Arash Khatami
+// Distributed under the MIT license. See the LICENSE file in the project root for more information.
 #include "Common.hlsli"
 
 struct VertexOut
@@ -129,9 +131,16 @@ float3 PointLight(float3 N, float3 worldPosition, float3 V, LightParameters ligh
     {
         const float dRcp = rsqrt(dSq);
         L *= dRcp;
-        color = CalculateLighting(N, L, V, light.Color * light.Intensity * 0.2f);
+        color = saturate(dot(N, L)) * light.Color * light.Intensity * 0.2f;
     }
 #else
+    if (dSq < light.Range * light.Range)
+    {
+        const float dRcp = rsqrt(dSq);
+        L *= dRcp;
+        const float attenuation = 1.f - smoothstep(-light.Range, light.Range, rcp(dRcp));
+        color = CalculateLighting(N, L, V, light.Color * light.Intensity * attenuation);
+    }
 #endif
     return color;
 }
@@ -148,9 +157,18 @@ float3 Spotlight(float3 N, float3 worldPosition, float3 V, LightParameters light
         L *= dRcp;
         const float CosAngleToLight = saturate(dot(-L, light.Direction));
         const float angularAttenuation = float(light.CosPenumbra < CosAngleToLight);
-        color = CalculateLighting(N, L, V, light.Color * light.Intensity * angularAttenuation * 0.2f);
+        color = saturate(dot(N, L)) * light.Color * light.Intensity * angularAttenuation * 0.2f;
     }
 #else
+    if (dSq < light.Range * light.Range)
+    {
+        const float dRcp = rsqrt(dSq);
+        L *= dRcp;
+        const float attenuation = 1.f - smoothstep(-light.Range, light.Range, rcp(dRcp));
+        const float CosAngleToLight = saturate(dot(-L, light.Direction));
+        const float angularAttenuation = smoothstep(light.CosPenumbra, light.CosUmbra, CosAngleToLight);
+        color = CalculateLighting(N, L, V, light.Color * light.Intensity * attenuation * angularAttenuation);
+    }
 #endif
     return color;
 }

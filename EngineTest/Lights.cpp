@@ -122,9 +122,9 @@ void generate_lights()
 #else
 	srand(37);
 
-	constexpr f32 scale1{ 4.0f };
+	constexpr f32 scale1{ 1.0f };
 	constexpr math::v3 scale{ 1.0f * scale1, 0.5f * scale1, 1.0f * scale1 };
-	constexpr s32 dim{ 8 };
+	constexpr s32 dim{ 20 };
 	for (s32 x{ -dim }; x < dim; ++x)
 		for (s32 y{ 0 }; y < 2 * dim; ++y)
 			for (s32 z{ -dim }; z < dim; ++z)
