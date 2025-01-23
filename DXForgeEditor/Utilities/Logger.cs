@@ -42,7 +42,7 @@ namespace DXForgeEditor.Utilities
     static class Logger
     {
         private static int _messageFilter = (int)(MessageType.Info) | (int)(MessageType.Warning) | (int)(MessageType.Error);
-        private static readonly ObservableCollection<LogMessage> _messages = new ObservableCollection<LogMessage>();
+        private static readonly ObservableCollection<LogMessage> _messages = new();
         public static ReadOnlyObservableCollection<LogMessage> Messages { get; } = new ReadOnlyObservableCollection<LogMessage>(_messages);
         public static CollectionViewSource FilterdMessages { get; } = new CollectionViewSource() { Source = Messages };
 

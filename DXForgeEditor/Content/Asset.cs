@@ -19,13 +19,18 @@ namespace DXForgeEditor.Content
         Texture
     }
 
+    interface IAssetImportSettings
+    {
+        void ToBinary(BinaryWriter writer);
+        void FromBinary(BinaryReader reader);
+    }
+
     sealed class AssetInfo
     {
         public AssetType Type { get; set; }
         public byte[] Icon { get; set; }
         public string FullPath { get; set; }
         public string FullName => Path.GetFileNameWithoutExtension(FullPath);
-        public string SourcePath { get; set; }
         public DateTime RegisterTime { get; set; }
         public DateTime ImportDate { get; set; }
         public Guid Guid { get; set; }
@@ -34,13 +39,11 @@ namespace DXForgeEditor.Content
 
     abstract class Asset : ViewModelBase
     {
-        public static string AssetFileExtension = ".asset";
-        public AssetType Type { get; private set; }
+        public static string AssetFileExtension => ".asset";
+        public AssetType Type { get; }
         public byte[] Icon { get; protected set; }
-        public string SourcePath { get; protected set; }
 
         private string _fullPath;
-
         public string FullPath
         {
             get => _fullPath;
@@ -50,22 +53,20 @@ namespace DXForgeEditor.Content
                 {
                     _fullPath = value;
                     OnPropertyChanged(nameof(FullPath));
-                    OnPropertyChanged(nameof(FullName));
+                    OnPropertyChanged(nameof(FileName));
                 }
             }
         }
 
-        public string FullName => Path.GetFileNameWithoutExtension(FullPath);
-
-        // グローバル一意識別子
+        public string FileName => Path.GetFileNameWithoutExtension(FullPath);
         public Guid Guid { get; protected set; } = Guid.NewGuid();
         public DateTime ImportDate { get; protected set; }
         public byte[] Hash { get; protected set; }
-        public abstract void Import(string file);
-        public abstract void Load(string file);
+
+        public abstract bool Import(string file);
+        public abstract bool Load(string file);
         public abstract IEnumerable<string> Save(string file);
         public abstract byte[] PackForEngine();
-
 
         private static AssetInfo GetAssetInfo(BinaryReader reader)
         {
@@ -77,15 +78,18 @@ namespace DXForgeEditor.Content
             info.Guid = new Guid(reader.ReadBytes(idSize));
             info.ImportDate = DateTime.FromBinary(reader.ReadInt64());
             var hashSize = reader.ReadInt32();
-            if (hashSize > 0) info.Hash = reader.ReadBytes(hashSize);
-            info.SourcePath = reader.ReadString();
+            if (hashSize > 0)
+            {
+                info.Hash = reader.ReadBytes(hashSize);
+            }
             var iconSize = reader.ReadInt32();
             info.Icon = reader.ReadBytes(iconSize);
 
             return info;
         }
 
-        public static AssetInfo TryGetAssetInfo(string file) => File.Exists(file) && Path.GetExtension(file) == AssetFileExtension ? AssetRegistry.GetAssetInfo(file) ?? GetAssetInfo(file) : null;
+        public static AssetInfo TryGetAssetInfo(string file) =>
+            File.Exists(file) && Path.GetExtension(file) == AssetFileExtension ? AssetRegistry.GetAssetInfo(file) ?? GetAssetInfo(file) : null;
 
         public static AssetInfo GetAssetInfo(string file)
         {
@@ -113,7 +117,7 @@ namespace DXForgeEditor.Content
             writer.Write(id.Length);
             writer.Write(id);
             writer.Write(importDate);
-            // アセットハッシュはオプション
+            // asset hash is optional
             if (Hash?.Length > 0)
             {
                 writer.Write(Hash.Length);
@@ -124,7 +128,6 @@ namespace DXForgeEditor.Content
                 writer.Write(0);
             }
 
-            writer.Write(SourcePath ?? "");
             writer.Write(Icon.Length);
             writer.Write(Icon);
         }
@@ -137,7 +140,6 @@ namespace DXForgeEditor.Content
             Guid = info.Guid;
             ImportDate = info.ImportDate;
             Hash = info.Hash;
-            SourcePath = info.SourcePath;
             Icon = info.Icon;
         }
 

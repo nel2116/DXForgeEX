@@ -11,9 +11,9 @@ namespace DXForgeEditor.Content
 {
     static class ContentInfoCache
     {
-        private static readonly object _lock = new object();
+        private static readonly object _lock = new();
 
-        private static readonly Dictionary<string, ContentInfo> _contentInfoCache = new Dictionary<string, ContentInfo>();
+        private static readonly Dictionary<string, ContentInfo> _contentInfoCache = new();
         private static bool _isDirty;
         private static string _cacheFilePath = string.Empty;
 

@@ -10,7 +10,10 @@
 #pragma once
 // ====== インクルード部 ======
 #include "CommonHeaders.h"
-#include <combaseapi.h>
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif // !NOMINMAX
+#include <wrl.h>
 
 // ====== マクロ定義 ======
 #pragma once

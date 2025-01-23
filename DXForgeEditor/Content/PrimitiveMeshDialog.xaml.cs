@@ -27,7 +27,7 @@ namespace DXForgeEditor.Content
     /// </summary>
     public partial class PrimitiveMeshDialog : Window
     {
-        private static readonly List<ImageBrush> _textures = new List<ImageBrush>();
+        private static readonly List<ImageBrush> _textures = new();
 
         private void OnPrimitiveType_ComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdatePrimitive();
 
@@ -82,7 +82,7 @@ namespace DXForgeEditor.Content
             }
 
             var geometry = new Geometry();
-            geometry.ImportSettings.SmootingAngle = smoothingAngle;
+            geometry.ImportSettings.SmoothingAngle = smoothingAngle;
             ContentToolsAPI.CreatePrimitiveMesh(geometry, info);
             (DataContext as GeometryEditor).SetAsset(geometry);
             OnTexture_CheckBox_Click(textureCheckBox, null);
@@ -93,9 +93,9 @@ namespace DXForgeEditor.Content
         {
             var uris = new List<Uri>()
             {
-                new Uri("pack://application:,,,/Resources/PrimitiveMeshView/PlaneTexture.png"),
-                new Uri("pack://application:,,,/Resources/PrimitiveMeshView/PlaneTexture.png"),
-                new Uri("pack://application:,,,/Resources/PrimitiveMeshView/CheckerMap.png"),
+                new("pack://application:,,,/Resources/PrimitiveMeshView/PlaneTexture.png"),
+                new("pack://application:,,,/Resources/PrimitiveMeshView/PlaneTexture.png"),
+                new("pack://application:,,,/Resources/PrimitiveMeshView/CheckerMap.png"),
             };
 
             _textures.Clear();

@@ -235,7 +235,7 @@ namespace dxforge::graphics
 		id::id_type* texture_ids;
 	};
 
-	struct primitve_topology
+	struct primitive_topology
 	{
 		enum type : u32
 		{

@@ -4,12 +4,10 @@
     <ProjectConfiguration Include="DebugEditor|x64">
       <Configuration>DebugEditor</Configuration>
       <Platform>x64</Platform>
-      <NuGetConfiguration>Debug</NuGetConfiguration>
     </ProjectConfiguration>
     <ProjectConfiguration Include="ReleaseEditor|x64">
       <Configuration>ReleaseEditor</Configuration>
       <Platform>x64</Platform>
-      <NuGetConfiguration>Release</NuGetConfiguration>
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
@@ -21,6 +19,7 @@
   <ItemGroup>
     <ClCompile Include="FbxImporter.cpp" />
     <ClCompile Include="Geometry.cpp" />
+    <ClCompile Include="NormalMapIdentification.cpp" />
     <ClCompile Include="PrimitiveMesh.cpp" />
     <ClCompile Include="TextureImpoter.cpp" />
   </ItemGroup>
@@ -40,6 +39,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
+    <NuGetConfiguration>Debug</NuGetConfiguration>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseEditor|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
@@ -47,6 +47,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <NuGetConfiguration>Release</NuGetConfiguration>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">

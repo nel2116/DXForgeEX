@@ -96,7 +96,7 @@ namespace DXForgeEditor.GameProject
             }
         }
 
-        private readonly ObservableCollection<ProjectTemplate> _projectTemplates = new ObservableCollection<ProjectTemplate>();
+        private readonly ObservableCollection<ProjectTemplate> _projectTemplates = new();
         public ReadOnlyObservableCollection<ProjectTemplate> ProjectTemplates { get; }
 
         private bool ValidateProjectPath()

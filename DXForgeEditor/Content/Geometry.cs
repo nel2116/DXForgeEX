@@ -10,8 +10,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
 
 namespace DXForgeEditor.Content
 {
@@ -34,7 +32,7 @@ namespace DXForgeEditor.Content
         Colors = 0x08,
     }
 
-    enum PrimitveTopology
+    enum PrimitiveTopology
     {
         PointList = 1,
         LineList,
@@ -45,7 +43,7 @@ namespace DXForgeEditor.Content
 
     class Mesh : ViewModelBase
     {
-        public static int PositionSize = sizeof(float) * 3;
+        public static int PositionSize => sizeof(float) * 3;
 
         private int _elementSize;
         public int ElementSize
@@ -118,7 +116,7 @@ namespace DXForgeEditor.Content
         }
 
         public ElementsType ElementsType { get; set; }
-        public PrimitveTopology PrimitveTopology { get; set; }
+        public PrimitiveTopology PrimitiveTopology { get; set; }
         public byte[] Positions { get; set; }
         public byte[] Elements { get; set; }
         public byte[] Indices { get; set; }
@@ -176,7 +174,7 @@ namespace DXForgeEditor.Content
         public ObservableCollection<MeshLOD> LODs { get; } = new ObservableCollection<MeshLOD>();
     }
 
-    class GeometryImportSettings : ViewModelBase
+    class GeometryImportSettings : ViewModelBase, IAssetImportSettings
     {
         private bool _calculateNormals;
         public bool CalculateNormals
@@ -206,16 +204,16 @@ namespace DXForgeEditor.Content
             }
         }
 
-        private float _smootingAngle;
-        public float SmootingAngle
+        private float _smoothingAngle;
+        public float SmoothingAngle
         {
-            get => _smootingAngle;
+            get => _smoothingAngle;
             set
             {
-                if (!_smootingAngle.IsTheSameAs(value))
+                if (!_smoothingAngle.IsTheSameAs(value))
                 {
-                    _smootingAngle = value;
-                    OnPropertyChanged(nameof(SmootingAngle));
+                    _smoothingAngle = value;
+                    OnPropertyChanged(nameof(SmoothingAngle));
                 }
             }
         }
@@ -266,7 +264,7 @@ namespace DXForgeEditor.Content
         {
             CalculateNormals = false;
             CalculateTangents = false;
-            SmootingAngle = 178f;
+            SmoothingAngle = 178f;
             ReverseHandedness = false;
             ImportEmbeddedTextures = true;
             ImportAnimations = true;
@@ -276,7 +274,7 @@ namespace DXForgeEditor.Content
         {
             writer.Write(CalculateNormals);
             writer.Write(CalculateTangents);
-            writer.Write(SmootingAngle);
+            writer.Write(SmoothingAngle);
             writer.Write(ReverseHandedness);
             writer.Write(ImportEmbeddedTextures);
             writer.Write(ImportAnimations);
@@ -286,7 +284,7 @@ namespace DXForgeEditor.Content
         {
             CalculateNormals = reader.ReadBoolean();
             CalculateTangents = reader.ReadBoolean();
-            SmootingAngle = reader.ReadSingle();
+            SmoothingAngle = reader.ReadSingle();
             ReverseHandedness = reader.ReadBoolean();
             ImportEmbeddedTextures = reader.ReadBoolean();
             ImportAnimations = reader.ReadBoolean();
@@ -295,10 +293,10 @@ namespace DXForgeEditor.Content
 
     class Geometry : Asset
     {
-        private readonly List<LODGroup> _lodGroups = new List<LODGroup>();
-        private readonly object _lock = new object();
+        private readonly List<LODGroup> _lodGroups = new();
+        private readonly object _lock = new();
 
-        public GeometryImportSettings ImportSettings { get; } = new GeometryImportSettings();
+        public GeometryImportSettings ImportSettings { get; } = new();
 
         public LODGroup GetLODGroup(int lodGroup = 0)
         {
@@ -378,17 +376,17 @@ namespace DXForgeEditor.Content
             var lodId = reader.ReadInt32();
             mesh.ElementSize = reader.ReadInt32();
             mesh.ElementsType = (ElementsType)reader.ReadInt32();
-            mesh.PrimitveTopology = PrimitveTopology.TriangleList; // ContentTools currently only support triangle list meshes.
+            mesh.PrimitiveTopology = PrimitiveTopology.TriangleList; // ContentTools currently only support triangle list meshes.
             mesh.VertexCount = reader.ReadInt32();
             mesh.IndexSize = reader.ReadInt32();
             mesh.IndexCount = reader.ReadInt32();
             var lodThreshold = reader.ReadSingle();
 
-            var elementBufferSize = mesh.ElementSize * mesh.VertexCount;
+            var elementsBufferSize = mesh.ElementSize * mesh.VertexCount;
             var indexBufferSize = mesh.IndexSize * mesh.IndexCount;
 
             mesh.Positions = reader.ReadBytes(Mesh.PositionSize * mesh.VertexCount);
-            mesh.Elements = reader.ReadBytes(elementBufferSize);
+            mesh.Elements = reader.ReadBytes(elementsBufferSize);
             mesh.Indices = reader.ReadBytes(indexBufferSize);
 
             MeshLOD lod;
@@ -407,35 +405,25 @@ namespace DXForgeEditor.Content
             lod.Meshes.Add(mesh);
         }
 
-        public override void Import(string file)
+        public override bool Import(string file)
         {
             Debug.Assert(File.Exists(file));
             Debug.Assert(!string.IsNullOrEmpty(FullPath));
             var ext = Path.GetExtension(file).ToLower();
 
-            SourcePath = file;
+            if (ext == ".fbx")
+            {
+                return ImportFbx(file);
+            }
 
-            try
-            {
-                if (ext == ".fbx")
-                {
-                    ImportFbx(file);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine(ex.Message);
-                var msg = $"インポート用ファイルの読み込みに失敗しました: {file} ";
-                Debug.WriteLine(msg);
-                Logger.Log(MessageType.Error, msg);
-            }
+            return false;
         }
 
-        private void ImportFbx(string file)
+        private bool ImportFbx(string file)
         {
             Logger.Log(MessageType.Info, $"FBXファイルのインポート: {file}");
             var tempPath = Application.Current.Dispatcher.Invoke(() => Project.Current.TempFolder);
-            if (string.IsNullOrEmpty(tempPath)) return;
+            if (string.IsNullOrEmpty(tempPath)) return false;
 
             lock (_lock)
             {
@@ -444,10 +432,30 @@ namespace DXForgeEditor.Content
 
             var tempFile = $"{tempPath}{ContentHelper.GetRandomString()}.fbx";
             File.Copy(file, tempFile, true);
-            ContentToolsAPI.ImportFbx(tempFile, this);
+
+            bool result = false;
+            try
+            {
+                ContentToolsAPI.ImportFbx(tempFile, this);
+                result = true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                var msg = $"FBXファイルのインポートに失敗しました: {file}";
+                Debug.WriteLine(msg);
+                Logger.Log(MessageType.Error, msg);
+            }
+
+            if (ImportSettings.ImportEmbeddedTextures)
+            {
+                // TODO: テクスチャのインポート
+            }
+
+            return result;
         }
 
-        public override void Load(string file)
+        public override bool Load(string file)
         {
             Debug.Assert(File.Exists(file));
             Debug.Assert(Path.GetExtension(file).ToLower() == AssetFileExtension);
@@ -468,7 +476,7 @@ namespace DXForgeEditor.Content
 
                 using (var reader = new BinaryReader(new MemoryStream(data)))
                 {
-                    LODGroup lodGroup = new LODGroup();
+                    LODGroup lodGroup = new();
                     lodGroup.Name = reader.ReadString();
                     var lodGroupCount = reader.ReadInt32();
 
@@ -482,14 +490,18 @@ namespace DXForgeEditor.Content
                 }
 
                 // For Testing. Remove later!
-                PackForEngine();
+                // PackForEngine();
                 // For Testing. Remove later!
+
+                return true;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
                 Logger.Log(MessageType.Error, $"ファイルからのGeometryAssetのロードに失敗しました: {file}");
             }
+
+            return false;
         }
 
         public override IEnumerable<string> Save(string file)
@@ -542,6 +554,8 @@ namespace DXForgeEditor.Content
                     Logger.Log(MessageType.Info, $"Geometryを保存: {meshFileName}");
                     savedFiles.Add(meshFileName);
                 }
+
+                FullPath = file;
             }
             catch (Exception ex)
             {
@@ -589,7 +603,7 @@ namespace DXForgeEditor.Content
                     writer.Write(mesh.VertexCount);
                     writer.Write(mesh.IndexCount);
                     writer.Write((int)mesh.ElementsType);
-                    writer.Write((int)mesh.PrimitveTopology);
+                    writer.Write((int)mesh.PrimitiveTopology);
                     var alignedPositionBuffer = new byte[MathUtil.AlignSizeUp(mesh.Positions.Length, 4)];
                     Array.Copy(mesh.Positions, alignedPositionBuffer, mesh.Positions.Length);
                     var alignedElementBuffer = new byte[MathUtil.AlignSizeUp(mesh.Elements.Length, 4)];
@@ -629,7 +643,7 @@ namespace DXForgeEditor.Content
                 writer.Write(mesh.Name);
                 writer.Write(mesh.ElementSize);
                 writer.Write((int)mesh.ElementsType);
-                writer.Write((int)mesh.PrimitveTopology);
+                writer.Write((int)mesh.PrimitiveTopology);
                 writer.Write(mesh.VertexCount);
                 writer.Write(mesh.IndexSize);
                 writer.Write(mesh.IndexCount);
@@ -658,7 +672,7 @@ namespace DXForgeEditor.Content
                     Name = reader.ReadString(),
                     ElementSize = reader.ReadInt32(),
                     ElementsType = (ElementsType)reader.ReadInt32(),
-                    PrimitveTopology = (PrimitveTopology)reader.ReadInt32(),
+                    PrimitiveTopology = (PrimitiveTopology)reader.ReadInt32(),
                     VertexCount = reader.ReadInt32(),
                     IndexSize = reader.ReadInt32(),
                     IndexCount = reader.ReadInt32()
@@ -674,27 +688,20 @@ namespace DXForgeEditor.Content
             return lod;
         }
 
-        private byte[] GenerateIcon(MeshLOD lod)
+        private static byte[] GenerateIcon(MeshLOD lod)
         {
             var width = ContentInfo.IconWidth * 4;
-
-            using var memStream = new MemoryStream();
-            BitmapSource bmp = null;
+            byte[] icon = null;
             // NOTE: ViewModelでWPFコントロール（ビュー）を使用するのは良い習慣ではありません。
             // しかし、スクリーンショットに使えるグラフィック・レンダラーがない限り、このケースは例外とする必要がある。
             Application.Current.Dispatcher.Invoke(() =>
             {
-                bmp = Editors.GeometryView.RenderToBitmap(new Editors.MeshRenderer(lod, null), width, width);
-                bmp = new TransformedBitmap(bmp, new ScaleTransform(0.25, 0.25, 0.5, 0.5));
-
-                memStream.SetLength(0);
-
-                var encoder = new PngBitmapEncoder();
-                encoder.Frames.Add(BitmapFrame.Create(bmp));
-                encoder.Save(memStream);
+                // 4倍の大きさの画像を作成し、縮小したときにソフトになるようにする。
+                var bmp = Editors.GeometryView.RenderToBitmap(new Editors.MeshRenderer(lod, null), width, width);
+                icon = BitmapHelper.CreateThumbnail(bmp, ContentInfo.IconWidth, ContentInfo.IconWidth);
             });
 
-            return memStream.ToArray();
+            return icon;
         }
 
         public Geometry() : base(AssetType.Mesh) { }

@@ -32,11 +32,10 @@ namespace DXForgeEditor.Content
             int mag = (int)Math.Log(value, 1024);
 
             // 1L << (mag * 10) == 2 ^ (10 * mag)
-            // [i.e. the number of bytes in the unit corresponding to mag]
+            // [つまり、マグに対応する単位のバイト数]。
             decimal adjustedSize = (decimal)value / (1L << (mag * 10));
 
-            // make adjustment when the value is large enough that
-            // it would round up to 1000 or more
+            // 四捨五入して1000以上になるような大きな値の場合は調整する。
             if (Math.Round(adjustedSize, decimalPlaces) >= 1000)
             {
                 mag += 1;
@@ -284,10 +283,13 @@ namespace DXForgeEditor.Content
                     case AssetType.Audio: break;
                     case AssetType.Material: break;
                     case AssetType.Mesh:
-                        editor = OpenEditorPanel<GeometryEditorView>(info, info.Guid, "GeometryEditor");
+                        editor = OpenEditorPanel<GeometryEditorView>(info, info.Guid, "Geometry Editor");
                         break;
                     case AssetType.Skeleton: break;
-                    case AssetType.Texture: break;
+                    case AssetType.Texture:
+                        break;
+                        editor = OpenEditorPanel<TextureEditorView>(info, info.Guid, "Texture Editor");
+                        break;
                 }
             }
             catch (Exception ex)
@@ -306,7 +308,7 @@ namespace DXForgeEditor.Content
             {
                 if (window.Content is FrameworkElement content &&
                     content.DataContext is IAssetEditor editor &&
-                    editor.Asset.Guid == info.Guid)
+                    editor.AssetGuid == info.Guid)
                 {
                     window.Activate();
                     return editor;
@@ -314,9 +316,15 @@ namespace DXForgeEditor.Content
             }
 
             // まだアセットエディタで開いていない場合は、新しいウィンドウを作成してアセットを読み込む。
+            var newEditor = CreateEditorWindow<T>(title);
+            (newEditor.DataContext as IAssetEditor).SetAsset(info);
+            return newEditor.DataContext as IAssetEditor;
+        }
+
+        private static FrameworkElement CreateEditorWindow<T>(string title) where T : FrameworkElement, new()
+        {
             var newEditor = new T();
             Debug.Assert(newEditor.DataContext is IAssetEditor);
-            (newEditor.DataContext as IAssetEditor).SetAsset(info);
 
             var win = new Window()
             {
@@ -328,7 +336,7 @@ namespace DXForgeEditor.Content
             };
 
             win.Show();
-            return newEditor.DataContext as IAssetEditor;
+            return newEditor;
         }
 
         private void OnFolderContent_ListView_Drop(object sender, DragEventArgs e)
