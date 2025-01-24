@@ -27,7 +27,7 @@ namespace DXForgeEditor
     {
         public static T FindVisualParent<T>(this DependencyObject depObject) where T : DependencyObject
         {
-            if (!(depObject is Visual)) return null;
+            if (depObject is not Visual) return null;
 
             var parent = VisualTreeHelper.GetParent(depObject);
             while (parent != null)
@@ -74,6 +74,13 @@ namespace DXForgeEditor
         public static bool IsDirectory(this FileInfo info) => info.Attributes.HasFlag(FileAttributes.Directory);
 
         public static bool IsOlder(this DateTime date, DateTime other) => date < other;
+
+        public static Uri GetPackUri(string relativePath, Type type)
+        {
+            var assemblyShortName = type.Assembly.ToString().Split(',')[0];
+            var packUriString = $"pack://application:,,,/{assemblyShortName};component/{relativePath}";
+            return new(packUriString);
+        }
 
         public static string SanitizeFileName(string name)
         {
@@ -257,9 +264,7 @@ namespace DXForgeEditor
                 // RチャンネルとBチャンネルを入れ替える： RGB -> BGR
                 for (int i = 0; i < data.Length; i += bytesPerPixel)
                 {
-                    var r = bgrData[i + 2];
-                    bgrData[i + 2] = bgrData[i];
-                    bgrData[i] = r;
+                    (bgrData[i], bgrData[i + 2]) = (bgrData[i + 2], bgrData[i]);
                 }
             }
             else if (bytesPerPixel == 2)

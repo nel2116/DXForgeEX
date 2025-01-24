@@ -171,7 +171,7 @@ namespace DXForgeEditor.Content
         TextureCube,
     }
 
-    // NOTE: ContentToEngine.hのprimal::content::texture_flags::flags列挙と同じでなければならない。
+    // NOTE: ContentToEngine.hのdxforge::content::texture_flags::flags列挙と同じでなければならない。
     enum TextureFlags : int
     {
         IsHdr = 0x01,
@@ -305,7 +305,7 @@ namespace DXForgeEditor.Content
             AlphaThreshold = 0.5f;
             PreferBC7 = true;
             FormatIndex = 0;
-            Compress = false;
+            Compress = true;
         }
     }
 
@@ -474,7 +474,7 @@ namespace DXForgeEditor.Content
 
             try
             {
-                Logger.Log(MessageType.Info, $"Importing image file {file}");
+                Logger.Log(MessageType.Info, $"画像ファイルのインポート: {file}");
                 ImportSettings.Sources.Add(file);
 
                 (var slices, var icon) = ContentToolsAPI.Import(this);
@@ -505,7 +505,7 @@ namespace DXForgeEditor.Content
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
-                var msg = $"Failed to read {file} for import";
+                var msg = $"インポート用のファイルの読み込みに失敗しました: {file}";
                 Debug.WriteLine(msg);
                 Logger.Log(MessageType.Error, msg);
             }

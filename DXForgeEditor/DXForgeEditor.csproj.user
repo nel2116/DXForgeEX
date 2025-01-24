@@ -25,6 +25,9 @@
     <Compile Update="Editors\GeometryEditor\GeometryView.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Update="Editors\TextureEditor\TextureDetailsView.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Update="Editors\TextureEditor\TextureEditorView.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -94,6 +97,9 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Update="Editors\GeometryEditor\GeometryView.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Update="Editors\TextureEditor\TextureDetailsView.xaml">
       <SubType>Designer</SubType>
     </Page>
     <Page Update="Editors\TextureEditor\TextureEditorView.xaml">

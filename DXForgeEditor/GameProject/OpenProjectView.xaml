@@ -15,7 +15,7 @@
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
                 <ListBox Width="195" Height="250" ItemsSource="{Binding Projects}" x:Name="projectListBox" SelectedIndex="0">
                     <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem" BasedOn="{StaticResource ListBoxStyle}">
+                        <Style TargetType="ListBoxItem" BasedOn="{StaticResource ListBoxItemStyle}">
                             <EventSetter Event="MouseDoubleClick" Handler="On_ListBoxItem_Mouse_DoubleClick"/>
                         </Style>
                     </ListBox.ItemContainerStyle>

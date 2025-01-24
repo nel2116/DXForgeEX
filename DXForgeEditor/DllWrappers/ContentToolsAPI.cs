@@ -183,6 +183,38 @@ namespace DXForgeEditor.DllWrappers
             return SlicesFromBinary(icon, 1, 1, false).First()?.First()?.First();
         }
 
+        private static void SetSubresourceData(List<List<List<Slice>>> slices, TextureData data)
+        {
+            var subresourceData = SlicesToBinary(slices);
+            data.SubresourceData = Marshal.AllocCoTaskMem(subresourceData.Length);
+            data.SubresourceSize = subresourceData.Length;
+            Marshal.Copy(subresourceData, 0, data.SubresourceData, data.SubresourceSize);
+        }
+
+        private static void GetTextureDataInfo(Texture texture, TextureData data)
+        {
+            var info = data.Info;
+
+            info.Width = texture.Width;
+            info.Height = texture.Height;
+            info.ArraySize = texture.ArraySize;
+            info.MipLevels = texture.MipLevels;
+            info.Format = (int)texture.Format;
+            info.Flags = (int)texture.Flags;
+        }
+
+        private static void GetTextureInfo(Texture texture, TextureData data)
+        {
+            var info = data.Info;
+
+            texture.Width = info.Width;
+            texture.Height = info.Height;
+            texture.ArraySize = info.ArraySize;
+            texture.MipLevels = info.MipLevels;
+            texture.Format = (DXGI_FORMAT)info.Format;
+            texture.Flags = (TextureFlags)info.Flags;
+        }
+
         public static List<List<List<Slice>>> SlicesFromBinary(byte[] data, int arraySize, int mipLevels, bool is3D)
         {
             Debug.Assert(data?.Length > 0 && arraySize > 0);
@@ -256,28 +288,36 @@ namespace DXForgeEditor.DllWrappers
             return data;
         }
 
-        private static void GetTextureDataInfo(Texture texture, TextureData data)
+        [DllImport(_toolsDLL)]
+        private static extern void Decompress([In, Out] TextureData data);
+
+        public static List<List<List<Slice>>> Decompress(Texture texture)
         {
-            var info = data.Info;
+            Debug.Assert(texture.ImportSettings.Compress);
+            using var textureData = new TextureData();
 
-            info.Width = texture.Width;
-            info.Height = texture.Height;
-            info.ArraySize = texture.ArraySize;
-            info.MipLevels = texture.MipLevels;
-            info.Format = (int)texture.Format;
-            info.Flags = (int)texture.Flags;
-        }
+            try
+            {
+                GetTextureDataInfo(texture, textureData);
+                textureData.ImportSettings.FromContentSettings(texture);
+                SetSubresourceData(texture.Slices, textureData);
 
-        private static void GetTextureInfo(Texture texture, TextureData data)
-        {
-            var info = data.Info;
+                Decompress(textureData);
 
-            texture.Width = info.Width;
-            texture.Height = info.Height;
-            texture.ArraySize = info.ArraySize;
-            texture.MipLevels = info.MipLevels;
-            texture.Format = (DXGI_FORMAT)info.Format;
-            texture.Flags = (TextureFlags)info.Flags;
+                if (textureData.Info.ImportError != 0)
+                {
+                    Logger.Log(MessageType.Error, $"Error: {EnumExtensions.GetDescription((TextureImportError)textureData.Info.ImportError)}");
+                    throw new Exception($"Error while trying to decompress mipmaps. Error code {textureData.Info.ImportError}");
+                }
+
+                return GetSlices(textureData);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log(MessageType.Error, $"ミップマップの解凍に失敗しました:{texture.FileName}");
+                Debug.WriteLine(ex.Message);
+                return new();
+            }
         }
 
         [DllImport(_toolsDLL)]
@@ -290,9 +330,7 @@ namespace DXForgeEditor.DllWrappers
 
             try
             {
-                GetTextureDataInfo(texture, textureData);
                 textureData.ImportSettings.FromContentSettings(texture);
-
                 Import(textureData);
 
                 if (textureData.Info.ImportError != 0)

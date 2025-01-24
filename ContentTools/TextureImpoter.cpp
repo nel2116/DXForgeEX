@@ -174,7 +174,7 @@ namespace dxforge::tools
 			}
 		}
 
-		constexpr void set_ore_clear_flags(u32& flags, u32 flag, bool set)
+		constexpr void set_or_clear_flag(u32& flags, u32 flag, bool set)
 		{
 			if (set) flags |= flag; else flags &= ~flag;
 		}
@@ -196,15 +196,17 @@ namespace dxforge::tools
 		{
 			using namespace dxforge::content;
 			const DXGI_FORMAT format{ metadata.format };
+			info.format = format;
 			info.width = (u32)metadata.width;
 			info.height = (u32)metadata.height;
 			info.array_size = metadata.IsVolumemap() ? (u32)metadata.depth : (u32)metadata.arraySize;
 			info.mip_levels = (u32)metadata.mipLevels;
-			set_ore_clear_flags(info.flags, texture_flags::has_alpha, HasAlpha(format));
-			set_ore_clear_flags(info.flags, texture_flags::is_hdr, format == DXGI_FORMAT_BC6H_UF16 || format == DXGI_FORMAT_BC6H_SF16);
-			set_ore_clear_flags(info.flags, texture_flags::is_premultiplied_alpha, metadata.IsPMAlpha());
-			set_ore_clear_flags(info.flags, texture_flags::is_cube_map, metadata.IsCubemap());
-			set_ore_clear_flags(info.flags, texture_flags::is_volume_map, metadata.IsVolumemap());
+			set_or_clear_flag(info.flags, texture_flags::has_alpha, HasAlpha(format));
+			set_or_clear_flag(info.flags, texture_flags::is_hdr, format == DXGI_FORMAT_BC6H_UF16 || format == DXGI_FORMAT_BC6H_SF16);
+			set_or_clear_flag(info.flags, texture_flags::is_premultiplied_alpha, metadata.IsPMAlpha());
+			set_or_clear_flag(info.flags, texture_flags::is_cube_map, metadata.IsCubemap());
+			set_or_clear_flag(info.flags, texture_flags::is_volume_map, metadata.IsVolumemap());
+			set_or_clear_flag(info.flags, texture_flags::is_srgb, IsSRGB(format));
 		}
 
 		void copy_subresources(const ScratchImage& scratch, texture_data* const data)
@@ -342,24 +344,24 @@ namespace dxforge::tools
 			const wchar_t* const file{ wfile.c_str() };
 			ScratchImage scratch;
 
-			// まずWICフォーマット（BMP、JPEG、PNGなど）を試す
+			// まずWICフォーマット（BMP、JPEG、PNGなど）を試してみます。
 			wic_flags |= WIC_FLAGS_FORCE_RGB;
 			HRESULT hr{ LoadFromWICFile(file, wic_flags, nullptr, scratch) };
 
-			// WICのフォーマットではなかった。 TGAを試す
+			// WICのフォーマットではなかった。 TGAを試してみます。
 			if (FAILED(hr))
 			{
 				hr = LoadFromTGAFile(file, tga_flags, nullptr, scratch);
 			}
 
-			// TGAでもなかった。 HDRを試す
+			// TGAでもなかった。 HDRを試してみます。
 			if (FAILED(hr))
 			{
 				hr = LoadFromHDRFile(file, nullptr, scratch);
 				if (SUCCEEDED(hr)) data->info.flags |= texture_flags::is_hdr;
 			}
 
-			// HDRではなかった。 DDSを試す
+			// HDRではなかった。 DDSを試してみます。
 			if (FAILED(hr))
 			{
 				hr = LoadFromDDSFile(file, DDS_FLAGS_FORCE_RGB, nullptr, scratch);
@@ -593,9 +595,11 @@ namespace dxforge::tools
 		metadata.arraySize = is_3d ? 1 : info.array_size;
 		metadata.mipLevels = info.mip_levels;
 		metadata.miscFlags = info.flags & texture_flags::is_cube_map ? TEX_MISC_TEXTURECUBE : 0;
-		metadata.miscFlags2 = info.flags & texture_flags::is_premultiplied_alpha ? TEX_ALPHA_MODE_PREMULTIPLIED : info.flags & texture_flags::has_alpha ? TEX_ALPHA_MODE_STRAIGHT : TEX_ALPHA_MODE_OPAQUE;
+		metadata.miscFlags2 = info.flags & texture_flags::is_premultiplied_alpha
+			? TEX_ALPHA_MODE_PREMULTIPLIED
+			: info.flags & texture_flags::has_alpha ? TEX_ALPHA_MODE_STRAIGHT : TEX_ALPHA_MODE_OPAQUE;
 		metadata.format = format;
-		// TODO: 1D テクスチャのサポート
+		// TODO: 1Dテクスチャのサポート
 		metadata.dimension = is_3d ? TEX_DIMENSION_TEXTURE3D : TEX_DIMENSION_TEXTURE2D;
 
 		ScratchImage scratch;
@@ -603,7 +607,7 @@ namespace dxforge::tools
 		if (SUCCEEDED(hr))
 		{
 			copy_subresources(scratch, data);
-			texture_info_from_metadata(scratch.GetMetadata(), info);
+			texture_info_from_metadata(scratch.GetMetadata(), data->info);
 		}
 		else
 		{
@@ -640,14 +644,14 @@ namespace dxforge::tools
 				format = metadata.format;
 			}
 
-			// すべての画像ソースは同じサイズでなければならない
+			// すべての画像ソースは同じサイズでなければなりません。
 			if (width != metadata.width || height != metadata.height)
 			{
 				data->info.import_error = import_error::size_mismatch;
 				return;
 			}
 
-			// すべての画像ソースは同じフォーマットでならない
+			// すべての画像ソースは同じフォーマットでなければなりません。
 			if (format != metadata.format)
 			{
 				data->info.import_error = import_error::format_mismatch;

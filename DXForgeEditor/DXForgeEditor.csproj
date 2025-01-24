@@ -23,6 +23,12 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<Resource Include="Resources\TextureEditor\Checker64.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Resource>
+	</ItemGroup>
+
+	<ItemGroup>
 		<Resource Include="Resources\ContentBrowser\TileView.png">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Resource>
@@ -49,6 +55,10 @@
 	</ItemGroup>
 	<ItemGroup>
 		<None Include="Resources\PrimitiveMeshView\PlaneTexture.png" />
+		<Resource Include="Resources\TextureEditor\ChannelSelectShader.cso">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Resource>
+		<None Include="Resources\TextureEditor\ChannelSelectShader.hlsl" />
 	</ItemGroup>
 	<ItemGroup>
 		<PackageReference Include="envdte" Version="17.12.40391" />

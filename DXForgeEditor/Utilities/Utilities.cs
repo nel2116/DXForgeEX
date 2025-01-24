@@ -29,6 +29,11 @@ namespace DXForgeEditor.Utilities
             return Math.Abs(value.Value - other.Value) < Epsilon;
         }
 
+        public static bool IsTheSameAs(this double value, double other)
+        {
+            return Math.Abs(value - other) < Epsilon;
+        }
+
         // 四捨五入して整列する。 alignment' の倍数が 'size' 以上となる。
         public static long AlignSizeUp(long size, long alignment)
         {

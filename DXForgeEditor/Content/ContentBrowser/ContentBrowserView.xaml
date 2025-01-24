@@ -229,7 +229,7 @@
 
         <local:PlainView x:Key="tileView" ItemTemplate="{StaticResource tileTemplate}">
             <local:PlainView.ItemContainerStyle>
-                <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource ListBoxStyle}">
+                <Style TargetType="{x:Type ListBoxItem}" BasedOn="{StaticResource ListBoxItemStyle}">
                     <EventSetter Event="MouseDoubleClick" Handler="OnContent_Item_MouseDoubleClick"/>
                     <EventSetter Event="KeyDown" Handler="OnContent_Item_KeyDown"/>
                 </Style>

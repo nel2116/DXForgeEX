@@ -37,6 +37,11 @@ namespace DXForgeEditor.Dictionaries
             }
         }
 
+        private void OnTextBox_GotFocus(object sender, RoutedEventArgs e)
+        {
+            (sender as TextBox).SelectAll();
+        }
+
         private void OnTextBoxRename_KeyDown(object sender, KeyEventArgs e)
         {
             var textBox = sender as TextBox;
@@ -93,6 +98,5 @@ namespace DXForgeEditor.Dictionaries
             var window = (Window)((FrameworkElement)sender).TemplatedParent;
             window.WindowState = WindowState.Minimized;
         }
-
     }
 }

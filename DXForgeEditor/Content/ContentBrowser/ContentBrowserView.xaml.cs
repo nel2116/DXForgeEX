@@ -287,7 +287,6 @@ namespace DXForgeEditor.Content
                         break;
                     case AssetType.Skeleton: break;
                     case AssetType.Texture:
-                        break;
                         editor = OpenEditorPanel<TextureEditorView>(info, info.Guid, "Texture Editor");
                         break;
                 }
