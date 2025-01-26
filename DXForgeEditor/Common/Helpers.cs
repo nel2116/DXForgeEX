@@ -19,7 +19,27 @@ namespace DXForgeEditor
     {
         public static string GetDescription(this Enum value)
         {
-            return (value.GetType().GetField(value.ToString()).GetCustomAttributes(typeof(DescriptionAttribute), false) as DescriptionAttribute[]).FirstOrDefault()?.Description ?? value.ToString();
+            if (value == null)
+            {
+                throw new ArgumentNullException(nameof(value), "Enum value cannot be null.");
+            }
+
+            // フィールド情報を取得
+            var field = value.GetType().GetField(value.ToString());
+            if (field == null)
+            {
+                return value.ToString(); // フィールドが存在しない場合はデフォルトの文字列を返す
+            }
+
+            // DescriptionAttribute を取得
+            var attributes = field.GetCustomAttributes(typeof(DescriptionAttribute), false) as DescriptionAttribute[];
+            if (attributes == null || attributes.Length == 0)
+            {
+                return value.ToString(); // 属性が存在しない場合はデフォルトの文字列を返す
+            }
+
+            // Description プロパティを返す
+            return attributes.FirstOrDefault()?.Description ?? value.ToString();
         }
     }
 

@@ -157,7 +157,7 @@
                 <Expander ExpandDirection="Up" x:Name="expanderHelp" d:IsExpanded="True">
                     <Expander.Header>
                         <TextBlock Text="?" FontSize="20" FontFamily="Arial"
-                                   Foreground="White" FontWeight="Bold" Margin="-3,0,5,0"/>
+                                   Foreground="White" FontWeight="Bold"/>
                     </Expander.Header>
                     <StackPanel Margin="10" Opacity="0.8">
                         <StackPanel.Resources>

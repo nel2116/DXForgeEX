@@ -1,4 +1,5 @@
 ﻿using DXForgeEditor.Content;
+using DXForgeEditor.DllWrappers;
 using DXForgeEditor.GameProject;
 using System.ComponentModel;
 using System.Diagnostics;
@@ -73,6 +74,7 @@ namespace DXForgeEditor
                 Closing -= OnMainWindowClosing;
                 Project.Current?.Unload();
                 DataContext = null;
+                ContentToolsAPI.ShutDownContentTools();
             }
         }
 

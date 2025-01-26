@@ -84,12 +84,14 @@ namespace DXForgeEditor.Content
         DXGI_FORMAT_G8R8_G8B8_UNORM = 69,
         DXGI_FORMAT_BC1_TYPELESS = 70,
         DXGI_FORMAT_BC1_UNORM = 71,
+        [Description("BC1 (sRGBA) Low Quality Alpha")]
         DXGI_FORMAT_BC1_UNORM_SRGB = 72,
         DXGI_FORMAT_BC2_TYPELESS = 73,
         DXGI_FORMAT_BC2_UNORM = 74,
         DXGI_FORMAT_BC2_UNORM_SRGB = 75,
         DXGI_FORMAT_BC3_TYPELESS = 76,
         DXGI_FORMAT_BC3_UNORM = 77,
+        [Description("BC3 (sRGBA) Medium Quality")]
         DXGI_FORMAT_BC3_UNORM_SRGB = 78,
         DXGI_FORMAT_BC4_TYPELESS = 79,
         DXGI_FORMAT_BC4_UNORM = 80,
@@ -111,6 +113,7 @@ namespace DXForgeEditor.Content
         DXGI_FORMAT_BC6H_SF16 = 96,
         DXGI_FORMAT_BC7_TYPELESS = 97,
         DXGI_FORMAT_BC7_UNORM = 98,
+        [Description("BC7 (sRGBA) High Quality")]
         DXGI_FORMAT_BC7_UNORM_SRGB = 99,
         DXGI_FORMAT_AYUV = 100,
         DXGI_FORMAT_Y410 = 101,
@@ -180,6 +183,7 @@ namespace DXForgeEditor.Content
         IsImportedAsNormalMap = 0x08,
         IsCubeMap = 0x10,
         IsVolumeMap = 0x20,
+        IsSRGB = 0x40,
     }
 
     class TextureImportSettings : ViewModelBase, IAssetImportSettings
@@ -322,6 +326,9 @@ namespace DXForgeEditor.Content
     {
         public static int MaxMipLevels => 14;
 
+        public static int MaxArraySize => 2048;
+        public static int Max3DSize => 2048;
+
         public TextureImportSettings ImportSettings { get; } = new();
 
         // array ( mip ( サブリソース (スライス) ) )
@@ -400,6 +407,7 @@ namespace DXForgeEditor.Content
                     OnPropertyChanged(nameof(IsNormalMap));
                     OnPropertyChanged(nameof(IsCubeMap));
                     OnPropertyChanged(nameof(IsVolumeMap));
+                    OnPropertyChanged(nameof(IsSRGB));
                 }
             }
         }
@@ -410,6 +418,7 @@ namespace DXForgeEditor.Content
         public bool IsNormalMap => Flags.HasFlag(TextureFlags.IsImportedAsNormalMap);
         public bool IsCubeMap => Flags.HasFlag(TextureFlags.IsCubeMap);
         public bool IsVolumeMap => Flags.HasFlag(TextureFlags.IsVolumeMap);
+        public bool IsSRGB => Flags.HasFlag(TextureFlags.IsSRGB);
 
         private int _mipLevels;
         public int MipLevels
@@ -441,28 +450,43 @@ namespace DXForgeEditor.Content
             }
         }
 
-        public string FormatName => ImportSettings.Compress ? ((BC_FORMAT)Format).GetDescription() : Format.GetDescription();
+        public string FormatName => ImportSettings.Compress && !IsSRGB ? ((BC_FORMAT)Format).GetDescription() : Format.GetDescription();
 
-        private static bool HasValidDimensions(int width, int height, string file)
+        private static bool HasValidDimensions(int width, int height, int arrayOrDepth, bool is3D, string file)
         {
             bool result = true;
 
+            if (width > (1 << MaxMipLevels) || height > (1 << MaxMipLevels))
+            {
+                Logger.Log(MessageType.Error, $"{1 << MaxMipLevels}を超える画像寸法 ! ({file})");
+                result = false;
+            }
+
             if (width % 4 != 0 || height % 4 != 0)
             {
-                Logger.Log(MessageType.Warning, $"画像寸法が4の倍数でない！ (file: {file})");
+                Logger.Log(MessageType.Error, $"画像寸法が4の倍数でない！ ({file})");
+                result = false;
+            }
+
+            if (is3D && (width > Max3DSize || height > Max3DSize) || arrayOrDepth > Max3DSize)
+            {
+                Logger.Log(MessageType.Error, $"{Max3DSize}を超える3Dテクスチャ寸法! ({file})");
+                result = false;
+            }
+            else if (arrayOrDepth > MaxArraySize)
+            {
+                Logger.Log(MessageType.Error, $"{MaxArraySize}を超える2Dテクスチャ寸法 ! ({file})");
                 result = false;
             }
 
             if (width != height)
             {
-                Logger.Log(MessageType.Warning, $"正方形でない画像（幅と高さが等しくない）！ (file: {file})");
-                result = false;
+                Logger.Log(MessageType.Warning, $"正方形でない画像（幅と高さが等しくない）！ ({file})");
             }
 
             if (!MathUtil.IsPow2(width) || !MathUtil.IsPow2(height))
             {
-                Logger.Log(MessageType.Warning, $"画像寸法が2のべき乗でない！ (file: {file})");
-                result = false;
+                Logger.Log(MessageType.Warning, $"画像寸法が2のべき乗でない！ ({file})");
             }
 
             return result;
@@ -490,7 +514,10 @@ namespace DXForgeEditor.Content
                 }
 
                 var firstMip = Slices[0][0][0];
-                HasValidDimensions(firstMip.Width, firstMip.Height, file);
+                if (!HasValidDimensions(firstMip.Width, firstMip.Height, ArraySize, IsVolumeMap, file))
+                {
+                    return false;
+                }
 
                 if (icon == null)
                 {
@@ -536,7 +563,7 @@ namespace DXForgeEditor.Content
                 var compressed = reader.ReadBytes(compressedLength);
                 DecompressContent(compressed);
 
-                HasValidDimensions(Width, Height, file);
+                HasValidDimensions(Width, Height, ArraySize, IsVolumeMap, file);
                 FullPath = file;
 
                 return true;

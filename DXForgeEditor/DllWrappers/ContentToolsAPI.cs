@@ -34,6 +34,8 @@ namespace DXForgeEditor.ContentToolsAPIStructs
         FormatMismatch,
         [Description("ソース画像ファイルが見つかりません。")]
         FileNotFound,
+        [Description("キューブマップの画像数は6の倍数でなければならない。")]
+        NeedSixImages,
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -158,6 +160,11 @@ namespace DXForgeEditor.DllWrappers
     static class ContentToolsAPI
     {
         private const string _toolsDLL = "ContentTools.dll";
+
+        [DllImport(_toolsDLL)]
+        public static extern void ShutDownContentTools();
+
+
         #region Texture
         private static List<List<List<Slice>>> GetSlices(TextureData data)
         {

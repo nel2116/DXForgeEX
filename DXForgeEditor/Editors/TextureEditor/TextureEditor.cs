@@ -23,12 +23,11 @@ namespace DXForgeEditor.Editors
         public ICommand SetChannelCommand { get; init; }
         public ICommand RegenerateBitmapsCommand { get; init; }
 
-
         private AssetEditorState _state;
         public AssetEditorState State
         {
             get => _state;
-            set
+            private set
             {
                 if (_state != value)
                 {
@@ -110,34 +109,6 @@ namespace DXForgeEditor.Editors
 
         public float Stride => (float?)SelectedSliceBitmap?.Format.BitsPerPixel / 8 ?? 1.0f;
 
-        private Point _panOffset;
-        public Point PanOffset
-        {
-            get => _panOffset;
-            set
-            {
-                if (_panOffset != value)
-                {
-                    _panOffset = value;
-                    OnPropertyChanged(nameof(PanOffset));
-                }
-            }
-        }
-
-        private double _scaleFactor = 1.0;
-        public double ScaleFactor
-        {
-            get => _scaleFactor;
-            set
-            {
-                if (_scaleFactor != value)
-                {
-                    _scaleFactor = value;
-                    OnPropertyChanged(nameof(ScaleFactor));
-                }
-            }
-        }
-
         Asset IAssetEditor.Asset => Texture;
 
         private Texture _texture;
@@ -188,6 +159,7 @@ namespace DXForgeEditor.Editors
                 if (_mipIndex != value)
                 {
                     _mipIndex = value;
+                    DepthIndex = _depthIndex;
                     OnPropertyChanged(nameof(MipIndex));
                     OnPropertyChanged(nameof(MaxDepthIndex));
                     SetSelectedBitmap();
@@ -213,10 +185,10 @@ namespace DXForgeEditor.Editors
             }
         }
 
+
         public BitmapSource SelectedSliceBitmap => _sliceBitmaps.ElementAtOrDefault(ArrayIndex)?.ElementAtOrDefault(MipIndex)?.ElementAtOrDefault(DepthIndex);
         public Slice SelectedSlice => Texture?.Slices?.ElementAtOrDefault(ArrayIndex)?.ElementAtOrDefault(MipIndex)?.ElementAtOrDefault(DepthIndex);
         public long DataSize => Texture?.Slices?.Sum(x => x.Sum(y => y.Sum(z => z.RawContent.LongLength))) ?? 0;
-
 
         private void SetSelectedBitmap()
         {
