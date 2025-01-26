@@ -3,42 +3,34 @@ using DXForgeEditor.GameProject;
 using DXForgeEditor.Utilities;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
-using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 namespace DXForgeEditor.Editors
 {
     public class NullableBoolToBoolConverter : IValueConverter
     {
-        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             return value is bool b && b == true;
         }
-        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
             return value is bool b && b == true;
         }
     }
 
-    /// <summary>
-    /// GameEntityView.xaml の相互作用ロジック
-    /// </summary>
     public partial class GameEntityView : UserControl
     {
         private Action _undoAction;
         private string _propertyName;
         public static GameEntityView Instance { get; private set; }
-
         public GameEntityView()
         {
             InitializeComponent();
@@ -62,7 +54,6 @@ namespace DXForgeEditor.Editors
                 selection.ForEach(item => item.entity.Name = item.Name);
                 (DataContext as MSEntity).Refresh();
             });
-
         }
 
         private Action GetIsEnabledAction()
@@ -74,7 +65,6 @@ namespace DXForgeEditor.Editors
                 selection.ForEach(item => item.entity.IsEnabled = item.IsEnabled);
                 (DataContext as MSEntity).Refresh();
             });
-
         }
 
         private void OnName_TextBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
@@ -88,7 +78,7 @@ namespace DXForgeEditor.Editors
             if (_propertyName == nameof(MSEntity.Name) && _undoAction != null)
             {
                 var redoAction = GetRenameAction();
-                Project.UndoRedo.Add(new UndoRedoAction(_undoAction, redoAction, "Rename Game Entity"));
+                Project.UndoRedo.Add(new UndoRedoAction(_undoAction, redoAction, "ゲーム・エンティティの名前を変更する"));
                 _propertyName = null;
             }
             _undoAction = null;
@@ -101,17 +91,17 @@ namespace DXForgeEditor.Editors
             vm.IsEnabled = (sender as CheckBox).IsChecked == true;
             var redoAction = GetIsEnabledAction();
             Project.UndoRedo.Add(new UndoRedoAction(undoAction, redoAction,
-                vm.IsEnabled == true ? "Enable game entity" : "Disable game entity"));
+                vm.IsEnabled == true ? "ゲーム・エンティティを有効にする" : "ゲーム・エンティティを無効にする"));
         }
 
         private void OnAddComponent_Button_PreviewMouse_LBD(object sender, MouseButtonEventArgs e)
         {
             var menu = FindResource("addComponentMenu") as ContextMenu;
-            var bth = sender as ToggleButton;
-            bth.IsChecked = true;
+            var btn = sender as ToggleButton;
+            btn.IsChecked = true;
             menu.Placement = PlacementMode.Bottom;
-            menu.PlacementTarget = bth;
-            menu.MinWidth = bth.ActualWidth;
+            menu.PlacementTarget = btn;
+            menu.MinWidth = btn.ActualWidth;
             menu.IsOpen = true;
         }
 
@@ -131,6 +121,8 @@ namespace DXForgeEditor.Editors
 
             if (chandedEntities.Any())
             {
+                vm.Refresh();
+
                 Project.UndoRedo.Add(new UndoRedoAction(
                 () =>
                 {
@@ -142,7 +134,7 @@ namespace DXForgeEditor.Editors
                     chandedEntities.ForEach(x => x.entity.AddComponent(x.component));
                     (DataContext as MSEntity).Refresh();
                 },
-                $"Add {componentType} component"));
+                $"{componentType}コンポーネントを追加"));
             }
         }
 

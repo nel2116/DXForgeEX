@@ -8,6 +8,74 @@
 
     <sys:Double x:Key="AssetIconWidth">90</sys:Double>
 
+    <!-- カスタムToggleButtonスタイル -->
+    <Style TargetType="ToggleButton" x:Key="CustomExpanderToggleButtonStyle">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <!-- 三角形アイコン（クリック可能部分を限定） -->
+                        <Border x:Name="ArrowBorder" Grid.Column="0" Background="Transparent"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Path x:Name="Arrow" Data="M 0,0 L 6,6 L 12,0 Z" Fill="{StaticResource Editor.Disabled.FontBrush}"
+                              RenderTransformOrigin="0.5,0.5">
+                                <Path.RenderTransform>
+                                    <RotateTransform Angle="0"/>
+                                </Path.RenderTransform>
+                            </Path>
+                        </Border>
+                        <!-- ヘッダー内容 -->
+                        <ContentPresenter x:Name="HeaderContent" Grid.Column="1" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <!-- 展開時 -->
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Arrow" Property="RenderTransform">
+                                <Setter.Value>
+                                    <RotateTransform Angle="180"/>
+                                </Setter.Value>
+                            </Setter>
+                            <Setter TargetName="Arrow" Property="Fill" Value="{StaticResource Editor.Disabled.FontBrush}"/>
+                        </Trigger>
+                        <!-- マウスオーバー時（ArrowBorder部分に限定） -->
+                        <Trigger SourceName="ArrowBorder" Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Arrow" Property="Fill" Value="{StaticResource Editor.FontBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- カスタムExpanderスタイル -->
+    <Style TargetType="Expander" x:Key="CustomExpanderStyle">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Expander">
+                    <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                        <StackPanel>
+                            <!-- ヘッダー部分 -->
+                            <ToggleButton x:Name="HeaderSite" Content="{TemplateBinding Header}"
+                                      IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                      Style="{StaticResource CustomExpanderToggleButtonStyle}" />
+                            <!-- コンテンツ部分 -->
+                            <ContentPresenter x:Name="ExpandSite" Visibility="Collapsed" ContentSource="Content" />
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsExpanded" Value="True">
+                            <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style TargetType="{x:Type TextBlock}" x:Key="LightTextBlockStyle">
         <Setter Property="Foreground" Value="{StaticResource Editor.FontBrush}"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
@@ -652,4 +720,85 @@
             </Canvas>
         </VisualBrush.Visual>
     </VisualBrush>
+
+    <Style x:Key="DXForgeTabItemStyle" TargetType="{x:Type TabItem}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type TabItem}">
+                    <Grid SnapsToDevicePixels="true">
+                        <Border x:Name="mainBorder"
+                                    BorderThickness="1,1,1,0"
+                                    Background="{StaticResource Editor.Window.GrayBrush3}"
+                                    BorderBrush="Transparent"
+                                    CornerRadius="0,10,0,0"
+                                    Margin="0">
+                            <Border x:Name="innerBorder"
+                                        Background="{StaticResource Editor.Window.GrayBrush4}"
+                                        BorderThickness="1,1,1,0"
+                                        CornerRadius="0,10,0,0"
+                                        Margin="-1"
+                                        Opacity="0"/>
+                        </Border>
+                        <TextBlock Name="TextBlock" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="5" FontSize="12" Foreground="{StaticResource Editor.FontBrush}" Grid.Column="1">
+                            <ContentPresenter ContentSource="Header" />
+                        </TextBlock>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Margin" Value="-2,-2,-2,0"/>
+                            <Setter Property="Opacity" TargetName="innerBorder" Value="1"/>
+                            <Setter Property="BorderThickness" TargetName="innerBorder" Value="1,1,1,0"/>
+                            <Setter Property="BorderThickness" TargetName="mainBorder" Value="1,1,1,0"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- MenuItem のカスタムテンプレート -->
+    <Style x:Key="CustomMenuItemStyle" TargetType="MenuItem">
+        <Setter Property="Background" Value="{StaticResource Editor.Window.GrayBrush2}"/>
+        <Setter Property="Foreground" Value="{StaticResource Editor.FontBrush}"/>
+        <Setter Property="Padding" Value="5"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Grid>
+                        <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            SnapsToDevicePixels="True">
+                            <ContentPresenter ContentSource="Header"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          Margin="{TemplateBinding Padding}"/>
+                        </Border>
+
+                        <!-- サブメニューの Popup -->
+                        <Popup IsOpen="{TemplateBinding IsSubmenuOpen}"
+                           Placement="Right"
+                           StaysOpen="True"
+                            AllowsTransparency="True"
+                           Focusable="False"
+                           PopupAnimation="Fade">
+                            <Border Background="{StaticResource Editor.Window.GrayBrush1}"
+                                BorderBrush="Transparent"
+                                BorderThickness="1">
+                                <ItemsPresenter Margin="2"/>
+                            </Border>
+                        </Popup>
+                    </Grid>
+
+                    <!-- サブメニューを開くトリガー -->
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter Property="Background" Value="{StaticResource Editor.Window.GrayBrush3}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

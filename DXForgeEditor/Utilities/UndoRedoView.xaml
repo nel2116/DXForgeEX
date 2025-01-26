@@ -6,8 +6,8 @@
              xmlns:local="clr-namespace:DXForgeEditor.Utilities"
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800">
-    <StackPanel>
-        <ItemsControl ItemsSource="{Binding UndoList}">
+    <Grid>
+        <ItemsControl ItemsSource="{Binding UndoList}" Margin="0,32,0,0">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                     <StackPanel/>
@@ -19,7 +19,7 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <ItemsControl ItemsSource="{Binding RedoList}">
+        <ItemsControl ItemsSource="{Binding RedoList}" Margin="0,32,0,0">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                     <StackPanel/>
@@ -31,5 +31,12 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
-    </StackPanel>
+        <Border Height="32" VerticalAlignment="Top" Background="{StaticResource Editor.Window.GrayBrush3}">
+            <Border.Effect>
+                <DropShadowEffect Opacity="0.3" BlurRadius="10" ShadowDepth="0"/>
+            </Border.Effect>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="4,0" VerticalAlignment="Center">
+            </StackPanel>
+        </Border>
+    </Grid>
 </UserControl>

@@ -11,6 +11,7 @@
              xmlns:c="clr-namespace:DXForgeEditor.Content"
              d:DataContext="{d:DesignInstance Type=gameproject:Project}"
              mc:Ignorable="d" Focusable="True"
+             PreviewMouseLeftButtonDown="OnBackgroundClick"
              d:DesignHeight="450" d:DesignWidth="800">
     <UserControl.Resources>
         <sys:Boolean x:Key="True">True</sys:Boolean>
@@ -31,82 +32,125 @@
         <KeyBinding Command="{Binding BuildCommand}" CommandParameter="{StaticResource True}" Key="F7"/>
     </UserControl.InputBindings>
     <Grid>
+        <!-- 全体を2つの主要セクションに分割 -->
         <Grid.RowDefinitions>
-            <RowDefinition Height="auto"/>
-            <RowDefinition Height="auto"/>
-            <RowDefinition/>
+            <RowDefinition Height="Auto"/>
+            <!-- 上部: メニューとボタン -->
+            <RowDefinition Height="*"/>
+            <!-- 下部: ビューとタブ -->
         </Grid.RowDefinitions>
-        <Menu  Grid.Row="0">
-            <MenuItem Header="File">
-                <MenuItem Header="New Project..." Command="ApplicationCommands.New"/>
-                <MenuItem Header="Open Project..." Command="ApplicationCommands.Open"/>
-                <MenuItem Header="Save Project" Command="{Binding SaveCommand}"/>
-                <MenuItem Header="Exit" Command="ApplicationCommands.Close"/>
-            </MenuItem>
-            <MenuItem Header="Setting"></MenuItem>
-            <MenuItem Header="View"></MenuItem>
-            <MenuItem Header="Create" IsEnabled="False"></MenuItem>
-            <MenuItem Header="Window"></MenuItem>
-        </Menu>
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="20,10">
-            <Button Content="Undo" Command="{Binding UndoCommand}" Cursor=""/>
-            <Button Content="Redo" Command="{Binding RedoCommand}" Margin="5,0"/>
-            <Button Content="New Script" Click="OnNewScript_Button_Click"
-                    IsEnabled="{Binding Path=IsEnabled,ElementName=buildButton}"/>
-            <Button x:Name="buildButton" Content="Build"  Margin="5,0"
-                    Command="{Binding BuildCommand}" CommandParameter="{StaticResource True}"/>
-            <ComboBox x:Name="runConfig" VerticalAlignment="Center"
-                      Width="72" SelectedIndex="{Binding BuildConfig}">
-                <ComboBoxItem Content="Debug"/>
-                <ComboBoxItem Content="Release"/>
-            </ComboBox>
-            <Button Content="Primitive mesh" Click="OnCreatePrimitiveMesh_Button_Click" Margin="10,0"/>
-        </StackPanel>
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <Grid Grid.Column="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition></RowDefinition>
-                    <RowDefinition></RowDefinition>
-                </Grid.RowDefinitions>
-                <util:RenderSurfaceView />
-                <!--<Border Background="{StaticResource Editor.Selected.BackgroundBrush}">
-                </Border>-->
-                <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch"
-                              VerticalAlignment="Top" Background="Transparent"/>
-                <Grid Grid.Row="1" Margin="0,5,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="250"/>
-                        <ColumnDefinition/>
-                        <ColumnDefinition/>
-                    </Grid.ColumnDefinitions>
-                    <util:UndoRedoView DataContext="{Binding UndoRedo}" Grid.Column="0"
-                                           Background="{StaticResource Editor.Window.GrayBrush2}"/>
-                    <GridSplitter Grid.Column="1" Width="5" VerticalAlignment="Stretch"
-                                    HorizontalAlignment="Left" Background="Transparent"/>
-                    <util:LoggerView Grid.Column="1" Margin="5,0,0,0" Cursor=""/>
-                    <GridSplitter Grid.Column="2" Width="5" VerticalAlignment="Stretch"
-                                    HorizontalAlignment="Left" Background="Transparent"/>
-                    <c:ContentBrowserView Grid.Column="2" Margin="5,0,0,0"/>
-                </Grid>
-            </Grid>
-            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Left"
-                          VerticalAlignment="Stretch" Background="Transparent"/>
-            <Grid Grid.Column="1" Margin="5,0,0,0" MinWidth="250">
-                <Grid.RowDefinitions>
-                    <RowDefinition></RowDefinition>
-                    <RowDefinition></RowDefinition>
-                </Grid.RowDefinitions>
-                <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch"
-                              VerticalAlignment="Top" Background="Transparent"/>
-                <local:ProjectLayoutView Background="{StaticResource Editor.Window.GrayBrush3}"/>
-                <local:GameEntityView Grid.Row="1" Background="{StaticResource Editor.Window.GrayBrush3}"
-                                      Margin="0,5,0,0"/>
-            </Grid>
 
+        <!-- 上部メニューとボタン -->
+        <Grid Grid.Row="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <!-- メニュー -->
+                <RowDefinition Height="Auto"/>
+                <!-- ボタン -->
+            </Grid.RowDefinitions>
+
+            <!-- メニュー -->
+            <Menu Grid.Row="0" Background="{StaticResource Editor.Window.GrayBrush1}">
+                <Menu.Resources>
+                    <Style TargetType="MenuItem" BasedOn="{StaticResource CustomMenuItemStyle}"/>
+                </Menu.Resources>
+                <MenuItem Header="File">
+                    <MenuItem Header="New Project..." Command="ApplicationCommands.New"/>
+                    <MenuItem Header="Open Project..." Command="ApplicationCommands.Open"/>
+                    <MenuItem Header="Save Project" Command="{Binding SaveCommand}"/>
+                    <MenuItem Header="Exit" Command="ApplicationCommands.Close"/>
+                </MenuItem>
+                <MenuItem Header="Setting"></MenuItem>
+                <MenuItem Header="View"></MenuItem>
+                <MenuItem Header="Create" IsEnabled="False"></MenuItem>
+                <MenuItem Header="Window"></MenuItem>
+            </Menu>
+
+            <!-- ボタン -->
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="10,10">
+                <Button Content="New Script" Click="OnNewScript_Button_Click"
+                        IsEnabled="{Binding Path=IsEnabled,ElementName=buildButton}"/>
+                <Button x:Name="buildButton" Content="Build"  Margin="5,0"
+                        Command="{Binding BuildCommand}" CommandParameter="{StaticResource True}"/>
+                <ComboBox x:Name="runConfig" VerticalAlignment="Center"
+                          Width="72" SelectedIndex="{Binding BuildConfig}">
+                    <ComboBoxItem Content="Debug"/>
+                    <ComboBoxItem Content="Release"/>
+                </ComboBox>
+                <Button Content="Primitive mesh" Click="OnCreatePrimitiveMesh_Button_Click" Margin="10,0"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ビューとタブ -->
+        <Grid Grid.Row="1">
+            <!-- 行と列の定義 -->
+            <Grid.RowDefinitions>
+                <RowDefinition Height="3*"/>
+                <!-- 上部ビュー (ProjectLayoutView + RenderSurfaceView) -->
+                <RowDefinition Height="5"/>
+                <!-- 中央スプリッター -->
+                <RowDefinition Height="2*"/>
+                <!-- 下部タブ -->
+            </Grid.RowDefinitions>
+
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.5*"/>
+                <!-- 左: ProjectLayoutView -->
+                <ColumnDefinition Width="5"/>
+                <!-- 左スプリッター -->
+                <ColumnDefinition Width="5*"/>
+                <!-- 中央: RenderSurfaceView -->
+                <ColumnDefinition Width="5"/>
+                <!-- 右スプリッター -->
+                <ColumnDefinition Width="2*"/>
+                <!-- 右: GameEntityView -->
+            </Grid.ColumnDefinitions>
+
+            <!-- 左: ProjectLayoutView -->
+            <local:ProjectLayoutView Grid.Column="0" Grid.Row="0" Background="{StaticResource Editor.Window.GrayBrush3}" />
+
+            <!-- 左スプリッター -->
+            <GridSplitter Grid.Column="1" Grid.Row="0"
+                          Width="5"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          Background="Transparent"
+                          ResizeBehavior="PreviousAndNext" />
+
+            <!-- 中央: RenderSurfaceView -->
+            <util:RenderSurfaceView Grid.Column="2" Grid.Row="0" Background="Transparent" />
+
+            <!-- 右スプリッター -->
+            <GridSplitter Grid.Column="3" Grid.Row="0"
+                          Width="5"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          Background="Transparent"
+                          ResizeBehavior="PreviousAndNext" />
+
+            <!-- 右: GameEntityView -->
+            <local:GameEntityView Grid.Column="4" Grid.Row="0" Background="{StaticResource Editor.Window.GrayBrush3}" />
+
+            <!-- 中央スプリッター (上下) -->
+            <GridSplitter Grid.ColumnSpan="5" Grid.Row="1"
+                          Height="5"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          Background="Transparent"
+                          ResizeBehavior="PreviousAndNext" />
+
+            <!-- 下部タブ -->
+            <TabControl Grid.ColumnSpan="5" Grid.Row="2" Background="Transparent" BorderBrush="{StaticResource Editor.Window.GrayBrush3}">
+                <TabItem Header="Content Browser" Style="{StaticResource DXForgeTabItemStyle}">
+                    <c:ContentBrowserView/>
+                </TabItem>
+                <TabItem Header="LoggerView" Style="{StaticResource DXForgeTabItemStyle}">
+                    <util:LoggerView/>
+                </TabItem>
+                <TabItem Header="Undo/Redo" Style="{StaticResource DXForgeTabItemStyle}">
+                    <util:UndoRedoView DataContext="{Binding UndoRedo}"/>
+                </TabItem>
+            </TabControl>
         </Grid>
     </Grid>
 </UserControl>

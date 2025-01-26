@@ -66,5 +66,14 @@ namespace DXForgeEditor.Editors
         {
             Application.Current.MainWindow.Close();
         }
+
+        private void OnBackgroundClick(object sender, MouseButtonEventArgs e)
+        {
+            // サブメニューを閉じる
+            if (FocusManager.GetFocusedElement(this) is MenuItem menuItem)
+            {
+                menuItem.IsSubmenuOpen = false;
+            }
+        }
     }
 }
