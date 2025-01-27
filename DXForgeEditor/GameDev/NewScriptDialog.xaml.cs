@@ -66,15 +66,15 @@ namespace {1}
             var name = scriptName.Text.Trim();
             var path = scriptPath.Text.Trim();
             string errorMsg = string.Empty;
-            var nameRegex = new Regex(@"[^A-Za-z_][A-Za-z0-9_]*$");
+            var nameRegex = new Regex(@"^[A-Za-z_][A-Za-z0-9_]*$");
 
             if (string.IsNullOrEmpty(name))
             {
                 errorMsg = "スクリプト名を入力してください";
             }
-            else if (nameRegex.IsMatch(name))
+            else if (!nameRegex.IsMatch(name))
             {
-                errorMsg = "スクリプト名に使用できない文字が含まれています";
+                errorMsg = "スクリプト名に無効な文字が使用されています";
             }
             else if (string.IsNullOrEmpty(path))
             {
@@ -86,12 +86,12 @@ namespace {1}
             }
             else if (!Path.GetFullPath(Path.Combine(Project.Current.Path, path)).Contains(Path.Combine(Project.Current.Path, @"GameCode\")))
             {
-                errorMsg = "スクリプトはGameCode（もしくはそのサブフォルダ）に追加する必要があります";
+                errorMsg = "スクリプトはGameCode（のサブフォルダ）に追加する必要があります";
             }
             else if (File.Exists(Path.GetFullPath(Path.Combine(Path.Combine(Project.Current.Path, path), $"{name}.cpp"))) ||
-                        File.Exists(Path.GetFullPath(Path.Combine(Path.Combine(Project.Current.Path, path), $"{name}.h"))))
+                File.Exists(Path.GetFullPath(Path.Combine(Path.Combine(Project.Current.Path, path), $"{name}.h"))))
             {
-                errorMsg = "同名のスクリプトが既に存在します";
+                errorMsg = $"スクリプト {name} はすでにこのフォルダに存在します。";
             }
             else
             {
@@ -142,7 +142,7 @@ namespace {1}
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
-                Logger.Log(MessageType.Error, $"Failed to create script {scriptName.Text}");
+                Logger.Log(MessageType.Error, $"スクリプトの作成に失敗しました: {scriptName.Text}");
             }
             finally
             {

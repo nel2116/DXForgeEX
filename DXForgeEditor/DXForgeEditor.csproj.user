@@ -13,6 +13,12 @@
     <Compile Update="Content\ContentBrowser\SaveDialog.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Update="Content\ImportSettingsConfig\ConfigureGeometryImportSettingsView.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="Content\ImportSettingsConfig\ConfigureImportSettingsWindow.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Update="Content\PrimitiveMeshDialog.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -79,6 +85,12 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Update="Content\ContentBrowser\SaveDialog.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Update="Content\ImportSettingsConfig\ConfigureGeometryImportSettingsView.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Update="Content\ImportSettingsConfig\ConfigureImportSettingsWindow.xaml">
       <SubType>Designer</SubType>
     </Page>
     <Page Update="Content\PrimitiveMeshDialog.xaml">

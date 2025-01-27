@@ -640,5 +640,11 @@ namespace DXForgeEditor.Content
 
         public Texture() : base(AssetType.Texture) { }
 
+        public Texture(IAssetImportSettings importSettings) : this()
+        {
+            Debug.Assert(importSettings is TextureImportSettings);
+            ImportSettings = (TextureImportSettings)importSettings;
+        }
+
     }
 }

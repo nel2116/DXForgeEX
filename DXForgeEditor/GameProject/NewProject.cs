@@ -104,29 +104,28 @@ namespace DXForgeEditor.GameProject
             var path = ProjectPath;
             if (!Path.EndsInDirectorySeparator(path)) path += @"\";
             path += $@"{ProjectName}\";
-            var nameRegex = new Regex(@"[^A-Za-z_][A-Za-z0-9_]*$");
+            var nameRegex = new Regex(@"^[A-Za-z_][A-Za-z0-9_]*$");
 
             IsValid = false;
-            // プロジェクト名が空白かどうか
             if (string.IsNullOrWhiteSpace(ProjectName.Trim()))
             {
                 ErrorMsg = "プロジェクト名を入力してください";
             }
-            else if (nameRegex.IsMatch(ProjectName))
+            else if (!nameRegex.IsMatch(ProjectName))
             {
-                ErrorMsg = "プロジェクト名に使用できない文字が含まれています";
+                ErrorMsg = "プロジェクト名に無効な文字が使用されています";
             }
             else if (string.IsNullOrWhiteSpace(ProjectPath.Trim()))
             {
-                ErrorMsg = "プロジェクトの保存先を入力してください";
+                ErrorMsg = "有効なプロジェクトフォルダを選択してください";
             }
             else if (ProjectPath.IndexOfAny(Path.GetInvalidPathChars()) != -1)
             {
-                ErrorMsg = "プロジェクトの保存先に使用できない文字が含まれています";
+                ErrorMsg = "プロジェクトパスに無効な文字が使用されています";
             }
             else if (Directory.Exists(path) && Directory.EnumerateFileSystemEntries(path).Any())
             {
-                ErrorMsg = "プロジェクト名が既に存在します";
+                ErrorMsg = "選択したプロジェクトフォルダはすでに存在しています";
             }
             else
             {

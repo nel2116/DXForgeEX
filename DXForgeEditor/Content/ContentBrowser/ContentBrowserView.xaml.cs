@@ -1,4 +1,5 @@
-﻿using DXForgeEditor.Editors;
+﻿using DXForgeEditor.Content;
+using DXForgeEditor.Editors;
 using DXForgeEditor.GameProject;
 using System;
 using System.Collections.Generic;
@@ -7,6 +8,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -14,6 +17,7 @@ using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 
@@ -21,14 +25,13 @@ namespace DXForgeEditor.Content
 {
     class DataSizeToStringConverter : IValueConverter
     {
-        static readonly string[] _sizeSuffixes =
-                   { "B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB" };
+        static readonly string[] _sizeSuffixes = { "B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB" };
 
         static string SizeSuffix(long value, int decimalPlaces = 1)
         {
             if (value <= 0 || decimalPlaces < 0) return string.Empty;
 
-            // mag is 0 for bytes, 1 for KB, 2, for MB, etc.
+            // magは0バイト、1はKB、2はMBなど。
             int mag = (int)Math.Log(value, 1024);
 
             // 1L << (mag * 10) == 2 ^ (10 * mag)
@@ -54,6 +57,7 @@ namespace DXForgeEditor.Content
             throw new NotImplementedException();
         }
     }
+
     class PlainView : ViewBase
     {
         public static readonly DependencyProperty ItemContainerStyleProperty =
@@ -95,9 +99,6 @@ namespace DXForgeEditor.Content
         protected override object DefaultStyleKey => new ComponentResourceKey(GetType(), "PlainViewResourceId");
     }
 
-    /// <summary>
-    /// ContentBrowserView.xaml の相互作用ロジック
-    /// </summary>
     public partial class ContentBrowserView : UserControl, IDisposable
     {
         private string _sortedProperty = nameof(ContentInfo.FileName);
@@ -108,6 +109,7 @@ namespace DXForgeEditor.Content
             get => (SelectionMode)GetValue(SelectionModeProperty);
             set => SetValue(SelectionModeProperty, value);
         }
+
         public static readonly DependencyProperty SelectionModeProperty =
             DependencyProperty.Register(nameof(SelectionMode), typeof(SelectionMode), typeof(ContentBrowserView), new PropertyMetadata(SelectionMode.Extended));
 
@@ -116,14 +118,26 @@ namespace DXForgeEditor.Content
             get => (FileAccess)GetValue(FileAccessProperty);
             set => SetValue(FileAccessProperty, value);
         }
+
         public static readonly DependencyProperty FileAccessProperty =
             DependencyProperty.Register(nameof(FileAccess), typeof(FileAccess), typeof(ContentBrowserView), new PropertyMetadata(FileAccess.ReadWrite));
+
+
+        public bool AllowImport
+        {
+            get => (bool)GetValue(AllowImportProperty);
+            set => SetValue(AllowImportProperty, value);
+        }
+
+        public static readonly DependencyProperty AllowImportProperty =
+            DependencyProperty.Register(nameof(AllowImport), typeof(bool), typeof(ContentBrowserView), new PropertyMetadata(false));
 
         internal ContentInfo SelectedItem
         {
             get => (ContentInfo)GetValue(SelectedItemProperty);
             set => SetValue(SelectedItemProperty, value);
         }
+
         public static readonly DependencyProperty SelectedItemProperty =
             DependencyProperty.Register(nameof(SelectedItem), typeof(ContentInfo), typeof(ContentBrowserView), new PropertyMetadata(null));
 
@@ -131,13 +145,12 @@ namespace DXForgeEditor.Content
         {
             DataContext = null;
             InitializeComponent();
-            Loaded += OnContentBrowseLoaded;
-            AllowDrop = true;
+            Loaded += OnContentBrowserLoaded;
         }
 
-        private void OnContentBrowseLoaded(object sender, RoutedEventArgs e)
+        private void OnContentBrowserLoaded(object sender, RoutedEventArgs e)
         {
-            Loaded -= OnContentBrowseLoaded;
+            Loaded -= OnContentBrowserLoaded;
             if (Application.Current?.MainWindow != null)
             {
                 Application.Current.MainWindow.DataContextChanged += OnProjectChanged;
@@ -146,11 +159,14 @@ namespace DXForgeEditor.Content
             OnProjectChanged(null, new DependencyPropertyChangedEventArgs(DataContextProperty, null, Project.Current));
             folderListView.AddHandler(Thumb.DragDeltaEvent, new DragDeltaEventHandler(Thumb_DragDelta), true);
             folderListView.Items.SortDescriptions.Add(new SortDescription(_sortedProperty, _sortDirection));
+
+            GeneratePathStackButtons();
         }
 
         private void Thumb_DragDelta(object sender, DragDeltaEventArgs e)
         {
-            if (e.OriginalSource is Thumb thumb && thumb.TemplatedParent is GridViewColumnHeader header)
+            if (e.OriginalSource is Thumb thumb &&
+                thumb.TemplatedParent is GridViewColumnHeader header)
             {
                 if (header.Column.ActualWidth < 50)
                 {
@@ -176,10 +192,10 @@ namespace DXForgeEditor.Content
             }
         }
 
-        private void OnSelectedFolderChanged(object? sender, PropertyChangedEventArgs e)
+        private void OnSelectedFolderChanged(object sender, PropertyChangedEventArgs e)
         {
             var vm = sender as ContentBrowser;
-            if ((e.PropertyName == nameof(vm.SelectedFolder) && !string.IsNullOrEmpty(vm.SelectedFolder)))
+            if (e.PropertyName == nameof(vm.SelectedFolder) && !string.IsNullOrEmpty(vm.SelectedFolder))
             {
                 GeneratePathStackButtons();
             }
@@ -189,10 +205,10 @@ namespace DXForgeEditor.Content
         {
             var vm = DataContext as ContentBrowser;
             var path = Directory.GetParent(Path.TrimEndingDirectorySeparator(vm.SelectedFolder)).FullName;
-            var contentPath = Path.TrimEndingDirectorySeparator(vm.SelectedFolder);
+            var contentPath = Path.TrimEndingDirectorySeparator(vm.ContentFolder);
 
             pathStack.Children.RemoveRange(1, pathStack.Children.Count - 1);
-            if (vm.SelectedFolder == vm.ContentFolder) return;
+            if (vm.SelectedFolder == vm.ContentFolder) goto _addCurrentDirectory;
             string[] paths = new string[3];
             string[] labels = new string[3];
 
@@ -216,6 +232,17 @@ namespace DXForgeEditor.Content
                 pathStack.Children.Add(btn);
                 if (i > 0) pathStack.Children.Add(new System.Windows.Shapes.Path());
             }
+
+            pathStack.Children.Add(new System.Windows.Shapes.Path());
+
+        _addCurrentDirectory:
+            pathStack.Children.Add(new TextBlock()
+            {
+                Text = $"[ {Path.GetFileName(Path.TrimEndingDirectorySeparator(vm.SelectedFolder))} ]",
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = Brushes.White,
+                Margin = new(5, 0, 5, 0),
+            });
         }
 
         private void OnPathStack_Button_Click(object sender, RoutedEventArgs e)
@@ -247,13 +274,21 @@ namespace DXForgeEditor.Content
             var info = (sender as FrameworkElement).DataContext as ContentInfo;
             ExecuteSelection(info);
         }
+
         private void OnContent_Item_KeyDown(object sender, KeyEventArgs e)
         {
             var info = (sender as FrameworkElement).DataContext as ContentInfo;
-            ExecuteSelection(info);
+            if (e.Key == Key.Enter)
+            {
+                ExecuteSelection(info);
+            }
+            else if (e.Key == Key.F2)
+            {
+                TryEdit(folderListView, info.FullPath);
+            }
         }
 
-        private void ExecuteSelection(ContentInfo? info)
+        private void ExecuteSelection(ContentInfo info)
         {
             if (info == null) return;
 
@@ -272,7 +307,7 @@ namespace DXForgeEditor.Content
             }
         }
 
-        private IAssetEditor OpenAssetEditor(AssetInfo info)
+        private static IAssetEditor OpenAssetEditor(AssetInfo info)
         {
             IAssetEditor editor = null;
             try
@@ -299,10 +334,10 @@ namespace DXForgeEditor.Content
             return editor;
         }
 
-        private IAssetEditor OpenEditorPanel<T>(AssetInfo info, Guid guid, string title)
-                   where T : FrameworkElement, new()
+        private static IAssetEditor OpenEditorPanel<T>(AssetInfo info, Guid guid, string title)
+            where T : FrameworkElement, new()
         {
-            // まず、すでに開いていて同じアセットを表示しているウィンドウを探す。
+            // まず、すでに開いていて同じアセットを表示しているウィンドウを探します。
             foreach (Window window in Application.Current.Windows)
             {
                 if (window.Content is FrameworkElement content &&
@@ -314,13 +349,14 @@ namespace DXForgeEditor.Content
                 }
             }
 
-            // まだアセットエディタで開いていない場合は、新しいウィンドウを作成してアセットを読み込む。
+            // まだアセットエディタで開いていない場合は、新しいウィンドウを作成してアセットを読み込みます。
             var newEditor = CreateEditorWindow<T>(title);
             (newEditor.DataContext as IAssetEditor).SetAsset(info);
             return newEditor.DataContext as IAssetEditor;
         }
 
-        private static FrameworkElement CreateEditorWindow<T>(string title) where T : FrameworkElement, new()
+        private static FrameworkElement CreateEditorWindow<T>(string title)
+            where T : FrameworkElement, new()
         {
             var newEditor = new T();
             Debug.Assert(newEditor.DataContext is IAssetEditor);
@@ -338,17 +374,59 @@ namespace DXForgeEditor.Content
             return newEditor;
         }
 
-        private void OnFolderContent_ListView_Drop(object sender, DragEventArgs e)
+        private void OnDropBorder_Drop(object sender, DragEventArgs e)
         {
             var vm = DataContext as ContentBrowser;
-            if (vm.SelectedFolder != null && e.Data.GetDataPresent(DataFormats.FileDrop))
+            if (Directory.Exists(vm.SelectedFolder) && e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-                if (files?.Length > 0 && Directory.Exists(vm.SelectedFolder))
+                if (files?.Length > 0)
                 {
-                    _ = ContentHelper.ImportFilesAsync(files, vm.SelectedFolder);
-                    e.Handled = true;
+                    if (e.OriginalSource == filesDrop)
+                    {
+                        new ConfigureImportSettings(files, vm.SelectedFolder).Import();
+                        e.Handled = true;
+                    }
+                    else if (e.OriginalSource == cfgDrop)
+                    {
+                        OpenImportSettingsConfigurator(files, vm.SelectedFolder);
+                        e.Handled = true;
+                    }
                 }
+            }
+
+            e.Effects = DragDropEffects.None;
+            OnDropBorder_DragLeave(sender, e);
+        }
+
+        private static void OpenImportSettingsConfigurator(string[] files, string selectedFolder)
+        {
+            ConfigureImportSettings settingsConfigurator = null;
+            // まず、このDataContextのあるウィンドウを探し、インポート用に設定するファイルを追加する。
+            foreach (Window win in Application.Current.Windows)
+            {
+                if (win.DataContext is ConfigureImportSettings cfg)
+                {
+                    if (files?.Length > 0)
+                    {
+                        cfg.AddFiles(files, selectedFolder);
+                    }
+
+                    settingsConfigurator = cfg;
+                    win.Activate();
+                    break;
+                }
+            }
+
+            // ウィンドウがまだ開いていなければ、新しいウィンドウを作成して表示する。
+            if (settingsConfigurator == null)
+            {
+                settingsConfigurator = (files?.Length > 0) ? new(files, selectedFolder) : new(selectedFolder);
+                new ConfigureImportSettingsWindow()
+                {
+                    DataContext = settingsConfigurator,
+                    Owner = Application.Current.MainWindow,
+                }.Show();
             }
         }
 
@@ -358,9 +436,68 @@ namespace DXForgeEditor.Content
             SelectedItem = item?.IsDirectory == true ? null : item;
         }
 
+        private void TryEdit(ListBoxItem item)
+        {
+            var textBox = item.FindVisualChild<TextBox>();
+            if (textBox != null)
+            {
+                textBox.Visibility = Visibility.Visible;
+                textBox.Focus();
+            }
+        }
+
+        private bool TryEdit(ListView list, string path)
+        {
+            foreach (ContentInfo item in list.Items)
+            {
+                if (item.FullPath == path)
+                {
+                    var listBoxItem = list.ItemContainerGenerator.ContainerFromItem(item) as ListBoxItem;
+                    listBoxItem.IsSelected = true;
+                    list.SelectedItem = item;
+                    list.SelectedIndex = list.Items.IndexOf(item);
+                    TryEdit(listBoxItem);
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private async void OnCreateNewFolder(object sender, RoutedEventArgs e)
+        {
+            var vm = DataContext as ContentBrowser;
+            var path = vm.SelectedFolder;
+            if (!Path.EndsInDirectorySeparator(path)) path += Path.DirectorySeparatorChar;
+            var folder = "NewFolder";
+            var index = 1;
+            while (Directory.Exists(path + folder))
+            {
+                folder = $"NewFolder{index++:0#}";
+            }
+
+            folder = path + folder;
+
+            try
+            {
+                Directory.CreateDirectory(folder);
+                var waitCounter = 0;
+                // OSがフォルダを作成し、ファイルシステムウォッチャーがコンテンツブラウザに新しいエントリーを作成するまで、最大3秒待つ。
+                while (waitCounter < 30 && !TryEdit(folderListView, folder))
+                {
+                    await Task.Run(() => Thread.Sleep(100));
+                    ++waitCounter;
+                }
+            }
+            catch (Exception ex)
+            {
+
+                Debug.WriteLine(ex.Message);
+                Debug.WriteLine($"Error: failed to create new folder: {folder}");
+            }
+        }
         public void Dispose()
         {
-            Loaded -= OnContentBrowseLoaded;
             if (Application.Current?.MainWindow != null)
             {
                 Application.Current.MainWindow.DataContextChanged -= OnProjectChanged;
@@ -368,6 +505,31 @@ namespace DXForgeEditor.Content
 
             (DataContext as ContentBrowser)?.Dispose();
             DataContext = null;
+        }
+
+        private void OnFolderContent_ListView_DragEnter(object sender, DragEventArgs e)
+        {
+            dropBorder.Opacity = 0;
+            dropBorder.Visibility = Visibility.Visible;
+            var fadeIn = new DoubleAnimation(0, 1, new Duration(TimeSpan.FromMilliseconds(100)));
+            dropBorder.BeginAnimation(OpacityProperty, fadeIn);
+        }
+
+        private void OnDropBorder_DragLeave(object sender, DragEventArgs e)
+        {
+            if (sender == dropBorder && e?.Effects != DragDropEffects.None)
+            {
+                var point = e.GetPosition(dropBorder);
+                var result = VisualTreeHelper.HitTest(dropBorder, point);
+                if (result != null)
+                {
+                    return;
+                }
+            }
+
+            var fadeOut = new DoubleAnimation(1, 0, new Duration(TimeSpan.FromMilliseconds(100)));
+            fadeOut.Completed += (_, _) => dropBorder.Visibility = Visibility.Collapsed;
+            dropBorder.BeginAnimation(OpacityProperty, fadeOut);
         }
     }
 }

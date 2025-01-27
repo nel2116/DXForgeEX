@@ -91,7 +91,6 @@ namespace DXForgeEditor.Utilities.Controls
                 {
                     textBox.Visibility = Visibility.Visible;
                     textBox.Focus();
-                    textBox.SelectAll();
                 }
             }
         }

@@ -142,7 +142,7 @@
             <!-- 下部タブ -->
             <TabControl Grid.ColumnSpan="5" Grid.Row="2" Background="Transparent" BorderBrush="{StaticResource Editor.Window.GrayBrush3}">
                 <TabItem Header="Content Browser" Style="{StaticResource DXForgeTabItemStyle}">
-                    <c:ContentBrowserView/>
+                    <c:ContentBrowserView AllowImport="True"/>
                 </TabItem>
                 <TabItem Header="LoggerView" Style="{StaticResource DXForgeTabItemStyle}">
                     <util:LoggerView/>

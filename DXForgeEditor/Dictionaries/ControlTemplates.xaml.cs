@@ -11,7 +11,7 @@ namespace DXForgeEditor.Dictionaries
 {
     public partial class ControlTemplates : ResourceDictionary
     {
-        private void OnTextBox_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        private void OnTextBox_KeyDown(object sender, KeyEventArgs e)
         {
             var textBox = sender as TextBox;
             var exp = textBox.GetBindingExpression(TextBox.TextProperty);
@@ -39,6 +39,10 @@ namespace DXForgeEditor.Dictionaries
 
         private void OnTextBox_GotFocus(object sender, RoutedEventArgs e)
         {
+            var textBox = sender as TextBox;
+            var exp = textBox.GetBindingExpression(TextBox.TextProperty);
+            exp?.UpdateTarget();
+
             (sender as TextBox).SelectAll();
         }
 
@@ -48,7 +52,7 @@ namespace DXForgeEditor.Dictionaries
             var exp = textBox.GetBindingExpression(TextBox.TextProperty);
             if (exp == null) return;
 
-            if (e.Key == Key.Enter)
+            void updateSource()
             {
                 if (textBox.Tag is ICommand command && command.CanExecute(textBox.Text))
                 {
@@ -58,8 +62,17 @@ namespace DXForgeEditor.Dictionaries
                 {
                     exp.UpdateSource();
                 }
+            }
+
+            if (e.Key == Key.Enter)
+            {
+                updateSource();
                 textBox.Visibility = Visibility.Collapsed;
                 e.Handled = true;
+            }
+            else if (e.Key == Key.Tab)
+            {
+                updateSource();
             }
             else if (e.Key == Key.Escape)
             {

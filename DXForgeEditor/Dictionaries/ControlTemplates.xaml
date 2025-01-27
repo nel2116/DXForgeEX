@@ -8,74 +8,6 @@
 
     <sys:Double x:Key="AssetIconWidth">90</sys:Double>
 
-    <!-- カスタムToggleButtonスタイル -->
-    <Style TargetType="ToggleButton" x:Key="CustomExpanderToggleButtonStyle">
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="ToggleButton">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <!-- 三角形アイコン（クリック可能部分を限定） -->
-                        <Border x:Name="ArrowBorder" Grid.Column="0" Background="Transparent"
-                            HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <Path x:Name="Arrow" Data="M 0,0 L 6,6 L 12,0 Z" Fill="{StaticResource Editor.Disabled.FontBrush}"
-                              RenderTransformOrigin="0.5,0.5">
-                                <Path.RenderTransform>
-                                    <RotateTransform Angle="0"/>
-                                </Path.RenderTransform>
-                            </Path>
-                        </Border>
-                        <!-- ヘッダー内容 -->
-                        <ContentPresenter x:Name="HeaderContent" Grid.Column="1" VerticalAlignment="Center" Margin="5,0,0,0"/>
-                    </Grid>
-                    <ControlTemplate.Triggers>
-                        <!-- 展開時 -->
-                        <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="Arrow" Property="RenderTransform">
-                                <Setter.Value>
-                                    <RotateTransform Angle="180"/>
-                                </Setter.Value>
-                            </Setter>
-                            <Setter TargetName="Arrow" Property="Fill" Value="{StaticResource Editor.Disabled.FontBrush}"/>
-                        </Trigger>
-                        <!-- マウスオーバー時（ArrowBorder部分に限定） -->
-                        <Trigger SourceName="ArrowBorder" Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Arrow" Property="Fill" Value="{StaticResource Editor.FontBrush}"/>
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
-    <!-- カスタムExpanderスタイル -->
-    <Style TargetType="Expander" x:Key="CustomExpanderStyle">
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Expander">
-                    <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
-                        <StackPanel>
-                            <!-- ヘッダー部分 -->
-                            <ToggleButton x:Name="HeaderSite" Content="{TemplateBinding Header}"
-                                      IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
-                                      Style="{StaticResource CustomExpanderToggleButtonStyle}" />
-                            <!-- コンテンツ部分 -->
-                            <ContentPresenter x:Name="ExpandSite" Visibility="Collapsed" ContentSource="Content" />
-                        </StackPanel>
-                    </Border>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsExpanded" Value="True">
-                            <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
     <Style TargetType="{x:Type TextBlock}" x:Key="LightTextBlockStyle">
         <Setter Property="Foreground" Value="{StaticResource Editor.FontBrush}"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
@@ -299,18 +231,18 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="Selector.IsSelectionActive" Value="True">
-                            <Setter Property="BorderBrush" TargetName="Bd" Value="{StaticResource Editor.Selected.BackgroundBrush}"/>
+                            <Setter Property="BorderBrush" Value="{StaticResource Editor.Selected.BackgroundBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="false">
-                            <Setter Property="Background" TargetName="Bd" Value="{StaticResource Editor.Window.GrayBrush2}"/>
-                            <Setter Property="BorderBrush" TargetName="Bd" Value="{StaticResource Editor.Window.GrayBrush4}"/>
+                            <Setter Property="Background" Value="{StaticResource Editor.Window.GrayBrush2}"/>
+                            <Setter Property="BorderBrush" Value="{StaticResource Editor.Window.GrayBrush4}"/>
                         </Trigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
                                 <Condition Property="Selector.IsSelectionActive" Value="False"/>
                                 <Condition Property="IsMouseOver" Value="True"/>
                             </MultiTrigger.Conditions>
-                            <Setter Property="BorderBrush" TargetName="Bd" Value="{StaticResource Editor.Selected.BackgroundBrush}"/>
+                            <Setter Property="BorderBrush" Value="{StaticResource Editor.Selected.BackgroundBrush}"/>
                         </MultiTrigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
@@ -794,6 +726,74 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsHighlighted" Value="True">
                             <Setter Property="Background" Value="{StaticResource Editor.Window.GrayBrush3}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- カスタムToggleButtonスタイル -->
+    <Style TargetType="ToggleButton" x:Key="CustomExpanderToggleButtonStyle">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <!-- 三角形アイコン（クリック可能部分を限定） -->
+                        <Border x:Name="ArrowBorder" Grid.Column="0" Background="Transparent"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Path x:Name="Arrow" Data="M 0,0 L 6,6 L 12,0 Z" Fill="{StaticResource Editor.Disabled.FontBrush}"
+                              RenderTransformOrigin="0.5,0.5">
+                                <Path.RenderTransform>
+                                    <RotateTransform Angle="0"/>
+                                </Path.RenderTransform>
+                            </Path>
+                        </Border>
+                        <!-- ヘッダー内容 -->
+                        <ContentPresenter x:Name="HeaderContent" Grid.Column="1" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <!-- 展開時 -->
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Arrow" Property="RenderTransform">
+                                <Setter.Value>
+                                    <RotateTransform Angle="180"/>
+                                </Setter.Value>
+                            </Setter>
+                            <Setter TargetName="Arrow" Property="Fill" Value="{StaticResource Editor.Disabled.FontBrush}"/>
+                        </Trigger>
+                        <!-- マウスオーバー時（ArrowBorder部分に限定） -->
+                        <Trigger SourceName="ArrowBorder" Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Arrow" Property="Fill" Value="{StaticResource Editor.FontBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- カスタムExpanderスタイル -->
+    <Style TargetType="Expander" x:Key="CustomExpanderStyle">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Expander">
+                    <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                        <StackPanel>
+                            <!-- ヘッダー部分 -->
+                            <ToggleButton x:Name="HeaderSite" Content="{TemplateBinding Header}"
+                                      IsChecked="{Binding IsExpanded, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                      Style="{StaticResource CustomExpanderToggleButtonStyle}" />
+                            <!-- コンテンツ部分 -->
+                            <ContentPresenter x:Name="ExpandSite" Visibility="Collapsed" ContentSource="Content" />
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsExpanded" Value="True">
+                            <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
