@@ -31,6 +31,12 @@ namespace DXForgeEditor.Content
             };
         }
 
+
+        private void OnTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ImportingItemCollection.SetItemFilter((AssetType)(tabControl.SelectedItem as TabItem)?.Tag);
+        }
+
         internal static void AddDroppedFiles(ConfigureImportSettings dataContext, ListBox listBox, DragEventArgs e)
         {
             var files = (string[])e.Data.GetData(DataFormats.FileDrop);

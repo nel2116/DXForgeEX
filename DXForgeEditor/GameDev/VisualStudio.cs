@@ -42,7 +42,10 @@ namespace DXForgeEditor.GameDev
             {
                 MessageFilter.Register();
                 try { action(); }
-                catch (Exception ex) { Logger.Log(MessageType.Warning, ex.Message); }
+                catch (Exception ex)
+                {
+                    Logger.Log(MessageType.Warning, ex.Message);
+                }
                 finally { MessageFilter.Revoke(); }
             });
 
@@ -105,7 +108,7 @@ namespace DXForgeEditor.GameDev
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
-                Logger.Log(MessageType.Error, "failed to open Visual Studio");
+                Logger.Log(MessageType.Error, "Visual Studioを開くのに失敗しました");
             }
             finally
             {
@@ -190,15 +193,15 @@ namespace DXForgeEditor.GameDev
         private static void OnBuildSolutionBegin(string project, string projectConfig, string platform, string solutionConfig)
         {
             if (BuildDone) return;
-            Logger.Log(MessageType.Info, $"Building {project}, {projectConfig}, {platform}, {solutionConfig}");
+            Logger.Log(MessageType.Info, $"Build: {project}, {projectConfig}, {platform}, {solutionConfig}");
         }
 
         private static void OnBuildSolutionDone(string project, string projectConfig, string platform, string solutionConfig, bool success)
         {
             if (BuildDone) return;
 
-            if (success) Logger.Log(MessageType.Info, $"Building {projectConfig} configuration succeeded");
-            else Logger.Log(MessageType.Error, $"Building {projectConfig} configuration failed");
+            if (success) Logger.Log(MessageType.Info, $"Build: {projectConfig} configuration 成功");
+            else Logger.Log(MessageType.Error, $"Build: {projectConfig} configuration 失敗");
 
             BuildDone = true;
             BuildSucceeded = success;
@@ -227,7 +230,7 @@ namespace DXForgeEditor.GameDev
 
             if (IsDebugging_Internal())
             {
-                Logger.Log(MessageType.Error, "Visual Studio is currenty running a process.");
+                Logger.Log(MessageType.Error, "Visual Studioは現在プロセスを実行しています。");
                 return;
             }
 

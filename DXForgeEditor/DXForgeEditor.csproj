@@ -64,6 +64,7 @@
 		<PackageReference Include="envdte" Version="17.12.40391" />
 		<PackageReference Include="envdte80" Version="17.12.40391" />
 	</ItemGroup>
+
 	<ItemGroup>
 		<Resource Include="Resources\PrimitiveMeshView\PlaneTexture.png">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

@@ -89,17 +89,19 @@ float4 PostProcessPS(in noperspective float4 Position : SV_Position,
 
     const uint2 pos = uint2(Position.xy);
     const uint tileX = ceil(GlobalData.ViewWidth / TILE_SIZE);
-    const uint2 idx = pos / (uint2)TILE_SIZE;
+    const uint2 idx = pos / (uint2) TILE_SIZE;
 
     float c = (idx.x + tileX * idx.y) * 0.00001f;
 
-    if (idx.x % 2 == 0) c += 0.1f;
-    if (idx.y % 2 == 0) c += 0.1f;
+    if (idx.x % 2 == 0)
+        c += 0.1f;
+    if (idx.y % 2 == 0)
+        c += 0.1f;
 
-    return float4((float3)c, 1.f);
-#elif 0 // LIGHT GRID OPAQUE
+    return float4((float3) c, 1.f);
+#elif 1 // LIGHT GRID OPAQUE
     return Heatmap(LightGridOpaque, Position.xy, 0.75f);
-#elif 1 // SCENE
+#elif 0 // SCENE
 
     Texture2D gpassMain = ResourceDescriptorHeap[ShaderParams.GPassMainBufferIndex];
     return float4(gpassMain[Position.xy].xyz, 1.f);

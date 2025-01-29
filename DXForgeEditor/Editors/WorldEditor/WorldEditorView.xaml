@@ -12,7 +12,7 @@
              d:DataContext="{d:DesignInstance Type=gameproject:Project}"
              mc:Ignorable="d" Focusable="True"
              PreviewMouseLeftButtonDown="OnBackgroundClick"
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="1080" d:DesignWidth="1920">
     <UserControl.Resources>
         <sys:Boolean x:Key="True">True</sys:Boolean>
         <sys:Boolean x:Key="False">False</sys:Boolean>
@@ -142,7 +142,7 @@
             <!-- 下部タブ -->
             <TabControl Grid.ColumnSpan="5" Grid.Row="2" Background="Transparent" BorderBrush="{StaticResource Editor.Window.GrayBrush3}">
                 <TabItem Header="Content Browser" Style="{StaticResource DXForgeTabItemStyle}">
-                    <c:ContentBrowserView AllowImport="True"/>
+                    <c:ContentBrowserView AllowImport="True" Loaded="OnContentBrowser_Loaded" IsVisibleChanged="OnContentBrowser_IsVisibleChanged"/>
                 </TabItem>
                 <TabItem Header="LoggerView" Style="{StaticResource DXForgeTabItemStyle}">
                     <util:LoggerView/>

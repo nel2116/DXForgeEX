@@ -168,7 +168,7 @@ namespace DXForgeEditor.GameProject
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
-                Logger.Log(MessageType.Error, $"Failed to create {ProjectName}");
+                Logger.Log(MessageType.Error, $"作成に失敗: {ProjectName}");
                 throw;
             }
         }
@@ -219,7 +219,7 @@ namespace DXForgeEditor.GameProject
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
-                Logger.Log(MessageType.Error, $"Failed to read project templates");
+                Logger.Log(MessageType.Error, $"プロジェクト・テンプレートの読み込みに失敗しました");
                 throw;
             }
         }

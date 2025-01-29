@@ -34,7 +34,7 @@ namespace
 
 	void create_light(math::v3 position, math::v3 rotation, graphics::light::type type, u64 light_set_key)
 	{
-		const char* script_name{ nullptr };// type == graphics::light::spot ? "rotator_script" : nullptr };
+		const char* script_name{ "light_random_move_script" };// type == graphics::light::spot ? "rotator_script" : nullptr };
 		game_entity::entity_id entity_id{ create_one_game_entity(position, rotation, script_name).get_id() };
 
 		graphics::light_init_info info{};
@@ -124,9 +124,9 @@ void generate_lights()
 #else
 	srand(37);
 
-	constexpr f32 scale1{ 1.0f };
+	constexpr f32 scale1{ 1.5f };
 	constexpr math::v3 scale{ 1.0f * scale1, 0.5f * scale1, 1.0f * scale1 };
-	constexpr s32 dim{ 20 };
+	constexpr s32 dim{ 10 };
 	for (s32 x{ -dim }; x < dim; ++x)
 		for (s32 y{ 0 }; y < 2 * dim; ++y)
 			for (s32 z{ -dim }; z < dim; ++z)

@@ -147,6 +147,7 @@ namespace DXForgeEditor
             List<Asset> assets = new();
             try
             {
+                ImportingItemCollection.Init();
                 ContentWatcher.EnableFileWatcher(false);
                 var tasks = proxies.Select(async proxy =>
                 await Task.Run(() =>
@@ -202,10 +203,13 @@ namespace DXForgeEditor
             if (!destination.EndsWith(Path.DirectorySeparatorChar)) destination += Path.DirectorySeparatorChar;
             asset.FullPath = destination + name + Asset.AssetFileExtension;
 
+            var importingItem = new ImportingItem(name, asset);
+            ImportingItemCollection.Add(importingItem);
             bool importSucceeded = false;
             try
             {
                 // NOTE: FullPathは、asset.Import()を呼び出す前に設定する必要があります。
+                Debug.Assert(asset.FullPath?.Contains(destination) == true);
                 importSucceeded = !string.IsNullOrEmpty(file) && asset.Import(file);
 
                 if (importSucceeded)
@@ -217,7 +221,7 @@ namespace DXForgeEditor
             }
             finally
             {
-                // TODO: 輸入ステータスのUI
+                importingItem.Status = importSucceeded ? ImportStatus.Succeeded : ImportStatus.Failed;
             }
         }
     }

@@ -13,9 +13,6 @@ using System.Windows.Media.Imaging;
 
 namespace DXForgeEditor.Content
 {
-    /// <summary>
-    /// SaveDialog.xaml の相互作用ロジック
-    /// </summary>
     public partial class SaveDialog : Window
     {
         public string SaveFilePath { get; private set; }
@@ -23,10 +20,17 @@ namespace DXForgeEditor.Content
         public SaveDialog()
         {
             InitializeComponent();
+
+            contentBrowserView.Loaded += (_, _) =>
+            {
+                var contentBrowser = contentBrowserView.DataContext as ContentBrowser;
+                contentBrowser.SelectedFolder = contentBrowser.ContentFolder;
+            };
+
             Closing += OnSaveDialogClosing;
         }
 
-        private bool ValidateFileName(out object saveFilePath)
+        private bool ValidateFileName(out string saveFilePath)
         {
             var contentBrowser = contentBrowserView.DataContext as ContentBrowser;
             var path = contentBrowser.SelectedFolder;
@@ -47,12 +51,12 @@ namespace DXForgeEditor.Content
 
             if (fileName.IndexOfAny(Path.GetInvalidFileNameChars()) != -1)
             {
-                errorMsg = "Invalid character(s) used in asset file name.";
+                errorMsg = "アセットファイル名に無効な文字が使用されている";
             }
             else if (File.Exists(path) &&
-                MessageBox.Show("File already exists. Overwrite?", "Overwrite file", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.No)
+                MessageBox.Show("ファイルはすでに存在します。 上書きしますか？", "ファイルの上書き", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.No)
             {
-                // Do nothing. Just return false.
+                // 何もしない。 ただ偽を返す。
             }
             else
             {
@@ -72,7 +76,7 @@ namespace DXForgeEditor.Content
         {
             if (ValidateFileName(out var saveFilePath))
             {
-                SaveFilePath = (string)saveFilePath;
+                SaveFilePath = saveFilePath;
                 DialogResult = true;
                 Close();
             }
@@ -80,12 +84,14 @@ namespace DXForgeEditor.Content
 
         private void OnContentBrowser_Mouse_DoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if ((e.OriginalSource as FrameworkElement).DataContext == contentBrowserView.SelectedItem && contentBrowserView.SelectedItem.FileName == fileNameTextBox.Text)
+            if ((e.OriginalSource as FrameworkElement).DataContext == contentBrowserView.SelectedItem &&
+                contentBrowserView.SelectedItem.FileName == fileNameTextBox.Text)
             {
                 OnSave_Button_Click(sender, null);
             }
         }
-        private void OnSaveDialogClosing(object? sender, CancelEventArgs e)
+
+        private void OnSaveDialogClosing(object sender, CancelEventArgs e)
         {
             contentBrowserView.Dispose();
         }

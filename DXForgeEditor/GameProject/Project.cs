@@ -189,7 +189,7 @@ namespace DXForgeEditor.GameProject
         private static void Save(Project project)
         {
             Serializer.ToFile(project, project.FullPath);
-            Logger.Log(MessageType.Info, $"Project saved to {project.FullPath}");
+            Logger.Log(MessageType.Info, $"プロジェクトの保存: {project.FullPath}");
         }
 
         private void SaveToBinary()
@@ -252,11 +252,11 @@ namespace DXForgeEditor.GameProject
             {
                 AvailableScripts = EngineAPI.GetScriptNames();
                 ActiveScene.GameEntities.Where(x => x.GetComponent<Script>() != null).ToList().ForEach(x => x.IsActive = true);
-                Logger.Log(MessageType.Info, "Game code DLL loaded successfully.");
+                Logger.Log(MessageType.Info, "ゲームコードDLLは正常にロードされました。");
             }
             else
             {
-                Logger.Log(MessageType.Warning, "Failed to load game code DLL file. Try to build the project first!");
+                Logger.Log(MessageType.Warning, "ゲームコードDLLファイルのロードに失敗しました。 まずプロジェクトをビルドしてみてください！");
             }
         }
 
@@ -265,7 +265,7 @@ namespace DXForgeEditor.GameProject
             ActiveScene.GameEntities.Where(x => x.GetComponent<Script>() != null).ToList().ForEach(x => x.IsActive = false);
             if (EngineAPI.UnloadGameCodeDll() != 0)
             {
-                Logger.Log(MessageType.Info, "Game code DLL unloaded");
+                Logger.Log(MessageType.Info, "ゲームコードDLLのアンロード");
                 AvailableScripts = null;
             }
         }

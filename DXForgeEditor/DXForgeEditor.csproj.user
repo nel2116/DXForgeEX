@@ -13,10 +13,22 @@
     <Compile Update="Content\ContentBrowser\SaveDialog.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Update="Content\ContentBrowser\SelectFolderDialog.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="Content\ImportSettingsConfig\ChangeDestinationFolder.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Update="Content\ImportSettingsConfig\ConfigureGeometryImportSettingsView.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Update="Content\ImportSettingsConfig\ConfigureImportSettingsWindow.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="Content\ImportSettingsConfig\GeometryImportSettingsView.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="Content\ImportSettingsConfig\ImportingItemsView.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
     <Compile Update="Content\PrimitiveMeshDialog.xaml.cs">
@@ -87,10 +99,22 @@
     <Page Update="Content\ContentBrowser\SaveDialog.xaml">
       <SubType>Designer</SubType>
     </Page>
+    <Page Update="Content\ContentBrowser\SelectFolderDialog.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Update="Content\ImportSettingsConfig\ChangeDestinationFolder.xaml">
+      <SubType>Designer</SubType>
+    </Page>
     <Page Update="Content\ImportSettingsConfig\ConfigureGeometryImportSettingsView.xaml">
       <SubType>Designer</SubType>
     </Page>
     <Page Update="Content\ImportSettingsConfig\ConfigureImportSettingsWindow.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Update="Content\ImportSettingsConfig\GeometryImportSettingsView.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Update="Content\ImportSettingsConfig\ImportingItemsView.xaml">
       <SubType>Designer</SubType>
     </Page>
     <Page Update="Content\PrimitiveMeshDialog.xaml">

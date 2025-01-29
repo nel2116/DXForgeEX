@@ -21,7 +21,7 @@ namespace DXForgeEditor.Utilities
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
-                Logger.Log(MessageType.Error, $"Failed to deseralze {instance} to {path}");
+                Logger.Log(MessageType.Error, $"デシリアライズに失敗: {instance} 場所: {path}");
                 throw;
             }
         }
@@ -39,7 +39,7 @@ namespace DXForgeEditor.Utilities
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
-                Logger.Log(MessageType.Error, $"Failed to deseralze {path}");
+                Logger.Log(MessageType.Error, $"デシリアライズに失敗: {path}");
                 throw;
             }
         }

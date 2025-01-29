@@ -15,6 +15,12 @@
 
 using namespace dxforge;
 
+namespace
+{
+	constexpr f32 inv_rand_max{ 1.0f / RAND_MAX };
+	f32 random(f32 min = 0.0f) { return std::max(min, rand() * inv_rand_max); }
+}
+
 class rotator_script;
 REGISTER_SCRIPT(rotator_script);
 class rotator_script : public script::entity_script
@@ -93,6 +99,74 @@ public:
 
 private:
 	f32 _angle{ 0.0f };
+};
+
+class light_random_move_script;
+REGISTER_SCRIPT(light_random_move_script);
+class light_random_move_script : public script::entity_script
+{
+public:
+	constexpr explicit light_random_move_script(game_entity::entity entity)
+		: script::entity_script{ entity } {}
+	void begin_play() override {}
+	void update(f32 dt) override
+	{
+		// 一定の確率でランダムに移動
+		if (!_is_move)
+		{
+			if (random(0.1f) > 0.99f)
+			{
+				_is_move = true;
+				set_random_destination();
+			}
+		}
+		else
+		{
+			if (is_destination())
+			{
+				_is_move = false;
+			}
+			else
+			{
+				math::v3 pos{ position() };
+				DirectX::XMVECTOR vPos = DirectX::XMLoadFloat3(&pos);
+				DirectX::XMVECTOR dest{ DirectX::XMLoadFloat3(&_destination) };
+
+				DirectX::XMVECTOR limit{ DirectX::XMVectorSet(10.0f, 10.0f, 10.0f, 0.0f) };
+				dest = DirectX::XMVectorClamp(dest, DirectX::XMVectorNegate(limit), limit);
+
+				DirectX::XMVECTOR dir{ DirectX::XMVector3Normalize(DirectX::XMVectorSubtract(dest, vPos)) };
+				DirectX::XMVECTOR move{ DirectX::XMVectorScale(dir, 0.03f) };
+
+				DirectX::XMVECTOR new_pos{ DirectX::XMVectorAdd(vPos, move) };
+				DirectX::XMStoreFloat3(&pos, new_pos);
+				set_position(pos);
+			}
+		}
+	}
+
+private:
+
+	// 目的地をランダムに設定
+	void set_random_destination()
+	{
+		math::v3 pos{ position() };
+		pos.x = (u32)(random(0.1f) * 10) % 2 == 0 ? 10.0f : -10.0f;
+		pos.z = (u32)(random(0.1f) * 10) % 2 == 0 ? 10.0f : -10.0f;
+		_destination = pos;
+	}
+
+	// 目的地まで移動したかどうか
+	bool is_destination() const
+	{
+		math::v3 pos{ position() };
+		DirectX::XMVECTOR vPos = DirectX::XMLoadFloat3(&pos);
+		DirectX::XMVECTOR dest = DirectX::XMLoadFloat3(&_destination);
+		DirectX::XMVECTOR distance = DirectX::XMVector3Length(DirectX::XMVectorSubtract(dest, vPos));
+		return DirectX::XMVectorGetX(distance) < 0.1f;
+	}
+	bool _is_move{ false };
+	math::v3 _destination{ 0.0f, 0.0f, 0.0f };
 };
 
 class camera_script;
