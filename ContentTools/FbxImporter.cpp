@@ -88,22 +88,50 @@ namespace dxforge::tools
 		}
 
 		const s32 num_nodes{ root->GetChildCount() };
-		for (s32 i{ 0 }; i < num_nodes; ++i)
-		{
-			FbxNode* node{ root->GetChild(i) };
-			if (!node) continue;
 
+		if (_scene_data->settings.coalesce_meshes)
+		{
 			lod_group lod{};
-			get_meshs(node, lod.meshes, 0, -1.0f);
+			for (s32 i{ 0 }; i < num_nodes; ++i)
+			{
+				FbxNode* node{ root->GetChild(i) };
+				if (!node) continue;
+
+				get_meshes(node, lod.meshes, 0, -1.f);
+			}
+
 			if (lod.meshes.size())
 			{
 				lod.name = lod.meshes[0].name;
+				mesh combined_mesh{};
+
+				if (coalesce_meshes(lod, combined_mesh, _progression))
+				{
+					lod.meshes.clear();
+					lod.meshes.emplace_back(combined_mesh);
+				}
 				_scene->lod_groups.emplace_back(lod);
+			}
+		}
+		else
+		{
+			for (s32 i{ 0 }; i < num_nodes; ++i)
+			{
+				FbxNode* node{ root->GetChild(i) };
+				if (!node) continue;
+
+				lod_group lod{};
+				get_meshes(node, lod.meshes, 0, -1.f);
+				if (lod.meshes.size())
+				{
+					lod.name = lod.meshes[0].name;
+					_scene->lod_groups.emplace_back(lod);
+				}
 			}
 		}
 	}
 
-	void fbx_context::get_meshs(FbxNode* node, utl::vector<mesh>& meshes, u32 lod_id, f32 lod_threshold)
+	void fbx_context::get_meshes(FbxNode* node, utl::vector<mesh>& meshes, u32 lod_id, f32 lod_threshold)
 	{
 		assert(node && lod_id != u32_invalid_id);
 		bool is_lod_group{ false };
@@ -132,7 +160,7 @@ namespace dxforge::tools
 			{
 				for (s32 i{ 0 }; i < num_children; ++i)
 				{
-					get_meshs(node->GetChild(i), meshes, lod_id, lod_threshold);
+					get_meshes(node->GetChild(i), meshes, lod_id, lod_threshold);
 				}
 			}
 		}
@@ -160,6 +188,7 @@ namespace dxforge::tools
 		if (get_mesh_data(fbx_mesh, m))
 		{
 			meshes.emplace_back(m);
+			_progression->callback(_progression->value(), _progression->max_value() + 1);
 		}
 	}
 
@@ -185,7 +214,7 @@ namespace dxforge::tools
 				lod_grp->GetThreshold(i - 1, threshold);
 				lod_threshold = threshold.value() * _scene_scale;
 			}
-			get_meshs(node->GetChild(i), lod.meshes, (u32)lod.meshes.size(), lod_threshold);
+			get_meshes(node->GetChild(i), lod.meshes, (u32)lod.meshes.size(), lod_threshold);
 		}
 		if (lod.meshes.size()) _scene->lod_groups.emplace_back(lod);
 
@@ -331,27 +360,28 @@ namespace dxforge::tools
 	}
 
 	// ====== グローバル関数 ======
-	EDITOR_INTERFACE void ImportFbx(const char* file, scene_data* data)
+	EDITOR_INTERFACE void ImportFbx(const char* file, scene_data* data, progression::progress_callback callback)
 	{
 		assert(file && data);
 		scene scene{};
-
-		// NOTE: SDKを使用するものはシングルスレッドであるべきです。
+		progression progression{ callback };
+		// NOTE: FBX SDKを使用するものは、シングルスレッドでなければならない。
 		{
 			std::lock_guard lock{ fbx_mutex };
-			fbx_context fbx_context{ file, &scene, data };
+			fbx_context fbx_context{ file, &scene, data, &progression };
 			if (fbx_context.is_valid())
 			{
 				fbx_context.get_scene();
 			}
-			else
-			{
-				// TODO: send failure message to editor
-				return;
-			}
 		}
 
-		process_scene(scene, data->settings);
+		if (scene.lod_groups.empty())
+		{
+			// TODO: 失敗ログメッセージをエディターに送る
+			return;
+		}
+
+		process_scene(scene, data->settings, &progression);
 		pack_data(scene, *data);
 	}
 }	// namespace dxforge::tools

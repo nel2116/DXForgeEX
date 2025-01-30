@@ -261,6 +261,20 @@ namespace DXForgeEditor.Content
             }
         }
 
+        private bool _coalesceMeshes;
+        public bool CoalesceMeshes
+        {
+            get => _coalesceMeshes;
+            set
+            {
+                if (_coalesceMeshes != value)
+                {
+                    _coalesceMeshes = value;
+                    OnPropertyChanged(nameof(CoalesceMeshes));
+                }
+            }
+        }
+
         public GeometryImportSettings()
         {
             CalculateNormals = false;
@@ -269,6 +283,7 @@ namespace DXForgeEditor.Content
             ReverseHandedness = false;
             ImportEmbeddedTextures = true;
             ImportAnimations = true;
+            CoalesceMeshes = false;
         }
 
         public void ToBinary(BinaryWriter writer)
@@ -279,6 +294,7 @@ namespace DXForgeEditor.Content
             writer.Write(ReverseHandedness);
             writer.Write(ImportEmbeddedTextures);
             writer.Write(ImportAnimations);
+            writer.Write(CoalesceMeshes);
         }
 
         public void FromBinary(BinaryReader reader)
@@ -289,6 +305,7 @@ namespace DXForgeEditor.Content
             ReverseHandedness = reader.ReadBoolean();
             ImportEmbeddedTextures = reader.ReadBoolean();
             ImportAnimations = reader.ReadBoolean();
+            CoalesceMeshes = reader.ReadBoolean();
         }
     }
 

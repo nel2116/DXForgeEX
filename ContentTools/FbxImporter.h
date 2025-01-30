@@ -27,10 +27,10 @@ namespace dxforge::tools
 		/// @param file ファイル名
 		/// @param scene シーン
 		/// @param data シーンデータ
-		fbx_context(const char* file, scene* scene, scene_data* data)
-			: _scene(scene), _scene_data(data)
+		fbx_context(const char* file, scene* scene, scene_data* data, progression* const progression)
+			: _scene(scene), _scene_data(data), _progression(progression)
 		{
-			assert(file && _scene && _scene_data);
+			assert(file && _scene && _scene_data && _progression);
 			if (initialize_fbx())
 			{
 				load_fbx_file(file);
@@ -56,10 +56,12 @@ namespace dxforge::tools
 		/// @brief シーンスケールを取得
 		constexpr f32 scene_scale() const { return _scene_scale; }
 
+		constexpr progression* get_progression() const { return _progression; }
+
 	private:	// プライベート関数
 		bool initialize_fbx();
 		void load_fbx_file(const char* file);
-		void get_meshs(FbxNode* node, utl::vector<mesh>& meshes, u32 lod_id, f32 lod_threshold);
+		void get_meshes(FbxNode* node, utl::vector<mesh>& meshes, u32 lod_id, f32 lod_threshold);
 		void get_mesh(FbxNodeAttribute* attribute, utl::vector<mesh>& meshes, u32 lod_id, f32 lod_threshold);
 		void get_lod_group(FbxNodeAttribute* attribute);
 		bool get_mesh_data(FbxMesh* fbx_mesh, mesh& m);
@@ -70,6 +72,7 @@ namespace dxforge::tools
 		scene_data* _scene_data{ nullptr };
 		FbxManager* _fbx_manager{ nullptr };
 		FbxScene* _fbx_scene{ nullptr };
+		progression* _progression{ nullptr };
 		f32 _scene_scale{ 1.0f };
 	};
 

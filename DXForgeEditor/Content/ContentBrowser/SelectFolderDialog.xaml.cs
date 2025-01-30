@@ -25,12 +25,10 @@ namespace DXForgeEditor.Content
 
             contentBrowserView.Loaded += (_, _) =>
             {
-                if (!Path.EndsInDirectorySeparator(startFolder))
-                {
-                    startFolder += Path.DirectorySeparatorChar;
-                }
+                // TODO: すべてのパスが常にディレクトリ区切り文字で終わるようにする！
+                var startPath = startFolder + Path.DirectorySeparatorChar;
 
-                if (startFolder?.Contains(Project.Current.ContentPath) == true)
+                if (startPath.Contains(Project.Current.ContentPath))
                 {
                     (contentBrowserView.DataContext as ContentBrowser).SelectedFolder = startFolder;
                 }

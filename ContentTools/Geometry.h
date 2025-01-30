@@ -174,8 +174,9 @@ namespace dxforge::tools
 		u8 calculate_normals;							// 法線の計算
 		u8 calculate_tangents;							// 接線の計算
 		u8 reverse_handedness;							// 右手系を左手系に変換
-		u8 import_embeded_textures;						// テクスチャの埋め込み
+		u8 import_embedded_textures;					// テクスチャの埋め込み
 		u8 import_animations;							// アニメーションのインポート
+		u8 coalesce_meshes;								// メッシュの結合
 	};
 
 	// シーンデータ
@@ -186,10 +187,9 @@ namespace dxforge::tools
 		geometry_import_settings settings;				// インポート設定
 	};
 
-	void process_scene(scene& scene, const geometry_import_settings& settings);
+	void process_scene(scene& scene, const geometry_import_settings& settings, progression* const progression);
 	void pack_data(const scene& scene, scene_data& data);
-
-
+	bool coalesce_meshes(const lod_group& lod, mesh& combined_mesh, progression* const progression);
 } // namespace dxforge::tools
 
 

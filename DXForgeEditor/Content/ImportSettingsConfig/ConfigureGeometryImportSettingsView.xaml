@@ -19,7 +19,7 @@
         <Style TargetType="{x:Type ListBoxItem}" x:Key="AlternateColorListBoxItemStyle" BasedOn="{StaticResource ListBoxItemStyle}">
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Background"
-                    Value="{Binding Path=(ItemsControl.AlternationCount), RelativeSource={RelativeSource Self}, Converter={StaticResource alternationConverter}}"/>
+                    Value="{Binding Path=(ItemsControl.AlternationIndex), RelativeSource={RelativeSource Self}, Converter={StaticResource alternationConverter}}"/>
         </Style>
 
         <Style TargetType="{x:Type Line}" x:Key="RedLineStyle">
@@ -47,7 +47,7 @@
         <Border Background="{StaticResource Editor.Window.GrayBrush3}" Margin="0,0,5,0">
             <DockPanel Background="{StaticResource Editor.Window.GrayBrush3}" Margin="10">
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
-                    <Button Content="Import" Width="64" Click="OnImport_Button_Click"
+                    <Button Content="インポート" Width="64" Click="OnImport_Button_Click"
                             IsEnabled="{Binding GeometryProxies.Count}"/>
                 </StackPanel>
                 <ListBox ItemsSource="{Binding GeometryProxies}" AlternationCount="{Binding GeometryProxies.Count}" SelectionMode="Extended"
@@ -154,8 +154,8 @@
                     <RowDefinition Height="auto"/>
                     <RowDefinition />
                 </Grid.RowDefinitions>
-                <TextBlock Text="{Binding FileInfo.Name, StringFormat='Import settings for {0}'}" TextTrimming="CharacterEllipsis"
-                           d:Text="Import settings for model.fbx" FontSize="16" Margin="10"/>
+                <TextBlock Text="{Binding FileInfo.Name, StringFormat=' {0} のインポート設定'}" TextTrimming="CharacterEllipsis"
+                           d:Text="model.fbxのインポート設定" FontSize="16" Margin="10"/>
                 <local:GeometryImportSettingsView DataContext="{Binding ImportSettings}" Grid.Row="1" Margin="10,0,10,28"/>
                 <Border Grid.Row="1" CornerRadius="5" BorderBrush="{StaticResource Editor.OrangeBrush}" BorderThickness="1" Background="#50000000"
                         Margin="5,-5,5,23" x:Name="lockBorder" ToolTipService.InitialShowDelay="100"
@@ -179,10 +179,10 @@
                     </Border>
                 </Border>
                 <StackPanel Grid.Row="2" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,0">
-                    <Button Content="Apply to Selection" Width="150" Click="OnApplyToSelection_Button_Click"
+                    <Button Content="選択したものに適用" Width="150" Click="OnApplyToSelection_Button_Click"
                             Visibility="{Binding Path=Visibility, ElementName=lockBorder}"/>
-                    <Button Content="Apply to All" Width="150" Margin="0,8" Click="OnApplyToAll_Button_Click"/>
-                    <Button Content="Set as Default" Width="150" />
+                    <Button Content="すべてに適用" Width="150" Margin="0,8" Click="OnApplyToAll_Button_Click"/>
+                    <Button Content="デフォルトに設定" Width="150" />
                 </StackPanel>
 
                 <local:ChangeDestinationFolder Grid.Row="3" Margin="10,20,10,10" VerticalAlignment="Top" />
@@ -193,10 +193,10 @@
         <GridSplitter Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Stretch" Width="5" Background="Transparent"/>
 
         <Grid Grid.Column="2" Background="{StaticResource Editor.Window.GrayBrush3}">
-            <Button Content="Clear" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="10" Click="OnClearImportingItems_Button_Click"/>
-            <DockPanel Margin="10">
-                <TextBlock Text="Imported files" DockPanel.Dock="Top" FontSize="16"/>
-                <local:ImportingItemsView Margin="0,10,10,0"/>
+            <Button Content="クリア" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="10" Click="OnClearImportingItems_Button_Click"/>
+            <DockPanel  Margin="10">
+                <TextBlock Text="Imported"  DockPanel.Dock="Top" FontSize="16"/>
+                <local:ImportingItemsView Margin="0,10,0,0"/>
             </DockPanel>
         </Grid>
 
