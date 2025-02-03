@@ -70,7 +70,7 @@
                             </Border>
                             <Canvas>
                                 <Thumb x:Name="PART_HeaderGripper"
-                                   Style="{StaticResource GridViewColumnHeaderGripper}"/>
+                                       Style="{StaticResource GridViewColumnHeaderGripper}"/>
                             </Canvas>
                         </Grid>
                         <ControlTemplate.Triggers>
@@ -103,8 +103,8 @@
                             <ControlTemplate TargetType="{x:Type GridViewColumnHeader}">
                                 <Canvas Name="PART_FloatingHeaderCanvas">
                                     <Rectangle Opacity="0.4697" Fill="#FF000000"
-                                           Width="{TemplateBinding ActualWidth}"
-                                           Height="{TemplateBinding ActualHeight}"/>
+                                               Width="{TemplateBinding ActualWidth}"
+                                               Height="{TemplateBinding ActualHeight}"/>
                                 </Canvas>
                             </ControlTemplate>
                         </Setter.Value>
@@ -115,8 +115,8 @@
                         <Setter.Value>
                             <ControlTemplate TargetType="{x:Type GridViewColumnHeader}">
                                 <Border x:Name="HeaderBorder" BorderThickness="0"
-                                    BorderBrush="{TemplateBinding BorderBrush}"
-                                    Background="{TemplateBinding Background}"/>
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        Background="{TemplateBinding Background}"/>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="Height" Value="Auto">
                                         <Setter Property="MinHeight" Value="20"/>
@@ -129,7 +129,7 @@
             </Style.Triggers>
         </Style>
 
-        <Style  TargetType="{x:Type ListViewItem}">
+        <Style TargetType="{x:Type ListViewItem}">
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Foreground" Value="{StaticResource Editor.FontBrush}"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -142,7 +142,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type ListViewItem}">
                         <Border BorderThickness="{TemplateBinding BorderThickness}" BorderBrush="{TemplateBinding BorderBrush}"
-                            Background="{TemplateBinding Background}" CornerRadius="0" SnapsToDevicePixels="true">
+                                Background="{TemplateBinding Background}" CornerRadius="0" SnapsToDevicePixels="true">
                             <GridViewRowPresenter VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                                   SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
                         </Border>
@@ -187,7 +187,7 @@
             <!-- Icon and file name -->
             <GridViewColumn>
                 <GridViewColumn.Header>
-                    <GridViewColumnHeader Tag="FileName" Content="Name"/>
+                    <GridViewColumnHeader Tag="FileName" Content="名前 "/>
                 </GridViewColumn.Header>
                 <GridViewColumn.CellTemplate>
                     <DataTemplate>
@@ -206,7 +206,7 @@
             <!-- Date modified -->
             <GridViewColumn>
                 <GridViewColumn.Header>
-                    <GridViewColumnHeader Tag="DateModified" Content="Date modified"/>
+                    <GridViewColumnHeader Tag="DateModified" Content="変更日"/>
                 </GridViewColumn.Header>
                 <GridViewColumn.CellTemplate>
                     <DataTemplate>
@@ -218,7 +218,7 @@
             <!-- File size -->
             <GridViewColumn DisplayMemberBinding="{Binding Size, Converter={StaticResource dataSizeToStringConverter}}">
                 <GridViewColumn.Header>
-                    <GridViewColumnHeader Tag="Size" Content="Size"/>
+                    <GridViewColumnHeader Tag="Size" Content="サイズ "/>
                 </GridViewColumn.Header>
             </GridViewColumn>
         </GridView>
@@ -249,32 +249,24 @@
             </local:PlainView.ItemContainerStyle>
         </local:PlainView>
 
-        <Style TargetType="{x:Type ToggleButton}" x:Key="ListViewToggleButtonStyle">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="{StaticResource Editor.Window.GrayBrush4}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="2"/>
-            <Setter Property="Margin" Value="5,0"/>
-            <Setter Property="Focusable" Value="False"/>
-            <Setter Property="Template">
+        <Style TargetType="{x:Type ToggleButton}" x:Key="ListViewToggleButtonStyle" BasedOn="{StaticResource DXForgeButtonStyle}">
+            <Setter Property="Content">
                 <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type ToggleButton}">
-                        <Border x:Name="border" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"
-                                Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
-                            <Image x:Name="image" Source="pack://application:,,,/Resources/ContentBrowser/ListView.png" Width="16" Opacity="0.8"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter Property="Source" TargetName="image" Value="pack://application:,,,/Resources/ContentBrowser/TileView.png"/>
-                                <Setter Property="ToolTip" TargetName="border" Value="Tile view"/>
-                            </Trigger>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="BorderBrush" TargetName="border" Value="{StaticResource Editor.MouseOver.BorderBrush}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
+                    <Image Width="32" Opacity="0.8" Source="pack://application:,,,/Resources/ContentBrowser/ListView.png"/>
                 </Setter.Value>
             </Setter>
+            <Setter Property="ToolTip" Value="Toggle list view"/>
+
+            <Style.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Content">
+                        <Setter.Value>
+                            <Image Width="32" Opacity="0.8" Source="pack://application:,,,/Resources/ContentBrowser/TileView.png"/>
+                        </Setter.Value>
+                    </Setter>
+                    <Setter Property="ToolTip" Value="Toggle tile view"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <ContextMenu x:Key="contextMenu">
@@ -326,16 +318,17 @@
                     <Border x:Name="filesDrop" Background="Transparent" Grid.Row="0"/>
                     <Border x:Name="cfgDrop" Background="Transparent" Grid.Row="1"/>
                 </Grid>
-                <Border BorderThickness="0" Background="#66000000"
+                <Border BorderBrush="{StaticResource Editor.OrangeBrush}" BorderThickness="2" CornerRadius="50" Background="#66000000"
                         SnapsToDevicePixels="True" UseLayoutRounding="True" IsHitTestVisible="False">
-                    <Border Background="#cc000000" VerticalAlignment="Center" HorizontalAlignment="Center" BorderThickness="0">
+                    <Border Background="#cc000000" VerticalAlignment="Center" HorizontalAlignment="Center"
+                            CornerRadius="20" BorderBrush="{StaticResource Editor.OrangeBrush}" BorderThickness="2">
                         <StackPanel>
                             <Border CornerRadius="16,16,0,0" HorizontalAlignment="Center" Width="250" x:Name="filesBorder" Background="Transparent">
-                                <TextBlock x:Name="filesText" Text="個別ファイルのインポート" FontFamily="Bahnschrift condensed" FontSize="22"
+                                <TextBlock x:Name="filesText" Text="個別ファイルのインポート" FontFamily="Bahnschrift condensed" FontSize="24"
                                        Foreground="{StaticResource Editor.FontBrush}" Margin="20" HorizontalAlignment="Center"/>
                             </Border>
                             <Border CornerRadius="0,0,16,16" HorizontalAlignment="Center" Width="250" x:Name="cfgBorder" Background="Transparent">
-                                <TextBlock x:Name="cfgText" Text="インポート設定の構成" FontFamily="Bahnschrift condensed" FontSize="22"
+                                <TextBlock x:Name="cfgText" Text="インポート設定の構成 " FontFamily="Bahnschrift condensed" FontSize="24"
                                        Foreground="{StaticResource Editor.FontBrush}" Margin="20" HorizontalAlignment="Center"/>
                             </Border>
                         </StackPanel>
@@ -400,9 +393,26 @@
             </Border.Effect>
             <DockPanel>
                 <DockPanel Margin="5" DockPanel.Dock="Top">
-                    <ToggleButton DockPanel.Dock="Right" Style="{StaticResource ListViewToggleButtonStyle}"
-                                  x:Name="listViewToggle"/>
-                    <TextBox />
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" Margin="5,0">
+
+                        <Button Padding="2" Margin="0,0,5,0" Focusable="False" Click="OnOpenImportSettingsConfigurator_Button_Click">
+                            <Button.Style>
+                                <Style TargetType="{x:Type Button}" BasedOn="{StaticResource DXForgeButtonStyle}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Path=AllowImport, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:ContentBrowserView}}}" Value="False">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                            <Button.Content>
+                                <Image Width="32" Source="pack://application:,,,/Resources/ContentBrowser/OpenImportCfg.png"/>
+                            </Button.Content>
+                        </Button>
+                        <ToggleButton Padding="2" Focusable="False" x:Name="listViewToggle"
+                                      Style="{StaticResource ListViewToggleButtonStyle}" d:IsChecked="True"/>
+                    </StackPanel>
+                    <TextBox VerticalAlignment="Stretch"/>
                 </DockPanel>
                 <StackPanel Orientation="Horizontal" x:Name="pathStack" Margin="0,0,0,5">
                     <StackPanel.Resources>
@@ -457,7 +467,7 @@
                             <Setter Property="VerticalAlignment" Value="Center"/>
                         </Style>
                     </StackPanel.Resources>
-                    <Image Source="pack://application:,,,/Resources/ContentBrowser/FolderSmall.png" Width="18" Margin="5,0,0,2"/>
+                    <Image Source="pack://application:,,,/Resources/ContentBrowser/FolderSmall.png" Width="24" Margin="5,0,0,2"/>
                 </StackPanel>
             </DockPanel>
         </Border>

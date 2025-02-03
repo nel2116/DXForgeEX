@@ -25,6 +25,9 @@
     <Compile Update="Content\ImportSettingsConfig\ConfigureImportSettingsWindow.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Update="Content\ImportSettingsConfig\ConfigureTextureImportSettingsView.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Update="Content\ImportSettingsConfig\GeometryImportSettingsView.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -109,6 +112,9 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Update="Content\ImportSettingsConfig\ConfigureImportSettingsWindow.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Update="Content\ImportSettingsConfig\ConfigureTextureImportSettingsView.xaml">
       <SubType>Designer</SubType>
     </Page>
     <Page Update="Content\ImportSettingsConfig\GeometryImportSettingsView.xaml">
