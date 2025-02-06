@@ -34,6 +34,9 @@
     <Compile Update="Content\ImportSettingsConfig\ImportingItemsView.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Update="Content\ImportSettingsConfig\TextureImportSettingsView.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Update="Content\PrimitiveMeshDialog.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -121,6 +124,9 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Update="Content\ImportSettingsConfig\ImportingItemsView.xaml">
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Update="Content\ImportSettingsConfig\TextureImportSettingsView.xaml">
       <SubType>Designer</SubType>
     </Page>
     <Page Update="Content\PrimitiveMeshDialog.xaml">

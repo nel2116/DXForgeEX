@@ -80,7 +80,7 @@
         <Border Background="{StaticResource Editor.Window.GrayBrush3}" Margin="0,0,5,0">
             <DockPanel Background="{StaticResource Editor.Window.GrayBrush3}" Margin="10">
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
-                    <Button Content="Import" Width="64" Click="OnImport_Button_Click"
+                    <Button Content="インポート" Width="64" Click="OnImport_Button_Click"
                             IsEnabled="{Binding TextureProxies.Count}"/>
                 </StackPanel>
                 <ListBox ItemsSource="{Binding TextureProxies}" AlternationCount="{Binding TextureProxies.Count}" SelectionMode="Extended"
@@ -223,8 +223,8 @@
                     <RowDefinition Height="auto"/>
                     <RowDefinition />
                 </Grid.RowDefinitions>
-                <TextBlock Text="{Binding FileInfo.Name, StringFormat='Import settings for {0}'}" TextTrimming="CharacterEllipsis"
-                           d:Text="Import settings for image.png" FontSize="16" Margin="10"/>
+                <TextBlock Text="{Binding FileInfo.Name, StringFormat=' {0} のインポート設定'}" TextTrimming="CharacterEllipsis"
+                           d:Text="image.png のインポート設定" FontSize="16" Margin="10"/>
                 <local:TextureImportSettingsView Grid.Row="1" DataContext="{Binding ImportSettings}" Margin="10,0,10,28"/>
                 <Border Grid.Row="1" CornerRadius="5" BorderBrush="{StaticResource Editor.OrangeBrush}" BorderThickness="1" Background="#50000000"
                         Margin="5,-5,5,23" x:Name="lockBorder" ToolTipService.InitialShowDelay="100"
@@ -248,10 +248,10 @@
                     </Border>
                 </Border>
                 <StackPanel Grid.Row="2" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,0">
-                    <Button Content="Apply to Selection" Width="150" Click="OnApplyToSelection_Button_Click"
+                    <Button Content="選択したものに適用" Width="150" Click="OnApplyToSelection_Button_Click"
                             Visibility="{Binding Path=Visibility, ElementName=lockBorder}"/>
-                    <Button Content="Apply to All" Width="150" Margin="0,8" Click="OnApplyToAll_Button_Click"/>
-                    <Button Content="Set as Default" Width="150" />
+                    <Button Content="全てに適用" Width="150" Margin="0,8" Click="OnApplyToAll_Button_Click"/>
+                    <Button Content="デフォルトに設定" Width="150" />
                 </StackPanel>
 
                 <local:ChangeDestinationFolder Grid.Row="3" Margin="10,20,10,10" VerticalAlignment="Top" />
@@ -334,7 +334,7 @@
         <GridSplitter Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Stretch" Width="5" Background="Transparent"/>
 
         <Grid Grid.Column="2" Background="{StaticResource Editor.Window.GrayBrush3}">
-            <Button Content="Clear" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="10" Click="OnClearImportingItems_Button_Click"/>
+            <Button Content="クリア" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="10" Click="OnClearImportingItems_Button_Click"/>
             <DockPanel Margin="10">
                 <TextBlock Text="Imported files" DockPanel.Dock="Top" FontSize="16"/>
                 <local:ImportingItemsView Margin="0,10,0,0"/>

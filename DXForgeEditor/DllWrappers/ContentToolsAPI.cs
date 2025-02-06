@@ -251,7 +251,7 @@ namespace DXForgeEditor.DllWrappers
                 for (var j = 0; j < mipLevels; ++j)
                 {
                     var mipSlice = new List<Slice>();
-                    for (var k = 0; k < depthPerMipLevel[i]; ++k)
+                    for (var k = 0; k < depthPerMipLevel[j]; ++k)
                     {
                         var slice = new Slice();
                         slice.Width = reader.ReadInt32();
@@ -371,7 +371,11 @@ namespace DXForgeEditor.DllWrappers
             {
                 sceneData.ImportSettings.FromContentSettings(geometry);
                 sceneDataGenerator(sceneData);
-                Debug.Assert(sceneData.Data != IntPtr.Zero && sceneData.DataSize > 0);
+                if (sceneData.Data == IntPtr.Zero || sceneData.DataSize == 0)
+                {
+                    throw new Exception(failureMessage);
+                }
+
                 var data = new byte[sceneData.DataSize];
                 Marshal.Copy(sceneData.Data, data, 0, sceneData.DataSize);
                 geometry.FromRawData(data);
