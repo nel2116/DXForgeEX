@@ -1,5 +1,4 @@
-﻿using DXForgeEditor.Content;
-using DXForgeEditor.Editors;
+﻿using DXForgeEditor.Editors;
 using DXForgeEditor.GameProject;
 using System;
 using System.Collections.Generic;
@@ -25,7 +24,8 @@ namespace DXForgeEditor.Content
 {
     class DataSizeToStringConverter : IValueConverter
     {
-        static readonly string[] _sizeSuffixes = { "B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB" };
+        static readonly string[] _sizeSuffixes =
+                   { "B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB" };
 
         static string SizeSuffix(long value, int decimalPlaces = 1)
         {
@@ -38,7 +38,8 @@ namespace DXForgeEditor.Content
             // [つまり、マグに対応する単位のバイト数]。
             decimal adjustedSize = (decimal)value / (1L << (mag * 10));
 
-            // 四捨五入して1000以上になるような大きな値の場合は調整する。
+            // その値が十分大きくなってから調整する。
+            // 四捨五入して1000以上になる
             if (Math.Round(adjustedSize, decimalPlaces) >= 1000)
             {
                 mag += 1;
@@ -98,6 +99,7 @@ namespace DXForgeEditor.Content
 
         protected override object DefaultStyleKey => new ComponentResourceKey(GetType(), "PlainViewResourceId");
     }
+
 
     public partial class ContentBrowserView : UserControl, IDisposable
     {
@@ -483,7 +485,8 @@ namespace DXForgeEditor.Content
             {
                 Directory.CreateDirectory(folder);
                 var waitCounter = 0;
-                // OSがフォルダを作成し、ファイルシステムウォッチャーがコンテンツブラウザに新しいエントリーを作成するまで、最大3秒待つ。
+                // OSがフォルダを作成するまで最大3秒待ちます。
+                // ファイルシステムウォッチャーがコンテンツブラウザに新しいエントリーを作成します。
                 while (waitCounter < 30 && !TryEdit(folderListView, folder))
                 {
                     await Task.Run(() => Thread.Sleep(100));
@@ -531,6 +534,12 @@ namespace DXForgeEditor.Content
             var fadeOut = new DoubleAnimation(1, 0, new Duration(TimeSpan.FromMilliseconds(100)));
             fadeOut.Completed += (_, _) => dropBorder.Visibility = Visibility.Collapsed;
             dropBorder.BeginAnimation(OpacityProperty, fadeOut);
+        }
+
+        private void OnOpenImportSettingsConfigurator_Button_Click(object sender, RoutedEventArgs e)
+        {
+            var vm = DataContext as ContentBrowser;
+            OpenImportSettingsConfigurator(null, vm.SelectedFolder, true);
         }
     }
 }

@@ -23,6 +23,14 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Compile Include="Content\ImportSettingsConfig\ConfigureTextureImportSettingsView.xaml.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Resource Include="Resources\ContentBrowser\OpenImportCfg.png" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<Resource Include="Resources\TextureEditor\Checker64.png">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Resource>
@@ -63,6 +71,11 @@
 	<ItemGroup>
 		<PackageReference Include="envdte" Version="17.12.40391" />
 		<PackageReference Include="envdte80" Version="17.12.40391" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Page Include="Content\ImportSettingsConfig\ConfigureTextureImportSettingsView.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </Page>
 	</ItemGroup>
 
 	<ItemGroup>
