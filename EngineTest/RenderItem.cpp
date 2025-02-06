@@ -62,6 +62,17 @@ namespace
 		return model_id;
 	}
 
+	[[nodiscard]] id::id_type load_texture(const char* path)
+	{
+		// load test texture
+		std::unique_ptr<u8[]> texture;
+		u64 size{ 0 };
+		read_file(path, texture, size);
+		const id::id_type texture_id{ content::create_resource(texture.get(), content::asset_type::texture) };
+		assert(id::is_valid(texture_id));
+		return texture_id;
+	}
+
 	void load_shaders()
 	{
 		// マテリアルがバーテックスシェーダーとピクセルシェーダーを使うとしよう。
@@ -133,8 +144,6 @@ namespace
 
 void create_render_items()
 {
-	// NOTE: これらのモデルは、Primal Engineのパトロンサポーターであれば購入できる。
-	// あなたが入手可能なものであれば、どれでも代用できる。
 	auto _1 = std::thread{ [] {lab_model_id = load_model("..\\..\\x64\\scene_model.model"); } };
 	auto _2 = std::thread{ [] {fan_model_id = load_model("..\\..\\x64\\Player.model"); } };
 	auto _3 = std::thread{ [] {int_model_id = load_model("..\\..\\x64\\Player.model"); } };

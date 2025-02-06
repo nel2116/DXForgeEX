@@ -241,7 +241,7 @@ namespace dxforge::content
 		//
 		// (gpu_id << 32) | 0x01
 		//
-		id::id_type create_geometry_resource(const void* const data)
+		[[nodiscard]] id::id_type create_geometry_resource(const void* const data)
 		{
 			assert(data);
 			return is_single_mesh(data) ? create_single_submesh(data) : create_mesh_hierarchy(data);
@@ -282,7 +282,7 @@ namespace dxforge::content
 		// 	id::id_type shader_ids[shader_type::count],
 		// 	id::id_type* texture_ids;
 		// } material_init_info
-		id::id_type create_material_resource(const void* const data)
+		[[nodiscard]] id::id_type create_material_resource(const void* const data)
 		{
 			assert(data);
 			return graphics::add_material(*(const graphics::material_init_info* const)data);
@@ -291,6 +291,26 @@ namespace dxforge::content
 		void destroy_material_resource(id::id_type id)
 		{
 			graphics::remove_material(id);
+		}
+
+		// NOTE: 以下を含むデータを期待する。
+		// struct
+		// {
+		//		u32 width, height, array_size (or depth), flags, mip_levels, format,
+		//		struct
+		//		{
+		//			u32 width, height, row_pitch, slice_pitch,
+		//			u8 image[slice_pitch],
+		//		} images[]
+		// } texture
+		[[nodiscard]] id::id_type create_texture_resource(const void* const data)
+		{
+			assert(data);
+			return graphics::add_texture((const u8* const)data);
+		}
+		void destroy_texture_resource(id::id_type id)
+		{
+			graphics::remove_texture(id);
 		}
 
 	} //  匿名名前空間
@@ -307,7 +327,7 @@ namespace dxforge::content
 		case asset_type::material: id = create_material_resource(data); break;
 		case asset_type::mesh:	id = create_geometry_resource(data); break;
 		case asset_type::skeleton: break;
-		case asset_type::texture: break;
+		case asset_type::texture: id = create_texture_resource(data); break;
 		}
 
 		assert(id::is_valid(id));
@@ -324,7 +344,7 @@ namespace dxforge::content
 		case asset_type::material: destroy_material_resource(id); break;
 		case asset_type::mesh:	destroy_geometry_resource(id); break;
 		case asset_type::skeleton: break;
-		case asset_type::texture: break;
+		case asset_type::texture: destroy_texture_resource(id); break;
 		default:
 			assert(false);
 			break;

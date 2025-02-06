@@ -19,7 +19,7 @@
 namespace dxforge::utl
 {
 	template<typename T>
-	using vector = std::vector<T>;  // std::vector を primal::utl 名前空間内の vector としてエイリアス
+	using vector = std::vector<T>;  // std::vector を dxforge::utl 名前空間内の vector としてエイリアス
 
 	template<typename T>
 	void erase_unordered(T& v, size_t index)
@@ -54,7 +54,7 @@ namespace dxforge::utl
 namespace dxforge::utl
 {
 	template<typename T>
-	using deque = std::deque<T>;   // std::deque を primal::utl 名前空間内の deque としてエイリアス
+	using deque = std::deque<T>;   // std::deque を dxforge::utl 名前空間内の deque としてエイリアス
 }
 #endif
 

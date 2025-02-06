@@ -547,7 +547,29 @@ namespace dxforge::graphics::d3d12::content
 
 	namespace texture
 	{
-		/// @brief テクスチャを追加する関数
+		/// @brief テクスチャを作成する関数
+		/// @param data テクスチャのデータ
+		/// @return 生成されたリソース
+		id::id_type add(const u8* const data)
+		{
+			assert(data);
+			d3d12_texture texture{ create_resource_from_texture_data(data) };
+			std::lock_guard lock{ texture_mutex };
+			const id::id_type id{ textures.add(std::move(texture)) };
+			descriptor_indices.add(textures[id].srv().index);
+			return id;
+		}
+
+		/// @brief テクスチャを削除する関数
+		/// @param id 削除するテクスチャのID
+		void remove(id::id_type id)
+		{
+			std::lock_guard lock{ texture_mutex };
+			textures.remove(id);
+			descriptor_indices.remove(id);
+		}
+
+		/// @brief テクスチャを追加する関数	
 		/// @param texture_ids テクスチャのID
 		/// @param id_count IDの数
 		/// @param indices ディスクリプタのインデックス
