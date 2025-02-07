@@ -299,7 +299,7 @@ namespace dxforge::graphics::d3d12
 	class d3d12_texture
 	{
 	public:		// 定数定義
-		constexpr static u32 max_mip{ 14 };	// 16K解像度までサポート
+		constexpr static u32 max_mips{ 14 };	// 16K解像度までサポート
 
 	public:		// パブリック関数
 		// ------ コンストラクタ ------
@@ -402,7 +402,7 @@ namespace dxforge::graphics::d3d12
 
 	private:	// メンバ変数
 		d3d12_texture _texture;															// テクスチャ
-		descriptor_handle _rtv[d3d12_texture::max_mip]{};								// レンダーターゲットビュー
+		descriptor_handle _rtv[d3d12_texture::max_mips]{};								// レンダーターゲットビュー
 		u32 _mip_count{ 0 };															// ミップレベル
 	};
 

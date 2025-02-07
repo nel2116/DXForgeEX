@@ -24,8 +24,7 @@ namespace dxforge::content
 		public:	// パブリック関数
 
 			DISABLE_COPY_AND_MOVE(geometry_hierarchy_stream);
-			geometry_hierarchy_stream(u8* const buffer, u32 lods = u32_invalid_id)
-				: _buffer{ buffer }
+			explicit geometry_hierarchy_stream(u8* const buffer, u32 lods = u32_invalid_id)
 			{
 				assert(buffer && lods);
 				if (lods != u32_invalid_id)
@@ -67,7 +66,6 @@ namespace dxforge::content
 			[[nodiscard]] constexpr id::id_type* gpu_ids() const { return _gpu_ids; }
 
 		private:	// プライベート変数
-			u8* const _buffer;			// バッファ
 			f32* _thresholds;			// LODのしきい値
 			lod_offset* _lod_offsets;	// LODのオフセット
 			id::id_type* _gpu_ids;		// GPU ID
@@ -404,6 +402,7 @@ namespace dxforge::content
 		else
 		{
 			geometry_hierarchy_stream stream{ pointer };
+
 			assert([&]() {
 				const u32 lod_count{ stream.lod_count() };
 				const lod_offset lod_offset{ stream.lod_offsets()[lod_count - 1] };

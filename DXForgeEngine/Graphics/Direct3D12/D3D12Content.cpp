@@ -16,6 +16,7 @@
 #include "Utilities/IOStream.h"
 #include "Content/ContentToEngine.h"
 #include "D3D12Gpass.h"
+#include "D3D12Upload.h"
 
 namespace dxforge::graphics::d3d12::content
 {
@@ -53,6 +54,7 @@ namespace dxforge::graphics::d3d12::content
 		std::mutex                                      submesh_mutex{};		///< サブメッシュ用ミューテックス
 
 		utl::free_list<d3d12_texture>                   textures;				///< テクスチャ用のリソースバッファ
+		utl::free_list<u32>                             descriptor_indices;		///< ディスクリプタのインデックス
 		std::mutex                                      texture_mutex{};		///< テクスチャ用ミューテックス
 
 		utl::vector<ID3D12RootSignature*>               root_signatures;		///< ルートシグネチャのリスト
@@ -160,7 +162,7 @@ namespace dxforge::graphics::d3d12::content
 			[[nodiscard]] constexpr shader_flags::flags shader_flags() const { return _shader_flags; }
 			[[nodiscard]] constexpr id::id_type root_signature_id() const { return _root_signature_id; }
 			[[nodiscard]] constexpr id::id_type* texture_ids() const { return _texture_ids; }
-			[[nodiscard]] constexpr u32* dectriptor_indices() const { return _descriptor_indices; }
+			[[nodiscard]] constexpr u32* desctriptor_indices() const { return _descriptor_indices; }
 			[[nodiscard]] constexpr id::id_type* shader_ids() const { return _shader_ids; }
 
 		private:	// プライベート関数
@@ -294,8 +296,15 @@ namespace dxforge::graphics::d3d12::content
 				parameters[params::cullable_lights].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 4);
 				parameters[params::light_grid].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 5);
 				parameters[params::light_index_list].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 6);
+				const D3D12_STATIC_SAMPLER_DESC samplers[]
+				{
+					d3dx::static_sampler(d3dx::sampler_state.static_point, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL),
+					d3dx::static_sampler(d3dx::sampler_state.static_linear, 1, 0, D3D12_SHADER_VISIBILITY_PIXEL),
+					d3dx::static_sampler(d3dx::sampler_state.static_anisotropic, 2, 0, D3D12_SHADER_VISIBILITY_PIXEL),
+				};
 
-				root_signature = d3dx::d3d12_root_signature_desc{ &parameters[0], _countof(parameters), get_root_signature_flags(flags) }.create();
+				root_signature = d3dx::d3d12_root_signature_desc{ &parameters[0], _countof(parameters), get_root_signature_flags(flags), &samplers[0], _countof(samplers) }.create();
+
 			}
 			break;
 			}
@@ -409,6 +418,192 @@ namespace dxforge::graphics::d3d12::content
 			id_pair.depth_pso_id = create_pso_if_needed(stream_ptr, aligned_stream_size, true);
 
 			return id_pair;
+		}
+
+
+
+		/// <returns>
+		/// Returns a byte array that contains
+		/// struct
+		/// {
+		///     u32 width, height, array_size (or depth), flags, mip_levels, format,
+		///     struct
+		///     {
+		///         u32 row_pitch, slice_pitch,
+		///         u8 image[mip_level][slice_pitch * depth_per_mip],
+		///     } images[]
+		/// } texture
+		/// </returns>
+		/// @brief テクスチャデータからリソースを作成する関数
+		/// @param data テクスチャデータ
+		/// @return 作成されたリソース
+		d3d12_texture
+			create_resource_from_texture_data(const u8* const data)
+		{
+			assert(data);
+			utl::blob_stream_reader blob{ data };
+			const u32 width{ blob.read<u32>() };
+			const u32 height{ blob.read<u32>() };
+			u32 depth{ 1 };
+			u32 array_size{ blob.read<u32>() };
+			const u32 flags{ blob.read<u32>() };
+			const u32 mip_levels{ blob.read<u32>() };
+			const DXGI_FORMAT format{ (DXGI_FORMAT)blob.read<u32>() };
+			const bool is_3d{ (flags & dxforge::content::texture_flags::is_volume_map) != 0 };
+
+			assert(mip_levels <= d3d12_texture::max_mips);
+
+			u32 depth_per_mip_level[d3d12_texture::max_mips]{};
+			for (u32 i{ 0 }; i < d3d12_texture::max_mips; ++i)
+			{
+				depth_per_mip_level[i] = 1;
+			}
+
+			if (is_3d)
+			{
+				depth = array_size;
+				array_size = 1;
+				u32 depth_per_mip{ depth };
+
+				for (u32 i{ 0 }; i < mip_levels; ++i)
+				{
+					depth_per_mip_level[i] = depth_per_mip;
+					depth_per_mip = std::max(depth_per_mip >> 1, (u32)1);
+				}
+			}
+
+			utl::vector<D3D12_SUBRESOURCE_DATA> subresources{};
+
+			for (u32 i{ 0 }; i < array_size; ++i)
+			{
+				for (u32 j{ 0 }; j < mip_levels; ++j)
+				{
+					const u32 row_pitch{ blob.read<u32>() };
+					const u32 slice_pitch{ blob.read<u32>() };
+
+					subresources.emplace_back(D3D12_SUBRESOURCE_DATA
+						{
+							blob.position(),
+							row_pitch,
+							slice_pitch
+						});
+
+					// 残りのスライスを飛ばす.
+					blob.skip(slice_pitch * depth_per_mip_level[j]);
+				}
+			}
+
+			D3D12_RESOURCE_DESC desc{};
+			// TODO: 1次元テクスチャを扱う。
+			desc.Dimension = is_3d ? D3D12_RESOURCE_DIMENSION_TEXTURE3D : D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+			desc.Alignment = 0;
+			desc.Width = width;
+			desc.Height = height;
+			desc.DepthOrArraySize = is_3d ? (u16)depth : (u16)array_size;
+			desc.MipLevels = (u16)mip_levels;
+			desc.Format = format;
+			desc.SampleDesc = { 1,0 };
+			desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+			desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+			assert(!(flags & dxforge::content::texture_flags::is_cube_map && (array_size % 6)));
+			const u32 subresource_count{ array_size * mip_levels };
+			assert(subresource_count);
+
+			const u32 footprints_data_size{ (sizeof(D3D12_PLACED_SUBRESOURCE_FOOTPRINT) + sizeof(u32) + sizeof(u64)) * subresource_count };
+			std::unique_ptr<u8[]> footprints_data{ std::make_unique<u8[]>(footprints_data_size) };
+
+			D3D12_PLACED_SUBRESOURCE_FOOTPRINT* const layouts{ (D3D12_PLACED_SUBRESOURCE_FOOTPRINT* const)footprints_data.get() };
+			u32* const num_rows{ (u32* const)&layouts[subresource_count] };
+			u64* const row_sizes{ (u64* const)&num_rows[subresource_count] };
+			u64 required_size{ 0 };
+			id3d12_device* device{ core::device() };
+
+			device->GetCopyableFootprints(&desc, 0, subresource_count, 0, layouts, num_rows, row_sizes, &required_size);
+
+			assert(required_size);
+			upload::d3d12_upload_context context{ (u32)required_size };
+			u8* const cpu_address{ (u8* const)context.cpu_address() };
+
+			for (u32 subresource_idx{ 0 }; subresource_idx < subresource_count; ++subresource_idx)
+			{
+				const D3D12_PLACED_SUBRESOURCE_FOOTPRINT& layout{ layouts[subresource_idx] };
+				const u32 subresource_height{ num_rows[subresource_idx] };
+				const u32 subresource_depth{ layout.Footprint.Depth };
+				const D3D12_SUBRESOURCE_DATA& subresource{ subresources[subresource_idx] };
+
+				const D3D12_MEMCPY_DEST copy_dst
+				{
+					cpu_address + layout.Offset,
+					layout.Footprint.RowPitch,
+					layout.Footprint.RowPitch * subresource_height
+				};
+
+				for (u32 depth_idx{ 0 }; depth_idx < subresource_depth; ++depth_idx)
+				{
+					u8* const src_slice{ (u8* const)subresource.pData + subresource.SlicePitch * depth_idx };
+					u8* const dst_slice{ (u8* const)copy_dst.pData + copy_dst.SlicePitch * depth_idx };
+
+					for (u32 row_idx{ 0 }; row_idx < subresource_height; ++row_idx)
+					{
+						memcpy(dst_slice + copy_dst.RowPitch * row_idx, src_slice + subresource.RowPitch * row_idx, row_sizes[subresource_idx]);
+					}
+				}
+			}
+
+			ID3D12Resource* resource{ nullptr };
+			DXCall(device->CreateCommittedResource(&d3dx::heap_properties.default_heap, D3D12_HEAP_FLAG_NONE, &desc,
+				D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&resource)));
+
+			ID3D12Resource* upload_buffer{ context.upload_buffer() };
+			for (u32 i{ 0 }; i < subresource_count; ++i)
+			{
+				D3D12_TEXTURE_COPY_LOCATION src{};
+				src.pResource = upload_buffer;
+				src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+				src.PlacedFootprint = layouts[i];
+
+				D3D12_TEXTURE_COPY_LOCATION dst{};
+				dst.pResource = resource;
+				dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+				dst.SubresourceIndex = i;
+
+				context.command_list()->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+			}
+
+			context.end_upload();
+
+			assert(resource);
+
+			D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc{};
+			d3d12_texture_init_info info{};
+			info.resource = resource;
+
+			if (flags & dxforge::content::texture_flags::is_cube_map)
+			{
+				assert(array_size % 6 == 0);
+				srv_desc.Format = format;
+				srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+				if (array_size > 6)
+				{
+					srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBEARRAY;
+					srv_desc.TextureCubeArray.MostDetailedMip = 0;
+					srv_desc.TextureCubeArray.MipLevels = mip_levels;
+					srv_desc.TextureCubeArray.NumCubes = array_size / 6;
+				}
+				else
+				{
+					srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURECUBE;
+					srv_desc.TextureCube.MostDetailedMip = 0;
+					srv_desc.TextureCube.MipLevels = mip_levels;
+					srv_desc.TextureCube.ResourceMinLODClamp = 0.0f;
+				}
+
+				info.srv_desc = &srv_desc;
+			}
+
+			return d3d12_texture{ info };
 		}
 
 	} // 匿名名前空間
@@ -569,7 +764,7 @@ namespace dxforge::graphics::d3d12::content
 			descriptor_indices.remove(id);
 		}
 
-		/// @brief テクスチャを追加する関数	
+		/// @brief テクスチャを追加する関数
 		/// @param texture_ids テクスチャのID
 		/// @param id_count IDの数
 		/// @param indices ディスクリプタのインデックス
@@ -673,11 +868,11 @@ namespace dxforge::graphics::d3d12::content
 			items[0] = geometry_content_id;
 			id::id_type* const item_ids{ &items[1] };
 
-			std::lock_guard lock{ render_item_mutex };
+			d3d12_render_item* const d3d12_items{ (d3d12_render_item* const)alloca(material_count * sizeof(d3d12_render_item)) };
 
 			for (u32 i{ 0 }; i < material_count; ++i)
 			{
-				d3d12_render_item item{};
+				d3d12_render_item& item{ d3d12_items[i] };
 				item.entity_id = entity_id;
 				item.submesh_gpu_id = gpu_ids[i];
 				item.material_id = material_ids[i];
@@ -686,7 +881,13 @@ namespace dxforge::graphics::d3d12::content
 				item.depth_pso_id = id_pair.depth_pso_id;
 
 				assert(id::is_valid(item.submesh_gpu_id) && id::is_valid(item.material_id));
-				item_ids[i] = render_items.add(item);
+			}
+
+			std::lock_guard lock{ render_item_mutex };
+
+			for (u32 i{ 0 }; i < material_count; ++i)
+			{
+				item_ids[i] = render_items.add(d3d12_items[i]);
 			}
 
 			// IDリストの終わりを示す。

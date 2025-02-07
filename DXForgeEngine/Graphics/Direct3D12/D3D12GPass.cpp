@@ -45,6 +45,7 @@ namespace dxforge::graphics::d3d12::gpass
 		struct gpass_cache
 		{
 			utl::vector<id::id_type>    d3d12_render_item_ids;
+			u32                         descriptor_index_count{ 0 };
 			// NOTE: 新しい配列を追加する場合は、必ず resize() と struct_size を更新してください。
 			id::id_type* entity_ids{ nullptr };
 			id::id_type* submesh_gpu_ids{ nullptr };
@@ -53,12 +54,15 @@ namespace dxforge::graphics::d3d12::gpass
 			ID3D12PipelineState** depth_pipeline_states{ nullptr };
 			ID3D12RootSignature** root_signatures{ nullptr };
 			material_type::type* material_types{ nullptr };
+			u32** descriptor_indices{ nullptr };
+			u32* texture_counts{ nullptr };
 			D3D12_GPU_VIRTUAL_ADDRESS* position_buffers{ nullptr };
 			D3D12_GPU_VIRTUAL_ADDRESS* element_buffers{ nullptr };
 			D3D12_INDEX_BUFFER_VIEW* index_buffer_views{ nullptr };
 			D3D_PRIMITIVE_TOPOLOGY* primitive_topologies{ nullptr };
 			u32* elements_types{ nullptr };
 			D3D12_GPU_VIRTUAL_ADDRESS* per_object_data{ nullptr };
+			D3D12_GPU_VIRTUAL_ADDRESS* srv_indices{ nullptr };
 
 			constexpr content::render_item::items_cache items_cache() const
 			{
@@ -89,7 +93,9 @@ namespace dxforge::graphics::d3d12::gpass
 				return
 				{
 					root_signatures,
-					material_types
+					material_types,
+					descriptor_indices,
+					texture_counts
 				};
 			}
 
@@ -101,6 +107,7 @@ namespace dxforge::graphics::d3d12::gpass
 			CONSTEXPR void clear()
 			{
 				d3d12_render_item_ids.clear();
+				descriptor_index_count = 0;
 			}
 
 			CONSTEXPR void resize()
@@ -116,35 +123,42 @@ namespace dxforge::graphics::d3d12::gpass
 				if (new_buffer_size != old_buffer_size)
 				{
 					entity_ids = (id::id_type*)_buffer.data();
-					submesh_gpu_ids = (id::id_type*)(&entity_ids[items_count]);
-					material_ids = (id::id_type*)(&submesh_gpu_ids[items_count]);
-					gpass_pipeline_states = (ID3D12PipelineState**)(&material_ids[items_count]);
-					depth_pipeline_states = (ID3D12PipelineState**)(&gpass_pipeline_states[items_count]);
-					root_signatures = (ID3D12RootSignature**)(&depth_pipeline_states[items_count]);
-					material_types = (material_type::type*)(&root_signatures[items_count]);
-					position_buffers = (D3D12_GPU_VIRTUAL_ADDRESS*)(&material_types[items_count]);
-					element_buffers = (D3D12_GPU_VIRTUAL_ADDRESS*)(&position_buffers[items_count]);
-					index_buffer_views = (D3D12_INDEX_BUFFER_VIEW*)(&element_buffers[items_count]);
-					primitive_topologies = (D3D_PRIMITIVE_TOPOLOGY*)(&index_buffer_views[items_count]);
-					elements_types = (u32*)(&primitive_topologies[items_count]);
-					per_object_data = (D3D12_GPU_VIRTUAL_ADDRESS*)(&elements_types[items_count]);
+					submesh_gpu_ids = (id::id_type*)&entity_ids[items_count];
+					material_ids = (id::id_type*)&submesh_gpu_ids[items_count];
+					gpass_pipeline_states = (ID3D12PipelineState**)&material_ids[items_count];
+					depth_pipeline_states = (ID3D12PipelineState**)&gpass_pipeline_states[items_count];
+					root_signatures = (ID3D12RootSignature**)&depth_pipeline_states[items_count];
+					material_types = (material_type::type*)&root_signatures[items_count];
+					descriptor_indices = (u32**)&material_types[items_count];
+					texture_counts = (u32*)&descriptor_indices[items_count];
+					position_buffers = (D3D12_GPU_VIRTUAL_ADDRESS*)&texture_counts[items_count];
+					element_buffers = (D3D12_GPU_VIRTUAL_ADDRESS*)&position_buffers[items_count];
+					index_buffer_views = (D3D12_INDEX_BUFFER_VIEW*)&element_buffers[items_count];
+					primitive_topologies = (D3D_PRIMITIVE_TOPOLOGY*)&index_buffer_views[items_count];
+					elements_types = (u32*)&primitive_topologies[items_count];
+					per_object_data = (D3D12_GPU_VIRTUAL_ADDRESS*)&elements_types[items_count];
+					srv_indices = (D3D12_GPU_VIRTUAL_ADDRESS*)&per_object_data[items_count];
 				}
 			}
 		private:
-			constexpr static u32 struct_size{
-				sizeof(id::id_type) +				// entity_ids
-				sizeof(id::id_type) +				// submesh_gpu_ids
-				sizeof(id::id_type) +				// material_ids
-				sizeof(ID3D12PipelineState*) +		// gpass_pipeline_states
-				sizeof(ID3D12PipelineState*) +		// depth_pipeline_states
-				sizeof(ID3D12RootSignature*) +		// root_signatures
-				sizeof(material_type::type) +		// material_types
-				sizeof(D3D12_GPU_VIRTUAL_ADDRESS) +	// position_buffers
-				sizeof(D3D12_GPU_VIRTUAL_ADDRESS) +	// element_buffers
-				sizeof(D3D12_INDEX_BUFFER_VIEW) +	// index_buffer_views
-				sizeof(D3D_PRIMITIVE_TOPOLOGY) +	// primitive_topologies
-				sizeof(u32) +						// elements_types
-				sizeof(D3D12_GPU_VIRTUAL_ADDRESS)	// per_object_data
+			constexpr static u32 struct_size
+			{
+				sizeof(id::id_type) +                   // entity_ids
+				sizeof(id::id_type) +                   // submesh_gpu_ids
+				sizeof(id::id_type) +                   // material_ids
+				sizeof(ID3D12PipelineState*) +         // gpass_pipeline_states
+				sizeof(ID3D12PipelineState*) +         // depth_pipeline_states
+				sizeof(ID3D12RootSignature*) +          // root_signatures
+				sizeof(material_type::type) +           // material_types
+				sizeof(u32*) +                          // descriptor_indices
+				sizeof(u32) +                           // texture_counts
+				sizeof(D3D12_GPU_VIRTUAL_ADDRESS) +     // position_buffers
+				sizeof(D3D12_GPU_VIRTUAL_ADDRESS) +     // element_buffers
+				sizeof(D3D12_INDEX_BUFFER_VIEW) +       // index_buffer_views
+				sizeof(D3D_PRIMITIVE_TOPOLOGY) +        // primitive_topologies
+				sizeof(u32) +                           // elements_types
+				sizeof(D3D12_GPU_VIRTUAL_ADDRESS) +     // per_object_data
+				sizeof(D3D12_GPU_VIRTUAL_ADDRESS)       // srv_indices
 			};
 			utl::vector<u8> _buffer;
 		} frame_cache;
@@ -236,7 +250,7 @@ namespace dxforge::graphics::d3d12::gpass
 
 		void set_root_parameters(id3d12_graphics_command_list* const cmd_list, u32 cache_index)
 		{
-			gpass_cache& cache{ frame_cache };
+			const gpass_cache& cache{ frame_cache };
 			assert(cache_index < cache.size());
 
 			const material_type::type mtl_type{ cache.material_types[cache_index] };

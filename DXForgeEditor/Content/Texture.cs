@@ -586,14 +586,14 @@ namespace DXForgeEditor.Content
         /// テクスチャを、エンジンで使用できるバイト配列にパックする。
         /// </summary>
         /// <returns>
-        /// 以下を含むバイト配列を返す。
+        /// Returns a byte array that contains
         /// struct
         /// {
         ///     u32 width, height, array_size (or depth), flags, mip_levels, format,
         ///     struct
         ///     {
-        ///         u32 width, height, row_pitch, slice_pitch,
-        ///         u8 image[slice_pitch],
+        ///         u32 row_pitch, slice_pitch,
+        ///         u8 image[mip_level][slice_pitch * depth_per_mip],
         ///     } images[]
         /// } texture
         /// </returns>
@@ -613,12 +613,10 @@ namespace DXForgeEditor.Content
             {
                 foreach (var mipLevel in arraySlice)
                 {
+                    writer.Write(mipLevel[0].RowPitch);
+                    writer.Write(mipLevel[0].SlicePitch);
                     foreach (var slice in mipLevel)
                     {
-                        writer.Write(slice.Width);
-                        writer.Write(slice.Height);
-                        writer.Write(slice.RowPitch);
-                        writer.Write(slice.SlicePitch);
                         writer.Write(slice.RawContent);
                     }
                 }
@@ -684,6 +682,7 @@ namespace DXForgeEditor.Content
         {
             Debug.Assert(Slices.First().Any() && Slices.First().Count == MipLevels);
             var data = ContentToolsAPI.SlicesToBinary(Slices);
+            Debug.Assert(data?.Length > 0);
 
             return CompressionHelper.Compress(data);
         }

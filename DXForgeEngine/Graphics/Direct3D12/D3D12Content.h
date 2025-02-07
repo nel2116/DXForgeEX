@@ -48,6 +48,8 @@ namespace dxforge::graphics::d3d12::content
 		{
 			ID3D12RootSignature** const root_signatures;
 			material_type::type* const material_types;
+			u32** const                 descriptor_indices;
+			u32* const                  texture_count;
 		};
 
 		id::id_type add(material_init_info info);

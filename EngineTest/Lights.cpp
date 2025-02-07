@@ -41,7 +41,7 @@ namespace
 		info.entity_id = entity_id;
 		info.type = type;
 		info.light_set_key = light_set_key;
-		info.intensity = 5.0f;
+		info.intensity = 10.0f;
 
 		info.color = { random(0.2f),random(0.2f), random(0.2f) };
 
@@ -124,7 +124,7 @@ void generate_lights()
 #else
 	srand(37);
 
-	constexpr f32 scale1{ 1.5f };
+	constexpr f32 scale1{ 2.0f };
 	constexpr math::v3 scale{ 1.0f * scale1, 0.5f * scale1, 1.0f * scale1 };
 	constexpr s32 dim{ 10 };
 	for (s32 x{ -dim }; x < dim; ++x)

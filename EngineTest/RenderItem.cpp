@@ -144,9 +144,9 @@ namespace
 
 void create_render_items()
 {
-	auto _1 = std::thread{ [] {lab_model_id = load_model("..\\..\\x64\\scene_model.model"); } };
-	auto _2 = std::thread{ [] {fan_model_id = load_model("..\\..\\x64\\Player.model"); } };
-	auto _3 = std::thread{ [] {int_model_id = load_model("..\\..\\x64\\Player.model"); } };
+	auto _1 = std::thread{ [] {lab_model_id = load_model("..\\..\\x64\\lab_model.model"); } };
+	auto _2 = std::thread{ [] {fan_model_id = load_model("..\\..\\x64\\fan_model.model"); } };
+	auto _3 = std::thread{ [] {int_model_id = load_model("..\\..\\x64\\Fembot.model"); } };
 	auto _4 = std::thread{ [] {player_model_id = load_model("..\\..\\x64\\Player.model"); } };
 	auto _5 = std::thread{ [] {load_shaders(); } };
 

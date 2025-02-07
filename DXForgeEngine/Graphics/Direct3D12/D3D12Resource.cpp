@@ -286,7 +286,7 @@ namespace dxforge::graphics::d3d12
 		// ミップレベルを取得
 		assert(info.desc);
 		_mip_count = resource()->GetDesc().MipLevels;
-		assert(_mip_count && _mip_count <= d3d12_texture::max_mip);
+		assert(_mip_count && _mip_count <= d3d12_texture::max_mips);
 
 		// レンダーターゲットビューを作成
 		descriptor_heap& rtv_heap{ core::rtv_heap() };
