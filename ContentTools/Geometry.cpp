@@ -20,6 +20,73 @@ namespace dxforge::tools
 		using namespace math;		// 数学関数
 		using namespace DirectX;	// DirectX関数
 
+		void calculate_tangents(mesh& m)
+		{
+			// 輸入タンジェントを使用しない
+			m.tangents.clear();
+
+			const u32 num_indices{ (u32)m.raw_indices.size() };
+			utl::vector<XMVECTOR> tangents(num_indices, XMVectorZero());
+			utl::vector<XMVECTOR> bitangents(num_indices, XMVectorZero());
+			utl::vector<XMVECTOR> positions(num_indices);
+
+			for (u32 i{ 0 }; i < num_indices; ++i)
+			{
+				positions[i] = XMLoadFloat3(&m.vertices[m.indices[i]].position);
+			}
+
+			for (u32 i{ 0 }; i < num_indices; i += 3)
+			{
+				const u32 i0{ i + 0 };
+				const u32 i1{ i + 1 };
+				const u32 i2{ i + 2 };
+
+				const XMVECTOR& p0{ positions[i0] };
+				const XMVECTOR& p1{ positions[i1] };
+				const XMVECTOR& p2{ positions[i2] };
+
+				const math::v2& uv0{ m.vertices[m.indices[i0]].uv };
+				const math::v2& uv1{ m.vertices[m.indices[i1]].uv };
+				const math::v2& uv2{ m.vertices[m.indices[i2]].uv };
+
+				const math::v2 duv1{ uv1.x - uv0.x, uv1.y - uv0.y };
+				const math::v2 duv2{ uv2.x - uv0.x, uv2.y - uv0.y };
+
+				const XMVECTOR dp1{ p1 - p0 };
+				const XMVECTOR dp2{ p2 - p0 };
+
+				f32 det{ duv1.x * duv2.y - duv1.y * duv2.x };
+				if (abs(det) < math::epsilon) det = math::epsilon;
+
+				const f32 inv_det{ 1.f / det };
+				const XMVECTOR t{ (dp1 * duv2.y - dp2 * duv1.y) * inv_det };
+				const XMVECTOR b{ (dp2 * duv1.x - dp1 * duv2.x) * inv_det };
+
+				tangents[i0] += t;
+				tangents[i1] += t;
+				tangents[i2] += t;
+				bitangents[i0] += b;
+				bitangents[i1] += b;
+				bitangents[i2] += b;
+			}
+
+			for (u32 i{ 0 }; i < num_indices; ++i)
+			{
+				const XMVECTOR& t{ tangents[i] };
+				const XMVECTOR& b{ bitangents[i] };
+				const XMVECTOR& n{ XMLoadFloat3(&m.vertices[m.indices[i]].normal) };
+
+				math::v3 tangent;
+				XMStoreFloat3(&tangent, XMVector3Normalize(t - n * XMVector3Dot(n, t)));
+				f32 handedness;
+				XMStoreFloat(&handedness, XMVector3Dot(XMVector3Cross(t, b), n));
+
+				handedness = handedness > 0.f ? 1.f : -1.f;
+
+				m.vertices[m.indices[i]].tangent = { tangent.x, tangent.y, tangent.z, handedness };
+			}
+		}
+
 		/// @brief 法線の再計算
 		/// @param m メッシュデータの参照
 		void recalculate_normals(mesh& m)
@@ -72,7 +139,7 @@ namespace dxforge::tools
 			for (u32 i{ 0 }; i < num_vertices; ++i)
 			{
 				// インデックス参照
-				auto& refs{ idx_ref[i] };
+				utl::vector<u32>& refs{ idx_ref[i] };
 				u32 num_refs{ (u32)refs.size() };
 				for (u32 j{ 0 }; j < num_refs; ++j)
 				{
@@ -138,7 +205,7 @@ namespace dxforge::tools
 			for (u32 i{ 0 }; i < num_vertices; ++i)
 			{
 				// インデックス参照
-				auto& refs{ idx_ref[i] };
+				utl::vector<u32>& refs{ idx_ref[i] };
 				u32 num_refs{ (u32)refs.size() };
 				for (u32 j{ 0 }; j < num_refs; ++j)
 				{
@@ -224,8 +291,8 @@ namespace dxforge::tools
 					for (u32 i{ 0 }; i < num_vertices; ++i)
 					{
 						vertex& v{ m.vertices[i] };
-						t_signs[i] |= (u8)((v.tangent.w > 0.0f) && (v.tangent.z > 0.0f));
-						tangents[i] = { (u16)pack_float<16>(v.tangent.x, -1.0f, 1.0f), (u16)pack_float<16>(v.tangent.y, -1.0f, 1.0f) };
+						t_signs[i] |= (u8)((v.tangent.w > 0.f) | ((v.tangent.z > 0.f) << 1));
+						tangents[i] = { (u16)math::pack_float<16>(v.tangent.x, -1.f, 1.f), (u16)math::pack_float<16>(v.tangent.y, -1.f, 1.f) };
 					}
 				}
 			}
@@ -412,6 +479,20 @@ namespace dxforge::tools
 			if (!m.uv_sets.empty())
 			{
 				process_uvs(m);
+			}
+
+			if ((settings.calculate_tangents || m.tangents.empty()) && !m.uv_sets.empty())
+			{
+				calculate_mikk_tspace(m);
+				//calculate_tangents(m);
+			}
+
+			// NOTE: m.tangentsには、インポートされた接線ベクトルの値が格納されます。
+			//		タンジェントが計算された場合は空になります。
+			//		したがって、process_tangentsは、ソースファイルからタンジェントがインポートされたときにのみ呼び出されます。
+			if (!m.tangents.empty())
+			{
+				process_tangents(m);
 			}
 
 			// 頂点のパック

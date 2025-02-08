@@ -17,13 +17,18 @@
 
 namespace dxforge::content
 {
-	namespace {
-
+	namespace
+	{
+		/// @brief マテリアルのストリームを表す構造体
 		class geometry_hierarchy_stream
 		{
-		public:	// パブリック関数
-
+		public:		// パブリック関数
+			// クラスの移動とコピーを禁止
 			DISABLE_COPY_AND_MOVE(geometry_hierarchy_stream);
+
+			/// @brief コンストラクタ
+			/// @param buffer バッファ
+			/// @param lods LODの数
 			explicit geometry_hierarchy_stream(u8* const buffer, u32 lods = u32_invalid_id)
 			{
 				assert(buffer && lods);
@@ -38,6 +43,10 @@ namespace dxforge::content
 				_gpu_ids = (id::id_type*)(&_lod_offsets[_lod_count]);
 			}
 
+			/// @brief LODの閾値を取得する関数
+			/// @param lod LOD
+			/// @param ids ID
+			/// @param id_count IDの数
 			void gpu_ids(u32 lod, id::id_type*& ids, u32& id_count)
 			{
 				assert(lod < _lod_count);
@@ -45,9 +54,12 @@ namespace dxforge::content
 				id_count = _lod_offsets[lod].count;
 			}
 
+			/// @brief 閾値からLODを取得する関数
+			/// @param threshold 閾値
+			/// @return LOD
 			u32 lod_from_threshold(f32 threshold)
 			{
-				assert(threshold > 0);
+				assert(threshold >= 0);
 				if (_lod_count == 1) return 0;
 
 				for (u32 i{ _lod_count - 1 }; i > 0; --i)
@@ -55,25 +67,24 @@ namespace dxforge::content
 					if (_thresholds[i] <= threshold) return i;
 				}
 
-				assert(false); // ここに来てはいけない。
 				return 0;
 			}
 
-			// ====== アクセサ ======
+			// ====== アクセサ関数 ======
 			[[nodiscard]] constexpr u32 lod_count() const { return _lod_count; }
 			[[nodiscard]] constexpr f32* thresholds() const { return _thresholds; }
 			[[nodiscard]] constexpr lod_offset* lod_offsets() const { return _lod_offsets; }
 			[[nodiscard]] constexpr id::id_type* gpu_ids() const { return _gpu_ids; }
 
-		private:	// プライベート変数
-			f32* _thresholds;			// LODのしきい値
+		private:	// プライベート関数
+			f32* _thresholds;			// 閾値
 			lod_offset* _lod_offsets;	// LODのオフセット
-			id::id_type* _gpu_ids;		// GPU ID
-			u32 _lod_count;				// LOD数
+			id::id_type* _gpu_ids;		// GPUのID
+			u32 _lod_count;				// LODの数
 		};
 
-		// ====== ローカル変数 ======
-		// NOTE: これはSTLとの互換性を維持するために必要である。
+		// ====== 構造体定義 ======
+		// NOTE: これはSTLベクターとの互換性を維持するために必要である。
 		struct noexcept_map
 		{
 			std::unordered_map<u32, std::unique_ptr<u8[]>> map;
@@ -84,15 +95,18 @@ namespace dxforge::content
 			noexcept_map& operator=(noexcept_map&&) noexcept = default;
 		};
 
+		// ====== ローカル変数 ======
 		// この定数は、geometry_hierarchiesの要素がポインタではなくgpu_idであることを示す。
-		constexpr uintptr_t single_mesh_marker{ (uintptr_t)0x01 };
-		utl::free_list<u8*> geometry_hierarchies;	// ジオメトリ階層
-		std::mutex geometry_mutex;					// ジオメトリミューテックス
-
-		utl::free_list<noexcept_map> shader_groups;	// シェーダー
-		std::mutex shader_mutex;					// シェーダーミューテックス
+		constexpr uintptr_t single_mesh_marker{ (uintptr_t)0x01 };	// 1ビット目を使用する
+		utl::free_list<u8*> geometry_hierarchies;					// ジオメトリの階層
+		std::mutex geometry_mutex;									// ジオメトリ用ミューテックス
+		utl::free_list<noexcept_map> shader_groups;					// シェーダーグループ
+		std::mutex shader_mutex;									// シェーダー用ミューテックス
 
 		// NOTE: create_geometry_resource() と同じデータを期待する。
+		/// @brief ジオメトリの階層バッファのサイズを取得する関数
+		/// @param data データ
+		/// @return サイズ
 		u32 get_geometry_hierarchy_buffer_size(const void* const data)
 		{
 			assert(data);
@@ -104,7 +118,7 @@ namespace dxforge::content
 
 			for (u32 lod_idx{ 0 }; lod_idx < lod_count; ++lod_idx)
 			{
-				// 閾値をスキップ
+				// 閾値スキップ
 				blob.skip(sizeof(f32));
 				// gpu_idsのサイズを追加 (sizeof(id::id_type) * submesh_count)
 				size += sizeof(id::id_type) * blob.read<u32>();
@@ -117,6 +131,9 @@ namespace dxforge::content
 
 		// 複数の LOD および/または複数のサブメッシュを持つジオメトリの階層ストリームを作成します。
 		// NOTE: create_geometry_resource() と同じデータを期待する。
+		/// @brief ジオメトリの階層を作成する関数
+		/// @param data データ
+		/// @return 生成されたジオメトリの階層
 		id::id_type create_mesh_hierarchy(const void* const data)
 		{
 			assert(data);
@@ -136,7 +153,7 @@ namespace dxforge::content
 				const u32 id_count{ blob.read<u32>() };
 				assert(id_count < (1 << 16));
 				stream.lod_offsets()[lod_idx] = { (u16)submesh_index, (u16)id_count };
-				blob.skip(sizeof(u32)); // submeshのサイズをスキップする
+				blob.skip(sizeof(u32)); // サブメッシュのサイズ分スキップする
 				for (u32 id_idx{ 0 }; id_idx < id_count; ++id_idx)
 				{
 					const u8* at{ blob.position() };
@@ -146,14 +163,15 @@ namespace dxforge::content
 				}
 			}
 
-			assert([&]() {
-				f32 previous_threshold{ stream.thresholds()[0] };
-				for (u32 i{ 1 }; i < lod_count; ++i)
+			assert([&]()
 				{
-					if (stream.thresholds()[i] <= previous_threshold) return false;
-					previous_threshold = stream.thresholds()[i];
-				}
-				return true;
+					f32 previous_threshold{ stream.thresholds()[0] };
+					for (u32 i{ 1 }; i < lod_count; ++i)
+					{
+						if (stream.thresholds()[i] <= previous_threshold) return false;
+						previous_threshold = stream.thresholds()[i];
+					}
+					return true;
 				}());
 
 			static_assert(alignof(void*) > 2, "We need the least significant bit for the single mesh marker.");
@@ -161,8 +179,11 @@ namespace dxforge::content
 			return geometry_hierarchies.add(hierarchy_buffer);
 		}
 
-		// 単一のsubmesh作成する gpu_id
+		// 単一のサブメッシュを作成する gpu_id
 		// NOTE: create_geometry_resource() と同じデータを期待する。
+		/// @brief 単一のサブメッシュを作成する関数
+		/// @param data データ
+		/// @return 生成されたサブメッシュ
 		id::id_type create_single_submesh(const void* const data)
 		{
 			assert(data);
@@ -180,8 +201,11 @@ namespace dxforge::content
 			return geometry_hierarchies.add(fake_pointer);
 		}
 
-		// このジオメトリが単一のsubmesh持つ単一のLODを持つかどうかを判断する
+		// このジオメトリが単一のサブメッシュを持つ単一のロッドを持つかどうかを判断する
 		// NOTE: create_geometry_resource() と同じデータを期待する。
+		/// @brief ジオメトリが単一のメッシュかどうかを判断する関数
+		/// @param data データ
+		/// @return 単一のロッドならtrue
 		bool is_single_mesh(const void* const data)
 		{
 			assert(data);
@@ -190,14 +214,17 @@ namespace dxforge::content
 			assert(lod_count);
 			if (lod_count > 1) return false;
 
-			// しきい値をスキップする
+			// 閾値を超える
 			blob.skip(sizeof(f32));
 			const u32 submesh_count{ blob.read<u32>() };
 			assert(submesh_count);
 			return submesh_count == 1;
 		}
 
-		id::id_type gpu_id_from_fake_pointer(u8* const pointer)
+		/// @brief 偽のポインターからGPU IDを取得する関数
+		/// @param pointer 偽のポインター
+		/// @return GPU ID
+		constexpr id::id_type gpu_id_from_fake_pointer(u8* const pointer)
 		{
 			assert((uintptr_t)pointer & single_mesh_marker);
 			static_assert(sizeof(uintptr_t) > sizeof(id::id_type));
@@ -205,7 +232,7 @@ namespace dxforge::content
 			return (((uintptr_t)pointer) >> shift_bits) & (uintptr_t)id::invalid_id;
 		}
 
-		// NOTE: 'data'に含まれることを期待する
+		// NOTE: 'data'に以下のことが含まれることを期待する
 		// struct{
 		//     u32 lod_count,
 		//     struct {
@@ -215,8 +242,8 @@ namespace dxforge::content
 		//         struct {
 		//             u32 element_size, u32 vertex_count,
 		//             u32 index_count, u32 elements_type, u32 primitive_topology
-		//             u8 positions[sizeof(f32) * 3 * vertex_count],     // sizeof(positions)は4バイトの倍数でなければならない。 必要であればパディングしてください。
-		//             u8 elements[sizeof(element_size) * vertex_count], // sizeof(elements)は4バイトの倍数でなければならない。 必要であればパディングしてください。
+		//             u8 positions[sizeof(f32) * 3 * vertex_count],     // sizeof(positions)は4バイトの倍数でなければならない。 必要ならパッドする。
+		//             u8 elements[sizeof(element_size) * vertex_count], // sizeof(elements)は4バイトの倍数でなければならない。 必要であればパッドしてください。
 		//             u8 indices[index_size * index_count]
 		//         } submeshes[submesh_count]
 		//     } mesh_lods[lod_count]
@@ -224,7 +251,7 @@ namespace dxforge::content
 		//
 		// 出力フォーマット
 		//
-		// ジオメトリに複数のLODまたはsubmesh場合
+		// ジオメトリに複数のLODまたはサブメッシュがある場合：
 		// struct {
 		//     u32 lod_count,
 		//     f32 thresholds[lod_count]
@@ -235,16 +262,20 @@ namespace dxforge::content
 		//     id::id_type gpu_ids[total_number_of_submeshes]
 		// } geometry_hierarchy
 		//
-		// ジオメトリが単一のLODとsubmeshを持つ場合：
+		// ジオメトリが単一のLODとサブメッシュを持つ場合：
 		//
 		// (gpu_id << 32) | 0x01
-		//
+		/// @brief ジオメトリのリソースを作成する関数
+		/// @param data データ
+		/// @return 生成されたリソース
 		[[nodiscard]] id::id_type create_geometry_resource(const void* const data)
 		{
 			assert(data);
 			return is_single_mesh(data) ? create_single_submesh(data) : create_mesh_hierarchy(data);
 		}
 
+		/// @brief ジオメトリのリソースを破棄する関数
+		/// @param id ID
 		void destroy_geometry_resource(id::id_type id)
 		{
 			std::lock_guard lock{ geometry_mutex };
@@ -272,47 +303,59 @@ namespace dxforge::content
 			geometry_hierarchies.remove(id);
 		}
 
-		// NOTE: 'data'に含まれることを期待する
-		// struct
-		// {
-		// 	material_type::type type,
-		// 	u32 texture_count,
-		// 	id::id_type shader_ids[shader_type::count],
-		// 	id::id_type* texture_ids;
+		// NOTE: 'data'に以下のことが含まれることを期待する
+		// struct {
+		//  material_type::type type,
+		//  u32                 texture_count,
+		//  id::id_type         shader_ids[shader_type::count],
+		//  id::id_type*        texture_ids;
 		// } material_init_info
+		/// @brief マテリアルのリソースを作成する関数
+		/// @param data データ
+		/// @return 生成されたリソース
 		[[nodiscard]] id::id_type create_material_resource(const void* const data)
 		{
 			assert(data);
 			return graphics::add_material(*(const graphics::material_init_info* const)data);
 		}
 
+		/// @brief マテリアルのリソースを破棄する関数
+		/// @param id ID
 		void destroy_material_resource(id::id_type id)
 		{
 			graphics::remove_material(id);
 		}
 
-		// NOTE: 以下を含むデータを期待する。
-		// struct
-		// {
-		//		u32 width, height, array_size (or depth), flags, mip_levels, format,
-		//		struct
-		//		{
-		//			u32 width, height, row_pitch, slice_pitch,
-		//			u8 image[slice_pitch],
-		//		} images[]
+		// NOTE: 'data'に以下のことが含まれることを期待する
+		// struct {
+		//     u32 width, height, array_size (or depth), flags, mip_levels, format,
+		//     struct {
+		//         u32 row_pitch, slice_pitch,
+		//         u8 image[mip_level][slice_pitch * depth_per_mip],
+		//     } images[]
 		// } texture
+		/// @brief テクスチャのリソースを作成する関数
+		/// @param data データ
+		/// @return 生成されたリソース
 		[[nodiscard]] id::id_type create_texture_resource(const void* const data)
 		{
 			assert(data);
 			return graphics::add_texture((const u8* const)data);
 		}
+
+		/// @brief テクスチャのリソースを破棄する関数
+		/// @param id ID
 		void destroy_texture_resource(id::id_type id)
 		{
 			graphics::remove_texture(id);
 		}
 
-	} //  匿名名前空間
+	} // 匿名名前空間
 
+	/// @brief リソースを作成する関数
+	/// @param data データ
+	/// @param type タイプ
+	/// @return 生成されたリソース
 	id::id_type create_resource(const void* const data, asset_type::type type)
 	{
 		assert(data);
@@ -332,6 +375,9 @@ namespace dxforge::content
 		return id;
 	}
 
+	/// @brief リソースを破棄する関数
+	/// @param id ID
+	/// @param type タイプ
 	void destroy_resource(id::id_type id, asset_type::type type)
 	{
 		assert(id::is_valid(id));
@@ -339,7 +385,7 @@ namespace dxforge::content
 		{
 		case asset_type::animation: break;
 		case asset_type::audio:	break;
-		case asset_type::material: destroy_material_resource(id); break;
+		case asset_type::material: destroy_material_resource(id);  break;
 		case asset_type::mesh:	destroy_geometry_resource(id); break;
 		case asset_type::skeleton: break;
 		case asset_type::texture: destroy_texture_resource(id); break;
@@ -351,6 +397,9 @@ namespace dxforge::content
 
 	// NOTE: シェーダーはcompiled_shadersへのポインターの配列であることを期待する。
 	// NOTE: エディターは、シェーダーの重複がないことを確認する責任があります。 もしあれば、喜んで追加します！
+	/// @brief シェーダーグループを追加する関数
+	/// @param shaders シェーダー
+	/// @return 生成されたID
 	id::id_type add_shader_group(const u8* const* shaders, u32 num_shaders, const u32* const keys)
 	{
 		assert(shaders && num_shaders && keys);
@@ -368,6 +417,8 @@ namespace dxforge::content
 		return shader_groups.add(std::move(group));
 	}
 
+	/// @brief シェーダーグループを削除する関数
+	/// @param id ID
 	void remove_shader_group(id::id_type id)
 	{
 		std::lock_guard lock{ shader_mutex };
@@ -377,6 +428,10 @@ namespace dxforge::content
 		shader_groups.remove(id);
 	}
 
+	/// @brief シェーダーを取得する関数
+	/// @param id ID
+	/// @param shader_key シェーダーキー
+	/// @return シェーダー
 	compiled_shader_ptr get_shader(id::id_type id, u32 shader_key)
 	{
 		std::lock_guard lock{ shader_mutex };
@@ -384,12 +439,20 @@ namespace dxforge::content
 
 		for (const auto& [key, value] : shader_groups[id].map)
 		{
-			if (key == shader_key) return (const compiled_shader_ptr)value.get();
+			if (key == shader_key)
+			{
+				return (const compiled_shader_ptr)value.get();
+			}
 		}
-		assert(false);
+
+		assert(false); // ここには来ないはず
 		return nullptr;
 	}
 
+	/// @brief サブメッシュのGPU IDを取得する関数
+	/// @param geometry_content_id ジオメトリのID
+	/// @param id_count IDの数
+	/// @param gpu_ids GPU ID
 	void get_submesh_gpu_ids(id::id_type geometry_content_id, u32 id_count, id::id_type* const gpu_ids)
 	{
 		std::lock_guard lock{ geometry_mutex };
@@ -403,22 +466,30 @@ namespace dxforge::content
 		{
 			geometry_hierarchy_stream stream{ pointer };
 
-			assert([&]() {
-				const u32 lod_count{ stream.lod_count() };
-				const lod_offset lod_offset{ stream.lod_offsets()[lod_count - 1] };
-				const u32 gpu_id_count{ (u32)lod_offset.offset + (u32)lod_offset.count };
-				return gpu_id_count == id_count;
+			assert([&]()
+				{
+					const u32 lod_count{ stream.lod_count() };
+					const lod_offset lod_offset{ stream.lod_offsets()[lod_count - 1] };
+					const u32 gpu_id_count{ (u32)lod_offset.offset + (u32)lod_offset.count };
+					return gpu_id_count == id_count;
 				}());
 
 			memcpy(gpu_ids, stream.gpu_ids(), sizeof(id::id_type) * id_count);
 		}
 	}
 
+	/// @brief LODのオフセットを取得する関数
+	/// @param geometry_ids ジオメトリのID
+	/// @param thresholds 閾値
+	/// @param id_count IDの数
+	/// @param offsets オフセット
 	void get_lod_offsets(const id::id_type* const geometry_ids, const f32* const thresholds, u32 id_count, utl::vector<lod_offset>& offsets)
 	{
 		assert(geometry_ids && thresholds && id_count);
 		assert(offsets.empty());
+
 		std::lock_guard lock{ geometry_mutex };
+
 		for (u32 i{ 0 }; i < id_count; ++i)
 		{
 			u8* const pointer{ geometry_hierarchies[geometry_ids[i]] };
@@ -434,5 +505,4 @@ namespace dxforge::content
 			}
 		}
 	}
-
 }	// namespace dxforge::content

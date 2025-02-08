@@ -60,7 +60,7 @@ namespace dxforge::utl
 			else
 			{
 				id = _next_free_index;
-				assert(id < _array.size() && already_removed(id));
+				assert(id < _array.size() && already_removed(id, true));
 				_next_free_index = *(const u32* const)std::addressof(_array[id]);
 				new (std::addressof(_array[id])) T(std::forward<param>(p)...);
 			}
@@ -72,7 +72,7 @@ namespace dxforge::utl
 		/// @param id 削除する要素の要素番号
 		constexpr void remove(u32 id)
 		{
-			assert(id < _array.size() && !already_removed(id));
+			assert(id < _array.size() && !already_removed(id, false));
 			T& item{ _array[id] };
 			item.~T();
 			DEBUG_OP(memset(std::addressof(_array[id]), 0xcc, sizeof(T)));
@@ -103,31 +103,31 @@ namespace dxforge::utl
 
 		[[nodiscard]] constexpr T& operator[](u32 id)
 		{
-			assert(id < _array.size() && !already_removed(id));
+			assert(id < _array.size() && !already_removed(id, false));
 			return _array[id];
 		}
 
 		[[nodiscard]] constexpr const T& operator[](u32 id) const
 		{
-			assert(id < _array.size() && !already_removed(id));
+			assert(id < _array.size() && !already_removed(id, false));
 			return _array[id];
 		}
 
 	private:	// ====== プライベート関数 ======
 
-		constexpr bool already_removed(u32 id) const
+		constexpr bool already_removed(u32 id, bool return_value_when_sizeof_t_equals_4) const
 		{
-			// NOTE: sizeof(T)==sizeof(u32)の場合、アイテムがすでに削除されているかどうかをテストできない。
+			// NOTE: sizeof(T)==sizeof(u32)の場合、アイテムがすでに削除されているかどうかをテストすることはできません！
 			if constexpr (sizeof(T) > sizeof(u32))
 			{
-				u32 i{ sizeof(u32) };	// 最初の4バイトをスキップする
+				u32 i{ sizeof(u32) }; // 最初の4バイトをスキップする。
 				const u8* const p{ (const u8* const)std::addressof(_array[id]) };
-				while ((p[i] == 0xcc) && (i < sizeof(T)))++i;
+				while ((p[i] == 0xcc) && (i < sizeof(T))) ++i;
 				return i == sizeof(T);
 			}
 			else
 			{
-				return true;
+				return return_value_when_sizeof_t_equals_4;
 			}
 		}
 

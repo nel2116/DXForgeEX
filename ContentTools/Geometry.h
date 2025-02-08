@@ -29,6 +29,7 @@ namespace dxforge::tools
 
 	namespace elements
 	{
+
 		struct elements_type
 		{
 			enum type : u32
@@ -55,14 +56,14 @@ namespace dxforge::tools
 		struct static_normal
 		{
 			u8 color[3];
-			u8 t_sign;				// bit 0: tangent handedness * (tangent.z sign), bit 1: normal.z  sign(0 means -1, 1 means +1)
+			u8 t_sign;		// bit 0: tangent handedness, bit 1: tangent.z sign, bit 2: normal.z sign (0 means -1, 1 means +1).
 			u16 normal[2];
 		};
 
 		struct static_normal_texture
 		{
 			u8 color[3];
-			u8 t_sign;				// bit 0: tangent handedness * (tangent.z sign), bit 1: normal.z  sign(0 means -1, 1 means +1)
+			u8 t_sign;		// bit 0: tangent handedness, bit 1: tangent.z sign, bit 2: normal.z sign (0 means -1, 1 means +1).
 			u16 normal[2];
 			u16 tangent[2];
 			math::v2 uv;
@@ -87,7 +88,7 @@ namespace dxforge::tools
 		struct skeletal_normal
 		{
 			u8 joint_weights[3];	// normalized joint weights for up 4 joints
-			u8 t_sign;				// bit 0: tangent handedness * (tangent.z sign), bit 1: normal.z  sign(0 means -1, 1 means +1)
+			u8 t_sign;				// bit 0: tangent handedness, bit 1: tangent.z sign, bit 2: normal.z sign (0 means -1, 1 means +1).
 			u16 joint_indices[4];
 			u16 normal[2];
 		};
@@ -95,7 +96,7 @@ namespace dxforge::tools
 		struct skeletal_normal_color
 		{
 			u8 joint_weights[3];	// normalized joint weights for up 4 joints
-			u8 t_sign;				// bit 0: tangent handedness * (tangent.z sign), bit 1: normal.z  sign(0 means -1, 1 means +1)
+			u8 t_sign;				// bit 0: tangent handedness, bit 1: tangent.z sign, bit 2: normal.z sign (0 means -1, 1 means +1).
 			u16 joint_indices[4];
 			u16 normal[2];
 			u8 color[3];
@@ -105,7 +106,7 @@ namespace dxforge::tools
 		struct skeletal_normal_texture
 		{
 			u8 joint_weights[3];	// normalized joint weights for up 4 joints
-			u8 t_sign;				// bit 0: tangent handedness * (tangent.z sign), bit 1: normal.z  sign(0 means -1, 1 means +1)
+			u8 t_sign;				// bit 0: tangent handedness, bit 1: tangent.z sign, bit 2: normal.z sign (0 means -1, 1 means +1).
 			u16 joint_indices[4];
 			u16 normal[2];
 			u16 tangent[2];
@@ -115,7 +116,7 @@ namespace dxforge::tools
 		struct skeletal_normal_texture_color
 		{
 			u8 joint_weights[3];	// normalized joint weights for up 4 joints
-			u8 t_sign;				// bit 0: tangent handedness * (tangent.z sign), bit 1: normal.z  sign(0 means -1, 1 means +1)
+			u8 t_sign;				// bit 0: tangent handedness, bit 1: tangent.z sign, bit 2: normal.z sign (0 means -1, 1 means +1).
 			u16 joint_indices[4];
 			u16 normal[2];
 			u16 tangent[2];

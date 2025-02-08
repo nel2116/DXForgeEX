@@ -199,7 +199,7 @@ namespace dxforge::graphics::d3d12
 		: _buffer{ info,false }
 	{
 		assert(info.size && info.alignment);
-		NAME_D3D12_OBJECT_INDEXED(buffer(), size(), L"Structured Buffer - size");
+		NAME_D3D12_OBJECT_INDEXED(buffer(), size(), L"UAV Clearable Buffer - size");
 
 		assert(info.flags && D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 		_uav = core::uav_heap().allocate();
@@ -229,41 +229,37 @@ namespace dxforge::graphics::d3d12
 	/// @param info テクスチャ初期化情報
 	d3d12_texture::d3d12_texture(d3d12_texture_init_info info)
 	{
-		// デバイスを取得
 		auto* const device{ core::device() };
 		assert(device);
 
-		// クリア値を取得
 		D3D12_CLEAR_VALUE* const clear_value
 		{
 			(info.desc &&
 			(info.desc->Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET ||
-			info.desc->Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL))
+			 info.desc->Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL))
 			? &info.clear_value : nullptr
 		};
 
-		// リソースを作成
 		if (info.resource)
-		{	// リソースがある場合
+		{
 			assert(!info.heap);
 			_resource = info.resource;
 		}
-		else if (info.heap && info.desc)
-		{	// ヒープとリソース設定がある場合
-			assert(!info.resource);
+		else if (info.heap)
+		{
+			assert(info.desc);
 			DXCall(device->CreatePlacedResource(
 				info.heap, info.allocation_info.Offset, info.desc,
 				info.initial_state, clear_value, IID_PPV_ARGS(&_resource)));
 		}
-		else if (info.desc)
-		{	// リソース設定がある場合
-			assert(!info.heap && !info.resource);
+		else
+		{
+			assert(info.desc);
 			DXCall(device->CreateCommittedResource(
 				&d3dx::heap_properties.default_heap, D3D12_HEAP_FLAG_NONE, info.desc,
 				info.initial_state, clear_value, IID_PPV_ARGS(&_resource)));
 		}
 
-		// シェーダーリソースビューを作成
 		assert(_resource);
 		_srv = core::srv_heap().allocate();
 		device->CreateShaderResourceView(_resource, info.srv_desc, _srv.cpu);

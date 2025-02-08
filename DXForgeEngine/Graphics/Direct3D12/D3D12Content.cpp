@@ -162,7 +162,7 @@ namespace dxforge::graphics::d3d12::content
 			[[nodiscard]] constexpr shader_flags::flags shader_flags() const { return _shader_flags; }
 			[[nodiscard]] constexpr id::id_type root_signature_id() const { return _root_signature_id; }
 			[[nodiscard]] constexpr id::id_type* texture_ids() const { return _texture_ids; }
-			[[nodiscard]] constexpr u32* desctriptor_indices() const { return _descriptor_indices; }
+			[[nodiscard]] constexpr u32* descriptor_indices() const { return _descriptor_indices; }
 			[[nodiscard]] constexpr id::id_type* shader_ids() const { return _shader_ids; }
 
 		private:	// プライベート関数
@@ -186,16 +186,19 @@ namespace dxforge::graphics::d3d12::content
 			constexpr static u32 root_signature_index{ shader_flags_index + sizeof(shader_flags::flags) };
 			constexpr static u32 texture_count_index{ root_signature_index + sizeof(id::id_type) };
 
-			u8* _buffer;									///< バッファ
-			id::id_type* _texture_ids;						///< textureのID
-			u32* _descriptor_indices;						///< ディスクリプタのインデックス
-			id::id_type* _shader_ids;						///< shaderのID
-			id::id_type             _root_signature_id;		///< ルートシグネチャーのID
-			u32                     _texture_count;			///< textureの数
-			material_type::type     _type;					///< materialの種類
-			shader_flags::flags     _shader_flags;			///< shaderのフラグ
+			u8* _buffer;						///< バッファ
+			id::id_type* _texture_ids;			///< textureのID
+			u32* _descriptor_indices;			///< ディスクリプタのインデックス
+			id::id_type* _shader_ids;			///< shaderのID
+			id::id_type _root_signature_id;		///< ルートシグネチャーのID
+			u32 _texture_count;					///< textureの数
+			material_type::type _type;			///< materialの種類
+			shader_flags::flags _shader_flags;	///< shaderのフラグ
 		};
 
+		/// @brief サブメッシュのGPU IDを取得する関数
+		/// @param type ジオメトリの種類
+		/// @return 生成されたID
 		constexpr D3D_PRIMITIVE_TOPOLOGY get_d3d_primitive_topology(primitive_topology::type type)
 		{
 			assert(type < primitive_topology::count);
@@ -212,6 +215,9 @@ namespace dxforge::graphics::d3d12::content
 			return D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
 		}
 
+		/// @brief サブメッシュのGPU IDを取得する関数
+		/// @param topology トポロジー
+		/// @return 生成されたID
 		constexpr D3D12_PRIMITIVE_TOPOLOGY_TYPE get_d3d_primitive_topology_type(D3D_PRIMITIVE_TOPOLOGY topology)
 		{
 			switch (topology)
@@ -226,7 +232,9 @@ namespace dxforge::graphics::d3d12::content
 			return D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED;
 		}
 
-
+		/// @brief サブメッシュのGPU IDを取得する関数
+		/// @param flags シェーダーフラグ
+		/// @return 生成されたID
 		constexpr D3D12_ROOT_SIGNATURE_FLAGS get_root_signature_flags(shader_flags::flags flags)
 		{
 			D3D12_ROOT_SIGNATURE_FLAGS default_flags{ d3dx::d3d12_root_signature_desc::default_flags };
@@ -240,6 +248,10 @@ namespace dxforge::graphics::d3d12::content
 			return default_flags;
 		}
 
+		/// @brief ルートシグネチャを作成する関数
+		/// @param type materialの種類
+		/// @param flags シェーダーフラグ
+		/// @return 生成されたルートシグネチャのID
 		id::id_type create_root_signature(material_type::type type, shader_flags::flags flags)
 		{
 			assert(type < material_type::count);
@@ -318,6 +330,11 @@ namespace dxforge::graphics::d3d12::content
 			return id;
 		}
 
+		/// @brief PSOを作成する関数
+		/// @param stream_ptr ストリームのポインター
+		/// @param aligned_stream_size ストリームのサイズ
+		/// @param is_depth 深度のみのPSOかどうか
+		/// @return 生成されたID
 		id::id_type create_pso_if_needed(const u8* const stream_ptr, u64 aligned_stream_size, [[maybe_unused]] bool is_depth)
 		{
 			const u64 key{ math::calc_crc32_u64(stream_ptr, aligned_stream_size) };
@@ -349,7 +366,11 @@ namespace dxforge::graphics::d3d12::content
 			}
 		}
 
+		// NOTE: _BitScanForwardは、ビットの位置を見つけるために使用されます。
 #pragma intrinsic(_BitScanForward)
+		/// @brief シェーダータイプを取得する関数
+		/// @param flag フラグ
+		/// @return シェーダータイプ
 		shader_type::type get_shader_type(u32 flag)
 		{
 			assert(flag);
@@ -358,6 +379,11 @@ namespace dxforge::graphics::d3d12::content
 			return (shader_type::type)index;
 		}
 
+		/// @brief PSOを作成する関数
+		/// @param material_id materialのID
+		/// @param primitive_topology プリミティブトポロジー
+		/// @param elements_type 要素の種類
+		/// @return 生成されたID
 		pso_id create_pso(id::id_type material_id, D3D12_PRIMITIVE_TOPOLOGY primitive_topology, u32 elements_type)
 		{
 			constexpr u64 aligned_stream_size{ math::align_size_up<sizeof(u64)>(sizeof(d3dx::d3d12_pipeline_state_subobject_stream)) };
@@ -420,8 +446,6 @@ namespace dxforge::graphics::d3d12::content
 			return id_pair;
 		}
 
-
-
 		/// <returns>
 		/// Returns a byte array that contains
 		/// struct
@@ -437,8 +461,7 @@ namespace dxforge::graphics::d3d12::content
 		/// @brief テクスチャデータからリソースを作成する関数
 		/// @param data テクスチャデータ
 		/// @return 作成されたリソース
-		d3d12_texture
-			create_resource_from_texture_data(const u8* const data)
+		d3d12_texture create_resource_from_texture_data(const u8* const data)
 		{
 			assert(data);
 			utl::blob_stream_reader blob{ data };
@@ -774,7 +797,7 @@ namespace dxforge::graphics::d3d12::content
 			std::lock_guard lock{ texture_mutex };
 			for (u32 i{ 0 }; i < id_count; ++i)
 			{
-				indices[i] = textures[i].srv().index;
+				indices[i] = descriptor_indices[texture_ids[i]];
 			}
 		}
 	} // namespace texture
@@ -816,18 +839,25 @@ namespace dxforge::graphics::d3d12::content
 		/// @param material_ids マテリアルのID
 		/// @param material_count IDの数
 		/// @param cache キャッシュ
-		void get_materials(const id::id_type* const material_ids, u32 material_count, const materials_cache& cache)
+		void get_materials(const id::id_type* const material_ids, u32 material_count, const materials_cache& cache, u32& descriptor_index_count)
 		{
 			assert(material_ids && material_count);
 			assert(cache.root_signatures && cache.material_types);
 			std::lock_guard lock{ material_mutex };
+
+			u32 total_index_count{ 0 };
 
 			for (u32 i{ 0 }; i < material_count; ++i)
 			{
 				const d3d12_material_stream stream{ materials[material_ids[i]].get() };
 				cache.root_signatures[i] = root_signatures[stream.root_signature_id()];
 				cache.material_types[i] = stream.material_type();
+				cache.descriptor_indices[i] = stream.descriptor_indices();
+				cache.texture_count[i] = stream.texture_count();
+				total_index_count += stream.texture_count();
 			}
+
+			descriptor_index_count = total_index_count;
 		}
 
 	} // namespace material
@@ -982,6 +1012,5 @@ namespace dxforge::graphics::d3d12::content
 		}
 
 	} // namespace render_item
-
 }	// namespace dxforge::graphics::d3d12::content
 

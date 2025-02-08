@@ -262,6 +262,10 @@ namespace dxforge::graphics::d3d12::gpass
 				cmd_list->SetGraphicsRootShaderResourceView(params::position_buffer, cache.position_buffers[cache_index]);
 				cmd_list->SetGraphicsRootShaderResourceView(params::element_buffer, cache.element_buffers[cache_index]);
 				cmd_list->SetGraphicsRootConstantBufferView(params::per_object_data, cache.per_object_data[cache_index]);
+				if (cache.texture_counts[cache_index])
+				{
+					cmd_list->SetGraphicsRootShaderResourceView(params::srv_indices, cache.srv_indices[cache_index]);
+				}
 			}
 			break;
 			}
@@ -285,9 +289,31 @@ namespace dxforge::graphics::d3d12::gpass
 			submesh::get_views(items_cache.submesh_gpu_ids, items_count, views_cache);
 
 			const material::materials_cache materials_cache{ cache.materials_cache() };
-			material::get_materials(items_cache.material_ids, items_count, materials_cache);
+			material::get_materials(items_cache.material_ids, items_count, materials_cache, cache.descriptor_index_count);
 
 			fill_per_object_data(d3d12_info);
+
+			if (cache.descriptor_index_count)
+			{
+				constant_buffer& cbuffer{ core::cbuffer() };
+				const u32 size{ cache.descriptor_index_count * sizeof(u32) };
+				u32* const srv_indices{ (u32* const)cbuffer.allocate(size) };
+				u32 srv_index_offset{ 0 };
+
+				for (u32 i{ 0 }; i < items_count; ++i)
+				{
+					const u32 texture_count{ cache.texture_counts[i] };
+					cache.srv_indices[i] = 0;
+
+					if (texture_count)
+					{
+						const u32* const descriptor_indices{ cache.descriptor_indices[i] };
+						memcpy(&srv_indices[srv_index_offset], descriptor_indices, texture_count * sizeof(u32));
+						cache.srv_indices[i] = cbuffer.gpu_address(srv_indices + srv_index_offset);
+						srv_index_offset += texture_count;
+					}
+				}
+			}
 		}
 
 	}	// “½–¼–¼‘O‹óŠÔ
