@@ -48,6 +48,8 @@
     <ClInclude Include="Input\Input.h" />
     <ClInclude Include="Input\InputWin32.h" />
     <ClInclude Include="Graphics\Direct3D12\D3D12LightCulling.h" />
+    <ClInclude Include="EngineAPI\GeometryComponent.h" />
+    <ClInclude Include="Components\Geometry.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Components\Entity.cpp" />
@@ -79,5 +81,6 @@
     <ClCompile Include="Input\Input.cpp" />
     <ClCompile Include="Input\InputWin32.cpp" />
     <ClCompile Include="Graphics\Direct3D12\D3D12LightCulling.cpp" />
+    <ClCompile Include="Components\Geometry.cpp" />
   </ItemGroup>
 </Project>

@@ -35,9 +35,11 @@ namespace dxforge::tools
 		std::mutex fbx_mutex{};
 
 	}	// 匿名名前空間
+
 	// ====== メンバ関数 ======
 
-	// ファイル読み込み
+	/// @brief FBX SDKの初期化
+	/// @return 初期化に成功したかどうか
 	bool fbx_context::initialize_fbx()
 	{
 		assert(!is_valid());
@@ -48,36 +50,41 @@ namespace dxforge::tools
 			return false;
 		}
 
-		FbxIOSettings* ios = FbxIOSettings::Create(_fbx_manager, IOSROOT);
+		FbxIOSettings* ios{ FbxIOSettings::Create(_fbx_manager, IOSROOT) };
 		assert(ios);
 		_fbx_manager->SetIOSettings(ios);
 
 		return true;
 	}
 
-	// FBXファイル読み込み
+	/// @brief FBXファイルの読み込み
+	/// @param file ファイル名
 	void fbx_context::load_fbx_file(const char* file)
 	{
 		assert(_fbx_manager && !_fbx_scene);
-		_fbx_scene = FbxScene::Create(_fbx_manager, "Importer scene");
+		_fbx_scene = FbxScene::Create(_fbx_manager, "Importer Scene");
 		if (!_fbx_scene)
 		{
 			return;
 		}
 
 		FbxImporter* importer{ FbxImporter::Create(_fbx_manager, "Importer") };
-		if (!(importer && importer->Initialize(file, -1, _fbx_manager->GetIOSettings()) && importer->Import(_fbx_scene)))
+		if (!(importer &&
+			importer->Initialize(file, -1, _fbx_manager->GetIOSettings()) &&
+			importer->Import(_fbx_scene)))
 		{
 			return;
 		}
 
 		importer->Destroy();
 
-		// シーンスケールをメートル単位で取得
-		_scene_scale = static_cast<f32>(_fbx_scene->GetGlobalSettings().GetSystemUnit().GetConversionFactorTo(FbxSystemUnit::m));
+		// シーンのスケールをメートル単位で取得する。
+		_scene_scale = (f32)_fbx_scene->GetGlobalSettings().GetSystemUnit().GetConversionFactorTo(FbxSystemUnit::m);
 	}
 
-	void fbx_context::get_scene(FbxNode* root)
+	/// @brief シーンの取得
+	/// @param root ルートノード
+	void fbx_context::get_scene(FbxNode* root /*= nullptr*/)
 	{
 		assert(is_valid());
 
@@ -131,6 +138,11 @@ namespace dxforge::tools
 		}
 	}
 
+	/// @brief メッシュの取得
+	/// @param node ノード
+	/// @param meshes メッシュリスト
+	/// @param lod_id LOD ID
+	/// @param lod_threshold LOD閾値
 	void fbx_context::get_meshes(FbxNode* node, utl::vector<mesh>& meshes, u32 lod_id, f32 lod_threshold)
 	{
 		assert(node && lod_id != u32_invalid_id);
@@ -166,14 +178,19 @@ namespace dxforge::tools
 		}
 	}
 
+	/// @brief メッシュの取得
+	/// @param attribute ノード属性
+	/// @param meshes メッシュリスト
+	/// @param lod_id LOD ID
+	/// @param lod_threshold LOD閾値
 	void fbx_context::get_mesh(FbxNodeAttribute* attribute, utl::vector<mesh>& meshes, u32 lod_id, f32 lod_threshold)
 	{
 		assert(attribute);
+
 		FbxMesh* fbx_mesh{ (FbxMesh*)attribute };
+		if (fbx_mesh->RemoveBadPolygons() < 0) return;
 
-		if (fbx_mesh->RemoveBadPolygons() > 0) return;
-
-		// 必要に応じてメッシュを三角形にする
+		// 必要であればメッシュを三角形化する。
 		FbxGeometryConverter gc{ _fbx_manager };
 		fbx_mesh = (FbxMesh*)gc.Triangulate(fbx_mesh, true);
 		if (!fbx_mesh || fbx_mesh->RemoveBadPolygons() < 0) return;
@@ -192,7 +209,8 @@ namespace dxforge::tools
 		}
 	}
 
-
+	/// @brief LODグループの取得
+	/// @param attribute ノード属性
 	void fbx_context::get_lod_group(FbxNodeAttribute* attribute)
 	{
 		assert(attribute);
@@ -201,28 +219,34 @@ namespace dxforge::tools
 		FbxNode* const node{ lod_grp->GetNode() };
 		lod_group lod{};
 		lod.name = (node->GetName()[0] != '\0') ? node->GetName() : lod_grp->GetName();
-		// NOTE: LODの数はベースメッシュ( LOD 0)に限定されます。
+		// NOTE: LODの数はベースメッシュ（LOD 0）専用です。
 		const s32 num_nodes{ node->GetChildCount() };
 		assert(num_nodes > 0 && lod_grp->GetNumThresholds() == (num_nodes - 1));
 
 		for (s32 i{ 0 }; i < num_nodes; ++i)
 		{
-			f32 lod_threshold{ -1.0f };
+			f32 lod_threshold{ -1.f };
 			if (i > 0)
 			{
 				FbxDistance threshold;
 				lod_grp->GetThreshold(i - 1, threshold);
 				lod_threshold = threshold.value() * _scene_scale;
 			}
+
 			get_meshes(node->GetChild(i), lod.meshes, (u32)lod.meshes.size(), lod_threshold);
 		}
-		if (lod.meshes.size()) _scene->lod_groups.emplace_back(lod);
 
+		if (lod.meshes.size()) _scene->lod_groups.emplace_back(lod);
 	}
 
+	/// @brief メッシュデータの取得
+	/// @param fbx_mesh FBXメッシュ
+	/// @param m メッシュデータ
+	/// @return 成功したかどうか
 	bool fbx_context::get_mesh_data(FbxMesh* fbx_mesh, mesh& m)
 	{
 		assert(fbx_mesh);
+
 		FbxNode* const node{ fbx_mesh->GetNode() };
 		FbxAMatrix geometricTransform;
 
@@ -251,8 +275,8 @@ namespace dxforge::tools
 		for (s32 i{ 0 }; i < num_indices; ++i)
 		{
 			const u32 v_idx{ (u32)indices[i] };
-			// 以前にこの頂点に出会ったことがあっただろうか？ もしそうなら、そのインデックスを追加してください。
-			// そうでなければ、頂点と新しいインデックスを追加する。
+
+			// 頂点参照が存在する場合は、そのインデックスを使用します。
 			if (vertex_ref[v_idx] != u32_invalid_id)
 			{
 				m.raw_indices[i] = vertex_ref[v_idx];
@@ -265,9 +289,10 @@ namespace dxforge::tools
 				m.positions.emplace_back((f32)v[0], (f32)v[1], (f32)v[2]);
 			}
 		}
+
 		assert(m.raw_indices.size() % 3 == 0);
 
-		// ポリゴンごとのマテリアルインデックスを取得
+		// ポリゴンごとの材料インデックスを取得
 		assert(num_polys > 0);
 		FbxLayerElementArrayTemplate<s32>* mtl_indices;
 		if (fbx_mesh->GetMaterialIndices(&mtl_indices))
@@ -294,7 +319,8 @@ namespace dxforge::tools
 		{
 			FbxArray<FbxVector4> normals;
 			// FBXの組み込みメソッドを使用して法線を計算しますが、法線データがすでに存在しない場合に限ります。
-			if (fbx_mesh->GenerateNormals() && fbx_mesh->GetPolygonVertexNormals(normals) && normals.Size() > 0)
+			if (fbx_mesh->GenerateNormals() &&
+				fbx_mesh->GetPolygonVertexNormals(normals) && normals.Size() > 0)
 			{
 				const s32 num_normals{ normals.Size() };
 				for (s32 i{ 0 }; i < num_normals; ++i)
@@ -307,33 +333,39 @@ namespace dxforge::tools
 			else
 			{
 				// FBXから法線をインポートする際に何か問題が発生した。
-				// 通常の計算方法に戻る。
+				// 独自の法線計算方法に戻る。
 				_scene_data->settings.calculate_normals = true;
 			}
 		}
-		// タンジェントのインポート
+
+		// タンジェントをインポートする
 		if (import_tangents)
 		{
 			FbxLayerElementArrayTemplate<FbxVector4>* tangents{ nullptr };
 			// FBXの組み込みメソッドを使用してタンジェントを計算しますが、タンジェントデータがすでに存在しない場合に限ります。
-			if (fbx_mesh->GenerateTangentsData() && fbx_mesh->GetTangents(&tangents) && tangents && tangents->GetCount() > 0)
+			// NOTE: ドキュメントによると、この関数は接線データがすでに存在し、pOverwrite == falseの場合にtrueを返す。
+			//		これは間違っている（つまり、その場合はfalseを返す）！
+			fbx_mesh->GenerateTangentsData();
+
+			if (fbx_mesh->GetTangents(&tangents) && tangents &&
+				tangents->GetCount() == m.raw_indices.size())
 			{
 				const s32 num_tangent{ tangents->GetCount() };
 				for (s32 i{ 0 }; i < num_tangent; ++i)
 				{
-					// TODO: この変換が正しいかどうかはわからない
+					// TODO: この変換が正しいかどうかはわからない。
 					FbxVector4 t{ tangents->GetAt(i) };
 					const f32 handedness{ (f32)t[3] };
-					t[3] = 0.0f;
+					t[3] = 0.0;
 					t = transform.MultT(t);
 					t.Normalize();
-					m.tangents.emplace_back((f32)t[0], (f32)t[1], (f32)t[2], handedness);
+					m.tangents.emplace_back((f32)t[0], (f32)t[1], (f32)t[2], -handedness);
 				}
 			}
 			else
 			{
 				// FBXからタンジェントをインポートするときに何か問題が発生した。
-				// 我々独自のタンジェント計算法に戻る。
+				// 独自のタンジェント計算方法に戻る。
 				_scene_data->settings.calculate_tangents = true;
 			}
 		}
@@ -342,8 +374,9 @@ namespace dxforge::tools
 		FbxStringList uv_names;
 		fbx_mesh->GetUVSetNames(uv_names);
 		const s32 uv_set_count{ uv_names.GetCount() };
-		// NOTE: UVセットがなくても大丈夫。 例えば、発光するオブジェクトの中には、uvマップを必要としないものがある。
+		// NOTE: UVセットがなくても大丈夫だ。 例えば、発光するオブジェクトの中には、uvマップを必要としないものがある。
 		m.uv_sets.resize(uv_set_count);
+
 		for (s32 i{ 0 }; i < uv_set_count; ++i)
 		{
 			FbxArray<FbxVector2> uvs;
@@ -352,19 +385,27 @@ namespace dxforge::tools
 				const s32 num_uvs{ uvs.Size() };
 				for (s32 j{ 0 }; j < num_uvs; ++j)
 				{
-					m.uv_sets[i].emplace_back((f32)uvs[j][0], (f32)uvs[j][1]);
+					// FBX UVの原点が常に左下にあると仮定すると、DirectXは左上隅を原点として使用するため、
+					// V軸は反転するはずです。
+					m.uv_sets[i].emplace_back((f32)uvs[j][0], 1.f - (f32)uvs[j][1]);
 				}
 			}
 		}
+
 		return true;
 	}
 
-	// ====== グローバル関数 ======
+	/// @brief fbxモデルを読み込む
+	/// @param file FBXファイル名
+	/// @param data シーンデータ
+	/// @param callback 進捗コールバック
+	/// @return 成功した場合はtrue
 	EDITOR_INTERFACE void ImportFbx(const char* file, scene_data* data, progression::progress_callback callback)
 	{
 		assert(file && data);
 		scene scene{};
 		progression progression{ callback };
+
 		// NOTE: FBX SDKを使用するものは、シングルスレッドでなければならない。
 		{
 			std::lock_guard lock{ fbx_mutex };

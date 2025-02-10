@@ -20,6 +20,7 @@ using namespace Microsoft::WRL;
 namespace dxforge::tools
 {
 	bool is_normal_map(const Image* const image);
+
 	namespace
 	{
 		struct import_error
@@ -76,26 +77,29 @@ namespace dxforge::tools
 
 		struct texture_data
 		{
-			constexpr static u32 max_mips{ 14 };	// 8Kテクスチャまでサポート
+			constexpr static u32    max_mips{ 14 }; // 最大8Kテクスチャをサポートしています。
 			u8* subresource_data;
-			u32 subresource_size;
+			u32                     subresource_size;
 			u8* icon;
-			u32 icon_size;
-			texture_info info;
+			u32                     icon_size;
+			texture_info            info;
 			texture_import_settings import_settings;
 		};
 
 		struct d3d11_device
 		{
-			ComPtr<ID3D11Device> device;
-			std::mutex hw_compression_mutex;
+			ComPtr<ID3D11Device>    device;
+			std::mutex              hw_compression_mutex;
 		};
-		std::mutex device_creation_mutex;
-		utl::vector<d3d11_device> d3d11_devices;
+
+		std::mutex                  device_creation_mutex;
+		utl::vector<d3d11_device>   d3d11_devices;
 
 		HMODULE dxgi_module{ nullptr };
 		HMODULE d3d11_module{ nullptr };
 
+		/// @brief ハードウェアアダプタを取得
+		/// @return ハードウェアアダプタのリスト
 		utl::vector<ComPtr<IDXGIAdapter>> get_adapters_by_performance()
 		{
 			if (!dxgi_module)
@@ -133,6 +137,7 @@ namespace dxforge::tools
 			return adapters;
 		}
 
+		/// @brief デバイスを作成
 		void create_device()
 		{
 			if (d3d11_devices.size()) return;
@@ -160,14 +165,15 @@ namespace dxforge::tools
 				ID3D11Device** device{ &devices[i] };
 				D3D_FEATURE_LEVEL feature_level;
 				[[maybe_unused]]
-				HRESULT hr{ d3d11_create_device(adapters[i].Get(), adapters[i] ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE,nullptr, create_device_flags, feature_levels, _countof(feature_levels),D3D11_SDK_VERSION, device, &feature_level, nullptr) };
+				HRESULT hr{ d3d11_create_device(adapters[i].Get(), adapters[i] ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE,
+											   nullptr, create_device_flags, feature_levels, _countof(feature_levels),
+											   D3D11_SDK_VERSION, device, &feature_level, nullptr) };
 				assert(SUCCEEDED(hr));
 			}
 
 			for (u32 i{ 0 }; i < devices.size(); ++i)
 			{
-				// NOTE: 要求された機能レベル(D3D_FEATURE_LEVEL_11_0)をサポートしていないアダプタでは
-				//		デバイスの作成に失敗することがあるためです。
+				// NOTE: 要求された機能レベル(D3D_FEATURE_LEVEL_11_0)をサポートしていないアダプタでは、デバイスの作成に失敗することがあるためです。
 				if (devices[i])
 				{
 					d3d11_devices.emplace_back();
@@ -176,11 +182,20 @@ namespace dxforge::tools
 			}
 		}
 
+		/// @brief デバイスを取得
+		/// @param flags フラグ
+		/// @param flag フラグ
+		/// @param set フラグを設定するかどうか
 		constexpr void set_or_clear_flag(u32& flags, u32 flag, bool set)
 		{
 			if (set) flags |= flag; else flags &= ~flag;
 		}
 
+		/// @brief テクスチャの最大ミップマップ数を取得
+		/// @param width 幅
+		/// @param height 高さ
+		/// @param depth 深度
+		/// @return ミップマップ数
 		constexpr u32 get_max_mip_count(u32 width, u32 height, u32 depth)
 		{
 			u32 mip_levels{ 1 };
@@ -189,11 +204,16 @@ namespace dxforge::tools
 				width >>= 1;
 				height >>= 1;
 				depth >>= 1;
+
 				++mip_levels;
 			}
+
 			return mip_levels;
 		}
 
+		/// @brief テクスチャ情報をメタデータから取得
+		/// @param metadata メタデータ
+		/// @param info テクスチャ情報
 		void texture_info_from_metadata(const TexMetadata& metadata, texture_info& info)
 		{
 			using namespace dxforge::content;
@@ -211,24 +231,26 @@ namespace dxforge::tools
 			set_or_clear_flag(info.flags, texture_flags::is_srgb, IsSRGB(format));
 		}
 
+		/// @brief テクスチャ情報を設定
+		/// @param scratch スクラッチイメージ
+		/// @param data テクスチャデータ
 		void copy_subresources(const ScratchImage& scratch, texture_data* const data)
 		{
-			const TexMetadata& metadata{ scratch.GetMetadata() };
 			const Image* const images{ scratch.GetImages() };
 			const u32 image_count{ (u32)scratch.GetImageCount() };
-			assert(images && metadata.mipLevels && metadata.mipLevels <= texture_data::max_mips);
+			assert(images && scratch.GetMetadata().mipLevels && scratch.GetMetadata().mipLevels <= texture_data::max_mips);
 
 			u64 subresource_size{ 0 };
 
 			for (u32 i{ 0 }; i < image_count; ++i)
 			{
-				// 4 x u32 （幅、高さ、行ピッチ、スライスピッチ
+				// 4 x u32 （幅、高さ、行ピッチ、スライスピッチ用
 				subresource_size += sizeof(u32) * 4 + images[i].slicePitch;
 			}
 
 			if (subresource_size > ~(u32)0)
 			{
-				// 最大4GBのサブリソースをサポート
+				// リソースあたり最大4GBをサポート。
 				data->info.import_error = import_error::max_size_exceeded;
 				return;
 			}
@@ -250,6 +272,9 @@ namespace dxforge::tools
 			}
 		}
 
+		/// @brief サブリソースデータをイメージに変換
+		/// @param data テクスチャデータ
+		/// @return イメージリスト
 		[[nodiscard]] utl::vector<Image> subresource_data_to_images(texture_data* const data)
 		{
 			assert(data && data->subresource_data && data->subresource_size);
@@ -294,9 +319,11 @@ namespace dxforge::tools
 			return images;
 		}
 
+		/// @brief アイコンをコピー
+		/// @param bc_image コピーするイメージ
+		/// @param data テクスチャデータ
 		void copy_icon(const Image& bc_image, texture_data* const data)
 		{
-
 			ScratchImage scratch;
 			if (FAILED(Decompress(bc_image, DXGI_FORMAT_UNKNOWN, scratch)))
 			{
@@ -306,7 +333,7 @@ namespace dxforge::tools
 			assert(scratch.GetImages());
 			const Image& image{ scratch.GetImages()[0] };
 
-			// 4 x u32 （幅、高さ、行ピッチ、スライスピッチ
+			// 4 x u32 （幅、高さ、行ピッチ、スライスピッチ用
 			data->icon_size = (u32)(sizeof(u32) * 4 + image.slicePitch);
 			data->icon = (u8* const)CoTaskMemRealloc(data->icon, data->icon_size);
 			assert(data->icon);
@@ -319,6 +346,10 @@ namespace dxforge::tools
 			blob.write(image.pixels, image.slicePitch);
 		}
 
+		/// @brief テクスチャをロード
+		/// @param data テクスチャデータ
+		/// @param file_name ファイル名
+		/// @return スクラッチイメージ
 		[[nodiscard]] ScratchImage load_from_file(texture_data* const data, const char* file_name)
 		{
 			using namespace dxforge::content;
@@ -346,24 +377,24 @@ namespace dxforge::tools
 			const wchar_t* const file{ wfile.c_str() };
 			ScratchImage scratch;
 
-			// まずWICフォーマット（BMP、JPEG、PNGなど）を試してみます。
+			// まずWICフォーマットの一つを試してみてください（例：BMP、JPEG、PNGなど）。
 			wic_flags |= WIC_FLAGS_FORCE_RGB;
 			HRESULT hr{ LoadFromWICFile(file, wic_flags, nullptr, scratch) };
 
-			// WICのフォーマットではなかった。 TGAを試してみます。
+			// WICのフォーマットではなかった。 TGAを試してみてください。
 			if (FAILED(hr))
 			{
 				hr = LoadFromTGAFile(file, tga_flags, nullptr, scratch);
 			}
 
-			// TGAでもなかった。 HDRを試してみます。
+			// TGAでもなかった。 HDRを試してみてください。
 			if (FAILED(hr))
 			{
 				hr = LoadFromHDRFile(file, nullptr, scratch);
 				if (SUCCEEDED(hr)) data->info.flags |= texture_flags::is_hdr;
 			}
 
-			// HDRではなかった。 DDSを試してみます。
+			// HDRではなかった。 DDSを試してみてください。
 			if (FAILED(hr))
 			{
 				hr = LoadFromDDSFile(file, DDS_FLAGS_FORCE_RGB, nullptr, scratch);
@@ -389,6 +420,10 @@ namespace dxforge::tools
 			return scratch;
 		}
 
+		/// @brief テクスチャを初期化
+		/// @param data テクスチャデータ
+		/// @param images イメージリスト
+		/// @return スクラッチイメージ
 		[[nodiscard]] ScratchImage initialize_from_images(texture_data* const data, const utl::vector<Image>& images)
 		{
 			assert(data);
@@ -398,14 +433,15 @@ namespace dxforge::tools
 			HRESULT hr{ S_OK };
 			const u32 array_size{ (u32)images.size() };
 
-			{	// スクラッチの作業スコープ
-				ScratchImage working_scratch;
+			{ // 画像をスクラッチイメージに変換
+				ScratchImage working_scratch{};
 
-				if (settings.dimension == texture_dimension::texture_1d || settings.dimension == texture_dimension::texture_2d)
+				if (settings.dimension == texture_dimension::texture_1d ||
+					settings.dimension == texture_dimension::texture_2d)
 				{
 					const bool allow_1d{ settings.dimension == texture_dimension::texture_1d };
 					assert(array_size >= 1 && images.size() >= 1);
-					hr = working_scratch.InitializeArrayFromImages(images.data(), array_size, allow_1d);
+					hr = working_scratch.InitializeArrayFromImages(images.data(), images.size(), allow_1d);
 				}
 				else if (settings.dimension == texture_dimension::texture_cube)
 				{
@@ -430,21 +466,23 @@ namespace dxforge::tools
 				}
 
 				scratch = std::move(working_scratch);
-			}	// !スクラッチの作業スコープ
+			}
 
 			if (settings.mip_levels != 1)
 			{
 				ScratchImage mip_scratch;
 				const TexMetadata& metadata{ scratch.GetMetadata() };
-				u32 mip_levels{ math::clamp(settings.mip_levels,(u32)0,get_max_mip_count((u32)metadata.width,(u32)metadata.height,(u32)metadata.depth)) };
+				u32 mip_levels{ math::clamp(settings.mip_levels, (u32)0, get_max_mip_count((u32)metadata.width, (u32)metadata.height, (u32)metadata.depth)) };
 
 				if (settings.dimension != texture_dimension::texture_3d)
 				{
-					hr = GenerateMipMaps(scratch.GetImages(), scratch.GetImageCount(), metadata, TEX_FILTER_DEFAULT, mip_levels, mip_scratch);
+					hr = GenerateMipMaps(scratch.GetImages(), scratch.GetImageCount(), scratch.GetMetadata(),
+						TEX_FILTER_DEFAULT, mip_levels, mip_scratch);
 				}
 				else
 				{
-					hr = GenerateMipMaps3D(scratch.GetImages(), scratch.GetImageCount(), scratch.GetMetadata(), TEX_FILTER_DEFAULT, mip_levels, mip_scratch);
+					hr = GenerateMipMaps3D(scratch.GetImages(), scratch.GetImageCount(), scratch.GetMetadata(),
+						TEX_FILTER_DEFAULT, mip_levels, mip_scratch);
 				}
 
 				if (FAILED(hr))
@@ -454,11 +492,16 @@ namespace dxforge::tools
 				}
 
 				scratch = std::move(mip_scratch);
-			}	// !ミップマップの生成
+			}
 
 			return scratch;
 		}
 
+		/// @brief テクスチャの出力フォーマットを決定
+		/// @param data テクスチャデータ
+		/// @param scratch スクラッチイメージ
+		/// @param image イメージ
+		/// @return DXGIフォーマット
 		DXGI_FORMAT determine_output_format(texture_data* const data, ScratchImage& scratch, const Image* const image)
 		{
 			assert(data && data->import_settings.compress);
@@ -466,22 +509,24 @@ namespace dxforge::tools
 			const DXGI_FORMAT image_format{ image->format };
 			DXGI_FORMAT output_format{ (DXGI_FORMAT)data->import_settings.output_format };
 
-			// インポート設定でフォーマットが明示的に指定されていない場合、
-			// 最適なブロック圧縮フォーマットを決定する。
+			// インポート設定でフォーマットが明示的に指定されていない場合、最適なブロック圧縮フォーマットを決定する。
 			if (output_format != DXGI_FORMAT_UNKNOWN)
 			{
 				goto _done;
 			}
 
-			if ((data->info.flags & texture_flags::is_hdr) || image_format == DXGI_FORMAT_BC6H_UF16 || image_format == DXGI_FORMAT_BC6H_SF16)
+			if ((data->info.flags & texture_flags::is_hdr) ||
+				image_format == DXGI_FORMAT_BC6H_UF16 || image_format == DXGI_FORMAT_BC6H_SF16)
 			{
 				output_format = DXGI_FORMAT_BC6H_UF16;
 			}
-			// ソース画像がグレースケールまたはシングルチャンネルのブロック圧縮フォーマット（XC4）の場合、出力フォーマットはBC4になります。
+
+			// ソース画像がグレースケールまたはシングルチャンネルのブロック圧縮フォーマット（BC4）の場合、出力フォーマットはBC4になります。
 			else if (image_format == DXGI_FORMAT_R8_UNORM || image_format == DXGI_FORMAT_BC4_UNORM || image_format == DXGI_FORMAT_BC4_SNORM)
 			{
 				output_format = DXGI_FORMAT_BC4_UNORM;
 			}
+
 			// 元画像が法線マップかどうかをテストし、法線マップであればBC5形式で出力する。
 			else if (is_normal_map(image) || image_format == DXGI_FORMAT_BC5_UNORM || image_format == DXGI_FORMAT_BC5_SNORM)
 			{
@@ -493,10 +538,12 @@ namespace dxforge::tools
 					scratch.OverrideFormat(MakeTypelessUNORM(MakeTypeless(image_format)));
 				}
 			}
+
 			// RGBAブロック圧縮フォーマットを使用する。
 			else
 			{
-				output_format = data->import_settings.prefer_bc7 ? DXGI_FORMAT_BC7_UNORM : scratch.IsAlphaAllOpaque() ? DXGI_FORMAT_BC1_UNORM : DXGI_FORMAT_BC3_UNORM;
+				output_format = data->import_settings.prefer_bc7 ? DXGI_FORMAT_BC7_UNORM :
+					scratch.IsAlphaAllOpaque() ? DXGI_FORMAT_BC1_UNORM : DXGI_FORMAT_BC3_UNORM;
 			}
 
 		_done:
@@ -506,6 +553,9 @@ namespace dxforge::tools
 			return IsSRGB(image_format) ? MakeSRGB(output_format) : output_format;
 		}
 
+		/// @brief テクスチャが法線マップかどうかを判定
+		/// @param format フォーマット
+		/// @return 法線マップの場合はtrue
 		bool can_use_gpu(DXGI_FORMAT format)
 		{
 			switch (format)
@@ -532,6 +582,10 @@ namespace dxforge::tools
 			return false;
 		}
 
+		/// @brief テクスチャが法線マップかどうかを判定
+		/// @param data テクスチャデータ
+		/// @param scratch スクラッチイメージ
+		/// @return 法線マップの場合はtrue
 		[[nodiscard]] ScratchImage compress_image(texture_data* const data, ScratchImage& scratch)
 		{
 			assert(data && data->import_settings.compress && scratch.GetImages());
@@ -543,8 +597,8 @@ namespace dxforge::tools
 				return {};
 			}
 
-			const DXGI_FORMAT output_format{ determine_output_format(data,scratch,image) };
-			HRESULT hr(S_OK);
+			const DXGI_FORMAT output_format{ determine_output_format(data, scratch, image) };
+			HRESULT hr{ S_OK };
 			ScratchImage bc_scratch;
 			if (can_use_gpu(output_format))
 			{
@@ -555,7 +609,8 @@ namespace dxforge::tools
 					{
 						if (d3d11_devices[i].hw_compression_mutex.try_lock())
 						{
-							hr = Compress(d3d11_devices[i].device.Get(), scratch.GetImages(), scratch.GetImageCount(), scratch.GetMetadata(), output_format, TEX_COMPRESS_DEFAULT, 1.0f, bc_scratch);
+							hr = Compress(d3d11_devices[i].device.Get(), scratch.GetImages(), scratch.GetImageCount(),
+								scratch.GetMetadata(), output_format, TEX_COMPRESS_DEFAULT, 1.0f, bc_scratch);
 							d3d11_devices[i].hw_compression_mutex.unlock();
 							wait = false;
 							break;
@@ -566,7 +621,8 @@ namespace dxforge::tools
 			}
 			else
 			{
-				hr = Compress(scratch.GetImages(), scratch.GetImageCount(), scratch.GetMetadata(), output_format, TEX_COMPRESS_PARALLEL, data->import_settings.alpha_threshold, bc_scratch);
+				hr = Compress(scratch.GetImages(), scratch.GetImageCount(), scratch.GetMetadata(),
+					output_format, TEX_COMPRESS_PARALLEL, data->import_settings.alpha_threshold, bc_scratch);
 			}
 
 			if (FAILED(hr))
@@ -578,8 +634,9 @@ namespace dxforge::tools
 			return bc_scratch;
 		}
 
-	}	// 匿名名前空間
+	} // 匿名名前空間
 
+	/// @brief テクスチャツールの終了処理
 	void ShutDownTextureTools()
 	{
 		d3d11_devices.clear();
@@ -597,6 +654,9 @@ namespace dxforge::tools
 		}
 	}
 
+	/// @brief テクスチャの解凍
+	/// @param data テクスチャデータ
+	/// @return 成功した場合はtrue
 	EDITOR_INTERFACE void Decompress(texture_data* const data)
 	{
 		using namespace dxforge::content;
@@ -618,7 +678,7 @@ namespace dxforge::tools
 			? TEX_ALPHA_MODE_PREMULTIPLIED
 			: info.flags & texture_flags::has_alpha ? TEX_ALPHA_MODE_STRAIGHT : TEX_ALPHA_MODE_OPAQUE;
 		metadata.format = format;
-		// TODO: 1Dテクスチャのサポート
+		// TODO: 1Dのテクスチャをサポートする
 		metadata.dimension = is_3d ? TEX_DIMENSION_TEXTURE3D : TEX_DIMENSION_TEXTURE2D;
 
 		ScratchImage scratch;
@@ -634,6 +694,9 @@ namespace dxforge::tools
 		}
 	}
 
+	/// @brief テクスチャのインポート
+	/// @param data テクスチャデータ
+	/// @return 成功した場合はtrue
 	EDITOR_INTERFACE void Import(texture_data* const data)
 	{
 		const texture_import_settings& settings{ data->import_settings };
@@ -721,5 +784,5 @@ namespace dxforge::tools
 		texture_info_from_metadata(scratch.GetMetadata(), data->info);
 	}
 
-}
+}	// namespace dxforge::tools
 

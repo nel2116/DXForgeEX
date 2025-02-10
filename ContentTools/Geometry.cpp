@@ -11,18 +11,124 @@
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Geometry.h"
-#include "../DXForgeEngine/Utilities/IOStream.h"
+#include "MikkTSpace/mikktspace.h"
+#include "Utilities/IOStream.h"
 
 namespace dxforge::tools
 {
 	namespace
 	{
-		using namespace math;		// 数学関数
-		using namespace DirectX;	// DirectX関数
+		//using namespace math;
+		using namespace DirectX;
 
+		/// @brief
+		/// @param context コンテキスト
+		/// @return 面数
+		s32 mikk_get_num_faces(const SMikkTSpaceContext* context)
+		{
+			const mesh& m{ *(mesh*)(context->m_pUserData) };
+			return (s32)m.indices.size() / 3;
+		}
+
+		/// @brief 面の頂点数を取得
+		/// @param context コンテキスト
+		/// @param face_index 面インデックス
+		/// @return 頂点数
+		s32 mikk_get_num_vertices_of_face([[maybe_unused]] const SMikkTSpaceContext* context, [[maybe_unused]] s32 face_index)
+		{
+			// 使用するメッシュは三角形のみ。
+			return 3;
+		}
+
+		/// @brief 位置を取得
+		/// @param context コンテキスト
+		/// @param position 位置
+		/// @param face_index 面インデックス
+		/// @param vert_index 頂点インデックス
+		void mikk_get_position(const SMikkTSpaceContext* context, f32 position[3], s32 face_index, s32 vert_index)
+		{
+			const mesh& m{ *(mesh*)(context->m_pUserData) };
+			const u32 index{ m.indices[face_index * 3 + vert_index] };
+			const math::v3& p{ m.vertices[index].position };
+			position[0] = p.x;
+			position[1] = p.y;
+			position[2] = p.z;
+		}
+
+		/// @brief 法線を取得
+		/// @param context コンテキスト
+		/// @param normal 法線
+		/// @param face_index 面インデックス
+		/// @param vert_index 頂点インデックス
+		void mikk_get_normal(const SMikkTSpaceContext* context, f32 normal[3], s32 face_index, s32 vert_index)
+		{
+			const mesh& m{ *(mesh*)(context->m_pUserData) };
+			const u32 index{ m.indices[face_index * 3 + vert_index] };
+			const math::v3& n{ m.vertices[index].normal };
+			normal[0] = n.x;
+			normal[1] = n.y;
+			normal[2] = n.z;
+		}
+
+		/// @brief テクスチャ座標を取得
+		/// @param context コンテキスト
+		/// @param texture テクスチャ座標
+		/// @param face_index 面インデックス
+		/// @param vert_index 頂点インデックス
+		void mikk_get_tex_coord(const SMikkTSpaceContext* context, f32 texture[2], s32 face_index, s32 vert_index)
+		{
+			const mesh& m{ *(mesh*)(context->m_pUserData) };
+			const u32 index{ m.indices[face_index * 3 + vert_index] };
+			const math::v2& uv{ m.vertices[index].uv };
+			texture[0] = uv.x;
+			texture[1] = uv.y;
+		}
+
+		/// @brief 接線を設定
+		/// @param context コンテキスト
+		/// @param tangent 接線
+		/// @param sign 符号
+		/// @param face_index 面インデックス
+		/// @param vert_index 頂点インデックス
+		void mikk_set_tspace_basic(const SMikkTSpaceContext* context, const f32 tangent[3], f32 sign, s32 face_index, s32 vert_index)
+		{
+			mesh& m{ *(mesh*)(context->m_pUserData) };
+			const u32 index{ m.indices[face_index * 3 + vert_index] };
+			math::v4& t{ m.vertices[index].tangent };
+			t.x = tangent[0];
+			t.y = tangent[1];
+			t.z = tangent[2];
+			t.w = sign;
+		}
+
+		/// @brief 接線を設定
+		/// @param m メッシュ
+		void calculate_mikk_tspace(mesh& m)
+		{
+			// インポートタンジェントを使用しない
+			m.tangents.clear();
+
+			SMikkTSpaceInterface mikk_interface{};
+			mikk_interface.m_getNumFaces = mikk_get_num_faces;
+			mikk_interface.m_getNumVerticesOfFace = mikk_get_num_vertices_of_face;
+			mikk_interface.m_getPosition = mikk_get_position;
+			mikk_interface.m_getNormal = mikk_get_normal;
+			mikk_interface.m_getTexCoord = mikk_get_tex_coord;
+			mikk_interface.m_setTSpaceBasic = mikk_set_tspace_basic;
+			mikk_interface.m_setTSpace = nullptr;
+
+			SMikkTSpaceContext mikk_context{};
+			mikk_context.m_pInterface = &mikk_interface;
+			mikk_context.m_pUserData = (void*)&m;
+
+			genTangSpaceDefault(&mikk_context);
+		}
+
+		/// @brief 接線を計算
+		/// @param m メッシュ
 		void calculate_tangents(mesh& m)
 		{
-			// 輸入タンジェントを使用しない
+			// インポートタンジェントを使用しない
 			m.tangents.clear();
 
 			const u32 num_indices{ (u32)m.raw_indices.size() };
@@ -70,6 +176,7 @@ namespace dxforge::tools
 				bitangents[i2] += b;
 			}
 
+			// 正規直列化し、ハンドネスを計算する
 			for (u32 i{ 0 }; i < num_indices; ++i)
 			{
 				const XMVECTOR& t{ tangents[i] };
@@ -87,8 +194,8 @@ namespace dxforge::tools
 			}
 		}
 
-		/// @brief 法線の再計算
-		/// @param m メッシュデータの参照
+		/// @brief 法線を再計算
+		/// @param m メッシュ
 		void recalculate_normals(mesh& m)
 		{
 			const u32 num_indices{ (u32)m.raw_indices.size() };
@@ -96,11 +203,11 @@ namespace dxforge::tools
 
 			for (u32 i{ 0 }; i < num_indices; ++i)
 			{
-				const u32 io{ m.raw_indices[i] };
+				const u32 i0{ m.raw_indices[i] };
 				const u32 i1{ m.raw_indices[++i] };
 				const u32 i2{ m.raw_indices[++i] };
 
-				XMVECTOR v0{ XMLoadFloat3(&m.positions[io]) };
+				XMVECTOR v0{ XMLoadFloat3(&m.positions[i0]) };
 				XMVECTOR v1{ XMLoadFloat3(&m.positions[i1]) };
 				XMVECTOR v2{ XMLoadFloat3(&m.positions[i2]) };
 
@@ -112,33 +219,28 @@ namespace dxforge::tools
 				m.normals[i - 1] = m.normals[i];
 				m.normals[i - 2] = m.normals[i];
 			}
-		};
+		}
 
-		/// @brief 法線の処理
-		/// @param m メッシュデータの参照
+		/// @brief 法線を処理
+		/// @param m メッシュ
 		/// @param smoothing_angle スムージング角度
 		void process_normals(mesh& m, f32 smoothing_angle)
 		{
-			const f32 cos_alpha{ XMScalarCos(pi - smoothing_angle * pi / 180.0f) };				// スムージング角度の余弦
-			const bool is_hard_edge{ XMScalarNearEqual(smoothing_angle, 180.0f, epsilon) };		// ハードエッジか
-			const bool is_soft_edge{ XMScalarNearEqual(smoothing_angle, 0.0f, epsilon) };		// ソフトエッジか
-			const u32 num_indices{ (u32)m.raw_indices.size() };									// インデックス数
-			const u32 num_vertices{ (u32)m.positions.size() };									// 頂点数
-			// インデックス数と頂点数が0でないことを確認
+			const f32 cos_alpha{ XMScalarCos(math::pi - smoothing_angle * math::pi / 180.f) };
+			const bool is_hard_edge{ XMScalarNearEqual(smoothing_angle, 180.f, math::epsilon) };
+			const bool is_soft_edge{ XMScalarNearEqual(smoothing_angle, 0.f, math::epsilon) };
+			const u32 num_indices{ (u32)m.raw_indices.size() };
+			const u32 num_vertices{ (u32)m.positions.size() };
 			assert(num_indices && num_vertices);
 
-			// インデックスのリサイズ
 			m.indices.resize(num_indices);
 
-			utl::vector<utl::vector<u32>> idx_ref(num_vertices);	// 頂点参照インデックス
-			// インデックスの参照を生成
+			utl::vector<utl::vector<u32>> idx_ref(num_vertices);
 			for (u32 i{ 0 }; i < num_indices; ++i)
 				idx_ref[m.raw_indices[i]].emplace_back(i);
 
-			// 法線の再計算
 			for (u32 i{ 0 }; i < num_vertices; ++i)
 			{
-				// インデックス参照
 				utl::vector<u32>& refs{ idx_ref[i] };
 				u32 num_refs{ (u32)refs.size() };
 				for (u32 j{ 0 }; j < num_refs; ++j)
@@ -147,29 +249,25 @@ namespace dxforge::tools
 					vertex& v{ m.vertices.emplace_back() };
 					v.position = m.positions[m.raw_indices[refs[j]]];
 
-					// 法線の計算
 					XMVECTOR n1{ XMLoadFloat3(&m.normals[refs[j]]) };
 					if (!is_hard_edge)
 					{
-						// インデックス参照のループ
 						for (u32 k{ j + 1 }; k < num_refs; ++k)
 						{
 							// この値は法線間の角度の余弦を表す。
-							f32 cos_theta{ 0.0f };
+							f32 cos_theta{ 0.f };
 							XMVECTOR n2{ XMLoadFloat3(&m.normals[refs[k]]) };
 							if (!is_soft_edge)
 							{
 								// NOTE: n1の長さはこのループの繰り返しで変化する可能性があるため、この計算ではn1の長さを考慮している。
-								// n2の長さは単位とする。 cos(angle) = dot(n1,n2) / (||n1|| * ||n2||)
+								//		n2の長さは単位とする。 cos(angle) = dot(n1, n2) / (||n1||*|n2||)
 								XMStoreFloat(&cos_theta, XMVector3Dot(n1, n2) * XMVector3ReciprocalLength(n1));
 							}
 
-							// ソフトエッジの場合は法線を加算
 							if (is_soft_edge || cos_theta >= cos_alpha)
 							{
 								n1 += n2;
 
-								// インデックスの削除
 								m.indices[refs[k]] = m.indices[refs[j]];
 								refs.erase(refs.begin() + k);
 								--num_refs;
@@ -177,14 +275,13 @@ namespace dxforge::tools
 							}
 						}
 					}
-					// 法線の正規化
 					XMStoreFloat3(&v.normal, XMVector3Normalize(n1));
 				}
 			}
 		}
 
-		/// @brief UV座標の処理
-		/// @param m メッシュデータの参照
+		/// @brief UVを処理
+		/// @param m メッシュ
 		void process_uvs(mesh& m)
 		{
 			utl::vector<vertex> old_vertices;
@@ -194,32 +291,28 @@ namespace dxforge::tools
 
 			const u32 num_vertices{ (u32)old_vertices.size() };
 			const u32 num_indices{ (u32)old_indices.size() };
-			assert(num_indices && num_vertices);
+			assert(num_vertices && num_indices);
 
-			// インデックスの参照を生成
-			utl::vector<utl::vector<u32>> idx_ref(num_vertices);	// 頂点参照インデックス
+			utl::vector<utl::vector<u32>> idx_ref(num_vertices);
 			for (u32 i{ 0 }; i < num_indices; ++i)
 				idx_ref[old_indices[i]].emplace_back(i);
 
-			// UV座標の再計算
 			for (u32 i{ 0 }; i < num_vertices; ++i)
 			{
-				// インデックス参照
 				utl::vector<u32>& refs{ idx_ref[i] };
 				u32 num_refs{ (u32)refs.size() };
 				for (u32 j{ 0 }; j < num_refs; ++j)
 				{
-					// インデックスの削除
 					m.indices[refs[j]] = (u32)m.vertices.size();
 					vertex& v{ old_vertices[old_indices[refs[j]]] };
 					v.uv = m.uv_sets[0][refs[j]];
 					m.vertices.emplace_back(v);
 
-					// 同じUV座標の頂点を削除
 					for (u32 k{ j + 1 }; k < num_refs; ++k)
 					{
-						v2& uv1{ m.uv_sets[0][refs[k]] };
-						if (XMScalarNearEqual(v.uv.x, uv1.x, epsilon) && XMScalarNearEqual(v.uv.y, uv1.y, epsilon))
+						math::v2& uv1{ m.uv_sets[0][refs[k]] };
+						if (XMScalarNearEqual(v.uv.x, uv1.x, math::epsilon) &&
+							XMScalarNearEqual(v.uv.y, uv1.y, math::epsilon))
 						{
 							m.indices[refs[k]] = m.indices[refs[j]];
 							refs.erase(refs.begin() + k);
@@ -231,63 +324,114 @@ namespace dxforge::tools
 			}
 		}
 
-		/// @brief 頂点のサイズを取得
+		/// @brief 接線を処理
+		/// @param m メッシュ
+		void process_tangents(mesh& m)
+		{
+			if (m.tangents.size() != m.raw_indices.size())
+			{
+				return;
+			}
+
+			utl::vector<vertex> old_vertices;
+			old_vertices.swap(m.vertices);
+			utl::vector<u32> old_indices(m.indices.size());
+			old_indices.swap(m.indices);
+
+			const u32 num_vertices{ (u32)old_vertices.size() };
+			const u32 num_indices{ (u32)old_indices.size() };
+			assert(num_vertices && num_indices);
+
+			utl::vector<utl::vector<u32>> idx_ref(num_vertices);
+			for (u32 i{ 0 }; i < num_indices; ++i)
+				idx_ref[old_indices[i]].emplace_back(i);
+
+			for (u32 i{ 0 }; i < num_vertices; ++i)
+			{
+				utl::vector<u32>& refs{ idx_ref[i] };
+				u32 num_refs{ (u32)refs.size() };
+				for (u32 j{ 0 }; j < num_refs; ++j)
+				{
+
+					const math::v4& tj{ m.tangents[refs[j]] };
+					vertex& v{ old_vertices[old_indices[refs[j]]] };
+					v.tangent = tj;
+					m.indices[refs[j]] = (u32)m.vertices.size();
+					m.vertices.emplace_back(v);
+
+					XMVECTOR xm_tj{ XMLoadFloat4(&tj) };
+					XMVECTOR xm_epsilon{ XMVectorReplicate(math::epsilon) };
+					for (u32 k{ j + 1 }; k < num_refs; ++k)
+					{
+						XMVECTOR xm_tangent{ XMLoadFloat4(&m.tangents[refs[k]]) };
+						if (XMVector4NearEqual(xm_tj, xm_tangent, xm_epsilon))
+						{
+							m.indices[refs[k]] = m.indices[refs[j]];
+							refs.erase(refs.begin() + k);
+							--num_refs;
+							--k;
+						}
+					}
+				}
+			}
+		}
+
+		/// @brief メッシュをパック
 		/// @param elements_type 要素タイプ
-		/// @return 頂点のサイズ
-		u64 get_vertex_element_size(elements::elements_type::type elements_type)
+		/// @return パックされたメッシュ
+		u64 get_vertex_elements_size(elements::elements_type::type elements_type)
 		{
 			using namespace elements;
 			switch (elements_type)
 			{
-			case elements_type::static_color:					return sizeof(static_color);
-			case elements_type::static_normal:					return sizeof(static_normal);
-			case elements_type::static_normal_texture:			return sizeof(static_normal_texture);
-			case elements_type::skeletal:						return sizeof(skeletal);
-			case elements_type::skeletal_color:					return sizeof(skeletal_color);
-			case elements_type::skeletal_normal:				return sizeof(skeletal_normal);
-			case elements_type::skeletal_normal_color:			return sizeof(skeletal_normal_color);
-			case elements_type::skeletal_normal_texture:		return sizeof(skeletal_normal_texture);
-			case elements_type::skeletal_normal_texture_color:	return sizeof(skeletal_normal_texture_color);
+			case elements_type::static_normal:                  return sizeof(static_normal);
+			case elements_type::static_normal_texture:          return sizeof(static_normal_texture);
+			case elements_type::static_color:                   return sizeof(static_color);
+			case elements_type::skeletal:                       return sizeof(skeletal);
+			case elements_type::skeletal_color:                 return sizeof(skeletal_color);
+			case elements_type::skeletal_normal:                return sizeof(skeletal_normal);
+			case elements_type::skeletal_normal_color:          return sizeof(skeletal_normal_color);
+			case elements_type::skeletal_normal_texture:        return sizeof(skeletal_normal_texture);
+			case elements_type::skeletal_normal_texture_color:  return sizeof(skeletal_normal_texture_color);
 			}
+
 			return 0;
 		}
 
-		/// @brief 頂点のパック
-		/// @param m メッシュデータの参照
+		/// @brief 頂点をパック
+		/// @param m メッシュ
 		void pack_vertices(mesh& m)
 		{
 			const u32 num_vertices{ (u32)m.vertices.size() };
 			assert(num_vertices);
 
-			m.position_buffer.resize(num_vertices * sizeof(v3));
-			v3* const position_buffer{ (v3* const)m.position_buffer.data() };
+			m.position_buffer.resize(sizeof(math::v3) * num_vertices);
+			math::v3* const position_buffer{ (math::v3* const)m.position_buffer.data() };
 
 			for (u32 i{ 0 }; i < num_vertices; ++i)
 			{
 				position_buffer[i] = m.vertices[i].position;
 			}
 
-			struct  u16v2 { u16 x, y; };
-			struct u16v3 { u16 x, y, z; };
+			struct u16v2 { u16 x, y; };
+			struct u8v3 { u8 x, y, z; };
 
 			utl::vector<u8> t_signs(num_vertices);
 			utl::vector<u16v2> normals(num_vertices);
 			utl::vector<u16v2> tangents(num_vertices);
-			utl::vector<u16v3> joint_weights(num_vertices);
+			utl::vector<u8v3> joint_weights(num_vertices);
 
 			if (m.elements_type & elements::elements_type::static_normal)
 			{
-				// normal only
 				for (u32 i{ 0 }; i < num_vertices; ++i)
 				{
 					vertex& v{ m.vertices[i] };
-					t_signs[i] = (u8)((v.normal.z > 0.0f) << 1);
-					normals[i] = { (u16)pack_float<16>(v.normal.x, -1.0f, 1.0f), (u16)pack_float<16>(v.normal.y, -1.0f, 1.0f) };
+					t_signs[i] = (u8)((v.normal.z > 0.f) << 2);
+					normals[i] = { (u16)math::pack_float<16>(v.normal.x, -1.f, 1.f), (u16)math::pack_float<16>(v.normal.y, -1.f, 1.f) };
 				}
 
 				if (m.elements_type & elements::elements_type::static_normal_texture)
 				{
-					// full T-space
 					for (u32 i{ 0 }; i < num_vertices; ++i)
 					{
 						vertex& v{ m.vertices[i] };
@@ -302,18 +446,17 @@ namespace dxforge::tools
 				for (u32 i{ 0 }; i < num_vertices; ++i)
 				{
 					vertex& v{ m.vertices[i] };
-					// pack joint weights (from [0.0,1.0] to [0...255])
-					joint_weights[i] =
-					{
-						(u8)pack_unit_float<8>(v.joint_weights.x),
-						(u8)pack_unit_float<8>(v.joint_weights.y),
-						(u8)pack_unit_float<8>(v.joint_weights.z)
-					};
-					// NOTE: w3はシェーダーで計算
+					// パックジョイントウェイト（[0.0, 1.0] から [0..255] まで）
+					joint_weights[i] = {
+						(u8)math::pack_unit_float<8>(v.joint_weights.x),
+						(u8)math::pack_unit_float<8>(v.joint_weights.y),
+						(u8)math::pack_unit_float<8>(v.joint_weights.z) };
+
+					// NOTE: w3はシェーダーで計算される。
 				}
 			}
 
-			m.element_buffer.resize(get_vertex_element_size(m.elements_type) * num_vertices);
+			m.element_buffer.resize(get_vertex_elements_size(m.elements_type) * num_vertices);
 			using namespace elements;
 
 			switch (m.elements_type)
@@ -324,7 +467,7 @@ namespace dxforge::tools
 				for (u32 i{ 0 }; i < num_vertices; ++i)
 				{
 					vertex& v{ m.vertices[i] };
-					element_buffer[i] = { {v.red,v.green,v.blue},{} };
+					element_buffer[i] = { {v.red, v.green, v.blue}, {} };
 				}
 			}
 			break;
@@ -334,7 +477,7 @@ namespace dxforge::tools
 				for (u32 i{ 0 }; i < num_vertices; ++i)
 				{
 					vertex& v{ m.vertices[i] };
-					element_buffer[i] = { {v.red,v.green,v.blue},t_signs[i],{normals[i].x,normals[i].y} };
+					element_buffer[i] = { {v.red, v.green, v.blue}, t_signs[i], {normals[i].x, normals[i].y} };
 				}
 			}
 			break;
@@ -344,9 +487,9 @@ namespace dxforge::tools
 				for (u32 i{ 0 }; i < num_vertices; ++i)
 				{
 					vertex& v{ m.vertices[i] };
-					element_buffer[i] = { {v.red,v.green,v.blue},t_signs[i],
-										{normals[i].x,normals[i].y},{tangents[i].x,tangents[i].y},
-										v.uv };
+					element_buffer[i] = { {v.red, v.green, v.blue}, t_signs[i],
+										 {normals[i].x, normals[i].y}, {tangents[i].x, tangents[i].y},
+										 v.uv };
 				}
 			}
 			break;
@@ -356,9 +499,9 @@ namespace dxforge::tools
 				for (u32 i{ 0 }; i < num_vertices; ++i)
 				{
 					vertex& v{ m.vertices[i] };
-					const u16 indices[4]{ (u16)v.joint_indices.x,(u16)v.joint_indices.y,(u16)v.joint_indices.z,(u16)v.joint_indices.w };
-					element_buffer[i] = { {(u8)joint_weights[i].x,(u8)joint_weights[i].y,(u8)joint_weights[i].z},{},
-						{indices[0],indices[1],indices[2],indices[3]} };
+					const u16 indices[4]{ (u16)v.joint_indices.x, (u16)v.joint_indices.y , (u16)v.joint_indices.z , (u16)v.joint_indices.w };
+					element_buffer[i] = { {joint_weights[i].x, joint_weights[i].y, joint_weights[i].z}, {},
+										 {indices[0], indices[1], indices[2], indices[3]} };
 				}
 			}
 			break;
@@ -368,10 +511,10 @@ namespace dxforge::tools
 				for (u32 i{ 0 }; i < num_vertices; ++i)
 				{
 					vertex& v{ m.vertices[i] };
-					const u16 indices[4]{ (u16)v.joint_indices.x,(u16)v.joint_indices.y,(u16)v.joint_indices.z,(u16)v.joint_indices.w };
-					element_buffer[i] = { {(u8)joint_weights[i].x,(u8)joint_weights[i].y,(u8)joint_weights[i].z},{},
-						{indices[0],indices[1],indices[2],indices[3]},
-						{v.red,v.green,v.blue},{} };
+					const u16 indices[4]{ (u16)v.joint_indices.x, (u16)v.joint_indices.y , (u16)v.joint_indices.z , (u16)v.joint_indices.w };
+					element_buffer[i] = { {joint_weights[i].x, joint_weights[i].y, joint_weights[i].z}, {},
+										 {indices[0], indices[1], indices[2], indices[3]},
+										 {v.red, v.green, v.blue}, {} };
 				}
 			}
 			break;
@@ -381,10 +524,10 @@ namespace dxforge::tools
 				for (u32 i{ 0 }; i < num_vertices; ++i)
 				{
 					vertex& v{ m.vertices[i] };
-					const u16 indices[4]{ (u16)v.joint_indices.x,(u16)v.joint_indices.y,(u16)v.joint_indices.z,(u16)v.joint_indices.w };
-					element_buffer[i] = { {(u8)joint_weights[i].x,(u8)joint_weights[i].y,(u8)joint_weights[i].z},t_signs[i],
-						{indices[0],indices[1],indices[2],indices[3]},
-						{normals[i].x,normals[i].y} };
+					const u16 indices[4]{ (u16)v.joint_indices.x, (u16)v.joint_indices.y , (u16)v.joint_indices.z , (u16)v.joint_indices.w };
+					element_buffer[i] = { {joint_weights[i].x, joint_weights[i].y, joint_weights[i].z}, t_signs[i],
+										 {indices[0], indices[1], indices[2], indices[3]},
+										 {normals[i].x, normals[i].y} };
 				}
 			}
 			break;
@@ -394,10 +537,10 @@ namespace dxforge::tools
 				for (u32 i{ 0 }; i < num_vertices; ++i)
 				{
 					vertex& v{ m.vertices[i] };
-					const u16 indices[4]{ (u16)v.joint_indices.x,(u16)v.joint_indices.y,(u16)v.joint_indices.z,(u16)v.joint_indices.w };
-					element_buffer[i] = { {(u8)joint_weights[i].x,(u8)joint_weights[i].y,(u8)joint_weights[i].z},t_signs[i],
-						{indices[0],indices[1],indices[2],indices[3]},
-						{normals[i].x,normals[i].y},{v.red,v.green,v.blue},{} };
+					const u16 indices[4]{ (u16)v.joint_indices.x, (u16)v.joint_indices.y , (u16)v.joint_indices.z , (u16)v.joint_indices.w };
+					element_buffer[i] = { {joint_weights[i].x, joint_weights[i].y, joint_weights[i].z}, t_signs[i],
+										 {indices[0], indices[1], indices[2], indices[3]},
+										 {normals[i].x, normals[i].y}, {v.red, v.green, v.blue}, {} };
 				}
 			}
 			break;
@@ -407,10 +550,10 @@ namespace dxforge::tools
 				for (u32 i{ 0 }; i < num_vertices; ++i)
 				{
 					vertex& v{ m.vertices[i] };
-					const u16 indices[4]{ (u16)v.joint_indices.x,(u16)v.joint_indices.y,(u16)v.joint_indices.z,(u16)v.joint_indices.w };
-					element_buffer[i] = { {(u8)joint_weights[i].x,(u8)joint_weights[i].y,(u8)joint_weights[i].z},t_signs[i],
-						{indices[0],indices[1],indices[2],indices[3]},
-						{normals[i].x,normals[i].y}, {tangents[i].x, tangents[i].y}, v.uv };
+					const u16 indices[4]{ (u16)v.joint_indices.x, (u16)v.joint_indices.y , (u16)v.joint_indices.z , (u16)v.joint_indices.w };
+					element_buffer[i] = { {joint_weights[i].x, joint_weights[i].y, joint_weights[i].z}, t_signs[i],
+										 {indices[0], indices[1], indices[2], indices[3]},
+										 {normals[i].x, normals[i].y}, {tangents[i].x, tangents[i].y}, v.uv };
 				}
 			}
 			break;
@@ -420,18 +563,20 @@ namespace dxforge::tools
 				for (u32 i{ 0 }; i < num_vertices; ++i)
 				{
 					vertex& v{ m.vertices[i] };
-					const u16 indices[4]{ (u16)v.joint_indices.x, (u16)v.joint_indices.y, (u16)v.joint_indices.z, (u16)v.joint_indices.w };
-					element_buffer[i] = { {(u8)joint_weights[i].x, (u8)joint_weights[i].y, (u8)joint_weights[i].z}, t_signs[i],
-						{indices[0], indices[1], indices[2], indices[3]},
-						{normals[i].x, normals[i].y}, {tangents[i].x, tangents[i].y}, v.uv,
-						{v.red, v.green, v.blue}, {} };
+					const u16 indices[4]{ (u16)v.joint_indices.x, (u16)v.joint_indices.y , (u16)v.joint_indices.z , (u16)v.joint_indices.w };
+					element_buffer[i] = { {joint_weights[i].x, joint_weights[i].y, joint_weights[i].z}, t_signs[i],
+										 {indices[0], indices[1], indices[2], indices[3]},
+										 {normals[i].x, normals[i].y}, {tangents[i].x, tangents[i].y}, v.uv,
+										 {v.red, v.green, v.blue}, {} };
 				}
 			}
 			break;
 			}
-
 		}
 
+		/// @brief 要素タイプを決定
+		/// @param m メッシュ
+		/// @return 要素タイプ
 		elements::elements_type::type determine_elements_type(const mesh& m)
 		{
 			using namespace elements;
@@ -457,31 +602,26 @@ namespace dxforge::tools
 			return type;
 		}
 
-		/// @brief 頂点の処理
-		/// @param m メッシュデータの参照
-		/// @param settings インポート設定
+		/// @brief 頂点を処理
+		/// @param m メッシュ
+		/// @param settings ジオメトリインポート設定
 		void process_vertices(mesh& m, const geometry_import_settings& settings)
 		{
-			// インデックス数が3の倍数であることを確認
 			assert((m.raw_indices.size() % 3) == 0);
-
-			// 頂点数が0でないことを確認
 			if (settings.calculate_normals || m.normals.empty())
 			{
-				// 法線の再計算
 				recalculate_normals(m);
 			}
 
-			// 法線の処理
-			process_normals(m, settings.smoothings_angle);
+			process_normals(m, settings.smoothing_angle);
 
-			// UV座標の再計算
 			if (!m.uv_sets.empty())
 			{
 				process_uvs(m);
 			}
 
-			if ((settings.calculate_tangents || m.tangents.empty()) && !m.uv_sets.empty())
+			if ((settings.calculate_tangents || m.tangents.empty()) &&
+				!m.uv_sets.empty())
 			{
 				calculate_mikk_tspace(m);
 				//calculate_tangents(m);
@@ -495,52 +635,51 @@ namespace dxforge::tools
 				process_tangents(m);
 			}
 
-			// 頂点のパック
 			m.elements_type = determine_elements_type(m);
 			pack_vertices(m);
 		}
 
-		/// @brief メッシュのサイズを取得
-		/// @param m メッシュデータの参照
-		/// @return メッシュのサイズ
+		/// @brief メッシュサイズを取得
+		/// @param m メッシュ
+		/// @return メッシュサイズ
 		u64 get_mesh_size(const mesh& m)
 		{
 			const u64 num_vertices{ m.vertices.size() };
 			const u64 position_buffer_size{ m.position_buffer.size() };
-			assert(position_buffer_size == sizeof(v3) * num_vertices);
+			assert(position_buffer_size == sizeof(math::v3) * num_vertices);
 			const u64 element_buffer_size{ m.element_buffer.size() };
-			assert(element_buffer_size == get_vertex_element_size(m.elements_type) * num_vertices);
+			assert(element_buffer_size == get_vertex_elements_size(m.elements_type) * num_vertices);
 			const u64 index_size{ (num_vertices < (1 << 16)) ? sizeof(u16) : sizeof(u32) };
 			const u64 index_buffer_size{ index_size * m.indices.size() };
 			constexpr u64 su32{ sizeof(u32) };
-			const u64 size
-			{
+			const u64 size{
 				su32 + m.name.size() +	// メッシュ名の長さとメッシュ名文字列のスペース
-				su32 +					// LODID
+				su32 +					// ロットID
 				su32 +					// 頂点要素サイズ（位置要素を除いた頂点サイズ）
-				su32 +					// 要素タイプ列挙
+				su32 +					// 要素型列挙
 				su32 +					// 頂点数
-				su32 + 					// インデックスサイズ（16ビットまたは32ビット）
+				su32 +					// インデックスサイズ（16ビットまたは32ビット）
 				su32 +					// インデックス数
-				sizeof(f32) +			// LOD閾値
-				position_buffer_size +	// 頂点位置のスペース
-				element_buffer_size +	// 頂点要素のスペース
-				index_buffer_size		// インデックスのスペース
+				sizeof(f32) +			// LODしきい値
+				position_buffer_size +	// 頂点位置の
+				element_buffer_size +	// 頂点要素の
+				index_buffer_size		// インデックスの
 			};
+
 			return size;
 		}
 
-		/// @brief メッシュのサイズを取得
-		/// @param scene シーンデータの参照
-		/// @return メッシュのサイズ
+		/// @brief シーンサイズを取得
+		/// @param scene シーン
+		/// @return シーンサイズ
 		u64 get_scene_size(const scene& scene)
 		{
 			constexpr u64 su32{ sizeof(u32) };
 			u64 size
 			{
-				su32 +				// 名前の長さ
-				scene.name.size() +	// 名前の文字列のスペース
-				su32				// LOD数
+				su32 +              // 名前の長さ
+				scene.name.size() + // シーン名文字列の部屋
+				su32                // LOD数
 			};
 
 			for (const auto& lod : scene.lod_groups)
@@ -548,7 +687,7 @@ namespace dxforge::tools
 				u64 lod_size
 				{
 					su32 + lod.name.size() + // LOD名の長さとLPD名文字列のスペース
-					su32					 // このLODのメッシュ数
+					su32                     // このLODのメッシュ数
 				};
 
 				for (const auto& m : lod.meshes)
@@ -558,53 +697,43 @@ namespace dxforge::tools
 
 				size += lod_size;
 			}
+
 			return size;
 		}
 
-		/// @brief メッシュデータのパック
-		/// @param m メッシュデータの参照
-		/// @param buffer バッファ
-		/// @param at バッファの位置
+		/// @brief メッシュデータをパック
+		/// @param m メッシュ
+		/// @param blob バイナリストリームライター
 		void pack_mesh_data(const mesh& m, utl::blob_stream_writer& blob)
 		{
-			// メッシュ名の書き込み
+			// メッシュ名
 			blob.write((u32)m.name.size());
 			blob.write(m.name.c_str(), m.name.size());
-
-			// LOD IDの書き込み
+			// ロットID
 			blob.write(m.lod_id);
-
-			// 頂点要素サイズの書き込み
-			const u32 elements_size{ (u32)get_vertex_element_size(m.elements_type) };
+			// 頂点要素サイズ
+			const u32 elements_size{ (u32)get_vertex_elements_size(m.elements_type) };
 			blob.write(elements_size);
-
-			// 要素タイプの書き込み
+			// 要素タイプ列挙
 			blob.write((u32)m.elements_type);
-
-			// 頂点数の書き込み
+			// 頂点数
 			const u32 num_vertices{ (u32)m.vertices.size() };
 			blob.write(num_vertices);
-
-			// インデックスサイズ(16ビットまたは32ビット)の書き込み
+			// インデックスサイズ（16ビットまたは32ビット）
 			const u32 index_size{ (num_vertices < (1 << 16)) ? sizeof(u16) : sizeof(u32) };
 			blob.write(index_size);
-
-			// インデックス数の書き込み
+			// インデックス数
 			const u32 num_indices{ (u32)m.indices.size() };
 			blob.write(num_indices);
-
-			// LOD閾値の書き込み
+			// LODしきい値
 			blob.write(m.lod_threshold);
-
-			// position bufferの書き込み
+			// ポジションバッファ
 			assert(m.position_buffer.size() == sizeof(math::v3) * num_vertices);
 			blob.write(m.position_buffer.data(), m.position_buffer.size());
-
-			// element bufferの書き込み
+			// 要素バッファ
 			assert(m.element_buffer.size() == elements_size * num_vertices);
 			blob.write(m.element_buffer.data(), m.element_buffer.size());
-
-			// index dataの書き込み
+			// インデックスデータ
 			const u32 index_buffer_size{ index_size * num_indices };
 			const u8* data{ (const u8*)m.indices.data() };
 			utl::vector<u16> indices;
@@ -618,6 +747,11 @@ namespace dxforge::tools
 			blob.write(data, index_buffer_size);
 		}
 
+		/// @brief メッシュデータをアンパック
+		/// @param material_idx マテリアルインデックス
+		/// @param m メッシュ
+		/// @param submesh サブメッシュ
+		/// @return サブメッシュが空でない場合はtrueを返します。
 		bool split_meshes_by_material(u32 material_idx, const mesh& m, mesh& submesh)
 		{
 			submesh.name = m.name;
@@ -645,7 +779,7 @@ namespace dxforge::tools
 					else
 					{
 						submesh.raw_indices.emplace_back((u32)submesh.positions.size());
-						vertex_ref[v_idx] = (u32)submesh.raw_indices.back();
+						vertex_ref[v_idx] = submesh.raw_indices.back();
 						submesh.positions.emplace_back(m.positions[v_idx]);
 					}
 
@@ -666,13 +800,16 @@ namespace dxforge::tools
 							submesh.uv_sets[k].emplace_back(m.uv_sets[k][j]);
 						}
 					}
-
 				}
 			}
+
 			assert((submesh.raw_indices.size() % 3) == 0);
-			return !submesh.positions.empty();
+			return !submesh.raw_indices.empty();
 		}
 
+		/// @brief メッシュをマテリアルごとに分割
+		/// @param scene シーン
+		/// @param progression 進行状況
 		void split_meshes_by_material(scene& scene, progression* const progression)
 		{
 			assert(progression);
@@ -710,7 +847,7 @@ namespace dxforge::tools
 
 		/// @brief ベクトルに追加
 		/// @tparam T 要素の型
-		/// @param dst 追加先のベクトル
+		/// @param dst ベクトル
 		/// @param src 追加するベクトル
 		template <typename T> void append_to_vector_pod(utl::vector<T>& dst, const utl::vector<T>& src)
 		{
@@ -722,26 +859,25 @@ namespace dxforge::tools
 
 	} // 匿名名前空間
 
-	/// @brief シーンデータの処理
-	/// @param scene シーンデータの参照
-	/// @param settings インポート設定
+	/// @brief シーンを処理
+	/// @param scene シーン
+	/// @param settings ジオメトリインポート設定
+	/// @param progression 進行状況
 	void process_scene(scene& scene, const geometry_import_settings& settings, progression* const progression)
 	{
 		assert(progression);
 		split_meshes_by_material(scene, progression);
 
 		for (auto& lod : scene.lod_groups)
-		{
 			for (auto& m : lod.meshes)
 			{
 				process_vertices(m, settings);
 				progression->callback(progression->value() + 1, progression->max_value());
 			}
-		}
 	}
 
-	/// @brief シーンデータのパック
-	/// @param scene シーンデータの参照
+	/// @brief シーンデータをパック
+	/// @param scene シーン
 	/// @param data シーンデータ
 	void pack_data(const scene& scene, scene_data& data)
 	{
@@ -752,19 +888,18 @@ namespace dxforge::tools
 
 		utl::blob_stream_writer blob{ data.buffer, data.buffer_size };
 
-		// シーン名を書き込む
+		// シーン名
 		blob.write((u32)scene.name.size());
 		blob.write(scene.name.c_str(), scene.name.size());
-
-		// LOD数を書き込む
+		// LOD数
 		blob.write((u32)scene.lod_groups.size());
 
 		for (const auto& lod : scene.lod_groups)
 		{
-			// LOD名を書き込む
+			// LOD名
 			blob.write((u32)lod.name.size());
 			blob.write(lod.name.c_str(), lod.name.size());
-			// このLODのメッシュ数を書き込む
+			// このLODのメッシュ数
 			blob.write((u32)lod.meshes.size());
 
 			for (const auto& m : lod.meshes)
@@ -776,11 +911,11 @@ namespace dxforge::tools
 		assert(scene_size == blob.offset());
 	}
 
-	/// @brief メッシュの結合
-	/// @param lod LODグループ
-	/// @param combined_mesh 結合されたメッシュへの参照
+	/// @brief メッシュを結合
+	/// @param lod LOD
+	/// @param combined_mesh 結合されたメッシュ
 	/// @param progression 進行状況
-	/// @return 成功したかどうか
+	/// @return メッシュが結合された場合はtrueを返します。
 	bool coalesce_meshes(const lod_group& lod, mesh& combined_mesh, progression* const progression)
 	{
 		assert(lod.meshes.size());
@@ -795,8 +930,10 @@ namespace dxforge::tools
 		{
 			const mesh& m{ lod.meshes[mesh_idx] };
 
-			// メッシュの要素が一致しない場合は、結合メッシュをクリアしてfalseを返す
-			if (combined_mesh.elements_type != determine_elements_type(m) || combined_mesh.uv_sets.size() != m.uv_sets.size() || combined_mesh.lod_id != m.lod_id || !math::is_equal(combined_mesh.lod_threshold, m.lod_threshold))
+			if (combined_mesh.elements_type != determine_elements_type(m) ||
+				combined_mesh.uv_sets.size() != m.uv_sets.size() ||
+				combined_mesh.lod_id != m.lod_id ||
+				!math::is_equal(combined_mesh.lod_threshold, m.lod_threshold))
 			{
 				combined_mesh = {};
 				return false;

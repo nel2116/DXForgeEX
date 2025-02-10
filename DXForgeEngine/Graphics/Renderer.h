@@ -226,13 +226,23 @@ namespace dxforge::graphics
 		};
 	};
 
+	struct material_surface
+	{
+		math::v4    base_color{ 1.f, 1.f, 1.f, 1.f };
+		math::v3    emissive{ 0.f, 0.f, 0.f };
+		f32         emissive_intensity{ 1.f };
+		f32         ambient_occlusion{ 1.f };
+		f32         metallic{ 0.f };
+		f32         roughness{ 1.f };
+	};
+
 	struct material_init_info
 	{
-		material_type::type type;	// マテリアルの種類
-		// NOTE: テクスチャはオプションなので、texture_countは0でもよい。
-		u32 texture_count;			// マテリアルに使用するテクスチャの数
-		id::id_type shader_ids[shader_type::count]{ id::invalid_id,id::invalid_id,id::invalid_id,id::invalid_id,id::invalid_id,id::invalid_id,id::invalid_id, id::invalid_id };	// シェーダーのID
 		id::id_type* texture_ids;
+		material_surface    surface;
+		material_type::type type;
+		u32                 texture_count; // NOTE: textureはオプションなので、texture countは0、texture_idsはnullptrでもよい。
+		id::id_type         shader_ids[shader_type::count]{ id::invalid_id, id::invalid_id, id::invalid_id, id::invalid_id, id::invalid_id, id::invalid_id, id::invalid_id, id::invalid_id };
 	};
 
 	struct primitive_topology

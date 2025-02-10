@@ -50,14 +50,16 @@ namespace dxforge::script
 		}
 #endif // USE_WITH_EDITOR
 
-
+		/// @brief ID‚ª‘¶İ‚·‚é‚©‚Ç‚¤‚©‚ğ•Ô‚·
+		/// @param id ID
+		/// @return ‘¶İ‚·‚éê‡‚Ítrue
 		bool exists(script_id id)
 		{
 			assert(id::is_valid(id));
 			const id::id_type index{ id::index(id) };
-			assert(index < generations.size() && id_mapping[index] < entity_scripts.size());
+			assert(index < generations.size() && !(id::is_valid(id_mapping[index]) && id_mapping[index] >= entity_scripts.size()));
 			assert(generations[index] == id::generation(id));
-			return (generations[index] == id::generation(id)) && entity_scripts[id_mapping[index]] && entity_scripts[id_mapping[index]]->is_valid();
+			return (id::is_valid(id_mapping[index]) && generations[index] == id::generation(id)) && entity_scripts[id_mapping[index]] && entity_scripts[id_mapping[index]]->is_valid();
 		}
 
 #if USE_TRANSFORM_CACHE_MAP
@@ -174,11 +176,16 @@ namespace dxforge::script
 		utl::erase_unordered(entity_scripts, index);
 		id_mapping[id::index(last_id)] = index;
 		id_mapping[id::index(id)] = id::invalid_id;
+
+		if (generations[index] < id::max_generation)
+		{
+			free_ids.push_back(id);
+		}
 	}
 
-	void update(float dt)
+	void update(f32 dt)
 	{
-		for (auto& ptr : entity_scripts)
+		for (const auto& ptr : entity_scripts)
 		{
 			ptr->update(dt);
 		}

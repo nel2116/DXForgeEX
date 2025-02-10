@@ -171,7 +171,7 @@ namespace dxforge::tools
 	// インポート設定
 	struct geometry_import_settings
 	{
-		f32 smoothings_angle;							// スムージング角度
+		f32 smoothing_angle;							// スムージング角度
 		u8 calculate_normals;							// 法線の計算
 		u8 calculate_tangents;							// 接線の計算
 		u8 reverse_handedness;							// 右手系を左手系に変換

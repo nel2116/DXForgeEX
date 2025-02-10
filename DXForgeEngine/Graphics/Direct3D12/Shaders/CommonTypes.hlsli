@@ -27,6 +27,14 @@ struct PerObjectData
     float4x4 World;
     float4x4 InvWorld;
     float4x4 WorldViewProjection;
+
+    float4 BaseColor;
+    float3 Emissive;
+    float EmissiveIntensity;
+    float AmbientOcclusion;
+    float Metallic;
+    float Roughness;
+    uint _pad;
 };
 
 struct Plane
@@ -34,24 +42,6 @@ struct Plane
     float3 Normal;
     float Distance;
 };
-
-#if USE_BOUNDING_SPHERES
-// ビュースペースのフルスタムコーン
-struct Frustum
-{
-    float3 ConeDirection;
-    float UnitRadius;
-};
-
-#else
-// ビュー・フラストゥム・プレーン（ビュー空間内）
-// 面順：左、右、上、下
-// フロントプレーンとバックプレーンは、ライトカリングコンピュートシェーダで計算される。
-struct Frustum
-{
-    Plane Planes[4];
-};
-#endif
 
 struct Sphere
 {
@@ -67,6 +57,24 @@ struct Cone
     float Radius;
 };
 
+#if USE_BOUNDING_SPHERES
+// 視界空間におけるフルストゥムコーン
+struct Frustum
+{
+    float3 ConeDirection;
+    float UnitRadius;
+};
+
+#else
+// ビューフラストゥムプレーン（ビュー空間内）
+// 面順：左、右、上、下
+// フロントプレーンとバックプレーンはライトカリングで計算される。r.
+struct Frustum
+{
+    Plane Planes[4];
+};
+#endif
+
 #ifndef __cplusplus
 struct ComputeShaderInput
 {
@@ -81,12 +89,15 @@ struct LightCullingDispatchParameters
 {
     // 派遣されたグループの数。 (このパラメータはHLSLのシステム値としては使用できません！)
     uint2 NumThreadGroups;
+
     // ディスパッチされたスレッドの総数。 (HLSLのシステム値としても利用できません!)
-    // NOTE: この値は、実際に実行されたスレッド数よりも少ないかもしれない。
-    //       スクリーンサイズがブロックサイズで均等に割り切れない場合。
+    // NOTE: スクリーンサイズがブロックサイズで均等に割り切れない場合、
+    //       この値は実際に実行されるスレッド数より少なくなる可能性がある。
     uint2 NumThreads;
-    // カリングするライトの数（カリングできないので、並行光源は含まない）。
+
+    // カリングするライトの数（カリングできないので、指向性ライトは含まない）。
     uint NumLights;
+
     // SRVディスクリプタヒープ内のカレントデプスバッファのインデックス
     uint DepthBufferSrvIndex;
 };
@@ -102,9 +113,10 @@ struct LightCullingLightInfo
     // これが-1に設定されている場合、ライトは点光源となる。
     float CosPenumbra;
 #else
-    float ConeRadius;
-    uint Type;
-    float3 _pad;
+    float   ConeRadius;
+
+    uint    Type;
+    float3  _pad;
 #endif
 };
 
@@ -118,15 +130,16 @@ struct LightParameters
     float Range;
 
     float3 Color;
-    float CosUmbra;
+    float CosUmbra; // アンブラのコサイン
 
     float3 Attenuation;
-    float CosPenumbra;
+    float CosPenumbra; // ペナンブラのコサイン
 
 #if !USE_BOUNDING_SPHERES
-    uint Type;
-    float3 _pad;
+    uint    Type;
+    float3  _pad;
 #endif
+
 };
 
 struct DirectionalLightParameters
@@ -144,7 +157,7 @@ static_assert((sizeof(PerObjectData) % 16) == 0,
 static_assert((sizeof(LightParameters) % 16) == 0,
               "Make sure LightParameters is formatted in 16-byte chunks without any implicit padding.");
 static_assert((sizeof(LightCullingLightInfo) % 16) == 0,
-                "Make sure LightCullingLightInfo is formatted in 16-byte chunks without any implicit padding.");
+              "Make sure LightCullingLightInfo is formatted in 16-byte chunks without any implicit padding.");
 static_assert((sizeof(DirectionalLightParameters) % 16) == 0,
               "Make sure DirectionalLightParameters is formatted in 16-byte chunks without any implicit padding.");
 #endif

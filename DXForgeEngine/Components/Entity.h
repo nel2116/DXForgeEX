@@ -19,6 +19,7 @@ namespace dxforge
 	// transform 名前空間に init_info 構造体を定義
 	INIT_INFO(transform);
 	INIT_INFO(script);
+	INIT_INFO(geometry);
 
 #undef INIT_INFO
 
@@ -29,6 +30,7 @@ namespace dxforge
 			// transform 名前空間の init_info 型のポインタを宣言、初期化は nullptr
 			transform::init_info* transform{ nullptr };
 			script::init_info* script{ nullptr };
+			geometry::init_info* geometry{ nullptr };
 		};
 
 		// ゲームエンティティを作成する関数
