@@ -36,7 +36,7 @@ namespace dxforge::graphics::d3d12
 		release();
 
 		// デバイスを取得
-		auto* const device{ core::device() };
+		id3d12_device* const device{ core::device() };
 		assert(device);
 
 		// ヒープの設定
@@ -52,7 +52,7 @@ namespace dxforge::graphics::d3d12
 		if (FAILED(hr)) return false;
 
 		// ヒープの開始アドレスを取得
-		_free_handles = std::move(std::make_unique<u32[]>(capacity));
+		_free_handles = std::make_unique<u32[]>(capacity);
 		_capacity = capacity;
 		_size = 0;
 
@@ -145,7 +145,7 @@ namespace dxforge::graphics::d3d12
 	/// @brief コンストラクタ
 	/// @param info バッファ初期化情報
 	/// @param is_cpu_accessible CPUアクセス可能かどうか
-	d3d12_buffer::d3d12_buffer(d3d12_buffer_init_info info, bool is_cpu_accessible)
+	d3d12_buffer::d3d12_buffer(const d3d12_buffer_init_info& info, bool is_cpu_accessible)
 	{
 		assert(!_buffer && info.size && info.alignment);
 		_size = (u32)math::align_size_up(info.size, info.alignment);
@@ -166,7 +166,7 @@ namespace dxforge::graphics::d3d12
 	//_/_/_/_/_/_/_/_/ CONSTANT BUFFER _/_/_/_/_/_/_/_/
 	/// @brief コンストラクタ
 	/// @param info バッファ初期化情報
-	constant_buffer::constant_buffer(d3d12_buffer_init_info info)
+	constant_buffer::constant_buffer(const d3d12_buffer_init_info& info)
 		: _buffer{ info,true }
 	{
 		NAME_D3D12_OBJECT_INDEXED(buffer(), size(), L"Constant Buffer - size");
@@ -201,7 +201,7 @@ namespace dxforge::graphics::d3d12
 		assert(info.size && info.alignment);
 		NAME_D3D12_OBJECT_INDEXED(buffer(), size(), L"UAV Clearable Buffer - size");
 
-		assert(info.flags && D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		assert(info.flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 		_uav = core::uav_heap().allocate();
 		_uav_shader_visible = core::srv_heap().allocate();
 		D3D12_UNORDERED_ACCESS_VIEW_DESC desc{};

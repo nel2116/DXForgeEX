@@ -12,11 +12,17 @@
 #pragma once
 // ====== インクルード部 ======
 #include "CommonHeaders.h"
-#include "MathType.h"
+
+// プラットフォーム固有のヘッダー
+#if defined(_WIN64)
+#include <DirectXMath.h>
+#endif
+
+#include "../Utilities/MathType.h"
 
 namespace dxforge::math
 {
-	constexpr bool is_equal(f32 a, f32 b, f32 eps = epsilon)
+	[[nodiscard]] constexpr bool is_equal(f32 a, f32 b, f32 eps = epsilon)
 	{
 		f32 diff{ a - b };
 		if (diff < 0.0f) diff = -diff;
@@ -26,13 +32,14 @@ namespace dxforge::math
 	template<typename T>
 	[[nodiscard]] constexpr T clamp(T value, T min, T max)
 	{
+		assert(min <= max);
 		return (value < min) ? min : (value > max) ? max : value;
 	}
 
 	template<u32 bits>
 	[[nodiscard]] constexpr u32 pack_unit_float(f32 f)
 	{
-		static_assert(bits <= sizeof(u32) * 8);
+		static_assert(bits && bits <= sizeof(u32) * 8);
 		assert(f >= 0.f && f <= 1.f);
 		constexpr f32 intervals{ (f32)(((u32)1 << bits) - 1) };
 		return (u32)(intervals * f + 0.5f);
@@ -41,7 +48,7 @@ namespace dxforge::math
 	template<u32 bits>
 	[[nodiscard]] constexpr f32 unpack_to_unit_float(u32 i)
 	{
-		static_assert(bits <= sizeof(u32) * 8);
+		static_assert(bits && bits <= sizeof(u32) * 8);
 		assert(i < ((u32)1 << bits));
 		constexpr f32 intervals{ (f32)(((u32)1 << bits) - 1) };
 		return (f32)i / intervals;

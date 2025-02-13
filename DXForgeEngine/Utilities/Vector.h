@@ -26,7 +26,7 @@ namespace dxforge::utl
 		// _/_/_/_/_/_/_/_/ メンバ関数 _/_/_/_/_/_/_/_/
 	public:		// ====== パブリック関数 ======
 		/// @brief デフォルトのコンストラクタ。 メモリを割り当てない。
-		vector() = default;
+		constexpr vector() = default;
 
 		/// @brief 配列のサイズを変更するコンストラクタ
 		/// @param count 配列のサイズ
@@ -72,7 +72,7 @@ namespace dxforge::utl
 			{
 				clear();
 				reserve(o._size);
-				for (auto item : o)
+				for (const auto& item : o)
 				{
 					emplace_back(item);
 				}

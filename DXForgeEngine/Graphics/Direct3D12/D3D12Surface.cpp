@@ -115,8 +115,8 @@ namespace dxforge::graphics::d3d12
 		// ビューポートとシザー矩形を設定する
 		_viewport.TopLeftX = 0.0f;
 		_viewport.TopLeftY = 0.0f;
-		_viewport.Width = (float)width;
-		_viewport.Height = (float)height;
+		_viewport.Width = (f32)width;
+		_viewport.Height = (f32)height;
 		_viewport.MinDepth = 0.0f;
 		_viewport.MaxDepth = 1.0f;
 		_scissor_rect = { 0, 0, (s32)width, (s32)height };

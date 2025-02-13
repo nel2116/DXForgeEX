@@ -16,7 +16,7 @@ namespace dxforge::graphics::d3d12
 	class d3d12_surface
 	{
 	public:	// 定数
-		constexpr static DXGI_FORMAT default_back_buffer_format{ DXGI_FORMAT_R8G8B8A8_UNORM_SRGB };	// デフォルトのバックバッファフォーマット
+		constexpr static DXGI_FORMAT default_back_buffer_format{ DXGI_FORMAT_R16G16B16A16_FLOAT };	// デフォルトのバックバッファフォーマット
 		constexpr static u32 buffer_count{ 3 };	// バッファ数
 
 	public:	// メソッド
@@ -36,8 +36,7 @@ namespace dxforge::graphics::d3d12
 		{
 			for (u32 i{ 0 }; i < buffer_count; ++i)
 			{
-				_render_target_data[i].resource = o._render_target_data[i].resource;
-				_render_target_data[i].rtv = o._render_target_data[i].rtv;
+				_render_target_data[i] = o._render_target_data[i];
 			}
 			o.reset();
 		}

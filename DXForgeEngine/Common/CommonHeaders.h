@@ -18,17 +18,12 @@
 // ====== インクルード部 ======
 // C/C++標準ライブラリ
 // NOTE: std::vectorやstd::dequeをインクルードするヘッダーはここに書かないでください。
-#include <cstdint>   // 固定幅整数型のヘッダー
-#include <assert.h>  // アサーション
-#include <typeinfo>  // 型情報
-#include <memory>    // スマートポインタ
-#include <unordered_map> // ハッシュマップ
-#include <mutex>     // 排他制御
-#include <cstring>   // C文字列操作
-
-#if defined(_WIN64)
-#include <DirectXMath.h> // DirectXMathライブラリ (Windows 64bit環境のみ)
-#endif
+#include <cstdint>          // 固定幅整数型のヘッダー
+#include <assert.h>         // アサーション
+#include <memory>           // スマートポインタ
+#include <unordered_map>    // ハッシュマップ
+#include <mutex>            // 排他制御
+#include <cstring>          // C文字列操作
 
 // ====== マクロ定義 ======
 // コピーを禁止するマクロ
@@ -62,9 +57,6 @@
 #include "PrimitiveTypes.h"
 
 // 数学関連のユーティリティ関数
-#include "../Utilities/Math.h"
 #include "../Utilities/Utilities.h"
-#include "../Utilities/MathType.h"
-
-// ID型を定義するファイル
-#include "Id.h"
+#include "../Common/Id.h"
+#include "../Utilities/Math.h"

@@ -132,11 +132,10 @@ namespace dxforge::graphics::d3d12::core
 				surface.present();
 
 				// フェンスにシグナルを送る
-				u64& fence_value{ _fence_value };
-				++fence_value;
+				const u64 fence_value{ ++_fence_value };
 				command_frame& frame{ _cmd_frames[_frame_index] };
 				frame.fence_value = fence_value;
-				_cmd_queue->Signal(_fence, fence_value);
+				DXCall(_cmd_queue->Signal(_fence, fence_value));
 
 				// フレームインデックスを更新
 				_frame_index = (_frame_index + 1) % frame_buffer_count;
@@ -439,6 +438,7 @@ namespace dxforge::graphics::d3d12::core
 		{
 			new (&constant_buffers[i]) constant_buffer{ constant_buffer::get_default_init_info(1024 * 1024) };
 			NAME_D3D12_OBJECT_INDEXED(constant_buffers[i].buffer(), i, L"Global Constant Buffer");
+			if (!constant_buffers[i].buffer()) return failed_init();
 		}
 
 		// グラフィックスコマンドを作成
@@ -511,6 +511,7 @@ namespace dxforge::graphics::d3d12::core
 
 		// デバッグモードでは、リークされたオブジェクトを報告する
 #ifdef _DEBUG
+		if (main_device)
 		{
 			{
 				// デバッグレイヤーを無効にする
@@ -610,7 +611,7 @@ namespace dxforge::graphics::d3d12::core
 		// GPUがコマンドアロケータを終了するのを待ち、GPUがコマンドアロケータを終了したら、アロケータをリセットする。
 		// これにより、コマンドの保存に使われていたメモリが解放される。
 		gfx_command.begin_frame();
-		id3d12_graphics_command_list* cmd_list{ gfx_command.command_list() };
+		id3d12_graphics_command_list* const cmd_list{ gfx_command.command_list() };
 
 		const u32 frame_idx{ current_frame_index() };
 
@@ -626,9 +627,7 @@ namespace dxforge::graphics::d3d12::core
 		const d3d12_surface& surface{ surfaces[id] };
 		ID3D12Resource* const current_back_buffer{ surface.back_buffer() };
 
-		const d3d12_frame_info d3d12_info{
-			get_d3d12_frame_info(info, cbuffer, surface, frame_idx, 16.7f) };
-
+		const d3d12_frame_info d3d12_info{ get_d3d12_frame_info(info, cbuffer, surface, frame_idx, 16.7f) };
 
 		gpass::set_size({ d3d12_info.surface_width, d3d12_info.surface_height });
 		d3dx::d3d12_resource_barrier& barriers{ resource_barriers };
@@ -641,10 +640,7 @@ namespace dxforge::graphics::d3d12::core
 		cmd_list->RSSetScissorRects(1, &surface.scissor_rect());
 
 		// Depth prepass
-		barriers.add(current_back_buffer,
-			D3D12_RESOURCE_STATE_PRESENT,
-			D3D12_RESOURCE_STATE_RENDER_TARGET,
-			D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY);
+		barriers.add(current_back_buffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY);
 		gpass::add_transitions_for_depth_prepass(barriers);
 		barriers.apply(cmd_list);
 		gpass::set_render_targets_for_depth_prepass(cmd_list);
@@ -659,19 +655,15 @@ namespace dxforge::graphics::d3d12::core
 		gpass::render(cmd_list, d3d12_info);
 
 		// Post-process
-		barriers.add(current_back_buffer,
-			D3D12_RESOURCE_STATE_PRESENT,
-			D3D12_RESOURCE_STATE_RENDER_TARGET,
-			D3D12_RESOURCE_BARRIER_FLAG_END_ONLY);
 		gpass::add_transitions_for_post_process(barriers);
+		barriers.add(current_back_buffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_BARRIER_FLAG_END_ONLY);
 		barriers.apply(cmd_list);
+
 		// 現在のバックバッファに書き込むので、バックバッファはレンダリングターゲットになる
 		fx::post_process(cmd_list, d3d12_info, surface.rtv());
 
 		// after post process
-		d3dx::transition_resource(cmd_list, current_back_buffer,
-			D3D12_RESOURCE_STATE_RENDER_TARGET,
-			D3D12_RESOURCE_STATE_PRESENT);
+		d3dx::transition_resource(cmd_list, current_back_buffer, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
 
 		// コマンドの録音が終わった。
 		// コマンドを実行し、シグナルを送り、次のフレームのフェンス値をインクリメントする。
