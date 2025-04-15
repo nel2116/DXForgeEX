@@ -1,15 +1,15 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12Helpers.cpp]
-// ì¬“ú : 2025/01/02
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// Direct3D12‚Ìƒwƒ‹ƒp[ŠÖ”
-// XV—š—ğ
-// 2025/01/02 V‹Kì¬
-// 2025/01/12 D3D12Upload.h‚Ì’Ç‰Á
+// ä½œæˆæ—¥ : 2025/01/02
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// Direct3D12ã®ãƒ˜ãƒ«ãƒ‘ãƒ¼é–¢æ•°
+// æ›´æ–°å±¥æ­´
+// 2025/01/02 æ–°è¦ä½œæˆ
+// 2025/01/12 D3D12Upload.hã®è¿½åŠ 
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12Helpers.h"
 #include "D3D12Core.h"
 #include "D3D12Upload.h"
@@ -19,15 +19,15 @@ namespace dxforge::graphics::d3d12::d3dx
 	namespace
 	{
 
-	}	// “½–¼–¼‘O‹óŠÔ
+	}	// åŒ¿ååå‰ç©ºé–“
 
-	/// @brief ƒŠƒ\[ƒX‚ğ‘JˆÚ
-	/// @param cmd_list ƒRƒ}ƒ“ƒhƒŠƒXƒg
-	/// @param resource ƒŠƒ\[ƒX
-	/// @param before •ÏX‘O‚Ìó‘Ô
-	/// @param after •ÏXŒã‚Ìó‘Ô
-	/// @param flags ƒtƒ‰ƒO
-	/// @param subresource ƒTƒuƒŠƒ\[ƒX
+	/// @brief ãƒªã‚½ãƒ¼ã‚¹ã‚’é·ç§»
+	/// @param cmd_list ã‚³ãƒãƒ³ãƒ‰ãƒªã‚¹ãƒˆ
+	/// @param resource ãƒªã‚½ãƒ¼ã‚¹
+	/// @param before å¤‰æ›´å‰ã®çŠ¶æ…‹
+	/// @param after å¤‰æ›´å¾Œã®çŠ¶æ…‹
+	/// @param flags ãƒ•ãƒ©ã‚°
+	/// @param subresource ã‚µãƒ–ãƒªã‚½ãƒ¼ã‚¹
 	void transition_resource(id3d12_graphics_command_list* cmd_list, ID3D12Resource* resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after, D3D12_RESOURCE_BARRIER_FLAGS flags, u32 subresource)
 	{
 		D3D12_RESOURCE_BARRIER barrier{};
@@ -41,45 +41,45 @@ namespace dxforge::graphics::d3d12::d3dx
 		cmd_list->ResourceBarrier(1, &barrier);
 	}
 
-	/// @brief ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚ğì¬
-	/// @param desc ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‹Lqq
-	/// @return ID3D12RootSignature* ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ
+	/// @brief ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ã‚’ä½œæˆ
+	/// @param desc ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£è¨˜è¿°å­
+	/// @return ID3D12RootSignature* ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£
 	ID3D12RootSignature* create_root_signature(const D3D12_ROOT_SIGNATURE_DESC1& desc)
 	{
-		// ƒo[ƒWƒ‡ƒ“•t‚«‚Ìƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‹Lqq‚ğì¬
+		// ãƒãƒ¼ã‚¸ãƒ§ãƒ³ä»˜ãã®ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£è¨˜è¿°å­ã‚’ä½œæˆ
 		D3D12_VERSIONED_ROOT_SIGNATURE_DESC versioned_desc{};
 		versioned_desc.Version = D3D_ROOT_SIGNATURE_VERSION_1_1;
 		versioned_desc.Desc_1_1 = desc;
 
-		// ƒVƒŠƒAƒ‰ƒCƒY
+		// ã‚·ãƒªã‚¢ãƒ©ã‚¤ã‚º
 		using namespace Microsoft::WRL;
 		ComPtr<ID3DBlob> signature_blob{ nullptr };
 		ComPtr<ID3DBlob> error_blob{ nullptr };
 		HRESULT hr{ S_OK };
 		if (FAILED(hr = D3D12SerializeVersionedRootSignature(&versioned_desc, &signature_blob, &error_blob)))
 		{
-			// ƒGƒ‰[ƒƒbƒZ[ƒW‚ğo—Í
+			// ã‚¨ãƒ©ãƒ¼ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ã‚’å‡ºåŠ›
 			DEBUG_OP(const char* error_msg{ error_blob ? (const char*)error_blob->GetBufferPointer() : "" });
 			DEBUG_OP(OutputDebugStringA(error_msg));
 			return nullptr;
 		}
 
-		// ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚ğì¬
+		// ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ã‚’ä½œæˆ
 		ID3D12RootSignature* signature{ nullptr };
 		DXCall(hr = core::device()->CreateRootSignature(0, signature_blob->GetBufferPointer(), signature_blob->GetBufferSize(), IID_PPV_ARGS(&signature)));
 
 		if (FAILED(hr))
-		{	// ¸”s‚µ‚½ê‡‚Í‰ğ•ú
+		{	// å¤±æ•—ã—ãŸå ´åˆã¯è§£æ”¾
 			core::release(signature);
 		}
 
-		// ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚ğ•Ô‚·
+		// ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ã‚’è¿”ã™
 		return signature;
 	}
 
-	/// @brief ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒg‚ğì¬
-	/// @param desc ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒgƒXƒgƒŠ[ƒ€‹Lqq
-	/// @return ID3D12PipelineState* ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒg
+	/// @brief ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚’ä½œæˆ
+	/// @param desc ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚¹ãƒˆãƒªãƒ¼ãƒ è¨˜è¿°å­
+	/// @return ID3D12PipelineState* ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆ
 	ID3D12PipelineState* create_pipeline_state(D3D12_PIPELINE_STATE_STREAM_DESC desc)
 	{
 		assert(desc.pPipelineStateSubobjectStream && desc.SizeInBytes >= sizeof(void*));
@@ -89,10 +89,10 @@ namespace dxforge::graphics::d3d12::d3dx
 		return pso;
 	}
 
-	/// @brief ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒg‚ğì¬
-	/// @param stream ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒgƒXƒgƒŠ[ƒ€
-	/// @param stream_size ƒXƒgƒŠ[ƒ€ƒTƒCƒY
-	/// @return ID3D12PipelineState* ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒg
+	/// @brief ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚’ä½œæˆ
+	/// @param stream ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚¹ãƒˆãƒªãƒ¼ãƒ 
+	/// @param stream_size ã‚¹ãƒˆãƒªãƒ¼ãƒ ã‚µã‚¤ã‚º
+	/// @return ID3D12PipelineState* ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆ
 	ID3D12PipelineState* create_pipeline_state(void* stream, u64 stream_size)
 	{
 		assert(stream && stream_size);
@@ -102,15 +102,15 @@ namespace dxforge::graphics::d3d12::d3dx
 		return create_pipeline_state(desc);
 	}
 
-	/// @brief ƒoƒbƒtƒ@‚ğì¬
-	/// @param data ƒf[ƒ^
-	/// @param buffer_size ƒoƒbƒtƒ@ƒTƒCƒY
-	/// @param is_cpu_accessible CPU‚©‚çƒAƒNƒZƒX‰Â”\‚©
-	/// @param state ƒŠƒ\[ƒXó‘Ô
-	/// @param flags ƒŠƒ\[ƒXƒtƒ‰ƒO
-	/// @param heap ƒq[ƒv
-	/// @param heap_offset ƒq[ƒvƒIƒtƒZƒbƒg
-	/// @return ID3D12Resource* ƒŠƒ\[ƒX
+	/// @brief ãƒãƒƒãƒ•ã‚¡ã‚’ä½œæˆ
+	/// @param data ãƒ‡ãƒ¼ã‚¿
+	/// @param buffer_size ãƒãƒƒãƒ•ã‚¡ã‚µã‚¤ã‚º
+	/// @param is_cpu_accessible CPUã‹ã‚‰ã‚¢ã‚¯ã‚»ã‚¹å¯èƒ½ã‹
+	/// @param state ãƒªã‚½ãƒ¼ã‚¹çŠ¶æ…‹
+	/// @param flags ãƒªã‚½ãƒ¼ã‚¹ãƒ•ãƒ©ã‚°
+	/// @param heap ãƒ’ãƒ¼ãƒ—
+	/// @param heap_offset ãƒ’ãƒ¼ãƒ—ã‚ªãƒ•ã‚»ãƒƒãƒˆ
+	/// @return ID3D12Resource* ãƒªã‚½ãƒ¼ã‚¹
 	ID3D12Resource* create_buffer(const void* data, u32 buffer_size, bool is_cpu_accessible, D3D12_RESOURCE_STATES state, D3D12_RESOURCE_FLAGS flags, ID3D12Heap* heap, u64 heap_offset)
 	{
 		assert(buffer_size);
@@ -127,7 +127,7 @@ namespace dxforge::graphics::d3d12::d3dx
 		desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 		desc.Flags = is_cpu_accessible ? D3D12_RESOURCE_FLAG_NONE : flags;
 
-		// ƒoƒbƒtƒ@‚ÍƒAƒbƒvƒ[ƒh‚É‚Ì‚İg—p‚³‚ê‚é‚©A’è”ƒoƒbƒtƒ@/UAV‚Æ‚µ‚Äg—p‚³‚ê‚éB
+		// ãƒãƒƒãƒ•ã‚¡ã¯ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ã«ã®ã¿ä½¿ç”¨ã•ã‚Œã‚‹ã‹ã€å®šæ•°ãƒãƒƒãƒ•ã‚¡/UAVã¨ã—ã¦ä½¿ç”¨ã•ã‚Œã‚‹ã€‚
 		assert(desc.Flags == D3D12_RESOURCE_FLAG_NONE ||
 			desc.Flags == D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
@@ -145,12 +145,12 @@ namespace dxforge::graphics::d3d12::d3dx
 
 		if (data)
 		{
-			// Œã‚Å•ÏX‚Å‚«‚é‚æ‚¤‚É‚µ‚½‚¢‰Šúƒf[ƒ^‚ª‚ ‚éê‡‚ÍAis_cpu_accessible‚ğtrue‚Éİ’è‚·‚éB
-			// GPU‚ªg—p‚·‚éƒf[ƒ^‚ğˆê“x‚¾‚¯ƒAƒbƒvƒ[ƒh‚µ‚½‚¢ê‡‚ÍAis_cpu_accessible‚ğfalse‚Éİ’è‚µ‚Ü‚·B
+			// å¾Œã§å¤‰æ›´ã§ãã‚‹ã‚ˆã†ã«ã—ãŸã„åˆæœŸãƒ‡ãƒ¼ã‚¿ãŒã‚ã‚‹å ´åˆã¯ã€is_cpu_accessibleã‚’trueã«è¨­å®šã™ã‚‹ã€‚
+			// GPUãŒä½¿ç”¨ã™ã‚‹ãƒ‡ãƒ¼ã‚¿ã‚’ä¸€åº¦ã ã‘ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ã—ãŸã„å ´åˆã¯ã€is_cpu_accessibleã‚’falseã«è¨­å®šã—ã¾ã™ã€‚
 			if (is_cpu_accessible)
 			{
-				// NOTE: ”ÍˆÍ‚ÌBeginƒtƒB[ƒ‹ƒh‚ÆEndƒtƒB[ƒ‹ƒh‚É0‚ªƒZƒbƒg‚³‚êA
-				//		CPU‚ªƒf[ƒ^‚ğ“Ç‚İ‚ñ‚Å‚¢‚È‚¢i‚Â‚Ü‚è‘‚«‚İê—pj‚±‚Æ‚ğ¦‚·B
+				// NOTE: ç¯„å›²ã®Beginãƒ•ã‚£ãƒ¼ãƒ«ãƒ‰ã¨Endãƒ•ã‚£ãƒ¼ãƒ«ãƒ‰ã«0ãŒã‚»ãƒƒãƒˆã•ã‚Œã€
+				//		CPUãŒãƒ‡ãƒ¼ã‚¿ã‚’èª­ã¿è¾¼ã‚“ã§ã„ãªã„ï¼ˆã¤ã¾ã‚Šæ›¸ãè¾¼ã¿å°‚ç”¨ï¼‰ã“ã¨ã‚’ç¤ºã™ã€‚
 				const D3D12_RANGE range{};
 				void* cpu_address{ nullptr };
 				DXCall(resource->Map(0, &range, reinterpret_cast<void**>(&cpu_address)));

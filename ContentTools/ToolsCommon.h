@@ -1,24 +1,24 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [ToolsCommon.h]
-// ì¬“ú : 2024/12/24
-// ì¬ŽÒ : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
+// ä½œæˆæ—¥ : 2024/12/24
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒŽãƒ«
+// æ¦‚è¦ :
 //
-// XV—š—ð
-// 2024/12/24 V‹Kì¬
+// æ›´æ–°å±¥æ­´
+// 2024/12/24 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "CommonHeaders.h"
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif // !NOMINMAX
 #include <wrl.h>
 
-// ====== ƒ}ƒNƒ’è‹` ======
+// ====== ãƒžã‚¯ãƒ­å®šç¾© ======
 #pragma once
 #ifndef EDITOR_INTERFACE
-#define EDITOR_INTERFACE extern "C" __declspec(dllexport)	// ƒGƒfƒBƒ^[—p‚ÌƒCƒ“ƒ^[ƒtƒF[ƒX‚ðƒGƒNƒXƒ|[ƒg
+#define EDITOR_INTERFACE extern "C" __declspec(dllexport)	// ã‚¨ãƒ‡ã‚£ã‚¿ãƒ¼ç”¨ã®ã‚¤ãƒ³ã‚¿ãƒ¼ãƒ•ã‚§ãƒ¼ã‚¹ã‚’ã‚¨ã‚¯ã‚¹ãƒãƒ¼ãƒˆ
 #endif // EDITOR_INTERFACE
 
 class progression

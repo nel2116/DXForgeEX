@@ -1,16 +1,16 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12Content.cpp]
-// ì¬“ú : 2025/01/12
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// Direct3D12‚ÌƒRƒ“ƒeƒ“ƒc
-// XV—š—ğ
-// 2025/01/12 V‹Kì¬
-// 2025/01/13 ƒ}ƒeƒŠƒAƒ‹‚Ì’Ç‰Á‚Æíœ‚ÌŠÖ”‚ğ’Ç‰Á
-// 2025/01/13 ƒeƒNƒXƒ`ƒƒ‚Ì’Ç‰Á‚Æíœ‚ÌŠÖ”‚ğ’Ç‰Á
-// 2025/01/14 ƒRƒƒ“ƒg‚Ì’Ç‰Á
+// ä½œæˆæ—¥ : 2025/01/12
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// Direct3D12ã®ã‚³ãƒ³ãƒ†ãƒ³ãƒ„
+// æ›´æ–°å±¥æ­´
+// 2025/01/12 æ–°è¦ä½œæˆ
+// 2025/01/13 ãƒãƒ†ãƒªã‚¢ãƒ«ã®è¿½åŠ ã¨å‰Šé™¤ã®é–¢æ•°ã‚’è¿½åŠ 
+// 2025/01/13 ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®è¿½åŠ ã¨å‰Šé™¤ã®é–¢æ•°ã‚’è¿½åŠ 
+// 2025/01/14 ã‚³ãƒ¡ãƒ³ãƒˆã®è¿½åŠ 
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12Content.h"
 #include "D3D12Core.h"
 #include "Utilities/IOStream.h"
@@ -22,84 +22,84 @@ namespace dxforge::graphics::d3d12::content
 {
 	namespace
 	{
-		/// @brief ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒgƒIƒuƒWƒFƒNƒg‚ÌID\‘¢‘Ì
+		/// @brief ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®IDæ§‹é€ ä½“
 		struct pso_id
 		{
-			id::id_type gpass_pso_id{ id::invalid_id };							///< GPass—pƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒgƒIƒuƒWƒFƒNƒg‚ÌID
-			id::id_type depth_pso_id{ id::invalid_id };							///< Depth—pƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒgƒIƒuƒWƒFƒNƒg‚ÌID
+			id::id_type gpass_pso_id{ id::invalid_id };							///< GPassç”¨ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®ID
+			id::id_type depth_pso_id{ id::invalid_id };							///< Depthç”¨ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®ID
 		};
 
-		/// @brief ƒTƒuƒƒbƒVƒ…ƒrƒ…[‚ğ•\‚·\‘¢‘Ì
+		/// @brief ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ãƒ“ãƒ¥ãƒ¼ã‚’è¡¨ã™æ§‹é€ ä½“
 		struct submesh_view
 		{
-			D3D12_VERTEX_BUFFER_VIEW position_buffer_view{};					///< ’¸“_ƒoƒbƒtƒ@ƒrƒ…[iˆÊ’uj
-			D3D12_VERTEX_BUFFER_VIEW element_buffer_view{};						///< ’¸“_ƒoƒbƒtƒ@ƒrƒ…[i—v‘fj
-			D3D12_INDEX_BUFFER_VIEW index_buffer_view{};						///< ƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@ƒrƒ…[
-			D3D_PRIMITIVE_TOPOLOGY primitive_topology;							///< ƒvƒŠƒ~ƒeƒBƒuƒgƒ|ƒƒW[
-			u32 elements_type{};												///< —v‘f‚Ìí—Ş‚ğ•\‚·Œ^
+			D3D12_VERTEX_BUFFER_VIEW position_buffer_view{};					///< é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ãƒ“ãƒ¥ãƒ¼ï¼ˆä½ç½®ï¼‰
+			D3D12_VERTEX_BUFFER_VIEW element_buffer_view{};						///< é ‚ç‚¹ãƒãƒƒãƒ•ã‚¡ãƒ“ãƒ¥ãƒ¼ï¼ˆè¦ç´ ï¼‰
+			D3D12_INDEX_BUFFER_VIEW index_buffer_view{};						///< ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ãƒ“ãƒ¥ãƒ¼
+			D3D_PRIMITIVE_TOPOLOGY primitive_topology;							///< ãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–ãƒˆãƒãƒ­ã‚¸ãƒ¼
+			u32 elements_type{};												///< è¦ç´ ã®ç¨®é¡ã‚’è¡¨ã™å‹
 		};
 
-		/// @brief Direct3D12‚Ì•`‰æƒAƒCƒeƒ€‚ğ•\‚·\‘¢‘Ì
+		/// @brief Direct3D12ã®æç”»ã‚¢ã‚¤ãƒ†ãƒ ã‚’è¡¨ã™æ§‹é€ ä½“
 		struct d3d12_render_item
 		{
-			id::id_type entity_id;												///< ƒGƒ“ƒeƒBƒeƒB‚ÌID
-			id::id_type submesh_gpu_id;											///< ƒTƒuƒƒbƒVƒ…‚ÌGPU ID
-			id::id_type material_id;											///< material‚ÌID
-			id::id_type pso_id;													///< ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒgƒIƒuƒWƒFƒNƒg‚ÌID
-			id::id_type depth_pso_id;											///< Depth—pƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒgƒIƒuƒWƒFƒNƒg‚ÌID
+			id::id_type entity_id;												///< ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®ID
+			id::id_type submesh_gpu_id;											///< ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã®GPU ID
+			id::id_type material_id;											///< materialã®ID
+			id::id_type pso_id;													///< ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®ID
+			id::id_type depth_pso_id;											///< Depthç”¨ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®ID
 		};
 
-		utl::free_list<ID3D12Resource*>                 submesh_buffers{};		///< ƒTƒuƒƒbƒVƒ…—p‚ÌƒŠƒ\[ƒXƒoƒbƒtƒ@
-		utl::free_list<submesh_view>                    submesh_views{};		///< ƒTƒuƒƒbƒVƒ…ƒrƒ…[
-		std::mutex                                      submesh_mutex{};		///< ƒTƒuƒƒbƒVƒ…—pƒ~ƒ…[ƒeƒbƒNƒX
+		utl::free_list<ID3D12Resource*>                 submesh_buffers{};		///< ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ç”¨ã®ãƒªã‚½ãƒ¼ã‚¹ãƒãƒƒãƒ•ã‚¡
+		utl::free_list<submesh_view>                    submesh_views{};		///< ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ãƒ“ãƒ¥ãƒ¼
+		std::mutex                                      submesh_mutex{};		///< ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ç”¨ãƒŸãƒ¥ãƒ¼ãƒ†ãƒƒã‚¯ã‚¹
 
-		utl::free_list<d3d12_texture>                   textures;				///< ƒeƒNƒXƒ`ƒƒ—p‚ÌƒŠƒ\[ƒXƒoƒbƒtƒ@
-		utl::free_list<u32>                             descriptor_indices;		///< ƒfƒBƒXƒNƒŠƒvƒ^‚ÌƒCƒ“ƒfƒbƒNƒX
-		std::mutex                                      texture_mutex{};		///< ƒeƒNƒXƒ`ƒƒ—pƒ~ƒ…[ƒeƒbƒNƒX
+		utl::free_list<d3d12_texture>                   textures;				///< ãƒ†ã‚¯ã‚¹ãƒãƒ£ç”¨ã®ãƒªã‚½ãƒ¼ã‚¹ãƒãƒƒãƒ•ã‚¡
+		utl::free_list<u32>                             descriptor_indices;		///< ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		std::mutex                                      texture_mutex{};		///< ãƒ†ã‚¯ã‚¹ãƒãƒ£ç”¨ãƒŸãƒ¥ãƒ¼ãƒ†ãƒƒã‚¯ã‚¹
 
-		utl::vector<ID3D12RootSignature*>               root_signatures;		///< ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚ÌƒŠƒXƒg
-		std::unordered_map<u64, id::id_type>            mtl_rs_map;				///< material‚Æƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚Ìƒ}ƒbƒv
+		utl::vector<ID3D12RootSignature*>               root_signatures;		///< ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ã®ãƒªã‚¹ãƒˆ
+		std::unordered_map<u64, id::id_type>            mtl_rs_map;				///< materialã¨ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ã®ãƒãƒƒãƒ—
 		utl::free_list<std::unique_ptr<u8[]>>           materials;				///< material
-		std::mutex                                      material_mutex{};		///< material—pƒ~ƒ…[ƒeƒbƒNƒX
+		std::mutex                                      material_mutex{};		///< materialç”¨ãƒŸãƒ¥ãƒ¼ãƒ†ãƒƒã‚¯ã‚¹
 
-		utl::free_list<d3d12_render_item>               render_items;			///< •`‰æƒAƒCƒeƒ€‚ÌƒŠƒXƒg
-		utl::free_list<std::unique_ptr<id::id_type[]>>  render_item_ids;		///< •`‰æƒAƒCƒeƒ€ID‚ÌƒŠƒXƒg
-		std::mutex                                      render_item_mutex{};	///< •`‰æƒAƒCƒeƒ€—pƒ~ƒ…[ƒeƒbƒNƒX
+		utl::free_list<d3d12_render_item>               render_items;			///< æç”»ã‚¢ã‚¤ãƒ†ãƒ ã®ãƒªã‚¹ãƒˆ
+		utl::free_list<std::unique_ptr<id::id_type[]>>  render_item_ids;		///< æç”»ã‚¢ã‚¤ãƒ†ãƒ IDã®ãƒªã‚¹ãƒˆ
+		std::mutex                                      render_item_mutex{};	///< æç”»ã‚¢ã‚¤ãƒ†ãƒ ç”¨ãƒŸãƒ¥ãƒ¼ãƒ†ãƒƒã‚¯ã‚¹
 
-		utl::vector<ID3D12PipelineState*>               pipeline_states;		///< ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒgƒIƒuƒWƒFƒNƒg
-		std::unordered_map<u64, id::id_type>            pso_map;				///< ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒgƒIƒuƒWƒFƒNƒg‚ÆID‚Ìƒ}ƒbƒv
-		std::mutex                                      pso_mutex{};			///< ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒgƒIƒuƒWƒFƒNƒg—pƒ~ƒ…[ƒeƒbƒNƒX
+		utl::vector<ID3D12PipelineState*>               pipeline_states;		///< ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆ
+		std::unordered_map<u64, id::id_type>            pso_map;				///< ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã¨IDã®ãƒãƒƒãƒ—
+		std::mutex                                      pso_mutex{};			///< ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆç”¨ãƒŸãƒ¥ãƒ¼ãƒ†ãƒƒã‚¯ã‚¹
 
-		/// @brief ƒtƒŒ[ƒ€ƒLƒƒƒbƒVƒ…
+		/// @brief ãƒ•ãƒ¬ãƒ¼ãƒ ã‚­ãƒ£ãƒƒã‚·ãƒ¥
 		struct
 		{
-			utl::vector<dxforge::content::lod_offset>    lod_offsets;			///< LODƒIƒtƒZƒbƒg
-			utl::vector<id::id_type>                    geometry_ids;			///< ƒWƒIƒƒgƒŠID
+			utl::vector<dxforge::content::lod_offset>    lod_offsets;			///< LODã‚ªãƒ•ã‚»ãƒƒãƒˆ
+			utl::vector<id::id_type>                    geometry_ids;			///< ã‚¸ã‚ªãƒ¡ãƒˆãƒªID
 		} frame_cache;
 
-		/// @brief ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚ğì¬‚·‚éŠÖ”
-		/// @param type material‚Ìí—Ş
-		/// @param flags ƒVƒF[ƒ_[ƒtƒ‰ƒO
-		/// @return ¶¬‚³‚ê‚½ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚ÌID
+		/// @brief ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ã‚’ä½œæˆã™ã‚‹é–¢æ•°
+		/// @param type materialã®ç¨®é¡
+		/// @param flags ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãƒ•ãƒ©ã‚°
+		/// @return ç”Ÿæˆã•ã‚ŒãŸãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ã®ID
 		id::id_type create_root_signature(material_type::type type, shader_flags::flags flags);
 
-		/// @brief material‚ÌƒXƒgƒŠ[ƒ€‚ğ•\‚·ƒNƒ‰ƒX
+		/// @brief materialã®ã‚¹ãƒˆãƒªãƒ¼ãƒ ã‚’è¡¨ã™ã‚¯ãƒ©ã‚¹
 		class d3d12_material_stream
 		{
-		public:		// ƒpƒuƒŠƒbƒNŠÖ”
-			/// ƒNƒ‰ƒX‚ÌˆÚ“®‚ÆƒRƒs[‚ğ‹Ö~
+		public:		// ãƒ‘ãƒ–ãƒªãƒƒã‚¯é–¢æ•°
+			/// ã‚¯ãƒ©ã‚¹ã®ç§»å‹•ã¨ã‚³ãƒ”ãƒ¼ã‚’ç¦æ­¢
 			DISABLE_COPY_AND_MOVE(d3d12_material_stream);
-			/// @brief ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-			/// @param material_buffer material‚Ìƒoƒbƒtƒ@
+			/// @brief ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+			/// @param material_buffer materialã®ãƒãƒƒãƒ•ã‚¡
 			explicit d3d12_material_stream(u8* const material_buffer)
 				:_buffer{ material_buffer }
 			{
 				initialize();
 			}
 
-			/// @brief ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-			/// @param material_buffer material‚Ìƒoƒbƒtƒ@
-			/// @param info material‚Ì‰Šú‰»î•ñ
+			/// @brief ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+			/// @param material_buffer materialã®ãƒãƒƒãƒ•ã‚¡
+			/// @param info materialã®åˆæœŸåŒ–æƒ…å ±
 			explicit d3d12_material_stream(std::unique_ptr<u8[]>& material_buffer, material_init_info info)
 			{
 				assert(!material_buffer);
@@ -118,13 +118,13 @@ namespace dxforge::graphics::d3d12::content
 				assert(shader_count && flags);
 
 				const u32 buffer_size{
-					sizeof(material_type::type) +								// material‚Ìí—Ş
-					sizeof(shader_flags::flags) +								// shader‚Ìƒtƒ‰ƒO
-					sizeof(id::id_type) +										// ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ[‚ÌID
-					sizeof(u32) +												// texture‚Ì”
-					sizeof(material_surface) + 									// PBR Material‚ÌƒvƒƒpƒeƒB
-					sizeof(id::id_type) * shader_count +						// shader‚ÌID
-					(sizeof(id::id_type) + sizeof(u32)) * info.texture_count	// texture‚ÌID‚ÆƒfƒBƒXƒNƒŠƒvƒ^‚ÌƒCƒ“ƒfƒbƒNƒXitexture‚ğg—p‚µ‚È‚¢ê‡‚Í0‚©‚à‚µ‚ê‚È‚¢j
+					sizeof(material_type::type) +								// materialã®ç¨®é¡
+					sizeof(shader_flags::flags) +								// shaderã®ãƒ•ãƒ©ã‚°
+					sizeof(id::id_type) +										// ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ãƒ¼ã®ID
+					sizeof(u32) +												// textureã®æ•°
+					sizeof(material_surface) + 									// PBR Materialã®ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£
+					sizeof(id::id_type) * shader_count +						// shaderã®ID
+					(sizeof(id::id_type) + sizeof(u32)) * info.texture_count	// textureã®IDã¨ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ï¼ˆtextureã‚’ä½¿ç”¨ã—ãªã„å ´åˆã¯0ã‹ã‚‚ã—ã‚Œãªã„ï¼‰
 				};
 
 				material_buffer = std::make_unique<u8[]>(buffer_size);
@@ -158,7 +158,7 @@ namespace dxforge::graphics::d3d12::content
 				assert(shader_index == (u32)_mm_popcnt_u32(_shader_flags));
 			}
 
-			// ------ ƒAƒNƒZƒTŠÖ” ------
+			// ------ ã‚¢ã‚¯ã‚»ã‚µé–¢æ•° ------
 			[[nodiscard]] constexpr u32 texture_count() const { return _texture_count; }
 			[[nodiscard]] constexpr material_type::type material_type() const { return _type; }
 			[[nodiscard]] constexpr shader_flags::flags shader_flags() const { return _shader_flags; }
@@ -168,8 +168,8 @@ namespace dxforge::graphics::d3d12::content
 			[[nodiscard]] constexpr id::id_type* shader_ids() const { return _shader_ids; }
 			[[nodiscard]] constexpr material_surface* surface() const { return _material_surface; }
 
-		private:	// ƒvƒ‰ƒCƒx[ƒgŠÖ”
-			/// @brief ‰Šú‰»ŠÖ”
+		private:	// ãƒ—ãƒ©ã‚¤ãƒ™ãƒ¼ãƒˆé–¢æ•°
+			/// @brief åˆæœŸåŒ–é–¢æ•°
 			void initialize()
 			{
 				assert(_buffer);
@@ -191,20 +191,20 @@ namespace dxforge::graphics::d3d12::content
 			constexpr static u32 texture_count_index{ root_signature_index + sizeof(id::id_type) };
 			constexpr static u32 material_surface_index{ texture_count_index + sizeof(u32) };
 
-			u8* _buffer;							///< ƒoƒbƒtƒ@
-			material_surface* _material_surface;	///< PBR Material‚ÌƒvƒƒpƒeƒB
-			id::id_type* _texture_ids;				///< texture‚ÌID
-			u32* _descriptor_indices;				///< ƒfƒBƒXƒNƒŠƒvƒ^‚ÌƒCƒ“ƒfƒbƒNƒX
-			id::id_type* _shader_ids;				///< shader‚ÌID
-			id::id_type _root_signature_id;			///< ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ[‚ÌID
-			u32 _texture_count;						///< texture‚Ì”
-			material_type::type _type;				///< material‚Ìí—Ş
-			shader_flags::flags _shader_flags;		///< shader‚Ìƒtƒ‰ƒO
+			u8* _buffer;							///< ãƒãƒƒãƒ•ã‚¡
+			material_surface* _material_surface;	///< PBR Materialã®ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£
+			id::id_type* _texture_ids;				///< textureã®ID
+			u32* _descriptor_indices;				///< ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+			id::id_type* _shader_ids;				///< shaderã®ID
+			id::id_type _root_signature_id;			///< ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ãƒ¼ã®ID
+			u32 _texture_count;						///< textureã®æ•°
+			material_type::type _type;				///< materialã®ç¨®é¡
+			shader_flags::flags _shader_flags;		///< shaderã®ãƒ•ãƒ©ã‚°
 		};
 
-		/// @brief ƒTƒuƒƒbƒVƒ…‚ÌGPU ID‚ğæ“¾‚·‚éŠÖ”
-		/// @param type ƒWƒIƒƒgƒŠ‚Ìí—Ş
-		/// @return ¶¬‚³‚ê‚½ID
+		/// @brief ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã®GPU IDã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param type ã‚¸ã‚ªãƒ¡ãƒˆãƒªã®ç¨®é¡
+		/// @return ç”Ÿæˆã•ã‚ŒãŸID
 		constexpr D3D_PRIMITIVE_TOPOLOGY get_d3d_primitive_topology(primitive_topology::type type)
 		{
 			assert(type < primitive_topology::count);
@@ -221,9 +221,9 @@ namespace dxforge::graphics::d3d12::content
 			return D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
 		}
 
-		/// @brief ƒTƒuƒƒbƒVƒ…‚ÌGPU ID‚ğæ“¾‚·‚éŠÖ”
-		/// @param topology ƒgƒ|ƒƒW[
-		/// @return ¶¬‚³‚ê‚½ID
+		/// @brief ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã®GPU IDã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param topology ãƒˆãƒãƒ­ã‚¸ãƒ¼
+		/// @return ç”Ÿæˆã•ã‚ŒãŸID
 		constexpr D3D12_PRIMITIVE_TOPOLOGY_TYPE get_d3d_primitive_topology_type(D3D_PRIMITIVE_TOPOLOGY topology)
 		{
 			switch (topology)
@@ -238,9 +238,9 @@ namespace dxforge::graphics::d3d12::content
 			return D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED;
 		}
 
-		/// @brief ƒTƒuƒƒbƒVƒ…‚ÌGPU ID‚ğæ“¾‚·‚éŠÖ”
-		/// @param flags ƒVƒF[ƒ_[ƒtƒ‰ƒO
-		/// @return ¶¬‚³‚ê‚½ID
+		/// @brief ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã®GPU IDã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param flags ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãƒ•ãƒ©ã‚°
+		/// @return ç”Ÿæˆã•ã‚ŒãŸID
 		constexpr D3D12_ROOT_SIGNATURE_FLAGS get_root_signature_flags(shader_flags::flags flags)
 		{
 			D3D12_ROOT_SIGNATURE_FLAGS default_flags{ d3dx::d3d12_root_signature_desc::default_flags };
@@ -254,10 +254,10 @@ namespace dxforge::graphics::d3d12::content
 			return default_flags;
 		}
 
-		/// @brief ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚ğì¬‚·‚éŠÖ”
-		/// @param type material‚Ìí—Ş
-		/// @param flags ƒVƒF[ƒ_[ƒtƒ‰ƒO
-		/// @return ¶¬‚³‚ê‚½ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚ÌID
+		/// @brief ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ã‚’ä½œæˆã™ã‚‹é–¢æ•°
+		/// @param type materialã®ç¨®é¡
+		/// @param flags ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãƒ•ãƒ©ã‚°
+		/// @return ç”Ÿæˆã•ã‚ŒãŸãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ã®ID
 		id::id_type create_root_signature(material_type::type type, shader_flags::flags flags)
 		{
 			assert(type < material_type::count);
@@ -309,7 +309,7 @@ namespace dxforge::graphics::d3d12::content
 				parameters[params::per_object_data].as_cbv(data_visibility, 1);
 				parameters[params::position_buffer].as_srv(buffer_visibility, 0);
 				parameters[params::element_buffer].as_srv(buffer_visibility, 1);
-				parameters[params::srv_indices].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 2); // TODO: ‚±‚ê‚ÍAƒeƒNƒXƒ`ƒƒ‚ğƒTƒ“ƒvƒŠƒ“ƒO‚·‚é•K—v‚Ì‚ ‚é‚·‚×‚Ä‚ÌƒXƒe[ƒW‚©‚çŒ©‚¦‚é‚æ‚¤‚É‚·‚é•K—v‚ª‚ ‚è‚Ü‚·B
+				parameters[params::srv_indices].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 2); // TODO: ã“ã‚Œã¯ã€ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’ã‚µãƒ³ãƒ—ãƒªãƒ³ã‚°ã™ã‚‹å¿…è¦ã®ã‚ã‚‹ã™ã¹ã¦ã®ã‚¹ãƒ†ãƒ¼ã‚¸ã‹ã‚‰è¦‹ãˆã‚‹ã‚ˆã†ã«ã™ã‚‹å¿…è¦ãŒã‚ã‚Šã¾ã™ã€‚
 				parameters[params::directional_lights].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 3);
 				parameters[params::cullable_lights].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 4);
 				parameters[params::light_grid].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 5);
@@ -336,16 +336,16 @@ namespace dxforge::graphics::d3d12::content
 			return id;
 		}
 
-		/// @brief PSO‚ğì¬‚·‚éŠÖ”
-		/// @param stream_ptr ƒXƒgƒŠ[ƒ€‚Ìƒ|ƒCƒ“ƒ^[
-		/// @param aligned_stream_size ƒXƒgƒŠ[ƒ€‚ÌƒTƒCƒY
-		/// @param is_depth [“x‚Ì‚İ‚ÌPSO‚©‚Ç‚¤‚©
-		/// @return ¶¬‚³‚ê‚½ID
+		/// @brief PSOã‚’ä½œæˆã™ã‚‹é–¢æ•°
+		/// @param stream_ptr ã‚¹ãƒˆãƒªãƒ¼ãƒ ã®ãƒã‚¤ãƒ³ã‚¿ãƒ¼
+		/// @param aligned_stream_size ã‚¹ãƒˆãƒªãƒ¼ãƒ ã®ã‚µã‚¤ã‚º
+		/// @param is_depth æ·±åº¦ã®ã¿ã®PSOã‹ã©ã†ã‹
+		/// @return ç”Ÿæˆã•ã‚ŒãŸID
 		id::id_type create_pso_if_needed(const u8* const stream_ptr, u64 aligned_stream_size, [[maybe_unused]] bool is_depth)
 		{
 			const u64 key{ math::calc_crc32_u64(stream_ptr, aligned_stream_size) };
 
-			{ // ƒXƒR[ƒv‚ğƒƒbƒN‚µAPSO‚ª‚·‚Å‚É‘¶İ‚·‚é‚©‚Ç‚¤‚©‚ğƒ`ƒFƒbƒN‚·‚é
+			{ // ã‚¹ã‚³ãƒ¼ãƒ—ã‚’ãƒ­ãƒƒã‚¯ã—ã€PSOãŒã™ã§ã«å­˜åœ¨ã™ã‚‹ã‹ã©ã†ã‹ã‚’ãƒã‚§ãƒƒã‚¯ã™ã‚‹
 				std::lock_guard lock{ pso_mutex };
 				auto pair = pso_map.find(key);
 
@@ -356,11 +356,11 @@ namespace dxforge::graphics::d3d12::content
 				}
 			}
 
-			// V‚µ‚¢PSO‚Ìì¬‚ÍƒƒbƒNƒtƒŠ[
+			// æ–°ã—ã„PSOã®ä½œæˆã¯ãƒ­ãƒƒã‚¯ãƒ•ãƒªãƒ¼
 			d3dx::d3d12_pipeline_state_subobject_stream* const stream{ (d3dx::d3d12_pipeline_state_subobject_stream* const)stream_ptr };
 			ID3D12PipelineState* pso{ d3dx::create_pipeline_state(stream, sizeof(d3dx::d3d12_pipeline_state_subobject_stream)) };
 
-			{ // ƒXƒR[ƒv‚ğƒƒbƒN‚µ‚ÄAV‚µ‚¢PSO‚Ìƒ|ƒCƒ“ƒ^[‚Æid‚ğ’Ç‰Á‚·‚éB
+			{ // ã‚¹ã‚³ãƒ¼ãƒ—ã‚’ãƒ­ãƒƒã‚¯ã—ã¦ã€æ–°ã—ã„PSOã®ãƒã‚¤ãƒ³ã‚¿ãƒ¼ã¨idã‚’è¿½åŠ ã™ã‚‹ã€‚
 				std::lock_guard lock{ pso_mutex };
 				const id::id_type id{ (u32)pipeline_states.size() };
 				pipeline_states.emplace_back(pso);
@@ -372,11 +372,11 @@ namespace dxforge::graphics::d3d12::content
 			}
 		}
 
-		// NOTE: _BitScanForward‚ÍAƒrƒbƒg‚ÌˆÊ’u‚ğŒ©‚Â‚¯‚é‚½‚ß‚Ég—p‚³‚ê‚Ü‚·B
+		// NOTE: _BitScanForwardã¯ã€ãƒ“ãƒƒãƒˆã®ä½ç½®ã‚’è¦‹ã¤ã‘ã‚‹ãŸã‚ã«ä½¿ç”¨ã•ã‚Œã¾ã™ã€‚
 #pragma intrinsic(_BitScanForward)
-		/// @brief ƒVƒF[ƒ_[ƒ^ƒCƒv‚ğæ“¾‚·‚éŠÖ”
-		/// @param flag ƒtƒ‰ƒO
-		/// @return ƒVƒF[ƒ_[ƒ^ƒCƒv
+		/// @brief ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚¿ã‚¤ãƒ—ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param flag ãƒ•ãƒ©ã‚°
+		/// @return ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚¿ã‚¤ãƒ—
 		shader_type::type get_shader_type(u32 flag)
 		{
 			assert(flag);
@@ -385,11 +385,11 @@ namespace dxforge::graphics::d3d12::content
 			return (shader_type::type)index;
 		}
 
-		/// @brief PSO‚ğì¬‚·‚éŠÖ”
-		/// @param material_id material‚ÌID
-		/// @param primitive_topology ƒvƒŠƒ~ƒeƒBƒuƒgƒ|ƒƒW[
-		/// @param elements_type —v‘f‚Ìí—Ş
-		/// @return ¶¬‚³‚ê‚½ID
+		/// @brief PSOã‚’ä½œæˆã™ã‚‹é–¢æ•°
+		/// @param material_id materialã®ID
+		/// @param primitive_topology ãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–ãƒˆãƒãƒ­ã‚¸ãƒ¼
+		/// @param elements_type è¦ç´ ã®ç¨®é¡
+		/// @return ç”Ÿæˆã•ã‚ŒãŸID
 		pso_id create_pso(id::id_type material_id, D3D12_PRIMITIVE_TOPOLOGY primitive_topology, u32 elements_type)
 		{
 			constexpr u64 aligned_stream_size{ math::align_size_up<sizeof(u64)>(sizeof(d3dx::d3d12_pipeline_state_subobject_stream)) };
@@ -399,7 +399,7 @@ namespace dxforge::graphics::d3d12::content
 
 			d3dx::d3d12_pipeline_state_subobject_stream& stream{ *(d3dx::d3d12_pipeline_state_subobject_stream* const)stream_ptr };
 
-			{ // materials‚ğƒƒbƒN‚µ‚ÄAmaterial‚Ìî•ñ‚ğæ“¾‚·‚é
+			{ // materialsã‚’ãƒ­ãƒƒã‚¯ã—ã¦ã€materialã®æƒ…å ±ã‚’å–å¾—ã™ã‚‹
 				std::lock_guard lock{ material_mutex };
 				const d3d12_material_stream material{ materials[material_id].get() };
 
@@ -422,8 +422,8 @@ namespace dxforge::graphics::d3d12::content
 				{
 					if (flags & (1 << i))
 					{
-						// NOTE: Šeƒ^ƒCƒv‚ÌƒVƒF[ƒ_‚ÍAsubmesh‚Ü‚½‚Ímaterial‚ÌˆÙ‚È‚éƒvƒƒpƒeƒB‚©‚ç¶¬‚³‚ê‚éƒL[‚ğ‚Â‚±‚Æ‚ª‚ ‚è‚Ü‚·B
-						//		Œ»“_‚Å‚ÍAelements_type‚É‚æ‚Á‚ÄˆÙ‚È‚éí—Ş‚Ì’¸“_ƒVƒF[ƒ_[‚µ‚©‚ ‚è‚Ü‚¹‚ñB
+						// NOTE: å„ã‚¿ã‚¤ãƒ—ã®ã‚·ã‚§ãƒ¼ãƒ€ã¯ã€submeshã¾ãŸã¯materialã®ç•°ãªã‚‹ãƒ—ãƒ­ãƒ‘ãƒ†ã‚£ã‹ã‚‰ç”Ÿæˆã•ã‚Œã‚‹ã‚­ãƒ¼ã‚’æŒã¤ã“ã¨ãŒã‚ã‚Šã¾ã™ã€‚
+						//		ç¾æ™‚ç‚¹ã§ã¯ã€elements_typeã«ã‚ˆã£ã¦ç•°ãªã‚‹ç¨®é¡ã®é ‚ç‚¹ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã—ã‹ã‚ã‚Šã¾ã›ã‚“ã€‚
 						const u32 key{ get_shader_type(flags & (1 << i)) == shader_type::vertex ? elements_type : u32_invalid_id };
 						dxforge::content::compiled_shader_ptr shader{ dxforge::content::get_shader(material.shader_ids()[shader_index], key) };
 						assert(shader);
@@ -464,9 +464,9 @@ namespace dxforge::graphics::d3d12::content
 		///     } images[]
 		/// } texture
 		/// </returns>
-		/// @brief ƒeƒNƒXƒ`ƒƒƒf[ƒ^‚©‚çƒŠƒ\[ƒX‚ğì¬‚·‚éŠÖ”
-		/// @param data ƒeƒNƒXƒ`ƒƒƒf[ƒ^
-		/// @return ì¬‚³‚ê‚½ƒŠƒ\[ƒX
+		/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ‡ãƒ¼ã‚¿ã‹ã‚‰ãƒªã‚½ãƒ¼ã‚¹ã‚’ä½œæˆã™ã‚‹é–¢æ•°
+		/// @param data ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ‡ãƒ¼ã‚¿
+		/// @return ä½œæˆã•ã‚ŒãŸãƒªã‚½ãƒ¼ã‚¹
 		d3d12_texture create_resource_from_texture_data(const u8* const data)
 		{
 			assert(data);
@@ -517,13 +517,13 @@ namespace dxforge::graphics::d3d12::content
 							slice_pitch
 						});
 
-					// c‚è‚ÌƒXƒ‰ƒCƒX‚ğ”ò‚Î‚·.
+					// æ®‹ã‚Šã®ã‚¹ãƒ©ã‚¤ã‚¹ã‚’é£›ã°ã™.
 					blob.skip(slice_pitch * depth_per_mip_level[j]);
 				}
 			}
 
 			D3D12_RESOURCE_DESC desc{};
-			// TODO: 1ŸŒ³ƒeƒNƒXƒ`ƒƒ‚ğˆµ‚¤B
+			// TODO: 1æ¬¡å…ƒãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’æ‰±ã†ã€‚
 			desc.Dimension = is_3d ? D3D12_RESOURCE_DIMENSION_TEXTURE3D : D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 			desc.Alignment = 0;
 			desc.Width = width;
@@ -635,7 +635,7 @@ namespace dxforge::graphics::d3d12::content
 			return d3d12_texture{ info };
 		}
 
-	} // “½–¼–¼‘O‹óŠÔ
+	} // åŒ¿ååå‰ç©ºé–“
 
 	bool initialize()
 	{
@@ -644,9 +644,9 @@ namespace dxforge::graphics::d3d12::content
 
 	void shutdown()
 	{
-		// NOTE: ‚±‚Ìƒ‚ƒWƒ…[ƒ‹‚Å‚ÍAƒŠƒ\[ƒX‚ğ’Ç‰Á‚·‚éÛ‚Ì•›ì—p‚Æ‚µ‚Äì¬‚³‚ê‚½ƒf[ƒ^‚Ì‚İ‚ğ‰ğ•ú‚µ‚Ü‚·B
-		// c‚è‚Ìƒf[ƒ^‚ÍAƒŒƒ“ƒ_ƒ‰[‚ğƒVƒƒƒbƒgƒ_ƒEƒ“‚·‚é‘O‚ÉAƒ†[ƒU[‚ªuremovevŠÖ”‚ğŒÄ‚Ño‚µ‚Ä‰ğ•ú‚·‚é•K—v‚ª‚ ‚è‚Ü‚·B
-		// ‚»‚¤‚·‚é‚±‚Æ‚ÅAƒRƒ“ƒeƒ“ƒc‚Ì’ •ëŠÇ—‚ª³‚µ‚­s‚í‚ê‚é‚æ‚¤‚É‚È‚è‚Ü‚·B
+		// NOTE: ã“ã®ãƒ¢ã‚¸ãƒ¥ãƒ¼ãƒ«ã§ã¯ã€ãƒªã‚½ãƒ¼ã‚¹ã‚’è¿½åŠ ã™ã‚‹éš›ã®å‰¯ä½œç”¨ã¨ã—ã¦ä½œæˆã•ã‚ŒãŸãƒ‡ãƒ¼ã‚¿ã®ã¿ã‚’è§£æ”¾ã—ã¾ã™ã€‚
+		// æ®‹ã‚Šã®ãƒ‡ãƒ¼ã‚¿ã¯ã€ãƒ¬ãƒ³ãƒ€ãƒ©ãƒ¼ã‚’ã‚·ãƒ£ãƒƒãƒˆãƒ€ã‚¦ãƒ³ã™ã‚‹å‰ã«ã€ãƒ¦ãƒ¼ã‚¶ãƒ¼ãŒã€Œremoveã€é–¢æ•°ã‚’å‘¼ã³å‡ºã—ã¦è§£æ”¾ã™ã‚‹å¿…è¦ãŒã‚ã‚Šã¾ã™ã€‚
+		// ãã†ã™ã‚‹ã“ã¨ã§ã€ã‚³ãƒ³ãƒ†ãƒ³ãƒ„ã®å¸³ç°¿ç®¡ç†ãŒæ­£ã—ãè¡Œã‚ã‚Œã‚‹ã‚ˆã†ã«ãªã‚Šã¾ã™ã€‚
 
 		for (auto& item : root_signatures)
 		{
@@ -668,21 +668,21 @@ namespace dxforge::graphics::d3d12::content
 	namespace submesh
 	{
 
-		// NOTE: data'‚ÉŠÜ‚Ü‚ê‚é‚±‚Æ‚ğŠú‘Ò‚·‚éF
+		// NOTE: data'ã«å«ã¾ã‚Œã‚‹ã“ã¨ã‚’æœŸå¾…ã™ã‚‹ï¼š
 		//
 		//     u32 element_size, u32 vertex_count,
 		//     u32 index_count, u32 elements_type, u32 primitive_topology
-		//     u8 positions[sizeof(f32) * 3 * vertex_count],     // sizeof(positions)‚Í4ƒoƒCƒg‚Ì”{”‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B •K—v‚Å‚ ‚ê‚ÎƒpƒfƒBƒ“ƒO‚µ‚Ä‚­‚¾‚³‚¢B
-		//     u8 elements[sizeof(element_size) * vertex_count], // sizeof(elements)‚Í4ƒoƒCƒg‚Ì”{”‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B •K—v‚Å‚ ‚ê‚ÎƒpƒfƒBƒ“ƒO‚µ‚Ä‚­‚¾‚³‚¢B
+		//     u8 positions[sizeof(f32) * 3 * vertex_count],     // sizeof(positions)ã¯4ãƒã‚¤ãƒˆã®å€æ•°ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚ å¿…è¦ã§ã‚ã‚Œã°ãƒ‘ãƒ‡ã‚£ãƒ³ã‚°ã—ã¦ãã ã•ã„ã€‚
+		//     u8 elements[sizeof(element_size) * vertex_count], // sizeof(elements)ã¯4ãƒã‚¤ãƒˆã®å€æ•°ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚ å¿…è¦ã§ã‚ã‚Œã°ãƒ‘ãƒ‡ã‚£ãƒ³ã‚°ã—ã¦ãã ã•ã„ã€‚
 		//     u8 indices[index_size * index_count],
 		//
 		// Remarks:
-		// - ƒf[ƒ^ƒ|ƒCƒ“ƒ^‚ği‚ß‚é
-		// - ƒ|ƒWƒVƒ‡ƒ“‚ÆƒGƒŒƒƒ“ƒg‚Ìƒoƒbƒtƒ@[‚ÍA4ƒoƒCƒg‚Ì”{”‚É‚È‚é‚æ‚¤‚ÉƒpƒfƒBƒ“ƒO‚³‚ê‚é‚×‚«‚Å‚ ‚éB
-		//   ‚±‚Ì16ƒoƒCƒg‚ÍD3D12_STANDARD_MAXIMUM_ELEMENT_ALIGNMENT_BYTE_MULTIPLE‚Æ‚µ‚Ä’è‹`‚³‚ê‚éB
-		/// @brief ƒTƒuƒƒbƒVƒ…‚ğ’Ç‰Á‚·‚éŠÖ”
-		/// @param data ƒTƒuƒƒbƒVƒ…‚Ìƒf[ƒ^
-		/// @return ƒTƒuƒƒbƒVƒ…‚ÌGPU ID
+		// - ãƒ‡ãƒ¼ã‚¿ãƒã‚¤ãƒ³ã‚¿ã‚’é€²ã‚ã‚‹
+		// - ãƒã‚¸ã‚·ãƒ§ãƒ³ã¨ã‚¨ãƒ¬ãƒ¡ãƒ³ãƒˆã®ãƒãƒƒãƒ•ã‚¡ãƒ¼ã¯ã€4ãƒã‚¤ãƒˆã®å€æ•°ã«ãªã‚‹ã‚ˆã†ã«ãƒ‘ãƒ‡ã‚£ãƒ³ã‚°ã•ã‚Œã‚‹ã¹ãã§ã‚ã‚‹ã€‚
+		//   ã“ã®16ãƒã‚¤ãƒˆã¯D3D12_STANDARD_MAXIMUM_ELEMENT_ALIGNMENT_BYTE_MULTIPLEã¨ã—ã¦å®šç¾©ã•ã‚Œã‚‹ã€‚
+		/// @brief ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã‚’è¿½åŠ ã™ã‚‹é–¢æ•°
+		/// @param data ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã®ãƒ‡ãƒ¼ã‚¿
+		/// @return ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã®GPU ID
 		id::id_type add(const u8*& data)
 		{
 			utl::blob_stream_reader blob{ (const u8*)data };
@@ -694,7 +694,7 @@ namespace dxforge::graphics::d3d12::content
 			const u32 primitive_topology{ blob.read<u32>() };
 			const u32 index_size{ (vertex_count < (1 << 16)) ? sizeof(u16) : sizeof(u32) };
 
-			// NOTE: —v‘f‚ÌƒTƒCƒY‚ÍAˆÊ’u‚Ì‚İ‚Ì’¸“_ƒtƒH[ƒ}ƒbƒg‚Ìê‡A0‚Å‚à‚æ‚¢B
+			// NOTE: è¦ç´ ã®ã‚µã‚¤ã‚ºã¯ã€ä½ç½®ã®ã¿ã®é ‚ç‚¹ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆã®å ´åˆã€0ã§ã‚‚ã‚ˆã„ã€‚
 			const u32 position_buffer_size{ sizeof(math::v3) * vertex_count };
 			const u32 element_buffer_size{ element_size * vertex_count };
 			const u32 index_buffer_size{ index_size * index_count };
@@ -735,8 +735,8 @@ namespace dxforge::graphics::d3d12::content
 			return submesh_views.add(view);
 		}
 
-		/// @brief ƒTƒuƒƒbƒVƒ…‚ğíœ‚·‚éŠÖ”
-		/// @param id íœ‚·‚éƒTƒuƒƒbƒVƒ…‚ÌGPU ID
+		/// @brief ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã‚’å‰Šé™¤ã™ã‚‹é–¢æ•°
+		/// @param id å‰Šé™¤ã™ã‚‹ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã®GPU ID
 		void remove(id::id_type id)
 		{
 			std::lock_guard lock{ submesh_mutex };
@@ -746,10 +746,10 @@ namespace dxforge::graphics::d3d12::content
 			submesh_buffers.remove(id);
 		}
 
-		/// @brief ƒTƒuƒƒbƒVƒ…‚Ìƒrƒ…[‚ğæ“¾‚·‚éŠÖ”
-		/// @param gpu_ids ƒTƒuƒƒbƒVƒ…‚ÌGPU ID
-		/// @param id_count ID‚Ì”
-		/// @param cache ƒLƒƒƒbƒVƒ…
+		/// @brief ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã®ãƒ“ãƒ¥ãƒ¼ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param gpu_ids ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã®GPU ID
+		/// @param id_count IDã®æ•°
+		/// @param cache ã‚­ãƒ£ãƒƒã‚·ãƒ¥
 		void get_views(const id::id_type* const gpu_ids, u32 id_count, const views_cache& cache)
 		{
 			assert(gpu_ids && id_count);
@@ -771,9 +771,9 @@ namespace dxforge::graphics::d3d12::content
 
 	namespace texture
 	{
-		/// @brief ƒeƒNƒXƒ`ƒƒ‚ğì¬‚·‚éŠÖ”
-		/// @param data ƒeƒNƒXƒ`ƒƒ‚Ìƒf[ƒ^
-		/// @return ¶¬‚³‚ê‚½ƒŠƒ\[ƒX
+		/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’ä½œæˆã™ã‚‹é–¢æ•°
+		/// @param data ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®ãƒ‡ãƒ¼ã‚¿
+		/// @return ç”Ÿæˆã•ã‚ŒãŸãƒªã‚½ãƒ¼ã‚¹
 		id::id_type add(const u8* const data)
 		{
 			assert(data);
@@ -784,8 +784,8 @@ namespace dxforge::graphics::d3d12::content
 			return id;
 		}
 
-		/// @brief ƒeƒNƒXƒ`ƒƒ‚ğíœ‚·‚éŠÖ”
-		/// @param id íœ‚·‚éƒeƒNƒXƒ`ƒƒ‚ÌID
+		/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’å‰Šé™¤ã™ã‚‹é–¢æ•°
+		/// @param id å‰Šé™¤ã™ã‚‹ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®ID
 		void remove(id::id_type id)
 		{
 			std::lock_guard lock{ texture_mutex };
@@ -793,10 +793,10 @@ namespace dxforge::graphics::d3d12::content
 			descriptor_indices.remove(id);
 		}
 
-		/// @brief ƒeƒNƒXƒ`ƒƒ‚ğ’Ç‰Á‚·‚éŠÖ”
-		/// @param texture_ids ƒeƒNƒXƒ`ƒƒ‚ÌID
-		/// @param id_count ID‚Ì”
-		/// @param indices ƒfƒBƒXƒNƒŠƒvƒ^‚ÌƒCƒ“ƒfƒbƒNƒX
+		/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’è¿½åŠ ã™ã‚‹é–¢æ•°
+		/// @param texture_ids ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®ID
+		/// @param id_count IDã®æ•°
+		/// @param indices ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
 		void get_descriptor_indices(const id::id_type* const texture_ids, u32 id_count, u32* const indices)
 		{
 			assert(texture_ids && id_count && indices);
@@ -811,7 +811,7 @@ namespace dxforge::graphics::d3d12::content
 
 	namespace material
 	{
-		// o—ÍƒtƒH[ƒ}ƒbƒgF
+		// å‡ºåŠ›ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆï¼š
 		//
 		// struct {
 		// material_type::type  type,
@@ -822,9 +822,9 @@ namespace dxforge::graphics::d3d12::content
 		// id::id_type          texture_ids[texture_count],
 		// u32*                 descriptor_indices[texture_count]
 		// } d3d12_material
-		/// @brief ƒ}ƒeƒŠƒAƒ‹‚ğ’Ç‰Á‚·‚éŠÖ”
-		/// @param info ƒ}ƒeƒŠƒAƒ‹‚Ì‰Šú‰»î•ñ
-		/// @return ƒ}ƒeƒŠƒAƒ‹‚ÌID
+		/// @brief ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’è¿½åŠ ã™ã‚‹é–¢æ•°
+		/// @param info ãƒãƒ†ãƒªã‚¢ãƒ«ã®åˆæœŸåŒ–æƒ…å ±
+		/// @return ãƒãƒ†ãƒªã‚¢ãƒ«ã®ID
 		id::id_type add(material_init_info info)
 		{
 			std::unique_ptr<u8[]> buffer;
@@ -834,18 +834,18 @@ namespace dxforge::graphics::d3d12::content
 			return materials.add(std::move(buffer));
 		}
 
-		/// @brief ƒ}ƒeƒŠƒAƒ‹‚ğíœ‚·‚éŠÖ”
-		/// @param id íœ‚·‚éƒ}ƒeƒŠƒAƒ‹‚ÌID
+		/// @brief ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’å‰Šé™¤ã™ã‚‹é–¢æ•°
+		/// @param id å‰Šé™¤ã™ã‚‹ãƒãƒ†ãƒªã‚¢ãƒ«ã®ID
 		void remove(id::id_type id)
 		{
 			std::lock_guard lock{ material_mutex };
 			materials.remove(id);
 		}
 
-		/// @brief ƒ}ƒeƒŠƒAƒ‹‚ğæ“¾‚·‚éŠÖ”
-		/// @param material_ids ƒ}ƒeƒŠƒAƒ‹‚ÌID
-		/// @param material_count ID‚Ì”
-		/// @param cache ƒLƒƒƒbƒVƒ…
+		/// @brief ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param material_ids ãƒãƒ†ãƒªã‚¢ãƒ«ã®ID
+		/// @param material_count IDã®æ•°
+		/// @param cache ã‚­ãƒ£ãƒƒã‚·ãƒ¥
 		void get_materials(const id::id_type* const material_ids, u32 material_count, const materials_cache& cache, u32& descriptor_index_count)
 		{
 			assert(material_ids && material_count);
@@ -872,16 +872,16 @@ namespace dxforge::graphics::d3d12::content
 
 	namespace render_item
 	{
-		// Šî–{“I‚É id::id_types ‚Ì”z—ñ‚Å‚ ‚éƒoƒbƒtƒ@‚ğì¬‚·‚éB
+		// åŸºæœ¬çš„ã« id::id_types ã®é…åˆ—ã§ã‚ã‚‹ãƒãƒƒãƒ•ã‚¡ã‚’ä½œæˆã™ã‚‹ã€‚
 		// buffer[0] = geometry_content_id
-		// buffer[1 .. n] = d3d12_render_item_ids (n‚Í’áƒŒƒxƒ‹‚ÌƒŒƒ“ƒ_[ƒAƒCƒeƒ€‚ÌID”‚ÅAƒTƒuƒƒbƒVƒ…/ƒ}ƒeƒŠƒAƒ‹‚ÌID”‚Æ“™‚µ‚­‚È‚¯‚ê‚Î‚È‚ç‚È‚¢jB
-		// buffer[n + 1] = id::invalid_id (‚±‚ê‚Ísubmesh_gpu_id”z—ñ‚ÌI‚í‚è‚ğ¦‚·jB
-		/// @brief •`‰æƒAƒCƒeƒ€‚ğ’Ç‰Á‚·‚éŠÖ”
-		/// @param entity_id ƒGƒ“ƒeƒBƒeƒB‚ÌID
-		/// @param geometry_content_id ƒWƒIƒƒgƒŠ‚ÌƒRƒ“ƒeƒ“ƒcID
-		/// @param material_count ƒ}ƒeƒŠƒAƒ‹‚Ì”
-		/// @param material_ids ƒ}ƒeƒŠƒAƒ‹‚ÌID
-		/// @return •`‰æƒAƒCƒeƒ€‚ÌID
+		// buffer[1 .. n] = d3d12_render_item_ids (nã¯ä½ãƒ¬ãƒ™ãƒ«ã®ãƒ¬ãƒ³ãƒ€ãƒ¼ã‚¢ã‚¤ãƒ†ãƒ ã®IDæ•°ã§ã€ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥/ãƒãƒ†ãƒªã‚¢ãƒ«ã®IDæ•°ã¨ç­‰ã—ããªã‘ã‚Œã°ãªã‚‰ãªã„ï¼‰ã€‚
+		// buffer[n + 1] = id::invalid_id (ã“ã‚Œã¯submesh_gpu_idé…åˆ—ã®çµ‚ã‚ã‚Šã‚’ç¤ºã™ï¼‰ã€‚
+		/// @brief æç”»ã‚¢ã‚¤ãƒ†ãƒ ã‚’è¿½åŠ ã™ã‚‹é–¢æ•°
+		/// @param entity_id ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®ID
+		/// @param geometry_content_id ã‚¸ã‚ªãƒ¡ãƒˆãƒªã®ã‚³ãƒ³ãƒ†ãƒ³ãƒ„ID
+		/// @param material_count ãƒãƒ†ãƒªã‚¢ãƒ«ã®æ•°
+		/// @param material_ids ãƒãƒ†ãƒªã‚¢ãƒ«ã®ID
+		/// @return æç”»ã‚¢ã‚¤ãƒ†ãƒ ã®ID
 		id::id_type add(id::id_type entity_id, id::id_type geometry_content_id, u32 material_count, const id::id_type* const material_ids)
 		{
 			assert(id::is_valid(entity_id) && id::is_valid(geometry_content_id));
@@ -900,7 +900,7 @@ namespace dxforge::graphics::d3d12::content
 
 			submesh::get_views(gpu_ids, material_count, views_cache);
 
-			// NOTE: id‚ÌƒŠƒXƒg‚Ígeomtery id‚Ån‚Ü‚èAƒŠƒXƒg‚ÌI‚í‚è‚ğ¦‚·–³Œø‚Èid‚ÅI‚í‚éB
+			// NOTE: idã®ãƒªã‚¹ãƒˆã¯geomtery idã§å§‹ã¾ã‚Šã€ãƒªã‚¹ãƒˆã®çµ‚ã‚ã‚Šã‚’ç¤ºã™ç„¡åŠ¹ãªidã§çµ‚ã‚ã‚‹ã€‚
 			std::unique_ptr<id::id_type[]> items{ std::make_unique<id::id_type[]>(sizeof(id::id_type) * (1 + (u64)material_count + 1)) };
 
 			items[0] = geometry_content_id;
@@ -928,20 +928,20 @@ namespace dxforge::graphics::d3d12::content
 				item_ids[i] = render_items.add(d3d12_items[i]);
 			}
 
-			// IDƒŠƒXƒg‚ÌI‚í‚è‚ğ¦‚·B
+			// IDãƒªã‚¹ãƒˆã®çµ‚ã‚ã‚Šã‚’ç¤ºã™ã€‚
 			item_ids[material_count] = id::invalid_id;
 
 			return render_item_ids.add(std::move(items));
 		}
 
-		/// @brief •`‰æƒAƒCƒeƒ€‚ğíœ‚·‚éŠÖ”
-		/// @param id íœ‚·‚é•`‰æƒAƒCƒeƒ€‚ÌID
+		/// @brief æç”»ã‚¢ã‚¤ãƒ†ãƒ ã‚’å‰Šé™¤ã™ã‚‹é–¢æ•°
+		/// @param id å‰Šé™¤ã™ã‚‹æç”»ã‚¢ã‚¤ãƒ†ãƒ ã®ID
 		void remove(id::id_type id)
 		{
 			std::lock_guard lock{ render_item_mutex };
 			const id::id_type* const item_ids{ &render_item_ids[id][1] };
 
-			// NOTE: id‚ÌƒŠƒXƒg‚ÌÅŒã‚Ì—v‘f‚Íí‚É–³Œø‚Èid‚Å‚ ‚éB
+			// NOTE: idã®ãƒªã‚¹ãƒˆã®æœ€å¾Œã®è¦ç´ ã¯å¸¸ã«ç„¡åŠ¹ãªidã§ã‚ã‚‹ã€‚
 			for (u32 i{ 0 }; item_ids[i] != id::invalid_id; ++i)
 			{
 				render_items.remove(item_ids[i]);
@@ -950,9 +950,9 @@ namespace dxforge::graphics::d3d12::content
 			render_item_ids.remove(id);
 		}
 
-		/// @brief •`‰æƒAƒCƒeƒ€‚ÌID‚ğæ“¾‚·‚éŠÖ”
-		/// @param info ƒtƒŒ[ƒ€î•ñ
-		/// @param d3d12_render_item_ids D3D12‚Ì•`‰æƒAƒCƒeƒ€‚ÌID
+		/// @brief æç”»ã‚¢ã‚¤ãƒ†ãƒ ã®IDã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param info ãƒ•ãƒ¬ãƒ¼ãƒ æƒ…å ±
+		/// @param d3d12_render_item_ids D3D12ã®æç”»ã‚¢ã‚¤ãƒ†ãƒ ã®ID
 		void get_d3d12_render_item_ids(const frame_info& info, utl::vector<id::id_type>& d3d12_render_item_ids)
 		{
 			assert(info.render_item_ids && info.thresholds && info.render_item_count);
@@ -995,10 +995,10 @@ namespace dxforge::graphics::d3d12::content
 			assert(item_index <= d3d12_render_item_count);
 		}
 
-		/// @brief •`‰æƒAƒCƒeƒ€‚ğæ“¾‚·‚éŠÖ”
-		/// @param d3d12_render_item_ids D3D12‚Ì•`‰æƒAƒCƒeƒ€‚ÌID
-		/// @param id_count ID‚Ì”
-		/// @param cache ƒLƒƒƒbƒVƒ…
+		/// @brief æç”»ã‚¢ã‚¤ãƒ†ãƒ ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param d3d12_render_item_ids D3D12ã®æç”»ã‚¢ã‚¤ãƒ†ãƒ ã®ID
+		/// @param id_count IDã®æ•°
+		/// @param cache ã‚­ãƒ£ãƒƒã‚·ãƒ¥
 		void get_items(const id::id_type* const d3d12_render_item_ids, u32 id_count, const items_cache& cache)
 		{
 			assert(d3d12_render_item_ids && id_count);

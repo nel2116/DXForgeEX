@@ -1,14 +1,14 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [TransformComponent.h]
-// ì¬“ú : 2024/11/11
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-//  ŠO•”‚ÉŒöŠJ‚·‚éTransformComponentƒNƒ‰ƒX‚ğ’è‹`‚µ‚½ƒtƒ@ƒCƒ‹
-// XV—š—ğ
-// 2024/11/11 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/11/11
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+//  å¤–éƒ¨ã«å…¬é–‹ã™ã‚‹TransformComponentã‚¯ãƒ©ã‚¹ã‚’å®šç¾©ã—ãŸãƒ•ã‚¡ã‚¤ãƒ«
+// æ›´æ–°å±¥æ­´
+// 2024/11/11 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "../Components/ComponentsCommon.h"
 
 namespace dxforge::transform
@@ -22,14 +22,14 @@ namespace dxforge::transform
 		constexpr explicit component(transform_id id) : _id(id) {}
 		constexpr component() : _id(id::invalid_id) {}
 		/// <summary>
-		/// TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚ÌID‚ğæ“¾‚·‚é
+		/// Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®IDã‚’å–å¾—ã™ã‚‹
 		/// </summary>
-		/// <returns>TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚ÌID</returns>
+		/// <returns>Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ID</returns>
 		constexpr transform_id get_id() const { return _id; }
 		/// <summary>
-		/// TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚ª—LŒø‚©‚Ç‚¤‚©‚ğ”»’è‚·‚é
+		/// Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆãŒæœ‰åŠ¹ã‹ã©ã†ã‹ã‚’åˆ¤å®šã™ã‚‹
 		/// </summary>
-		/// <returns>—LŒø‚È‚çtrueA–³Œø‚È‚çfalse</returns>
+		/// <returns>æœ‰åŠ¹ãªã‚‰trueã€ç„¡åŠ¹ãªã‚‰false</returns>
 		constexpr bool is_valid() const { return id::is_valid(_id); }
 
 		math::v4 rotation() const;
@@ -39,7 +39,7 @@ namespace dxforge::transform
 
 	private:
 		/// <summary>
-		/// TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚ÌID
+		/// Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ID
 		/// </summary>
 		transform_id _id;
 	};

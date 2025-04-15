@@ -1,15 +1,15 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [ShaderCompilation.cpp]
-// ì¬“ú : 2025/01/07
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-// @ƒVƒF[ƒ_[‚ÌƒRƒ“ƒpƒCƒ‹‚ğs‚¤
-// XV—š—ğ
-// 2025/01/07 V‹Kì¬
-// 2025/01/13 ƒ†[ƒU[’è‹`‚ÌƒVƒF[ƒ_[‚ğƒRƒ“ƒpƒCƒ‹‚·‚éˆ—‚ğ’Ç‰Á
+// ä½œæˆæ—¥ : 2025/01/07
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+// ã€€ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã®ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«ã‚’è¡Œã†
+// æ›´æ–°å±¥æ­´
+// 2025/01/07 æ–°è¦ä½œæˆ
+// 2025/01/13 ãƒ¦ãƒ¼ã‚¶ãƒ¼å®šç¾©ã®ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚’ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«ã™ã‚‹å‡¦ç†ã‚’è¿½åŠ 
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include <fstream>
 #include <filesystem>
 
@@ -22,7 +22,7 @@
 #include "Content/ContentToEngine.h"
 #include "Utilities/IOStream.h"
 
-// NOTE: DXC‚ÉNuGetƒpƒbƒP[ƒW‚ª‚ ‚ê‚ÎA‚±‚ñ‚È‚±‚Æ‚Í•K—v‚È‚¢B
+// NOTE: DXCã«NuGetãƒ‘ãƒƒã‚±ãƒ¼ã‚¸ãŒã‚ã‚Œã°ã€ã“ã‚“ãªã“ã¨ã¯å¿…è¦ãªã„ã€‚
 #pragma comment(lib, "../packages/DirectXShaderCompiler/lib/x64/dxcompiler.lib")
 
 using namespace dxforge;
@@ -86,7 +86,7 @@ namespace
 			assert(_compiler && _utils && _include_handler);
 			HRESULT hr{ S_OK };
 
-			// UtilsƒCƒ“ƒ^[ƒtƒFƒCƒX‚ğg‚Á‚Äƒ\[ƒXƒtƒ@ƒCƒ‹‚ğ“Ç‚İ‚Ş
+			// Utilsã‚¤ãƒ³ã‚¿ãƒ¼ãƒ•ã‚§ã‚¤ã‚¹ã‚’ä½¿ã£ã¦ã‚½ãƒ¼ã‚¹ãƒ•ã‚¡ã‚¤ãƒ«ã‚’èª­ã¿è¾¼ã‚€
 			ComPtr<IDxcBlobEncoding> source_blob{ nullptr };
 			DXCall(hr = _utils->LoadFile(full_path.c_str(), nullptr, &source_blob));
 			if (FAILED(hr)) return {};
@@ -103,7 +103,7 @@ namespace
 		dxc_compiled_shader compile(IDxcBlobEncoding* source_blob, dxforge::utl::vector<std::wstring> compiler_args)
 		{
 			DxcBuffer buffer{};
-			buffer.Encoding = DXC_CP_ACP; // ƒeƒLƒXƒgŒ`®‚Ì©“®ŒŸo‚©‚ÈH
+			buffer.Encoding = DXC_CP_ACP; // ãƒ†ã‚­ã‚¹ãƒˆå½¢å¼ã®è‡ªå‹•æ¤œå‡ºã‹ãªï¼Ÿ
 			buffer.Ptr = source_blob->GetBufferPointer();
 			buffer.Size = source_blob->GetBufferSize();
 
@@ -138,12 +138,12 @@ namespace
 			DXCall(hr = results->GetOutput(DXC_OUT_SHADER_HASH, IID_PPV_ARGS(&hash), nullptr));
 			if (FAILED(hr)) return {};
 			DxcShaderHash* const hash_buffer{ (DxcShaderHash* const)hash->GetBufferPointer() };
-			// ƒ\[ƒXƒR[ƒh‚ªˆÙ‚È‚ê‚ÎA“¯‚¶ƒoƒCƒgƒR[ƒh‚É‚È‚é‰Â”\«‚ª‚ ‚éB
+			// ã‚½ãƒ¼ã‚¹ã‚³ãƒ¼ãƒ‰ãŒç•°ãªã‚Œã°ã€åŒã˜ãƒã‚¤ãƒˆã‚³ãƒ¼ãƒ‰ã«ãªã‚‹å¯èƒ½æ€§ãŒã‚ã‚‹ã€‚
 			assert(!(hash_buffer->Flags & DXC_HASHFLAG_INCLUDES_SOURCE));
 			OutputDebugStringA("Shader hash: ");
 			for (u32 i{ 0 }; i < _countof(hash_buffer->HashDigest); ++i)
 			{
-				char hash_bytes[3]{};	// 2•¶š‚Ì16i”•¶š—ñ‚Æƒkƒ‹•¶š
+				char hash_bytes[3]{};	// 2æ–‡å­—ã®16é€²æ•°æ–‡å­—åˆ—ã¨ãƒŒãƒ«æ–‡å­—
 				sprintf_s(hash_bytes, "%02X", hash_buffer->HashDigest[i]);
 				OutputDebugStringA(hash_bytes);
 				OutputDebugStringA(" ");
@@ -168,7 +168,7 @@ namespace
 			return result;
 		}
 
-	private:	// ƒvƒ‰ƒCƒx[ƒgŠÖ”
+	private:	// ãƒ—ãƒ©ã‚¤ãƒ™ãƒ¼ãƒˆé–¢æ•°
 		utl::vector<std::wstring> get_args(const shader_file_info& info, utl::vector<std::wstring>& extra_args)
 		{
 			utl::vector<std::wstring> args{};
@@ -202,8 +202,8 @@ namespace
 
 
 
-	private:	// ƒƒ“ƒo•Ï”
-		// NOTE: ƒVƒF[ƒ_[ƒ‚ƒfƒ‹6.x‚àg—p‚Å‚«‚Ü‚·iAS‚ÆMS‚ÍSM6.5ˆÈ~‚Ì‚İƒTƒ|[ƒgjB
+	private:	// ãƒ¡ãƒ³ãƒå¤‰æ•°
+		// NOTE: ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãƒ¢ãƒ‡ãƒ«6.xã‚‚ä½¿ç”¨ã§ãã¾ã™ï¼ˆASã¨MSã¯SM6.5ä»¥é™ã®ã¿ã‚µãƒãƒ¼ãƒˆï¼‰ã€‚
 		constexpr static const char* _profile_string[]{ "vs_6_6","hs_6_6", "ds_6_6", "gs_6_6", "ps_6_6", "cs_6_6", "as_6_6", "ms_6_6" };
 
 		ComPtr<IDxcCompiler3> _compiler{ nullptr };
@@ -211,7 +211,7 @@ namespace
 		ComPtr<IDxcIncludeHandler> _include_handler{ nullptr };
 	};
 
-	// ƒRƒ“ƒpƒCƒ‹‚³‚ê‚½ƒVƒF[ƒ_‚ÌƒoƒCƒiƒŠƒtƒ@ƒCƒ‹‚Ö‚ÌƒpƒX‚ğæ“¾‚·‚éB
+	// ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«ã•ã‚ŒãŸã‚·ã‚§ãƒ¼ãƒ€ã®ãƒã‚¤ãƒŠãƒªãƒ•ã‚¡ã‚¤ãƒ«ã¸ã®ãƒ‘ã‚¹ã‚’å–å¾—ã™ã‚‹ã€‚
 	decltype(auto) get_engine_shaders_path()
 	{
 		return std::filesystem::path{ graphics::get_engine_shaders_path(graphics::graphics_platform::direct3d12) };
@@ -257,7 +257,7 @@ namespace
 		return true;
 	}
 
-}	// “½–¼–¼‘O‹óŠÔ
+}	// åŒ¿ååå‰ç©ºé–“
 
 std::unique_ptr<u8[]> compile_shader(shader_file_info info, const char* file_path, utl::vector<std::wstring>& extra_args)
 {
@@ -266,7 +266,7 @@ std::unique_ptr<u8[]> compile_shader(shader_file_info info, const char* file_pat
 	if (!std::filesystem::exists(full_path)) return {};
 
 	// NOTE: according to marcelolr()
-	//		"...ƒRƒ“ƒpƒCƒ‰[EƒCƒ“ƒXƒ^ƒ“ƒX‚ğì‚é‚Ì‚Í‚©‚È‚èˆÀ‚¢‚Ì‚ÅAƒLƒƒƒbƒVƒ…‚µ‚½‚è‹¤—L‚µ‚½‚è‚·‚éèŠÔ‚ğ‚©‚¯‚é‰¿’l‚Í‚È‚¢‚¾‚ë‚¤B"
+	//		"...ã‚³ãƒ³ãƒ‘ã‚¤ãƒ©ãƒ¼ãƒ»ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ã‚’ä½œã‚‹ã®ã¯ã‹ãªã‚Šå®‰ã„ã®ã§ã€ã‚­ãƒ£ãƒƒã‚·ãƒ¥ã—ãŸã‚Šå…±æœ‰ã—ãŸã‚Šã™ã‚‹æ‰‹é–“ã‚’ã‹ã‘ã‚‹ä¾¡å€¤ã¯ãªã„ã ã‚ã†ã€‚"
 	shader_compiler compiler{};
 	dxc_compiled_shader compiled_shader{ compiler.compile(info, full_path,extra_args) };
 
@@ -296,7 +296,7 @@ bool compile_shaders()
 	utl::vector<dxc_compiled_shader> shaders{};
 	std::filesystem::path full_path{};
 
-	// ƒRƒ“ƒpƒCƒ‹‚³‚ê‚½ƒVƒF[ƒ_[‚ÍAƒRƒ“ƒpƒCƒ‹‡‚Æ“¯‚¶‡”Ô‚Åƒoƒbƒtƒ@‚É‚Ü‚Æ‚ß‚ç‚ê‚éB
+	// ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«ã•ã‚ŒãŸã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã¯ã€ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«é †ã¨åŒã˜é †ç•ªã§ãƒãƒƒãƒ•ã‚¡ã«ã¾ã¨ã‚ã‚‰ã‚Œã‚‹ã€‚
 	for (u32 i{ 0 }; i < engine_shader::count; ++i)
 	{
 		auto& file = engine_shader_files[i];
@@ -308,7 +308,7 @@ bool compile_shaders()
 
 		if (file.id == engine_shader::grid_frustums_cs || engine_shader::light_culling_cs)
 		{
-			// TODO: d3d12‚©‚çTILE_SIZE’l‚ğæ“¾‚·‚é
+			// TODO: d3d12ã‹ã‚‰TILE_SIZEå€¤ã‚’å–å¾—ã™ã‚‹
 			extra_args.emplace_back(L"-D");
 			extra_args.emplace_back(L"TILE_SIZE=16");
 		}

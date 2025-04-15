@@ -1,14 +1,14 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [TestRenderer.cpp]
-// ì¬“ú : 2024/12/27
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// @ƒŒƒ“ƒ_ƒ‰‚ÌƒeƒXƒg
-// XV—š—ğ
-// 2024/12/27 V‹Kì¬
-// 2025/01/13 ƒeƒXƒg‚Ì‚½‚ß‚Ìƒ[ƒJ[ƒXƒŒƒbƒh‚ğ’Ç‰Á
+// ä½œæˆæ—¥ : 2024/12/27
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// ã€€ãƒ¬ãƒ³ãƒ€ãƒ©ã®ãƒ†ã‚¹ãƒˆ
+// æ›´æ–°å±¥æ­´
+// 2024/12/27 æ–°è¦ä½œæˆ
+// 2025/01/13 ãƒ†ã‚¹ãƒˆã®ãŸã‚ã®ãƒ¯ãƒ¼ã‚«ãƒ¼ã‚¹ãƒ¬ãƒƒãƒ‰ã‚’è¿½åŠ 
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "Platform/PlatformType.h"
 #include "Platform/Platform.h"
 #include "Graphics/Renderer.h"
@@ -38,14 +38,14 @@ std::thread workers[num_threads];
 
 utl::vector<u8> buffer(1024 * 1024, 0);
 
-// ƒAƒbƒvƒ[ƒhƒRƒ“ƒeƒLƒXƒg‚ÌƒeƒXƒgƒ[ƒJ[
+// ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ã‚³ãƒ³ãƒ†ã‚­ã‚¹ãƒˆã®ãƒ†ã‚¹ãƒˆãƒ¯ãƒ¼ã‚«ãƒ¼
 void buffer_test_worker()
 {
 	while (!shutdown)
 	{
 		auto* resource = graphics::d3d12::d3dx::create_buffer(buffer.data(), (u32)buffer.size());
-		// NOTE: ƒŒƒ“ƒ_ƒŠƒ“ƒO‚Éƒoƒbƒtƒ@‚ğg‚í‚È‚¢‚Ì‚ÅAcore::release(resource)‚ğg‚¤‚±‚Æ‚à‚Å‚«‚éB
-		//		‚µ‚©‚µA‚±‚ê‚Í deferred_release ‹@”\‚Ì—Ç‚¢ƒeƒXƒg‚É‚È‚è‚Ü‚·B
+		// NOTE: ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã«ãƒãƒƒãƒ•ã‚¡ã‚’ä½¿ã‚ãªã„ã®ã§ã€core::release(resource)ã‚’ä½¿ã†ã“ã¨ã‚‚ã§ãã‚‹ã€‚
+		//		ã—ã‹ã—ã€ã“ã‚Œã¯ deferred_release æ©Ÿèƒ½ã®è‰¯ã„ãƒ†ã‚¹ãƒˆã«ãªã‚Šã¾ã™ã€‚
 		graphics::d3d12::core::deferred_release(resource);
 	}
 }
@@ -72,7 +72,7 @@ void joint_test_workers()
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 
 
-// ====== ƒOƒ[ƒoƒ‹•Ï” ======
+// ====== ã‚°ãƒ­ãƒ¼ãƒãƒ«å¤‰æ•° ======
 struct camera_surface
 {
 	game_entity::entity entity{};
@@ -83,7 +83,7 @@ struct camera_surface
 camera_surface _surfaces[1];
 time_it timer{};
 
-// ====== ƒvƒƒgƒ^ƒCƒvéŒ¾ ======
+// ====== ãƒ—ãƒ­ãƒˆã‚¿ã‚¤ãƒ—å®£è¨€ ======
 bool resized{ false };
 bool is_restarting{ false };
 utl::vector<id::id_type> render_item_id_cache;
@@ -156,9 +156,9 @@ LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 				if (toggle_fullscreen)
 				{
 					win.set_fullscrean(!win.is_fullscreen());
-					// ƒfƒtƒHƒ‹ƒg‚ÌƒEƒBƒ“ƒhƒEƒvƒƒV[ƒWƒƒ‚Å‚ÍAWM_SYSCHAR‚ªˆ—‚³‚ê‚È‚¢ê‡A
-					// Alt+EnterƒL[ƒ{[ƒh‚Ì‘g‚İ‡‚í‚¹‚ğ‰Ÿ‚µ‚½‚Æ‚«‚ÉƒVƒXƒeƒ€’Ê’m‰¹‚ªÄ¶‚³‚ê‚éB
-					// 0‚ğ•Ô‚·‚±‚Æ‚ÅA‚±‚ÌƒƒbƒZ[ƒW‚ğˆ—‚µ‚½‚±‚Æ‚ğƒVƒXƒeƒ€‚É“`‚¦‚é‚±‚Æ‚ª‚Å‚«‚éB
+					// ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã®ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ãƒ—ãƒ­ã‚·ãƒ¼ã‚¸ãƒ£ã§ã¯ã€WM_SYSCHARãŒå‡¦ç†ã•ã‚Œãªã„å ´åˆã€
+					// Alt+Enterã‚­ãƒ¼ãƒœãƒ¼ãƒ‰ã®çµ„ã¿åˆã‚ã›ã‚’æŠ¼ã—ãŸã¨ãã«ã‚·ã‚¹ãƒ†ãƒ é€šçŸ¥éŸ³ãŒå†ç”Ÿã•ã‚Œã‚‹ã€‚
+					// 0ã‚’è¿”ã™ã“ã¨ã§ã€ã“ã®ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ã‚’å‡¦ç†ã—ãŸã“ã¨ã‚’ã‚·ã‚¹ãƒ†ãƒ ã«ä¼ãˆã‚‹ã“ã¨ãŒã§ãã‚‹ã€‚
 					return 0;
 				}
 				else
@@ -206,23 +206,23 @@ void remove_game_entity(game_entity::entity_id id)
 	game_entity::remove(id);
 }
 
-/// @brief ƒtƒ@ƒCƒ‹‚ğ“Ç‚İ‚Ş
-/// @param path ƒtƒ@ƒCƒ‹‚ÌƒpƒX
-/// @param data “Ç‚İ‚ñ‚¾ƒf[ƒ^
-/// @param size ƒf[ƒ^‚ÌƒTƒCƒY
-/// @return “Ç‚İ‚İ‚É¬Œ÷‚µ‚½‚çtrue
+/// @brief ãƒ•ã‚¡ã‚¤ãƒ«ã‚’èª­ã¿è¾¼ã‚€
+/// @param path ãƒ•ã‚¡ã‚¤ãƒ«ã®ãƒ‘ã‚¹
+/// @param data èª­ã¿è¾¼ã‚“ã ãƒ‡ãƒ¼ã‚¿
+/// @param size ãƒ‡ãƒ¼ã‚¿ã®ã‚µã‚¤ã‚º
+/// @return èª­ã¿è¾¼ã¿ã«æˆåŠŸã—ãŸã‚‰true
 bool read_file(std::filesystem::path path, std::unique_ptr<u8[]>& data, u64& size)
 {
-	// ƒtƒ@ƒCƒ‹‚ª‘¶İ‚µ‚È‚¢ê‡‚Ífalse‚ğ•Ô‚·
+	// ãƒ•ã‚¡ã‚¤ãƒ«ãŒå­˜åœ¨ã—ãªã„å ´åˆã¯falseã‚’è¿”ã™
 	if (!std::filesystem::exists(path)) return false;
 
-	// ƒtƒ@ƒCƒ‹‚ğ“Ç‚İ‚Ş
+	// ãƒ•ã‚¡ã‚¤ãƒ«ã‚’èª­ã¿è¾¼ã‚€
 	size = std::filesystem::file_size(path);
 	assert(size);
 	if (!size) return false;
 	data = std::make_unique<u8[]>(size);
 	std::ifstream file{ path, std::ios::in | std::ios::binary };
-	// ƒtƒ@ƒCƒ‹‚ªŠJ‚¯‚È‚¢ê‡‚Ífalse‚ğ•Ô‚·
+	// ãƒ•ã‚¡ã‚¤ãƒ«ãŒé–‹ã‘ãªã„å ´åˆã¯falseã‚’è¿”ã™
 	if (!file || !file.read((char*)data.get(), size))
 	{
 		file.close();
@@ -257,8 +257,8 @@ bool test_initialize()
 {
 	while (!compile_shaders())
 	{
-		// ƒRƒ“ƒpƒCƒ‹‚ÌÄs‚ğ‹–‰Â‚·‚éƒƒbƒZ[ƒWƒ{ƒbƒNƒX‚ğƒ|ƒbƒvƒAƒbƒv‚·‚éB
-		if (MessageBox(nullptr, L"ƒGƒ“ƒWƒ“ƒVƒF[ƒ_[‚ÌƒRƒ“ƒpƒCƒ‹‚É¸”s‚µ‚Ü‚µ‚½B", L"Shader Compilation Error", MB_RETRYCANCEL) != IDRETRY)
+		// ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«ã®å†è©¦è¡Œã‚’è¨±å¯ã™ã‚‹ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ãƒœãƒƒã‚¯ã‚¹ã‚’ãƒãƒƒãƒ—ã‚¢ãƒƒãƒ—ã™ã‚‹ã€‚
+		if (MessageBox(nullptr, L"ã‚¨ãƒ³ã‚¸ãƒ³ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã®ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«ã«å¤±æ•—ã—ã¾ã—ãŸã€‚", L"Shader Compilation Error", MB_RETRYCANCEL) != IDRETRY)
 			return false;
 	}
 

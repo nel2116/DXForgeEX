@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [ContentLoader.cpp]
-// ì¬“ú : 2024/08/20
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-//	ƒRƒ“ƒeƒ“ƒc‚Ì“Ç‚İ‚İ‚ÌÀ‘•
-// XV—š—ğ
-// 2024/08/20 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/08/20
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+//	ã‚³ãƒ³ãƒ†ãƒ³ãƒ„ã®èª­ã¿è¾¼ã¿ã®å®Ÿè£…
+// æ›´æ–°å±¥æ­´
+// 2024/08/20 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "ContentLoader.h"
 #include "Components/Entity.h"
 #include "Components/Transform.h"
@@ -23,7 +23,7 @@ namespace dxforge::content
 {
 	namespace
 	{
-		// ƒRƒ“ƒ|[ƒlƒ“ƒg‚Ìí—Ş
+		// ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ç¨®é¡
 		enum conponent_type
 		{
 			transform,
@@ -32,25 +32,25 @@ namespace dxforge::content
 			count
 		};
 
-		utl::vector < game_entity::entity > entities;	// ƒGƒ“ƒeƒBƒeƒB‚ÌƒŠƒXƒg
-		transform::init_info transform_info{};			// Transform‚Ì‰Šú‰»î•ñ
-		script::init_info script_info{};				// Script‚Ì‰Šú‰»î•ñ
+		utl::vector < game_entity::entity > entities;	// ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®ãƒªã‚¹ãƒˆ
+		transform::init_info transform_info{};			// Transformã®åˆæœŸåŒ–æƒ…å ±
+		script::init_info script_info{};				// Scriptã®åˆæœŸåŒ–æƒ…å ±
 
-		/// @brief Transform‚ğ“Ç‚İ‚Ş
+		/// @brief Transformã‚’èª­ã¿è¾¼ã‚€
 		/// @param data
 		/// @param info
-		/// @return ¬Œ÷‚µ‚½‚çtrue
+		/// @return æˆåŠŸã—ãŸã‚‰true
 		bool read_transform(const u8*& data, game_entity::entity_info& info)
 		{
 			using namespace DirectX;
 			f32 rotation[3];
 
-			assert(!info.transform);	// ‚·‚Å‚ÉTransform‚ª‚ ‚é‚È‚çƒGƒ‰[
-			memcpy(&transform_info.position[0], data, sizeof(transform_info.position)); data += sizeof(transform_info.position);	// ˆÊ’u
-			memcpy(&rotation[0], data, sizeof(rotation)); data += sizeof(rotation);	// ‰ñ“]
-			memcpy(&transform_info.scale[0], data, sizeof(transform_info.scale)); data += sizeof(transform_info.scale);	// ƒXƒP[ƒ‹
+			assert(!info.transform);	// ã™ã§ã«TransformãŒã‚ã‚‹ãªã‚‰ã‚¨ãƒ©ãƒ¼
+			memcpy(&transform_info.position[0], data, sizeof(transform_info.position)); data += sizeof(transform_info.position);	// ä½ç½®
+			memcpy(&rotation[0], data, sizeof(rotation)); data += sizeof(rotation);	// å›è»¢
+			memcpy(&transform_info.scale[0], data, sizeof(transform_info.scale)); data += sizeof(transform_info.scale);	// ã‚¹ã‚±ãƒ¼ãƒ«
 
-			// ‰ñ“]‚ğƒIƒCƒ‰[‚©‚çƒNƒH[ƒ^ƒjƒIƒ“‚É•ÏŠ·
+			// å›è»¢ã‚’ã‚ªã‚¤ãƒ©ãƒ¼ã‹ã‚‰ã‚¯ã‚©ãƒ¼ã‚¿ãƒ‹ã‚ªãƒ³ã«å¤‰æ›
 			XMFLOAT3A rot{ &rotation[0] };
 			XMVECTOR quat{ XMQuaternionRotationRollPitchYawFromVector(XMLoadFloat3A(&rot)) };
 			XMFLOAT4A rot_quat{};
@@ -61,52 +61,52 @@ namespace dxforge::content
 			return true;
 		}
 
-		/// @brief Script‚ğ“Ç‚İ‚Ş
+		/// @brief Scriptã‚’èª­ã¿è¾¼ã‚€
 		/// @param data
 		/// @param info
-		/// @return ¬Œ÷‚µ‚½‚çtrue
+		/// @return æˆåŠŸã—ãŸã‚‰true
 		bool read_script(const u8*& data, game_entity::entity_info& info)
 		{
-			assert(!info.script);	// ‚·‚Å‚ÉScript‚ª‚ ‚é‚È‚çƒGƒ‰[
-			const u32 name_length{ *data }; data += sizeof(u32);	// ƒXƒNƒŠƒvƒg–¼‚Ì’·‚³
-			if (!name_length) return false;	// ƒXƒNƒŠƒvƒg–¼‚Ì’·‚³‚ª0‚È‚çƒGƒ‰[
-			// ƒXƒNƒŠƒvƒg–¼‚ª255•¶š‚æ‚è’·‚¢ê‡A‚¨‚»‚ç‚­ƒoƒCƒiƒŠ‚©ƒQ[ƒ€ƒvƒƒOƒ‰ƒ}[‚Ì‚Ç‚¿‚ç‚©‚ª”ñí‚ÉŠÔˆá‚Á‚Ä‚¢‚Ü‚·B
-			assert(name_length < 256);	// ƒXƒNƒŠƒvƒg–¼‚ª256•¶š‚æ‚è’·‚¢‚È‚çƒGƒ‰[
+			assert(!info.script);	// ã™ã§ã«ScriptãŒã‚ã‚‹ãªã‚‰ã‚¨ãƒ©ãƒ¼
+			const u32 name_length{ *data }; data += sizeof(u32);	// ã‚¹ã‚¯ãƒªãƒ—ãƒˆåã®é•·ã•
+			if (!name_length) return false;	// ã‚¹ã‚¯ãƒªãƒ—ãƒˆåã®é•·ã•ãŒ0ãªã‚‰ã‚¨ãƒ©ãƒ¼
+			// ã‚¹ã‚¯ãƒªãƒ—ãƒˆåãŒ255æ–‡å­—ã‚ˆã‚Šé•·ã„å ´åˆã€ãŠãã‚‰ããƒã‚¤ãƒŠãƒªã‹ã‚²ãƒ¼ãƒ ãƒ—ãƒ­ã‚°ãƒ©ãƒãƒ¼ã®ã©ã¡ã‚‰ã‹ãŒéå¸¸ã«é–“é•ã£ã¦ã„ã¾ã™ã€‚
+			assert(name_length < 256);	// ã‚¹ã‚¯ãƒªãƒ—ãƒˆåãŒ256æ–‡å­—ã‚ˆã‚Šé•·ã„ãªã‚‰ã‚¨ãƒ©ãƒ¼
 			char script_name[256];
-			memcpy(&script_name[0], data, name_length); data += name_length;	// ƒXƒNƒŠƒvƒg–¼
-			// –¼‘O‚ğƒ[ƒI’[‚Ìc•¶š—ñ‚É‚·‚éB
+			memcpy(&script_name[0], data, name_length); data += name_length;	// ã‚¹ã‚¯ãƒªãƒ—ãƒˆå
+			// åå‰ã‚’ã‚¼ãƒ­çµ‚ç«¯ã®cæ–‡å­—åˆ—ã«ã™ã‚‹ã€‚
 			script_name[name_length] = 0;
-			script_info.script_creator = script::detail::get_script_creator(script::detail::string_hash()(script_name));	// ƒXƒNƒŠƒvƒg‚Ìì¬ŠÖ”
+			script_info.script_creator = script::detail::get_script_creator(script::detail::string_hash()(script_name));	// ã‚¹ã‚¯ãƒªãƒ—ãƒˆã®ä½œæˆé–¢æ•°
 			info.script = &script_info;
-			return script_info.script_creator != nullptr;	// ƒXƒNƒŠƒvƒg‚Ìì¬ŠÖ”‚ª‚ ‚é‚È‚çtrue
+			return script_info.script_creator != nullptr;	// ã‚¹ã‚¯ãƒªãƒ—ãƒˆã®ä½œæˆé–¢æ•°ãŒã‚ã‚‹ãªã‚‰true
 		}
 
-		// ŠÖ”ƒ|ƒCƒ“ƒ^‚ÌŒ^
+		// é–¢æ•°ãƒã‚¤ãƒ³ã‚¿ã®å‹
 		using component_reader = bool(*)(const u8*&, game_entity::entity_info&);
 		component_reader component_readers[]
 		{
 			read_transform,
 			read_script
 		};
-		static_assert(_countof(component_readers) == conponent_type::count);	// ƒRƒ“ƒ|[ƒlƒ“ƒg‚Ìí—Ş”‚ÆŠÖ”ƒ|ƒCƒ“ƒ^‚Ì”‚ªˆê’v‚µ‚Ä‚¢‚é‚±‚Æ‚ğŠm”F
+		static_assert(_countof(component_readers) == conponent_type::count);	// ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ç¨®é¡æ•°ã¨é–¢æ•°ãƒã‚¤ãƒ³ã‚¿ã®æ•°ãŒä¸€è‡´ã—ã¦ã„ã‚‹ã“ã¨ã‚’ç¢ºèª
 
-		/// @brief ƒtƒ@ƒCƒ‹‚ğ“Ç‚İ‚Ş
-		/// @param path ƒtƒ@ƒCƒ‹‚ÌƒpƒX
-		/// @param data “Ç‚İ‚ñ‚¾ƒf[ƒ^
-		/// @param size ƒf[ƒ^‚ÌƒTƒCƒY
-		/// @return “Ç‚İ‚İ‚É¬Œ÷‚µ‚½‚çtrue
+		/// @brief ãƒ•ã‚¡ã‚¤ãƒ«ã‚’èª­ã¿è¾¼ã‚€
+		/// @param path ãƒ•ã‚¡ã‚¤ãƒ«ã®ãƒ‘ã‚¹
+		/// @param data èª­ã¿è¾¼ã‚“ã ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã®ã‚µã‚¤ã‚º
+		/// @return èª­ã¿è¾¼ã¿ã«æˆåŠŸã—ãŸã‚‰true
 		bool read_file(std::filesystem::path path, std::unique_ptr<u8[]>& data, u64& size)
 		{
-			// ƒtƒ@ƒCƒ‹‚ª‘¶İ‚µ‚È‚¢ê‡‚Ífalse‚ğ•Ô‚·
+			// ãƒ•ã‚¡ã‚¤ãƒ«ãŒå­˜åœ¨ã—ãªã„å ´åˆã¯falseã‚’è¿”ã™
 			if (!std::filesystem::exists(path)) return false;
 
-			// ƒtƒ@ƒCƒ‹‚ğ“Ç‚İ‚Ş
+			// ãƒ•ã‚¡ã‚¤ãƒ«ã‚’èª­ã¿è¾¼ã‚€
 			size = std::filesystem::file_size(path);
 			assert(size);
 			if (!size) return false;
 			data = std::make_unique<u8[]>(size);
 			std::ifstream file{ path, std::ios::in | std::ios::binary };
-			// ƒtƒ@ƒCƒ‹‚ªŠJ‚¯‚È‚¢ê‡‚Ífalse‚ğ•Ô‚·
+			// ãƒ•ã‚¡ã‚¤ãƒ«ãŒé–‹ã‘ãªã„å ´åˆã¯falseã‚’è¿”ã™
 			if (!file || !file.read((char*)data.get(), size))
 			{
 				file.close();
@@ -116,57 +116,57 @@ namespace dxforge::content
 			file.close();
 			return true;
 		}
-	}	// “½–¼–¼‘O‹óŠÔ
+	}	// åŒ¿ååå‰ç©ºé–“
 
-	/// @brief ƒQ[ƒ€‚ÌBinaryƒtƒ@ƒCƒ‹‚ğ“Ç‚İ‚Ş
-	/// @return “Ç‚İ‚İ‚É¬Œ÷‚µ‚½‚çtrue
+	/// @brief ã‚²ãƒ¼ãƒ ã®Binaryãƒ•ã‚¡ã‚¤ãƒ«ã‚’èª­ã¿è¾¼ã‚€
+	/// @return èª­ã¿è¾¼ã¿ã«æˆåŠŸã—ãŸã‚‰true
 	bool load_game()
 	{
-		// game.bin‚ğ“Ç‚İ‚İAEntity‚ğì¬‚·‚éB
+		// game.binã‚’èª­ã¿è¾¼ã¿ã€Entityã‚’ä½œæˆã™ã‚‹ã€‚
 		std::unique_ptr<u8[]> game_data{};
 		u64 size{ 0 };
 		if (!read_file("game.bin", game_data, size)) return false;
-		// ƒf[ƒ^‚ª“Ç‚İ‚ß‚È‚©‚Á‚½‚çƒGƒ‰[
+		// ãƒ‡ãƒ¼ã‚¿ãŒèª­ã¿è¾¼ã‚ãªã‹ã£ãŸã‚‰ã‚¨ãƒ©ãƒ¼
 		assert(game_data.get());
 		const u8* at{ game_data.get() };
 		constexpr u32 su32{ sizeof(u32) };
 		const u32 num_entities{ *at }; at += su32;
-		// ƒGƒ“ƒeƒBƒeƒB”‚ª0‚È‚çƒGƒ‰[
+		// ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£æ•°ãŒ0ãªã‚‰ã‚¨ãƒ©ãƒ¼
 		if (!num_entities) return false;
 
-		// ƒGƒ“ƒeƒBƒeƒB‚ğ“Ç‚İ‚Ş
+		// ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚’èª­ã¿è¾¼ã‚€
 		for (u32 entity_index{ 0 }; entity_index < num_entities; ++entity_index)
 		{
-			// ƒGƒ“ƒeƒBƒeƒB‚Ìî•ñ‚ğ“Ç‚İ‚Ş
+			// ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®æƒ…å ±ã‚’èª­ã¿è¾¼ã‚€
 			game_entity::entity_info info{};
 			//const u32 entity_type{ *at };
-			// ƒGƒ“ƒeƒBƒeƒBEƒ^ƒCƒv‚Íi¡‚Ì‚Æ‚±‚ëjƒXƒLƒbƒv‚·‚éF
+			// ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ãƒ»ã‚¿ã‚¤ãƒ—ã¯ï¼ˆä»Šã®ã¨ã“ã‚ï¼‰ã‚¹ã‚­ãƒƒãƒ—ã™ã‚‹ï¼š
 			at += su32;
-			const u32 num_components{ *at }; at += su32;	// ƒRƒ“ƒ|[ƒlƒ“ƒg”
-			if (!num_components) return false;				// ƒRƒ“ƒ|[ƒlƒ“ƒg”‚ª0‚È‚çƒGƒ‰[
+			const u32 num_components{ *at }; at += su32;	// ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆæ•°
+			if (!num_components) return false;				// ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆæ•°ãŒ0ãªã‚‰ã‚¨ãƒ©ãƒ¼
 
-			// ƒRƒ“ƒ|[ƒlƒ“ƒg‚ğ“Ç‚İ‚Ş
+			// ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’èª­ã¿è¾¼ã‚€
 			for (u32 component_index{ 0 }; component_index < num_components; ++component_index)
 			{
-				const u32 component_type{ *at }; at += su32;	// ƒRƒ“ƒ|[ƒlƒ“ƒg‚Ìí—Ş
-				assert(component_type < conponent_type::count);	// ƒRƒ“ƒ|[ƒlƒ“ƒg‚Ìí—Ş‚ª”ÍˆÍŠO‚È‚çƒGƒ‰[
-				if (!component_readers[component_type](at, info)) return false;	// ƒRƒ“ƒ|[ƒlƒ“ƒg‚Ì“Ç‚İ‚İ
+				const u32 component_type{ *at }; at += su32;	// ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ç¨®é¡
+				assert(component_type < conponent_type::count);	// ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ç¨®é¡ãŒç¯„å›²å¤–ãªã‚‰ã‚¨ãƒ©ãƒ¼
+				if (!component_readers[component_type](at, info)) return false;	// ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®èª­ã¿è¾¼ã¿
 			}
 
-			// ƒGƒ“ƒeƒBƒeƒB‚ğì¬
+			// ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚’ä½œæˆ
 			assert(info.transform);
-			game_entity::entity entity{ game_entity::create(info) };	// ƒGƒ“ƒeƒBƒeƒB‚ğì¬
-			if (!entity.is_valid()) return false;	// ƒGƒ“ƒeƒBƒeƒB‚ªì¬‚Å‚«‚È‚©‚Á‚½‚çƒGƒ‰[
-			entities.emplace_back(entity);	// ƒGƒ“ƒeƒBƒeƒB‚ğƒŠƒXƒg‚É’Ç‰Á
+			game_entity::entity entity{ game_entity::create(info) };	// ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚’ä½œæˆ
+			if (!entity.is_valid()) return false;	// ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ãŒä½œæˆã§ããªã‹ã£ãŸã‚‰ã‚¨ãƒ©ãƒ¼
+			entities.emplace_back(entity);	// ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚’ãƒªã‚¹ãƒˆã«è¿½åŠ 
 		}
 
-		assert(at == game_data.get() + size);	// ƒoƒbƒtƒ@‚ÌÅŒã‚Ü‚Å“Ç‚İ‚ñ‚¾‚±‚Æ‚ğŠm”F
+		assert(at == game_data.get() + size);	// ãƒãƒƒãƒ•ã‚¡ã®æœ€å¾Œã¾ã§èª­ã¿è¾¼ã‚“ã ã“ã¨ã‚’ç¢ºèª
 		return true;
 	}
 
 	void unload_game()
 	{
-		// ƒGƒ“ƒeƒBƒeƒB‚ğ”jŠü
+		// ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚’ç ´æ£„
 		for (auto entity : entities)
 		{
 			game_entity::remove(entity.get_id());

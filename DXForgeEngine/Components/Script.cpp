@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Script.cpp]
-// ì¬“ú : 2024/12/2
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-// @ƒXƒNƒŠƒvƒg‚ğÀ‘•‚µ‚½ƒtƒ@ƒCƒ‹
-// XV—š—ğ
-// 2024/12/2 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/12/2
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+// ã€€ã‚¹ã‚¯ãƒªãƒ—ãƒˆã‚’å®Ÿè£…ã—ãŸãƒ•ã‚¡ã‚¤ãƒ«
+// æ›´æ–°å±¥æ­´
+// 2024/12/2 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "Script.h"
 #include "Entity.h"
 #include "Transform.h"
@@ -18,23 +18,23 @@ namespace dxforge::script
 {
 	namespace
 	{
-		utl::vector<detail::script_ptr> entity_scripts;				///< ƒGƒ“ƒeƒBƒeƒBƒXƒNƒŠƒvƒg‚ÌƒxƒNƒ^[
-		utl::vector<id::id_type> id_mapping;						///< IDƒ}ƒbƒsƒ“ƒO
-		utl::vector<id::generation_type> generations;				///< ¢‘ãî•ñ
-		utl::deque<script_id> free_ids;								///< ‰ğ•ú‚³‚ê‚½ID
+		utl::vector<detail::script_ptr> entity_scripts;				///< ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚¹ã‚¯ãƒªãƒ—ãƒˆã®ãƒ™ã‚¯ã‚¿ãƒ¼
+		utl::vector<id::id_type> id_mapping;						///< IDãƒãƒƒãƒ”ãƒ³ã‚°
+		utl::vector<id::generation_type> generations;				///< ä¸–ä»£æƒ…å ±
+		utl::deque<script_id> free_ids;								///< è§£æ”¾ã•ã‚ŒãŸID
 
-		utl::vector<transform::component_cache> transform_cache;	///< TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚ÌƒLƒƒƒbƒVƒ…
+		utl::vector<transform::component_cache> transform_cache;	///< Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ã‚­ãƒ£ãƒƒã‚·ãƒ¥
 #if USE_TRANSFORM_CACHE_MAP
-		std::unordered_map<id::id_type, u32> cache_map;				///< ƒLƒƒƒbƒVƒ…ƒ}ƒbƒv
+		std::unordered_map<id::id_type, u32> cache_map;				///< ã‚­ãƒ£ãƒƒã‚·ãƒ¥ãƒãƒƒãƒ—
 #endif // !USE_TRANSFORM_CACHE_MAP
 
 		using script_registry = std::unordered_map<size_t, detail::script_creator>;
 
 		script_registry& registery()
 		{
-			// NOTE : ‚±‚ÌÃ“I•Ï”‚ğŠÖ”“à‚É’u‚­‚Ì‚ÍAŸ‚Ì——R‚©‚ç‚Å‚ ‚éB
-			//		  Ã“Iƒf[ƒ^‚Ì‰Šú‰»‡˜
-			//		  ‚±‚¤‚·‚é‚±‚Æ‚ÅƒAƒNƒZƒX‚·‚é‘O‚Éƒf[ƒ^‚ª‰Šú‰»‚³‚ê‚Ä‚¢‚é‚±‚Æ‚ğŠm”F‚Å‚«‚éB
+			// NOTE : ã“ã®é™çš„å¤‰æ•°ã‚’é–¢æ•°å†…ã«ç½®ãã®ã¯ã€æ¬¡ã®ç†ç”±ã‹ã‚‰ã§ã‚ã‚‹ã€‚
+			//		  é™çš„ãƒ‡ãƒ¼ã‚¿ã®åˆæœŸåŒ–é †åº
+			//		  ã“ã†ã™ã‚‹ã“ã¨ã§ã‚¢ã‚¯ã‚»ã‚¹ã™ã‚‹å‰ã«ãƒ‡ãƒ¼ã‚¿ãŒåˆæœŸåŒ–ã•ã‚Œã¦ã„ã‚‹ã“ã¨ã‚’ç¢ºèªã§ãã‚‹ã€‚
 			static script_registry reg;
 			return reg;
 		}
@@ -42,17 +42,17 @@ namespace dxforge::script
 #ifdef USE_WITH_EDITOR
 		utl::vector<std::string>& script_names()
 		{
-			// NOTE : ‚±‚ÌÃ“I•Ï”‚ğŠÖ”“à‚É’u‚­‚Ì‚ÍAŸ‚Ì——R‚©‚ç‚Å‚ ‚éB
-			//		  Ã“Iƒf[ƒ^‚Ì‰Šú‰»‡˜
-			//		  ‚±‚¤‚·‚é‚±‚Æ‚ÅƒAƒNƒZƒX‚·‚é‘O‚Éƒf[ƒ^‚ª‰Šú‰»‚³‚ê‚Ä‚¢‚é‚±‚Æ‚ğŠm”F‚Å‚«‚éB
+			// NOTE : ã“ã®é™çš„å¤‰æ•°ã‚’é–¢æ•°å†…ã«ç½®ãã®ã¯ã€æ¬¡ã®ç†ç”±ã‹ã‚‰ã§ã‚ã‚‹ã€‚
+			//		  é™çš„ãƒ‡ãƒ¼ã‚¿ã®åˆæœŸåŒ–é †åº
+			//		  ã“ã†ã™ã‚‹ã“ã¨ã§ã‚¢ã‚¯ã‚»ã‚¹ã™ã‚‹å‰ã«ãƒ‡ãƒ¼ã‚¿ãŒåˆæœŸåŒ–ã•ã‚Œã¦ã„ã‚‹ã“ã¨ã‚’ç¢ºèªã§ãã‚‹ã€‚
 			static utl::vector<std::string> names;
 			return names;
 		}
 #endif // USE_WITH_EDITOR
 
-		/// @brief ID‚ª‘¶İ‚·‚é‚©‚Ç‚¤‚©‚ğ•Ô‚·
+		/// @brief IDãŒå­˜åœ¨ã™ã‚‹ã‹ã©ã†ã‹ã‚’è¿”ã™
 		/// @param id ID
-		/// @return ‘¶İ‚·‚éê‡‚Ítrue
+		/// @return å­˜åœ¨ã™ã‚‹å ´åˆã¯true
 		bool exists(script_id id)
 		{
 			assert(id::is_valid(id));
@@ -71,7 +71,7 @@ namespace dxforge::script
 			u32 index{ u32_invalid_id };
 			auto pair = cache_map.try_emplace(id, id::invalid_id);
 
-			// cache_map‚É‚±‚Ìid‚ÌƒGƒ“ƒgƒŠ[‚ª‚È‚©‚Á‚½‚½‚ßAV‚µ‚¢ƒGƒ“ƒgƒŠ[‚ğ‘}“ü‚µ‚½B
+			// cache_mapã«ã“ã®idã®ã‚¨ãƒ³ãƒˆãƒªãƒ¼ãŒãªã‹ã£ãŸãŸã‚ã€æ–°ã—ã„ã‚¨ãƒ³ãƒˆãƒªãƒ¼ã‚’æŒ¿å…¥ã—ãŸã€‚
 			if (pair.second)
 			{
 				index = (u32)transform_cache.size();
@@ -108,7 +108,7 @@ namespace dxforge::script
 		}
 #endif // !USE_TRANSFORM_CACHE_MAP
 
-	}// “½–¼–¼‘O‹óŠÔ
+	}// åŒ¿ååå‰ç©ºé–“
 
 	namespace detail
 	{

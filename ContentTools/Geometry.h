@@ -1,20 +1,20 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Geometry.h]
-// ì¬“ú : 2024/12/24
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
+// ä½œæˆæ—¥ : 2024/12/24
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
 //
-// XV—š—ğ
-// 2024/12/24 V‹Kì¬
-// 2025/01/12 elements_type‚Ì’Ç‰Á
+// æ›´æ–°å±¥æ­´
+// 2024/12/24 æ–°è¦ä½œæˆ
+// 2025/01/12 elements_typeã®è¿½åŠ 
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "ToolsCommon.h"
 
 namespace dxforge::tools
 {
-	// ’¸“_ƒf[ƒ^
+	// é ‚ç‚¹ãƒ‡ãƒ¼ã‚¿
 	struct vertex
 	{
 		math::v4 tangent{};
@@ -127,65 +127,65 @@ namespace dxforge::tools
 
 	}	// namespace elements
 
-	// ƒƒbƒVƒ…ƒf[ƒ^
+	// ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿
 	struct mesh
 	{
-		// ‰Šúƒf[ƒ^
-		utl::vector<math::v3> positions;				// ’¸“_À•W
-		utl::vector<math::v3> normals;					// –@ü
-		utl::vector<math::v4> tangents;					// Úü
-		utl::vector<math::v3> colors;					// ƒJƒ‰[
-		utl::vector< utl::vector<math::v2>> uv_sets;	// UVƒZƒbƒg
-		utl::vector<u32> material_indices;				// ƒ}ƒeƒŠƒAƒ‹ƒCƒ“ƒfƒbƒNƒX
-		utl::vector<u32> material_used;					// ƒ}ƒeƒŠƒAƒ‹‚ªg—p‚³‚ê‚Ä‚¢‚é‚©‚Ç‚¤‚©
+		// åˆæœŸãƒ‡ãƒ¼ã‚¿
+		utl::vector<math::v3> positions;				// é ‚ç‚¹åº§æ¨™
+		utl::vector<math::v3> normals;					// æ³•ç·š
+		utl::vector<math::v4> tangents;					// æ¥ç·š
+		utl::vector<math::v3> colors;					// ã‚«ãƒ©ãƒ¼
+		utl::vector< utl::vector<math::v2>> uv_sets;	// UVã‚»ãƒƒãƒˆ
+		utl::vector<u32> material_indices;				// ãƒãƒ†ãƒªã‚¢ãƒ«ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		utl::vector<u32> material_used;					// ãƒãƒ†ãƒªã‚¢ãƒ«ãŒä½¿ç”¨ã•ã‚Œã¦ã„ã‚‹ã‹ã©ã†ã‹
 
-		utl::vector<u32> raw_indices;					// ƒCƒ“ƒfƒbƒNƒX
+		utl::vector<u32> raw_indices;					// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
 
-		// ’†ŠÔƒf[ƒ^
-		utl::vector<vertex> vertices;					// ’¸“_
-		utl::vector<u32> indices;						// ƒCƒ“ƒfƒbƒNƒX
+		// ä¸­é–“ãƒ‡ãƒ¼ã‚¿
+		utl::vector<vertex> vertices;					// é ‚ç‚¹
+		utl::vector<u32> indices;						// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
 
-		// o—Íƒf[ƒ^
-		std::string name;								// ƒƒbƒVƒ…‚Ì–¼‘O
-		elements::elements_type::type elements_type;	// —v‘fƒ^ƒCƒv
-		utl::vector<u8> position_buffer;				// ’¸“_À•Wƒoƒbƒtƒ@
-		utl::vector<u8> element_buffer;					// —v‘fƒoƒbƒtƒ@
-		f32 lod_threshold{ -1.0f }; 					// LODè‡’l
+		// å‡ºåŠ›ãƒ‡ãƒ¼ã‚¿
+		std::string name;								// ãƒ¡ãƒƒã‚·ãƒ¥ã®åå‰
+		elements::elements_type::type elements_type;	// è¦ç´ ã‚¿ã‚¤ãƒ—
+		utl::vector<u8> position_buffer;				// é ‚ç‚¹åº§æ¨™ãƒãƒƒãƒ•ã‚¡
+		utl::vector<u8> element_buffer;					// è¦ç´ ãƒãƒƒãƒ•ã‚¡
+		f32 lod_threshold{ -1.0f }; 					// LODé–¾å€¤
 		u32 lod_id{ u32_invalid_id };					// LOD ID
 	};
 
-	// LODƒOƒ‹[ƒv
+	// LODã‚°ãƒ«ãƒ¼ãƒ—
 	struct lod_group
 	{
-		std::string name;								// LODƒOƒ‹[ƒv‚Ì–¼‘O
-		utl::vector<mesh> meshes;						// ƒƒbƒVƒ…
+		std::string name;								// LODã‚°ãƒ«ãƒ¼ãƒ—ã®åå‰
+		utl::vector<mesh> meshes;						// ãƒ¡ãƒƒã‚·ãƒ¥
 	};
 
-	// ƒQ[ƒ€’†‚ÌƒV[ƒ“ƒf[ƒ^‚Å‚Í‚È‚­AƒRƒ“ƒeƒ“ƒcƒtƒ@ƒCƒ‹‚É‘¶İ‚·‚é‚·‚×‚Ä‚ÌƒIƒuƒWƒFƒNƒg‚Ìƒf[ƒ^
+	// ã‚²ãƒ¼ãƒ ä¸­ã®ã‚·ãƒ¼ãƒ³ãƒ‡ãƒ¼ã‚¿ã§ã¯ãªãã€ã‚³ãƒ³ãƒ†ãƒ³ãƒ„ãƒ•ã‚¡ã‚¤ãƒ«ã«å­˜åœ¨ã™ã‚‹ã™ã¹ã¦ã®ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®ãƒ‡ãƒ¼ã‚¿
 	struct scene
 	{
-		std::string name;								// ƒV[ƒ“‚Ì–¼‘O
-		utl::vector<lod_group> lod_groups;				// LODƒOƒ‹[ƒv
+		std::string name;								// ã‚·ãƒ¼ãƒ³ã®åå‰
+		utl::vector<lod_group> lod_groups;				// LODã‚°ãƒ«ãƒ¼ãƒ—
 	};
 
-	// ƒCƒ“ƒ|[ƒgİ’è
+	// ã‚¤ãƒ³ãƒãƒ¼ãƒˆè¨­å®š
 	struct geometry_import_settings
 	{
-		f32 smoothing_angle;							// ƒXƒ€[ƒWƒ“ƒOŠp“x
-		u8 calculate_normals;							// –@ü‚ÌŒvZ
-		u8 calculate_tangents;							// Úü‚ÌŒvZ
-		u8 reverse_handedness;							// ‰EèŒn‚ğ¶èŒn‚É•ÏŠ·
-		u8 import_embedded_textures;					// ƒeƒNƒXƒ`ƒƒ‚Ì–„‚ß‚İ
-		u8 import_animations;							// ƒAƒjƒ[ƒVƒ‡ƒ“‚ÌƒCƒ“ƒ|[ƒg
-		u8 coalesce_meshes;								// ƒƒbƒVƒ…‚ÌŒ‹‡
+		f32 smoothing_angle;							// ã‚¹ãƒ ãƒ¼ã‚¸ãƒ³ã‚°è§’åº¦
+		u8 calculate_normals;							// æ³•ç·šã®è¨ˆç®—
+		u8 calculate_tangents;							// æ¥ç·šã®è¨ˆç®—
+		u8 reverse_handedness;							// å³æ‰‹ç³»ã‚’å·¦æ‰‹ç³»ã«å¤‰æ›
+		u8 import_embedded_textures;					// ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®åŸ‹ã‚è¾¼ã¿
+		u8 import_animations;							// ã‚¢ãƒ‹ãƒ¡ãƒ¼ã‚·ãƒ§ãƒ³ã®ã‚¤ãƒ³ãƒãƒ¼ãƒˆ
+		u8 coalesce_meshes;								// ãƒ¡ãƒƒã‚·ãƒ¥ã®çµåˆ
 	};
 
-	// ƒV[ƒ“ƒf[ƒ^
+	// ã‚·ãƒ¼ãƒ³ãƒ‡ãƒ¼ã‚¿
 	struct scene_data
 	{
-		u8* buffer;										// ƒoƒbƒtƒ@
-		u32 buffer_size;								// ƒoƒbƒtƒ@‚ÌƒTƒCƒY
-		geometry_import_settings settings;				// ƒCƒ“ƒ|[ƒgİ’è
+		u8* buffer;										// ãƒãƒƒãƒ•ã‚¡
+		u32 buffer_size;								// ãƒãƒƒãƒ•ã‚¡ã®ã‚µã‚¤ã‚º
+		geometry_import_settings settings;				// ã‚¤ãƒ³ãƒãƒ¼ãƒˆè¨­å®š
 	};
 
 	void process_scene(scene& scene, const geometry_import_settings& settings, progression* const progression);

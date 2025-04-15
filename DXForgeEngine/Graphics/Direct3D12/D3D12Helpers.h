@@ -1,15 +1,15 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12Helpers.h]
-// ì¬“ú : 2025/01/02
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// Direct3D12‚Ìƒwƒ‹ƒp[ŠÖ”
-// XV—š—ğ
-// 2025/01/02 V‹Kì¬
-// 2025/01/07 ƒRƒƒ“ƒg‚Ì’Ç‰Á
+// ä½œæˆæ—¥ : 2025/01/02
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// Direct3D12ã®ãƒ˜ãƒ«ãƒ‘ãƒ¼é–¢æ•°
+// æ›´æ–°å±¥æ­´
+// 2025/01/02 æ–°è¦ä½œæˆ
+// 2025/01/07 ã‚³ãƒ¡ãƒ³ãƒˆã®è¿½åŠ 
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12CommonHeaders.h"
 
 namespace dxforge::graphics::d3d12::d3dx
@@ -18,18 +18,18 @@ namespace dxforge::graphics::d3d12::d3dx
 	{
 		const D3D12_HEAP_PROPERTIES default_heap
 		{
-			D3D12_HEAP_TYPE_DEFAULT,			// Type: ƒfƒtƒHƒ‹ƒgƒq[ƒv
-			D3D12_CPU_PAGE_PROPERTY_UNKNOWN,	// CPUPageProperty: •s–¾
-			D3D12_MEMORY_POOL_UNKNOWN,			// MemoryPoolPreference: •s–¾
+			D3D12_HEAP_TYPE_DEFAULT,			// Type: ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆãƒ’ãƒ¼ãƒ—
+			D3D12_CPU_PAGE_PROPERTY_UNKNOWN,	// CPUPageProperty: ä¸æ˜
+			D3D12_MEMORY_POOL_UNKNOWN,			// MemoryPoolPreference: ä¸æ˜
 			0,									// CreationNodeMask: 0
 			0									// VisibleNodeMask: 0
 		};
 
 		const D3D12_HEAP_PROPERTIES upload_heap
 		{
-			D3D12_HEAP_TYPE_UPLOAD,				// Type: ƒAƒbƒvƒ[ƒhƒq[ƒv
-			D3D12_CPU_PAGE_PROPERTY_UNKNOWN,	// CPUPageProperty: •s–¾
-			D3D12_MEMORY_POOL_UNKNOWN,			// MemoryPoolPreference: •s–¾
+			D3D12_HEAP_TYPE_UPLOAD,				// Type: ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ãƒ’ãƒ¼ãƒ—
+			D3D12_CPU_PAGE_PROPERTY_UNKNOWN,	// CPUPageProperty: ä¸æ˜
+			D3D12_MEMORY_POOL_UNKNOWN,			// MemoryPoolPreference: ä¸æ˜
 			0,									// CreationNodeMask: 0
 			0									// VisibleNodeMask: 0
 		};
@@ -311,7 +311,7 @@ namespace dxforge::graphics::d3d12::d3dx
 	{
 	public:
 		constexpr static u32 max_resource_barriers{ 64 };
-		// ƒoƒŠƒAƒŠƒXƒg‚Éƒgƒ‰ƒ“ƒWƒVƒ‡ƒ“ƒoƒŠƒA‚ğ’Ç‰Á‚·‚é
+		// ãƒãƒªã‚¢ãƒªã‚¹ãƒˆã«ãƒˆãƒ©ãƒ³ã‚¸ã‚·ãƒ§ãƒ³ãƒãƒªã‚¢ã‚’è¿½åŠ ã™ã‚‹
 		constexpr void add(ID3D12Resource* resource,
 			D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after,
 			D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
@@ -330,7 +330,7 @@ namespace dxforge::graphics::d3d12::d3dx
 			++_offset;
 		}
 
-		// ƒoƒŠƒA‚ÌƒŠƒXƒg‚ÉUAVƒoƒŠƒA‚ğ’Ç‰Á‚·‚éB
+		// ãƒãƒªã‚¢ã®ãƒªã‚¹ãƒˆã«UAVãƒãƒªã‚¢ã‚’è¿½åŠ ã™ã‚‹ã€‚
 		constexpr void add(ID3D12Resource* resource, D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE)
 		{
 			assert(resource);
@@ -358,7 +358,7 @@ namespace dxforge::graphics::d3d12::d3dx
 		}
 
 
-		// ƒoƒŠƒAƒŠƒXƒg‚ğ“K—p‚·‚é
+		// ãƒãƒªã‚¢ãƒªã‚¹ãƒˆã‚’é©ç”¨ã™ã‚‹
 		void apply(id3d12_graphics_command_list* cmd_list)
 		{
 			assert(_offset);
@@ -367,8 +367,8 @@ namespace dxforge::graphics::d3d12::d3dx
 		}
 
 	private:
-		D3D12_RESOURCE_BARRIER _barriers[max_resource_barriers]{};	// ƒŠƒ\[ƒXƒoƒŠƒA
-		u32 _offset{ 0 };											// ƒŠƒ\[ƒXƒoƒŠƒA‚ÌƒIƒtƒZƒbƒg
+		D3D12_RESOURCE_BARRIER _barriers[max_resource_barriers]{};	// ãƒªã‚½ãƒ¼ã‚¹ãƒãƒªã‚¢
+		u32 _offset{ 0 };											// ãƒªã‚½ãƒ¼ã‚¹ãƒãƒªã‚¢ã®ã‚ªãƒ•ã‚»ãƒƒãƒˆ
 	};
 
 	void transition_resource(id3d12_graphics_command_list* cmd_list,
@@ -393,11 +393,11 @@ namespace dxforge::graphics::d3d12::d3dx
 
 	struct d3d12_root_parameter : public D3D12_ROOT_PARAMETER1
 	{
-		/// @brief ƒ‹[ƒg’è”‚ğİ’è
-		/// @param num_constants ’è”‚Ì”
-		/// @param visibility ƒVƒF[ƒ_[‚Ì‰Â‹«
-		/// @param shader_register ƒVƒF[ƒ_[ƒŒƒWƒXƒ^‚Ì”Ô†
-		/// @param space ƒŒƒWƒXƒ^ƒXƒy[ƒX
+		/// @brief ãƒ«ãƒ¼ãƒˆå®šæ•°ã‚’è¨­å®š
+		/// @param num_constants å®šæ•°ã®æ•°
+		/// @param visibility ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã®å¯è¦–æ€§
+		/// @param shader_register ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãƒ¬ã‚¸ã‚¹ã‚¿ã®ç•ªå·
+		/// @param space ãƒ¬ã‚¸ã‚¹ã‚¿ã‚¹ãƒšãƒ¼ã‚¹
 		constexpr void as_constants(u32 num_constants, D3D12_SHADER_VISIBILITY visibility, u32 shader_register, u32 space = 0)
 		{
 			ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
@@ -407,40 +407,40 @@ namespace dxforge::graphics::d3d12::d3dx
 			Constants.RegisterSpace = space;
 		}
 
-		/// @brief ƒ‹[ƒg‹Lqq‚ğİ’è(CBV)
-		/// @param visibility ƒVƒF[ƒ_[‚Ì‰Â‹«
-		/// @param shader_register ƒVƒF[ƒ_[ƒŒƒWƒXƒ^‚Ì”Ô†
-		/// @param space ƒŒƒWƒXƒ^ƒXƒy[ƒX
-		/// @param flags ƒtƒ‰ƒO
+		/// @brief ãƒ«ãƒ¼ãƒˆè¨˜è¿°å­ã‚’è¨­å®š(CBV)
+		/// @param visibility ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã®å¯è¦–æ€§
+		/// @param shader_register ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãƒ¬ã‚¸ã‚¹ã‚¿ã®ç•ªå·
+		/// @param space ãƒ¬ã‚¸ã‚¹ã‚¿ã‚¹ãƒšãƒ¼ã‚¹
+		/// @param flags ãƒ•ãƒ©ã‚°
 		constexpr void as_cbv(D3D12_SHADER_VISIBILITY visibility, u32 shader_register, u32 space = 0, D3D12_ROOT_DESCRIPTOR_FLAGS flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE)
 		{
 			as_descriptor(D3D12_ROOT_PARAMETER_TYPE_CBV, visibility, shader_register, space, flags);
 		}
 
-		/// @brief ƒ‹[ƒg‹Lqq‚ğİ’è(SRV)
-		/// @param visibility ƒVƒF[ƒ_[‚Ì‰Â‹«
-		/// @param shader_register ƒVƒF[ƒ_[ƒŒƒWƒXƒ^‚Ì”Ô†
-		/// @param space ƒŒƒWƒXƒ^ƒXƒy[ƒX
-		/// @param flags ƒtƒ‰ƒO
+		/// @brief ãƒ«ãƒ¼ãƒˆè¨˜è¿°å­ã‚’è¨­å®š(SRV)
+		/// @param visibility ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã®å¯è¦–æ€§
+		/// @param shader_register ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãƒ¬ã‚¸ã‚¹ã‚¿ã®ç•ªå·
+		/// @param space ãƒ¬ã‚¸ã‚¹ã‚¿ã‚¹ãƒšãƒ¼ã‚¹
+		/// @param flags ãƒ•ãƒ©ã‚°
 		constexpr void as_srv(D3D12_SHADER_VISIBILITY visibility, u32 shader_register, u32 space = 0, D3D12_ROOT_DESCRIPTOR_FLAGS flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE)
 		{
 			as_descriptor(D3D12_ROOT_PARAMETER_TYPE_SRV, visibility, shader_register, space, flags);
 		}
 
-		/// @brief ƒ‹[ƒg‹Lqq‚ğİ’è(UAV)
-		/// @param visibility ƒVƒF[ƒ_[‚Ì‰Â‹«
-		/// @param shader_register ƒVƒF[ƒ_[ƒŒƒWƒXƒ^‚Ì”Ô†
-		/// @param space ƒŒƒWƒXƒ^ƒXƒy[ƒX
-		/// @param flags ƒtƒ‰ƒO
+		/// @brief ãƒ«ãƒ¼ãƒˆè¨˜è¿°å­ã‚’è¨­å®š(UAV)
+		/// @param visibility ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã®å¯è¦–æ€§
+		/// @param shader_register ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãƒ¬ã‚¸ã‚¹ã‚¿ã®ç•ªå·
+		/// @param space ãƒ¬ã‚¸ã‚¹ã‚¿ã‚¹ãƒšãƒ¼ã‚¹
+		/// @param flags ãƒ•ãƒ©ã‚°
 		constexpr void as_uav(D3D12_SHADER_VISIBILITY visibility, u32 shader_register, u32 space = 0, D3D12_ROOT_DESCRIPTOR_FLAGS flags = D3D12_ROOT_DESCRIPTOR_FLAG_NONE)
 		{
 			as_descriptor(D3D12_ROOT_PARAMETER_TYPE_UAV, visibility, shader_register, space, flags);
 		}
 
-		/// @brief ƒ‹[ƒg‹Lqqƒe[ƒuƒ‹‚ğİ’è
-		/// @param visibility ƒVƒF[ƒ_[‚Ì‰Â‹«
-		/// @param ranges ƒfƒBƒXƒNƒŠƒvƒ^EƒŒƒ“ƒW
-		/// @param range_count ƒŒƒ“ƒW‚Ì”
+		/// @brief ãƒ«ãƒ¼ãƒˆè¨˜è¿°å­ãƒ†ãƒ¼ãƒ–ãƒ«ã‚’è¨­å®š
+		/// @param visibility ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã®å¯è¦–æ€§
+		/// @param ranges ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒ»ãƒ¬ãƒ³ã‚¸
+		/// @param range_count ãƒ¬ãƒ³ã‚¸ã®æ•°
 		constexpr void as_descriptor_table(D3D12_SHADER_VISIBILITY visibility, const d3d12_descriptor_range* ranges, u32 range_count)
 		{
 			ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -460,11 +460,11 @@ namespace dxforge::graphics::d3d12::d3dx
 		}
 	};
 
-	// Å‘å64ŒÂ‚ÌDWORDiu32j‚ğ‚·‚×‚Ä‚Ìƒ‹[ƒgEƒpƒ‰ƒ[ƒ^[‚É•ªŠ„‚·‚éB
-	// ƒ‹[ƒg’è” = 32ƒrƒbƒg’è”‚É‚Â‚«1DWORDB
-	// ƒ‹[ƒg‹LqqiCBV,SRV‚Ü‚½‚ÍUAVjŠe2DWORDB
-	// ƒfƒBƒXƒNƒŠƒvƒ^Eƒe[ƒuƒ‹Eƒ|ƒCƒ“ƒ^ = 1 DWORDB
-	// static sampler = 0 DWORDs. (ƒVƒF[ƒ_‚ÉƒRƒ“ƒpƒCƒ‹‚³‚ê‚é)
+	// æœ€å¤§64å€‹ã®DWORDï¼ˆu32ï¼‰ã‚’ã™ã¹ã¦ã®ãƒ«ãƒ¼ãƒˆãƒ»ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ãƒ¼ã«åˆ†å‰²ã™ã‚‹ã€‚
+	// ãƒ«ãƒ¼ãƒˆå®šæ•° = 32ãƒ“ãƒƒãƒˆå®šæ•°ã«ã¤ã1DWORDã€‚
+	// ãƒ«ãƒ¼ãƒˆè¨˜è¿°å­ï¼ï¼ˆCBV,SRVã¾ãŸã¯UAVï¼‰ï¼å„2DWORDã€‚
+	// ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒ»ãƒ†ãƒ¼ãƒ–ãƒ«ãƒ»ãƒã‚¤ãƒ³ã‚¿ = 1 DWORDã€‚
+	// static sampler = 0 DWORDs. (ã‚·ã‚§ãƒ¼ãƒ€ã«ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«ã•ã‚Œã‚‹)
 	struct  d3d12_root_signature_desc : public D3D12_ROOT_SIGNATURE_DESC1
 	{
 		constexpr static D3D12_ROOT_SIGNATURE_FLAGS default_flags{
@@ -495,7 +495,7 @@ namespace dxforge::graphics::d3d12::d3dx
 	};
 
 #pragma warning(push)
-#pragma warning(disable : 4324) // ƒpƒfƒBƒ“ƒO‚ÌŒx‚ğ–³Œø‚É‚·‚é
+#pragma warning(disable : 4324) // ãƒ‘ãƒ‡ã‚£ãƒ³ã‚°ã®è­¦å‘Šã‚’ç„¡åŠ¹ã«ã™ã‚‹
 	template<D3D12_PIPELINE_STATE_SUBOBJECT_TYPE type, typename T>
 	class alignas(void*) d3d12_pipeline_state_subobject
 	{
@@ -509,7 +509,7 @@ namespace dxforge::graphics::d3d12::d3dx
 	};
 #pragma warning(pop)
 
-	// ƒpƒCƒvƒ‰ƒCƒ“EƒXƒe[ƒgEƒTƒuƒIƒuƒWƒFƒNƒgiPSSjƒ}ƒNƒ
+	// ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ãƒ»ã‚¹ãƒ†ãƒ¼ãƒˆãƒ»ã‚µãƒ–ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆï¼ˆPSSï¼‰ãƒã‚¯ãƒ­
 #define PSS(name, ...) using d3d12_pipeline_state_subobject_##name = d3d12_pipeline_state_subobject<__VA_ARGS__>;
 
 	PSS(root_signature, D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE, ID3D12RootSignature*);
@@ -570,15 +570,15 @@ namespace dxforge::graphics::d3d12::d3dx
 	ID3D12PipelineState* create_pipeline_state(D3D12_PIPELINE_STATE_STREAM_DESC desc);
 	ID3D12PipelineState* create_pipeline_state(void* stream, u64 stream_size);
 
-	/// @brief ƒoƒbƒtƒ@‚ğì¬‚·‚é
-	/// @param buffer_size ƒoƒbƒtƒ@‚ÌƒTƒCƒY
-	/// @param data ƒf[ƒ^(È—ª‰Â”\)
-	/// @param is_cpu_accessible CPU‚©‚çƒAƒNƒZƒX‰Â”\‚©(È—ª‰Â”\)
-	/// @param state ƒŠƒ\[ƒX‚Ìó‘Ô(È—ª‰Â”\)
-	/// @param flags ƒŠƒ\[ƒX‚Ìƒtƒ‰ƒO(È—ª‰Â”\)
-	/// @param heap ƒq[ƒv(È—ª‰Â”\)
-	/// @param heap_offset ƒq[ƒv‚ÌƒIƒtƒZƒbƒg(È—ª‰Â”\)
-	/// @return ì¬‚³‚ê‚½ƒŠƒ\[ƒX
+	/// @brief ãƒãƒƒãƒ•ã‚¡ã‚’ä½œæˆã™ã‚‹
+	/// @param buffer_size ãƒãƒƒãƒ•ã‚¡ã®ã‚µã‚¤ã‚º
+	/// @param data ãƒ‡ãƒ¼ã‚¿(çœç•¥å¯èƒ½)
+	/// @param is_cpu_accessible CPUã‹ã‚‰ã‚¢ã‚¯ã‚»ã‚¹å¯èƒ½ã‹(çœç•¥å¯èƒ½)
+	/// @param state ãƒªã‚½ãƒ¼ã‚¹ã®çŠ¶æ…‹(çœç•¥å¯èƒ½)
+	/// @param flags ãƒªã‚½ãƒ¼ã‚¹ã®ãƒ•ãƒ©ã‚°(çœç•¥å¯èƒ½)
+	/// @param heap ãƒ’ãƒ¼ãƒ—(çœç•¥å¯èƒ½)
+	/// @param heap_offset ãƒ’ãƒ¼ãƒ—ã®ã‚ªãƒ•ã‚»ãƒƒãƒˆ(çœç•¥å¯èƒ½)
+	/// @return ä½œæˆã•ã‚ŒãŸãƒªã‚½ãƒ¼ã‚¹
 	ID3D12Resource* create_buffer(const void* data, u32 buffer_size, bool is_cpu_accessible = false,
 		D3D12_RESOURCE_STATES state = D3D12_RESOURCE_STATE_COMMON,
 		D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE,

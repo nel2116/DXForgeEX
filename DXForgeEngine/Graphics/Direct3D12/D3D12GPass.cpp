@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12GPass.cpp]
-// ì¬“ú : 2025/01/07
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// GPass‚Ìƒ\[ƒXƒtƒ@ƒCƒ‹
-// XV—š—ğ
-// 2025/01/07 V‹Kì¬
+// ä½œæˆæ—¥ : 2025/01/07
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// GPassã®ã‚½ãƒ¼ã‚¹ãƒ•ã‚¡ã‚¤ãƒ«
+// æ›´æ–°å±¥æ­´
+// 2025/01/07 æ–°è¦ä½œæˆ
 // // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12GPass.h"
 #include "D3D12Core.h"
 #include "D3D12Shaders.h"
@@ -23,19 +23,19 @@ namespace dxforge::graphics::d3d12::gpass
 {
 	namespace
 	{
-		constexpr math::u32v2 initial_dimensions{ 100, 100 };						///< ‰ŠúƒTƒCƒY
+		constexpr math::u32v2 initial_dimensions{ 100, 100 };						///< åˆæœŸã‚µã‚¤ã‚º
 
-		d3d12_render_texture gpass_main_buffer{};									///< GPass‚ÌƒƒCƒ“ƒoƒbƒtƒ@
-		d3d12_depth_buffer gpass_depth_buffer{};									///< GPass‚ÌƒfƒvƒXƒoƒbƒtƒ@
-		math::u32v2 dimensions{ initial_dimensions };								///< ƒTƒCƒY
+		d3d12_render_texture gpass_main_buffer{};									///< GPassã®ãƒ¡ã‚¤ãƒ³ãƒãƒƒãƒ•ã‚¡
+		d3d12_depth_buffer gpass_depth_buffer{};									///< GPassã®ãƒ‡ãƒ—ã‚¹ãƒãƒƒãƒ•ã‚¡
+		math::u32v2 dimensions{ initial_dimensions };								///< ã‚µã‚¤ã‚º
 
 #if _DEBUG
-		constexpr f32 clear_value[4]{ 0.5f, 0.5f, 0.5f, 1.0f };						///< ƒNƒŠƒAƒJƒ‰[(ƒfƒoƒbƒN‚Å‚ÍŠDF)
+		constexpr f32 clear_value[4]{ 0.5f, 0.5f, 0.5f, 1.0f };						///< ã‚¯ãƒªã‚¢ã‚«ãƒ©ãƒ¼(ãƒ‡ãƒãƒƒã‚¯ã§ã¯ç°è‰²)
 #else
-		constexpr f32 clear_value[4]{};												///< ƒNƒŠƒAƒJƒ‰[
+		constexpr f32 clear_value[4]{};												///< ã‚¯ãƒªã‚¢ã‚«ãƒ©ãƒ¼
 #endif
 
-		// NOTE: ‚±‚ÌƒR[ƒhEƒuƒƒbƒN‚ğƒRƒs[Eƒy[ƒXƒg‚·‚éÛ‚É‚ÍA#undef CONSTEXPR‚ğ–Y‚ê‚È‚¢‚æ‚¤‚É‚µ‚Ä‚­‚¾‚³‚¢B
+		// NOTE: ã“ã®ã‚³ãƒ¼ãƒ‰ãƒ»ãƒ–ãƒ­ãƒƒã‚¯ã‚’ã‚³ãƒ”ãƒ¼ãƒ»ãƒšãƒ¼ã‚¹ãƒˆã™ã‚‹éš›ã«ã¯ã€#undef CONSTEXPRã‚’å¿˜ã‚Œãªã„ã‚ˆã†ã«ã—ã¦ãã ã•ã„ã€‚
 #if USE_STL_VECTOR
 #define CONSTEXPR
 #else
@@ -46,7 +46,7 @@ namespace dxforge::graphics::d3d12::gpass
 		{
 			utl::vector<id::id_type>    d3d12_render_item_ids;
 			u32                         descriptor_index_count{ 0 };
-			// NOTE: V‚µ‚¢”z—ñ‚ğ’Ç‰Á‚·‚éê‡‚ÍA•K‚¸ resize() ‚Æ struct_size ‚ğXV‚µ‚Ä‚­‚¾‚³‚¢B
+			// NOTE: æ–°ã—ã„é…åˆ—ã‚’è¿½åŠ ã™ã‚‹å ´åˆã¯ã€å¿…ãš resize() ã¨ struct_size ã‚’æ›´æ–°ã—ã¦ãã ã•ã„ã€‚
 			id::id_type* entity_ids{ nullptr };
 			id::id_type* submesh_gpu_ids{ nullptr };
 			id::id_type* material_ids{ nullptr };
@@ -169,9 +169,9 @@ namespace dxforge::graphics::d3d12::gpass
 
 #undef CONSTEXPR
 
-		/// @brief ƒoƒbƒtƒ@[‚ğì¬‚·‚é
-		/// @param size ƒoƒbƒtƒ@[‚ÌƒTƒCƒY
-		/// @return ì¬‚É¬Œ÷‚µ‚½‚çtrue
+		/// @brief ãƒãƒƒãƒ•ã‚¡ãƒ¼ã‚’ä½œæˆã™ã‚‹
+		/// @param size ãƒãƒƒãƒ•ã‚¡ãƒ¼ã®ã‚µã‚¤ã‚º
+		/// @return ä½œæˆã«æˆåŠŸã—ãŸã‚‰true
 		bool create_buffers(math::u32v2 size)
 		{
 			assert(size.x && size.y);
@@ -179,18 +179,18 @@ namespace dxforge::graphics::d3d12::gpass
 			gpass_depth_buffer.release();
 
 			D3D12_RESOURCE_DESC desc{};
-			desc.Alignment = 0;										// NOTE: 0‚Í64KB‚Æ“¯‚¶iMSAA‚Ìê‡‚Í4MBj
+			desc.Alignment = 0;										// NOTE: 0ã¯64KBã¨åŒã˜ï¼ˆMSAAã®å ´åˆã¯4MBï¼‰
 			desc.DepthOrArraySize = 1;
 			desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 			desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
 			desc.Format = main_buffer_format;
 			desc.Height = size.y;
 			desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-			desc.MipLevels = 0;										// ‚·‚×‚Ä‚Ìƒ~ƒbƒvEƒŒƒxƒ‹‚ÉƒXƒy[ƒX‚ğİ‚¯‚é
+			desc.MipLevels = 0;										// ã™ã¹ã¦ã®ãƒŸãƒƒãƒ—ãƒ»ãƒ¬ãƒ™ãƒ«ã«ã‚¹ãƒšãƒ¼ã‚¹ã‚’è¨­ã‘ã‚‹
 			desc.SampleDesc = { 1, 0 };
 			desc.Width = size.x;
 
-			// ƒƒCƒ“ƒoƒbƒtƒ@‚Ìì¬
+			// ãƒ¡ã‚¤ãƒ³ãƒãƒƒãƒ•ã‚¡ã®ä½œæˆ
 			{
 				d3d12_texture_init_info info{};
 				info.desc = &desc;
@@ -204,7 +204,7 @@ namespace dxforge::graphics::d3d12::gpass
 			desc.Format = depth_buffer_format;
 			desc.MipLevels = 1;
 
-			// [“xƒoƒbƒtƒ@‚Ìì¬
+			// æ·±åº¦ãƒãƒƒãƒ•ã‚¡ã®ä½œæˆ
 			{
 				d3d12_texture_init_info info{};
 				info.desc = &desc;
@@ -323,20 +323,20 @@ namespace dxforge::graphics::d3d12::gpass
 			}
 		}
 
-	}	// “½–¼–¼‘O‹óŠÔ
+	}	// åŒ¿ååå‰ç©ºé–“
 
-	/// @brief ‰Šú‰»ˆ—
-	/// @return ‰Šú‰»‚É¬Œ÷‚µ‚½‚çtrue
+	/// @brief åˆæœŸåŒ–å‡¦ç†
+	/// @return åˆæœŸåŒ–ã«æˆåŠŸã—ãŸã‚‰true
 	bool initialize()
 	{
-		// ƒoƒbƒtƒ@[‚Æƒ‹[ƒgƒVƒOƒlƒ`ƒƒAƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒg‚ğì¬
+		// ãƒãƒƒãƒ•ã‚¡ãƒ¼ã¨ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ã€ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚’ä½œæˆ
 		return create_buffers(initial_dimensions);
 	}
 
-	/// @brief I—¹ˆ—
+	/// @brief çµ‚äº†å‡¦ç†
 	void shutdown()
 	{
-		// ƒoƒbƒtƒ@[‚ğ‰ğ•ú
+		// ãƒãƒƒãƒ•ã‚¡ãƒ¼ã‚’è§£æ”¾
 		gpass_main_buffer.release();
 		gpass_depth_buffer.release();
 		dimensions = initial_dimensions;
@@ -352,8 +352,8 @@ namespace dxforge::graphics::d3d12::gpass
 		return gpass_depth_buffer;
 	}
 
-	/// @brief ƒoƒbƒtƒ@[‚ÌƒTƒCƒY‚ğİ’è‚·‚é
-	/// @param size ƒTƒCƒY
+	/// @brief ãƒãƒƒãƒ•ã‚¡ãƒ¼ã®ã‚µã‚¤ã‚ºã‚’è¨­å®šã™ã‚‹
+	/// @param size ã‚µã‚¤ã‚º
 	void set_size(math::u32v2 size)
 	{
 		math::u32v2& d{ dimensions };

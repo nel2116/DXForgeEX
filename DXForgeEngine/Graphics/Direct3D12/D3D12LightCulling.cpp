@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12LightCulling.cpp]
-// ì¬“ú : 2025/01/19
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
+// ä½œæˆæ—¥ : 2025/01/19
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
 //
-// XV—š—ğ
-// 2025/01/19 V‹Kì¬
+// æ›´æ–°å±¥æ­´
+// 2025/01/19 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12LightCulling.h"
 #include "D3D12Core.h"
 #include "Shaders/SharedTypes.h"
@@ -20,7 +20,7 @@ namespace dxforge::graphics::d3d12::delight
 {
 	namespace
 	{
-		// ====== \‘¢‘Ì’è‹` ======
+		// ====== æ§‹é€ ä½“å®šç¾© ======
 		struct light_culling_root_parameter
 		{
 			enum parameter : u32
@@ -50,7 +50,7 @@ namespace dxforge::graphics::d3d12::delight
 			u32 view_height{ 0 };
 			f32 camera_fov{ 0.0f };
 			D3D12_GPU_VIRTUAL_ADDRESS light_index_list_opaque_buffer{ 0 };
-			// NOTE: has_lights‚ğ "true "‚Å‰Šú‰»‚µAƒoƒbƒtƒ@‚ğƒNƒŠƒA‚·‚é‚½‚ß‚ÉƒJƒŠƒ“ƒOƒVƒF[ƒ_‚ª­‚È‚­‚Æ‚à1‰ñ‚ÍÀs‚³‚ê‚é‚æ‚¤‚É‚·‚éB
+			// NOTE: has_lightsã‚’ "true "ã§åˆæœŸåŒ–ã—ã€ãƒãƒƒãƒ•ã‚¡ã‚’ã‚¯ãƒªã‚¢ã™ã‚‹ãŸã‚ã«ã‚«ãƒªãƒ³ã‚°ã‚·ã‚§ãƒ¼ãƒ€ãŒå°‘ãªãã¨ã‚‚1å›ã¯å®Ÿè¡Œã•ã‚Œã‚‹ã‚ˆã†ã«ã™ã‚‹ã€‚
 			bool has_lights{ true };
 		};
 
@@ -59,10 +59,10 @@ namespace dxforge::graphics::d3d12::delight
 			culling_parameters cullers[frame_buffer_count]{};
 		};
 
-		// ====== ’è”’è‹` ======
+		// ====== å®šæ•°å®šç¾© ======
 		constexpr u32 max_lights_per_tile{ 256 };
 
-		// ====== •Ï”’è‹` ======
+		// ====== å¤‰æ•°å®šç¾© ======
 		ID3D12RootSignature* light_culling_root_signature{ nullptr };
 		ID3D12PipelineState* grid_frustum_pso{ nullptr };
 		ID3D12PipelineState* light_culling_pso{ nullptr };
@@ -190,8 +190,8 @@ namespace dxforge::graphics::d3d12::delight
 			hlsl::LightCullingDispatchParameters* const buffer{ cbuffer.allocate<hlsl::LightCullingDispatchParameters>() };
 			const hlsl::LightCullingDispatchParameters& params{ culler.grid_frustums_dispatch_params };
 			memcpy(buffer, &params, sizeof(hlsl::LightCullingDispatchParameters));
-			// ƒtƒ‰ƒXƒgƒ‰ƒ€ƒoƒbƒtƒ@‚ğ‘‚«‚İ‰Â”\‚É‚·‚é
-			// TODO: pixel_shader_resourceƒtƒ‰ƒO‚ğíœ‚·‚éiƒOƒŠƒbƒhEƒtƒ‰ƒXƒgƒ‰ƒ€‚ğ‹Šo‰»‚·‚é‚½‚ß‚¾‚¯‚É‚ ‚éjB
+			// ãƒ•ãƒ©ã‚¹ãƒˆãƒ©ãƒ ãƒãƒƒãƒ•ã‚¡ã‚’æ›¸ãè¾¼ã¿å¯èƒ½ã«ã™ã‚‹
+			// TODO: pixel_shader_resourceãƒ•ãƒ©ã‚°ã‚’å‰Šé™¤ã™ã‚‹ï¼ˆã‚°ãƒªãƒƒãƒ‰ãƒ»ãƒ•ãƒ©ã‚¹ãƒˆãƒ©ãƒ ã‚’è¦–è¦šåŒ–ã™ã‚‹ãŸã‚ã ã‘ã«ã‚ã‚‹ï¼‰ã€‚
 			barriers.add(culler.frustums.buffer(),
 				D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
 				D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
@@ -204,9 +204,9 @@ namespace dxforge::graphics::d3d12::delight
 			cmd_list->SetComputeRootUnorderedAccessView(param::frustums_out_or_index_counter, culler.frustums.gpu_address());
 			cmd_list->Dispatch(params.NumThreadGroups.x, params.NumThreadGroups.y, 1);
 
-			// ƒtƒ‰ƒXƒgƒ‰ƒ€ƒoƒbƒtƒ@‚ğ“Ç‚ß‚é‚æ‚¤‚É‚·‚é
-			// NOTE: cull_lights() ‚Í‚±‚Ìƒgƒ‰ƒ“ƒWƒVƒ‡ƒ“‚ğ“K—p‚·‚éB
-			// TODO: pixel_shader_resourceƒtƒ‰ƒO‚ğíœ‚·‚éiƒOƒŠƒbƒhEƒtƒ‰ƒXƒgƒ‰ƒ€‚ğ‹Šo‰»‚·‚é‚½‚ß‚¾‚¯‚É‚ ‚éjB
+			// ãƒ•ãƒ©ã‚¹ãƒˆãƒ©ãƒ ãƒãƒƒãƒ•ã‚¡ã‚’èª­ã‚ã‚‹ã‚ˆã†ã«ã™ã‚‹
+			// NOTE: cull_lights() ã¯ã“ã®ãƒˆãƒ©ãƒ³ã‚¸ã‚·ãƒ§ãƒ³ã‚’é©ç”¨ã™ã‚‹ã€‚
+			// TODO: pixel_shader_resourceãƒ•ãƒ©ã‚°ã‚’å‰Šé™¤ã™ã‚‹ï¼ˆã‚°ãƒªãƒƒãƒ‰ãƒ»ãƒ•ãƒ©ã‚¹ãƒˆãƒ©ãƒ ã‚’è¦–è¦šåŒ–ã™ã‚‹ãŸã‚ã ã‘ã«ã‚ã‚‹ï¼‰ã€‚
 			barriers.add(culler.frustums.buffer(),
 				D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
 				D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -222,7 +222,7 @@ namespace dxforge::graphics::d3d12::delight
 			calculate_grid_frustums(culler, cmd_list, d3d12_info, barriers);
 		}
 
-	}	// “½–¼–¼‘O‹óŠÔ
+	}	// åŒ¿ååå‰ç©ºé–“
 
 	bool initialize()
 	{
@@ -266,8 +266,8 @@ namespace dxforge::graphics::d3d12::delight
 		params.NumLights = light::cullable_light_count(d3d12_info.info->light_set_key);
 		params.DepthBufferSrvIndex = gpass::depth_buffer().srv().index;
 
-		// NOTE: ‚±‚ÌƒXƒe[ƒgƒƒ“ƒg‚ÌŒã‚Éculler.has_lights‚ğXV‚µ‚Ä‚¢‚é‚Ì‚ÅA
-		//		ƒ‰ƒCƒg‚ª‚È‚¢‚Æ‚«‚Éƒoƒbƒtƒ@‚ğƒNƒŠƒA‚·‚é‚½‚ß‚Éƒ‰ƒCƒgƒJƒŠƒ“ƒOƒVƒF[ƒ_‚ªˆê“xÀs‚³‚ê‚Ü‚·B
+		// NOTE: ã“ã®ã‚¹ãƒ†ãƒ¼ãƒˆãƒ¡ãƒ³ãƒˆã®å¾Œã«culler.has_lightsã‚’æ›´æ–°ã—ã¦ã„ã‚‹ã®ã§ã€
+		//		ãƒ©ã‚¤ãƒˆãŒãªã„ã¨ãã«ãƒãƒƒãƒ•ã‚¡ã‚’ã‚¯ãƒªã‚¢ã™ã‚‹ãŸã‚ã«ãƒ©ã‚¤ãƒˆã‚«ãƒªãƒ³ã‚°ã‚·ã‚§ãƒ¼ãƒ€ãŒä¸€åº¦å®Ÿè¡Œã•ã‚Œã¾ã™ã€‚
 		if (!params.NumLights && !culler.has_lights) return;
 
 		culler.has_lights = params.NumLights > 0;
@@ -276,7 +276,7 @@ namespace dxforge::graphics::d3d12::delight
 		hlsl::LightCullingDispatchParameters* const buffer{ cbuffer.allocate<hlsl::LightCullingDispatchParameters>() };
 		memcpy(buffer, &params, sizeof(hlsl::LightCullingDispatchParameters));
 
-		// ƒ‰ƒCƒgƒOƒŠƒbƒh‚Æƒ‰ƒCƒgƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@‚ğ‘‚«‚İ‰Â”\‚É‚·‚é
+		// ãƒ©ã‚¤ãƒˆã‚°ãƒªãƒƒãƒ‰ã¨ãƒ©ã‚¤ãƒˆã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ã‚’æ›¸ãè¾¼ã¿å¯èƒ½ã«ã™ã‚‹
 		barriers.add(culler.light_grid_and_index_list.buffer(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 		barriers.apply(cmd_list);
 
@@ -297,12 +297,12 @@ namespace dxforge::graphics::d3d12::delight
 
 		cmd_list->Dispatch(params.NumThreadGroups.x, params.NumThreadGroups.y, 1);
 
-		// ƒ‰ƒCƒgƒOƒŠƒbƒh‚Æƒ‰ƒCƒgƒCƒ“ƒfƒbƒNƒXƒoƒbƒtƒ@‚ğ“Ç‚İæ‚è‰Â”\‚É‚·‚é
-		// NOTE: ‚±‚Ìƒgƒ‰ƒ“ƒWƒVƒ‡ƒ“EƒoƒŠƒA‚ÍA‚±‚ÌŠÖ”‚ÌŒÄ‚Ño‚µŒ³‚É‚æ‚Á‚Ä“K—p‚³‚ê‚éB
+		// ãƒ©ã‚¤ãƒˆã‚°ãƒªãƒƒãƒ‰ã¨ãƒ©ã‚¤ãƒˆã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒãƒƒãƒ•ã‚¡ã‚’èª­ã¿å–ã‚Šå¯èƒ½ã«ã™ã‚‹
+		// NOTE: ã“ã®ãƒˆãƒ©ãƒ³ã‚¸ã‚·ãƒ§ãƒ³ãƒ»ãƒãƒªã‚¢ã¯ã€ã“ã®é–¢æ•°ã®å‘¼ã³å‡ºã—å…ƒã«ã‚ˆã£ã¦é©ç”¨ã•ã‚Œã‚‹ã€‚
 		barriers.add(culler.light_grid_and_index_list.buffer(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 	}
 
-	// TODO: ƒ‰ƒCƒg‚ÌƒJƒŠƒ“ƒO‚ğ‹Šo‰»‚·‚é‚½‚ß‚Ìˆê“I‚È‚à‚ÌB Œã‚Åæ‚èœ‚­B
+	// TODO: ãƒ©ã‚¤ãƒˆã®ã‚«ãƒªãƒ³ã‚°ã‚’è¦–è¦šåŒ–ã™ã‚‹ãŸã‚ã®ä¸€æ™‚çš„ãªã‚‚ã®ã€‚ å¾Œã§å–ã‚Šé™¤ãã€‚
 	D3D12_GPU_VIRTUAL_ADDRESS frustums(id::id_type id, u32 frame_index)
 	{
 		assert(frame_index < frame_buffer_count && id::is_valid(id));

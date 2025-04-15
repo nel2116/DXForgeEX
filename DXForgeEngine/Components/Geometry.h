@@ -1,38 +1,38 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Geometry.h]
-// ì¬“ú : 2025/02/10
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-// ƒQ[ƒ€ƒGƒ“ƒeƒBƒeƒB‚ÌGeometryƒRƒ“ƒ|[ƒlƒ“ƒg‚ğŠÇ—‚·‚é
-// XV—š—ğ
-// 2025/02/10 V‹Kì¬
+// ä½œæˆæ—¥ : 2025/02/10
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+// ã‚²ãƒ¼ãƒ ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®Geometryã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’ç®¡ç†ã™ã‚‹
+// æ›´æ–°å±¥æ­´
+// 2025/02/10 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "ComponentsCommon.h"
 
 namespace dxforge::geometry
 {
-	/// @brief GeometryƒRƒ“ƒ|[ƒlƒ“ƒg‚Ì‰Šú‰»î•ñ
+	/// @brief Geometryã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®åˆæœŸåŒ–æƒ…å ±
 	struct init_info
 	{
-		id::id_type     geometry_content_id;	///< ƒWƒIƒƒgƒŠƒRƒ“ƒeƒ“ƒc‚ÌID
-		u32             material_count;			///< ƒ}ƒeƒŠƒAƒ‹‚Ì”
-		id::id_type* material_ids;			///< ƒ}ƒeƒŠƒAƒ‹‚ÌID
+		id::id_type     geometry_content_id;	///< ã‚¸ã‚ªãƒ¡ãƒˆãƒªã‚³ãƒ³ãƒ†ãƒ³ãƒ„ã®ID
+		u32             material_count;			///< ãƒãƒ†ãƒªã‚¢ãƒ«ã®æ•°
+		id::id_type* material_ids;			///< ãƒãƒ†ãƒªã‚¢ãƒ«ã®ID
 	};
 
-	/// @brief GeometryƒRƒ“ƒ|[ƒlƒ“ƒg‚Ìì¬
-	/// @param info ‰Šú‰»î•ñ
-	/// @param entity ƒAƒ^ƒbƒ`‚·‚éƒQ[ƒ€ƒGƒ“ƒeƒBƒeƒB
-	/// @return GeometryƒRƒ“ƒ|[ƒlƒ“ƒg
+	/// @brief Geometryã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ä½œæˆ
+	/// @param info åˆæœŸåŒ–æƒ…å ±
+	/// @param entity ã‚¢ã‚¿ãƒƒãƒã™ã‚‹ã‚²ãƒ¼ãƒ ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£
+	/// @return Geometryã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆ
 	component create(init_info info, game_entity::entity entity);
 
-	/// @brief GeometryƒRƒ“ƒ|[ƒlƒ“ƒg‚Ìíœ
-	/// @param c íœ‚·‚éGeometryƒRƒ“ƒ|[ƒlƒ“ƒg
+	/// @brief Geometryã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®å‰Šé™¤
+	/// @param c å‰Šé™¤ã™ã‚‹Geometryã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆ
 	void remove(component c);
 
-	/// @brief GeometryƒRƒ“ƒ|[ƒlƒ“ƒg‚Ìæ“¾
-	/// @param item_ids GeometryƒRƒ“ƒ|[ƒlƒ“ƒg‚ÌID
-	/// @param count æ“¾‚·‚é”
+	/// @brief Geometryã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®å–å¾—
+	/// @param item_ids Geometryã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ID
+	/// @param count å–å¾—ã™ã‚‹æ•°
 	void get_render_item_ids(id::id_type* const item_ids, u32 count);
 }

@@ -1,31 +1,31 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12Camera.cpp]
-// ì¬“ú : 2025/01/12
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// Direct3D12—pƒJƒƒ‰ƒNƒ‰ƒX
-// XV—š—ğ
-// 2025/01/12 V‹Kì¬
-// 2025/01/14 ƒRƒƒ“ƒg‚Ì’Ç‰Á
+// ä½œæˆæ—¥ : 2025/01/12
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// Direct3D12ç”¨ã‚«ãƒ¡ãƒ©ã‚¯ãƒ©ã‚¹
+// æ›´æ–°å±¥æ­´
+// 2025/01/12 æ–°è¦ä½œæˆ
+// 2025/01/14 ã‚³ãƒ¡ãƒ³ãƒˆã®è¿½åŠ 
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12Camera.h"
 #include "EngineAPI/GameEntity.h"
 
 namespace dxforge::graphics::d3d12::camera
 {
 
-	// ====== “½–¼–¼‘O‹óŠÔ ======
+	// ====== åŒ¿ååå‰ç©ºé–“ ======
 	namespace
 	{
-		// ƒJƒƒ‰‚Ìî•ñ‚ğŠi”[‚·‚éƒtƒŠ[ƒXƒg\‘¢
+		// ã‚«ãƒ¡ãƒ©ã®æƒ…å ±ã‚’æ ¼ç´ã™ã‚‹ãƒ•ãƒªãƒ¼ã‚¹ãƒˆæ§‹é€ 
 		utl::free_list<d3d12_camera> cameras;
 
-		/// @brief ƒJƒƒ‰‚Ì"ã•ûŒü"ƒxƒNƒgƒ‹‚ğİ’è‚·‚éŠÖ”
-		/// @param camera İ’è‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data "ã•ûŒü"ƒxƒNƒgƒ‹‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®"ä¸Šæ–¹å‘"ãƒ™ã‚¯ãƒˆãƒ«ã‚’è¨­å®šã™ã‚‹é–¢æ•°
+		/// @param camera è¨­å®šå¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data "ä¸Šæ–¹å‘"ãƒ™ã‚¯ãƒˆãƒ«ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		void set_up_vector(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
 		{
 			math::v3 up_vector{ *(math::v3*)data };
@@ -33,10 +33,10 @@ namespace dxforge::graphics::d3d12::camera
 			camera.up(up_vector);
 		}
 
-		/// @brief ƒJƒƒ‰‚Ì‹–ìŠp‚ğİ’è‚·‚éŠÖ”
-		/// @param camera İ’è‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ‹–ìŠp‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®è¦–é‡è§’ã‚’è¨­å®šã™ã‚‹é–¢æ•°
+		/// @param camera è¨­å®šå¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data è¦–é‡è§’ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		constexpr void set_field_of_view(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::perspective);
@@ -45,10 +45,10 @@ namespace dxforge::graphics::d3d12::camera
 			camera.field_of_view(fov);
 		}
 
-		/// @brief ƒJƒƒ‰‚ÌƒAƒXƒyƒNƒg”ä‚ğİ’è‚·‚éŠÖ”
-		/// @param camera İ’è‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ƒAƒXƒyƒNƒg”ä‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®ã‚¢ã‚¹ãƒšã‚¯ãƒˆæ¯”ã‚’è¨­å®šã™ã‚‹é–¢æ•°
+		/// @param camera è¨­å®šå¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data ã‚¢ã‚¹ãƒšã‚¯ãƒˆæ¯”ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		constexpr void set_aspect_ratio(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::perspective);
@@ -57,10 +57,10 @@ namespace dxforge::graphics::d3d12::camera
 			camera.aspect_ratio(aspect_ratio);
 		}
 
-		/// @brief ƒJƒƒ‰‚Ìƒrƒ…[•‚ğİ’è‚·‚éŠÖ”
-		/// @param camera İ’è‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ƒrƒ…[•‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®ãƒ“ãƒ¥ãƒ¼å¹…ã‚’è¨­å®šã™ã‚‹é–¢æ•°
+		/// @param camera è¨­å®šå¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data ãƒ“ãƒ¥ãƒ¼å¹…ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		constexpr void set_view_width(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::orthographic);
@@ -69,10 +69,10 @@ namespace dxforge::graphics::d3d12::camera
 			camera.view_width(view_width);
 		}
 
-		/// @brief ƒJƒƒ‰‚Ìƒrƒ…[‚‚³‚ğİ’è‚·‚éŠÖ”
-		/// @param camera İ’è‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ƒrƒ…[‚‚³‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®ãƒ“ãƒ¥ãƒ¼é«˜ã•ã‚’è¨­å®šã™ã‚‹é–¢æ•°
+		/// @param camera è¨­å®šå¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data ãƒ“ãƒ¥ãƒ¼é«˜ã•ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		constexpr void set_view_height(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::orthographic);
@@ -81,10 +81,10 @@ namespace dxforge::graphics::d3d12::camera
 			camera.view_height(view_height);
 		}
 
-		/// @brief ƒJƒƒ‰‚Ì‹ßƒNƒŠƒbƒv–Ê‚ğİ’è‚·‚éŠÖ”
-		/// @param camera İ’è‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ‹ßƒNƒŠƒbƒv–Ê‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®è¿‘ã‚¯ãƒªãƒƒãƒ—é¢ã‚’è¨­å®šã™ã‚‹é–¢æ•°
+		/// @param camera è¨­å®šå¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data è¿‘ã‚¯ãƒªãƒƒãƒ—é¢ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		constexpr void set_near_z(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
 		{
 			f32 near_z{ *(f32*)data };
@@ -92,10 +92,10 @@ namespace dxforge::graphics::d3d12::camera
 			camera.near_z(near_z);
 		}
 
-		/// @brief ƒJƒƒ‰‚Ì‰“ƒNƒŠƒbƒv–Ê‚ğİ’è‚·‚éŠÖ”
-		/// @param camera İ’è‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ‰“ƒNƒŠƒbƒv–Ê‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®é ã‚¯ãƒªãƒƒãƒ—é¢ã‚’è¨­å®šã™ã‚‹é–¢æ•°
+		/// @param camera è¨­å®šå¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data é ã‚¯ãƒªãƒƒãƒ—é¢ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		constexpr void set_far_z(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
 		{
 			f32 far_z{ *(f32*)data };
@@ -103,10 +103,10 @@ namespace dxforge::graphics::d3d12::camera
 			camera.far_z(far_z);
 		}
 
-		/// @brief ƒJƒƒ‰‚Ìƒrƒ…[s—ñ‚ğæ“¾‚·‚éŠÖ”
-		/// @param camera æ“¾‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ƒrƒ…[s—ñ‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®ãƒ“ãƒ¥ãƒ¼è¡Œåˆ—ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param camera å–å¾—å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data ãƒ“ãƒ¥ãƒ¼è¡Œåˆ—ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		void get_view(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			math::m4x4* const matrix{ (math::m4x4* const)data };
@@ -114,10 +114,10 @@ namespace dxforge::graphics::d3d12::camera
 			DirectX::XMStoreFloat4x4(matrix, camera.view());
 		}
 
-		/// @brief ƒJƒƒ‰‚ÌË‰es—ñ‚ğæ“¾‚·‚éŠÖ”
-		/// @param camera æ“¾‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data Ë‰es—ñ‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®å°„å½±è¡Œåˆ—ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param camera å–å¾—å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data å°„å½±è¡Œåˆ—ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		void get_projection(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			math::m4x4* const matrix{ (math::m4x4* const)data };
@@ -125,10 +125,10 @@ namespace dxforge::graphics::d3d12::camera
 			DirectX::XMStoreFloat4x4(matrix, camera.projection());
 		}
 
-		/// @brief ƒJƒƒ‰‚Ì‹tË‰es—ñ‚ğæ“¾‚·‚éŠÖ”
-		/// @param camera æ“¾‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ‹tË‰es—ñ‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®é€†å°„å½±è¡Œåˆ—ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param camera å–å¾—å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data é€†å°„å½±è¡Œåˆ—ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		void get_inverse_projection(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			math::m4x4* const matrix{ (math::m4x4* const)data };
@@ -136,10 +136,10 @@ namespace dxforge::graphics::d3d12::camera
 			DirectX::XMStoreFloat4x4(matrix, camera.inverse_projection());
 		}
 
-		/// @brief ƒJƒƒ‰‚Ìƒrƒ…[Ë‰es—ñ‚ğæ“¾‚·‚éŠÖ”
-		/// @param camera æ“¾‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ƒrƒ…[Ë‰es—ñ‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®ãƒ“ãƒ¥ãƒ¼å°„å½±è¡Œåˆ—ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param camera å–å¾—å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data ãƒ“ãƒ¥ãƒ¼å°„å½±è¡Œåˆ—ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		void get_view_projection(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			math::m4x4* const matrix{ (math::m4x4* const)data };
@@ -147,10 +147,10 @@ namespace dxforge::graphics::d3d12::camera
 			DirectX::XMStoreFloat4x4(matrix, camera.view_projection());
 		}
 
-		/// @brief ƒJƒƒ‰‚Ì‹tƒrƒ…[Ë‰es—ñ‚ğæ“¾‚·‚éŠÖ”
-		/// @param camera æ“¾‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ‹tƒrƒ…[Ë‰es—ñ‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®é€†ãƒ“ãƒ¥ãƒ¼å°„å½±è¡Œåˆ—ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param camera å–å¾—å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data é€†ãƒ“ãƒ¥ãƒ¼å°„å½±è¡Œåˆ—ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		void get_inverse_view_projection(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			math::m4x4* const matrix{ (math::m4x4* const)data };
@@ -158,10 +158,10 @@ namespace dxforge::graphics::d3d12::camera
 			DirectX::XMStoreFloat4x4(matrix, camera.inverse_view_projection());
 		}
 
-		/// @brief ƒJƒƒ‰‚Ì"ã•ûŒü"ƒxƒNƒgƒ‹‚ğæ“¾‚·‚éŠÖ”
-		/// @param camera æ“¾‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data "ã•ûŒü"ƒxƒNƒgƒ‹‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®"ä¸Šæ–¹å‘"ãƒ™ã‚¯ãƒˆãƒ«ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param camera å–å¾—å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data "ä¸Šæ–¹å‘"ãƒ™ã‚¯ãƒˆãƒ«ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		void get_up_vector(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			math::v3* const up_vector{ (math::v3* const)data };
@@ -169,10 +169,10 @@ namespace dxforge::graphics::d3d12::camera
 			DirectX::XMStoreFloat3(up_vector, camera.up());
 		}
 
-		/// @brief ƒJƒƒ‰‚Ì‹–ìŠp‚ğæ“¾‚·‚éŠÖ”
-		/// @param camera æ“¾‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ‹–ìŠp‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®è¦–é‡è§’ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param camera å–å¾—å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data è¦–é‡è§’ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		constexpr void get_field_of_view(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::perspective);
@@ -181,10 +181,10 @@ namespace dxforge::graphics::d3d12::camera
 			*fov = camera.field_of_view();
 		}
 
-		/// @brief ƒJƒƒ‰‚ÌƒAƒXƒyƒNƒg”ä‚ğæ“¾‚·‚éŠÖ”
-		/// @param camera æ“¾‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ƒAƒXƒyƒNƒg”ä‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®ã‚¢ã‚¹ãƒšã‚¯ãƒˆæ¯”ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param camera å–å¾—å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data ã‚¢ã‚¹ãƒšã‚¯ãƒˆæ¯”ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		constexpr void get_aspect_ratio(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::perspective);
@@ -193,10 +193,10 @@ namespace dxforge::graphics::d3d12::camera
 			*aspect_ratio = camera.aspect_ratio();
 		}
 
-		/// @brief ƒJƒƒ‰‚Ìƒrƒ…[•‚ğæ“¾‚·‚éŠÖ”
-		/// @param camera æ“¾‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ƒrƒ…[•‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®ãƒ“ãƒ¥ãƒ¼å¹…ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param camera å–å¾—å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data ãƒ“ãƒ¥ãƒ¼å¹…ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		constexpr void get_view_width(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::orthographic);
@@ -205,10 +205,10 @@ namespace dxforge::graphics::d3d12::camera
 			*view_width = camera.view_width();
 		}
 
-		/// @brief ƒJƒƒ‰‚Ìƒrƒ…[‚‚³‚ğæ“¾‚·‚éŠÖ”
-		/// @param camera æ“¾‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ƒrƒ…[‚‚³‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®ãƒ“ãƒ¥ãƒ¼é«˜ã•ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param camera å–å¾—å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data ãƒ“ãƒ¥ãƒ¼é«˜ã•ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		constexpr void get_view_height(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			assert(camera.projection_type() == graphics::camera::orthographic);
@@ -217,10 +217,10 @@ namespace dxforge::graphics::d3d12::camera
 			*view_height = camera.view_height();
 		}
 
-		/// @brief ƒJƒƒ‰‚Ì‹ßƒNƒŠƒbƒv–Ê‚ğæ“¾‚·‚éŠÖ”
-		/// @param camera æ“¾‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ‹ßƒNƒŠƒbƒv–Ê‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®è¿‘ã‚¯ãƒªãƒƒãƒ—é¢ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param camera å–å¾—å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data è¿‘ã‚¯ãƒªãƒƒãƒ—é¢ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		constexpr void get_near_z(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			f32* const near_z{ (f32* const)data };
@@ -228,10 +228,10 @@ namespace dxforge::graphics::d3d12::camera
 			*near_z = camera.near_z();
 		}
 
-		/// @brief ƒJƒƒ‰‚Ì‰“ƒNƒŠƒbƒv–Ê‚ğæ“¾‚·‚éŠÖ”
-		/// @param camera æ“¾‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ‰“ƒNƒŠƒbƒv–Ê‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®é ã‚¯ãƒªãƒƒãƒ—é¢ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param camera å–å¾—å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data é ã‚¯ãƒªãƒƒãƒ—é¢ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		constexpr void get_far_z(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			f32* const far_z{ (f32* const)data };
@@ -239,10 +239,10 @@ namespace dxforge::graphics::d3d12::camera
 			*far_z = camera.far_z();
 		}
 
-		/// @brief ƒJƒƒ‰‚Ìƒrƒ…[s—ñ‚ğæ“¾‚·‚éŠÖ”
-		/// @param camera æ“¾‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ƒrƒ…[s—ñ‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®ãƒ“ãƒ¥ãƒ¼è¡Œåˆ—ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param camera å–å¾—å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data ãƒ“ãƒ¥ãƒ¼è¡Œåˆ—ã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		constexpr void get_projection_type(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			graphics::camera::type* const type{ (graphics::camera::type* const)data };
@@ -250,10 +250,10 @@ namespace dxforge::graphics::d3d12::camera
 			*type = camera.projection_type();
 		}
 
-		/// @brief ƒJƒƒ‰‚ÌƒGƒ“ƒeƒBƒeƒBID‚ğæ“¾‚·‚éŠÖ”
-		/// @param camera æ“¾‘ÎÛ‚ÌƒJƒƒ‰
-		/// @param data ƒGƒ“ƒeƒBƒeƒBID‚Ìƒf[ƒ^
-		/// @param size ƒf[ƒ^ƒTƒCƒY
+		/// @brief ã‚«ãƒ¡ãƒ©ã®ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£IDã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param camera å–å¾—å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©
+		/// @param data ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£IDã®ãƒ‡ãƒ¼ã‚¿
+		/// @param size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 		constexpr void get_entity_id(const d3d12_camera& camera, void* const data, [[maybe_unused]] u32 size)
 		{
 			id::id_type* const entity_id{ (id::id_type* const)data };
@@ -265,11 +265,11 @@ namespace dxforge::graphics::d3d12::camera
 		{
 		}
 
-		// ƒJƒƒ‰‚Ìƒpƒ‰ƒ[ƒ^İ’èŠÖ”
+		// ã‚«ãƒ¡ãƒ©ã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿è¨­å®šé–¢æ•°
 		using set_function = void(*)(d3d12_camera&, const void* const, u32);
-		// ƒJƒƒ‰‚Ìƒpƒ‰ƒ[ƒ^æ“¾ŠÖ”
+		// ã‚«ãƒ¡ãƒ©ã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿å–å¾—é–¢æ•°
 		using get_function = void(*)(const d3d12_camera&, void* const, u32);
-		// ƒJƒƒ‰‚Ìƒpƒ‰ƒ[ƒ^İ’èŠÖ””z—ñ
+		// ã‚«ãƒ¡ãƒ©ã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿è¨­å®šé–¢æ•°é…åˆ—
 		constexpr set_function set_functions[]
 		{
 			set_up_vector,
@@ -290,7 +290,7 @@ namespace dxforge::graphics::d3d12::camera
 
 		static_assert(_countof(set_functions) == camera_parameter::count);
 
-		// ƒJƒƒ‰‚Ìƒpƒ‰ƒ[ƒ^æ“¾ŠÖ””z—ñ
+		// ã‚«ãƒ¡ãƒ©ã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿å–å¾—é–¢æ•°é…åˆ—
 		constexpr get_function get_functions[]
 		{
 			get_up_vector,
@@ -311,9 +311,9 @@ namespace dxforge::graphics::d3d12::camera
 
 		static_assert(_countof(get_functions) == camera_parameter::count);
 
-	} // “½–¼–¼‘O‹óŠÔ
+	} // åŒ¿ååå‰ç©ºé–“
 
-	// ====== ƒNƒ‰ƒXÀ‘••” ======
+	// ====== ã‚¯ãƒ©ã‚¹å®Ÿè£…éƒ¨ ======
 	d3d12_camera::d3d12_camera(camera_init_info info)
 		: _up{ DirectX::XMLoadFloat3(&info.up) },
 		_near_z{ info.near_z }, _far_z{ info.far_z },
@@ -324,7 +324,7 @@ namespace dxforge::graphics::d3d12::camera
 		update();
 	}
 
-	/// @brief ƒJƒƒ‰‚ğXV‚·‚éŠÖ”
+	/// @brief ã‚«ãƒ¡ãƒ©ã‚’æ›´æ–°ã™ã‚‹é–¢æ•°
 	void d3d12_camera::update()
 	{
 		game_entity::entity entity{ game_entity::entity_id{_entity_id} };
@@ -348,15 +348,15 @@ namespace dxforge::graphics::d3d12::camera
 		_inverse_view_projection = XMMatrixInverse(nullptr, _view_projection);
 	}
 
-	/// @brief ƒJƒƒ‰‚Ì"ã•ûŒü"ƒxƒNƒgƒ‹‚ğİ’è‚·‚éŠÖ”
-	/// @param up ƒJƒƒ‰‚Ì"ã•ûŒü"ƒxƒNƒgƒ‹
+	/// @brief ã‚«ãƒ¡ãƒ©ã®"ä¸Šæ–¹å‘"ãƒ™ã‚¯ãƒˆãƒ«ã‚’è¨­å®šã™ã‚‹é–¢æ•°
+	/// @param up ã‚«ãƒ¡ãƒ©ã®"ä¸Šæ–¹å‘"ãƒ™ã‚¯ãƒˆãƒ«
 	void d3d12_camera::up(math::v3 up)
 	{
 		_up = DirectX::XMLoadFloat3(&up);
 	}
 
-	/// @brief ƒJƒƒ‰‚Ì‹–ìŠp‚ğİ’è‚·‚éŠÖ”
-	/// @param fov ‹–ìŠp
+	/// @brief ã‚«ãƒ¡ãƒ©ã®è¦–é‡è§’ã‚’è¨­å®šã™ã‚‹é–¢æ•°
+	/// @param fov è¦–é‡è§’
 	constexpr void d3d12_camera::field_of_view(f32 fov)
 	{
 		assert(_projection_type == graphics::camera::perspective);
@@ -364,8 +364,8 @@ namespace dxforge::graphics::d3d12::camera
 		_is_dirty = true;
 	}
 
-	/// @brief ƒJƒƒ‰‚ÌƒAƒXƒyƒNƒg”ä‚ğİ’è‚·‚éŠÖ”
-	/// @param aspect_ratio ƒAƒXƒyƒNƒg”ä
+	/// @brief ã‚«ãƒ¡ãƒ©ã®ã‚¢ã‚¹ãƒšã‚¯ãƒˆæ¯”ã‚’è¨­å®šã™ã‚‹é–¢æ•°
+	/// @param aspect_ratio ã‚¢ã‚¹ãƒšã‚¯ãƒˆæ¯”
 	constexpr void d3d12_camera::aspect_ratio(f32 aspect_ratio)
 	{
 		assert(_projection_type == graphics::camera::perspective);
@@ -373,8 +373,8 @@ namespace dxforge::graphics::d3d12::camera
 		_is_dirty = true;
 	}
 
-	/// @brief ƒJƒƒ‰‚Ìƒrƒ…[•‚ğİ’è‚·‚éŠÖ”
-	/// @param width ƒrƒ…[•
+	/// @brief ã‚«ãƒ¡ãƒ©ã®ãƒ“ãƒ¥ãƒ¼å¹…ã‚’è¨­å®šã™ã‚‹é–¢æ•°
+	/// @param width ãƒ“ãƒ¥ãƒ¼å¹…
 	constexpr void d3d12_camera::view_width(f32 width)
 	{
 		assert(width);
@@ -383,8 +383,8 @@ namespace dxforge::graphics::d3d12::camera
 		_is_dirty = true;
 	}
 
-	/// @brief ƒJƒƒ‰‚Ìƒrƒ…[‚‚³‚ğİ’è‚·‚éŠÖ”
-	/// @param height ƒrƒ…[‚‚³
+	/// @brief ã‚«ãƒ¡ãƒ©ã®ãƒ“ãƒ¥ãƒ¼é«˜ã•ã‚’è¨­å®šã™ã‚‹é–¢æ•°
+	/// @param height ãƒ“ãƒ¥ãƒ¼é«˜ã•
 	constexpr void d3d12_camera::view_height(f32 height)
 	{
 		assert(height);
@@ -393,43 +393,43 @@ namespace dxforge::graphics::d3d12::camera
 		_is_dirty = true;
 	}
 
-	/// @brief ƒJƒƒ‰‚Ì‹ßƒNƒŠƒbƒv–Ê‚ğİ’è‚·‚éŠÖ”
-	/// @param near_z ‹ßƒNƒŠƒbƒv–Ê
+	/// @brief ã‚«ãƒ¡ãƒ©ã®è¿‘ã‚¯ãƒªãƒƒãƒ—é¢ã‚’è¨­å®šã™ã‚‹é–¢æ•°
+	/// @param near_z è¿‘ã‚¯ãƒªãƒƒãƒ—é¢
 	constexpr void d3d12_camera::near_z(f32 near_z)
 	{
 		_near_z = near_z;
 		_is_dirty = true;
 	}
 
-	/// @brief ƒJƒƒ‰‚Ì‰“ƒNƒŠƒbƒv–Ê‚ğİ’è‚·‚éŠÖ”
-	/// @param far_z ‰“ƒNƒŠƒbƒv–Ê
+	/// @brief ã‚«ãƒ¡ãƒ©ã®é ã‚¯ãƒªãƒƒãƒ—é¢ã‚’è¨­å®šã™ã‚‹é–¢æ•°
+	/// @param far_z é ã‚¯ãƒªãƒƒãƒ—é¢
 	constexpr void d3d12_camera::far_z(f32 far_z)
 	{
 		_far_z = far_z;
 		_is_dirty = true;
 	}
 
-	/// @brief ƒJƒƒ‰‚ğ¶¬‚·‚éŠÖ”
-	/// @param info ƒJƒƒ‰‚Ì‰Šú‰»î•ñ
-	/// @return ¶¬‚µ‚½ƒJƒƒ‰
+	/// @brief ã‚«ãƒ¡ãƒ©ã‚’ç”Ÿæˆã™ã‚‹é–¢æ•°
+	/// @param info ã‚«ãƒ¡ãƒ©ã®åˆæœŸåŒ–æƒ…å ±
+	/// @return ç”Ÿæˆã—ãŸã‚«ãƒ¡ãƒ©
 	graphics::camera create(camera_init_info info)
 	{
 		return graphics::camera{ camera_id{ cameras.add(info) } };
 	}
 
-	/// @brief ƒJƒƒ‰‚ğíœ‚·‚éŠÖ”
-	/// @param id íœ‘ÎÛ‚ÌƒJƒƒ‰ID
+	/// @brief ã‚«ãƒ¡ãƒ©ã‚’å‰Šé™¤ã™ã‚‹é–¢æ•°
+	/// @param id å‰Šé™¤å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©ID
 	void remove(camera_id id)
 	{
 		assert(id::is_valid(id));
 		cameras.remove(id);
 	}
 
-	/// @brief ƒJƒƒ‰‚Ìƒpƒ‰ƒ[ƒ^‚ğİ’è‚·‚éŠÖ”
-	/// @param id İ’è‘ÎÛ‚ÌƒJƒƒ‰ID
-	/// @param parameter İ’è‚·‚éƒpƒ‰ƒ[ƒ^
-	/// @param data ƒpƒ‰ƒ[ƒ^‚Ìƒf[ƒ^
-	/// @param data_size ƒf[ƒ^ƒTƒCƒY
+	/// @brief ã‚«ãƒ¡ãƒ©ã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã‚’è¨­å®šã™ã‚‹é–¢æ•°
+	/// @param id è¨­å®šå¯¾è±¡ã®ã‚«ãƒ¡ãƒ©ID
+	/// @param parameter è¨­å®šã™ã‚‹ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿
+	/// @param data ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã®ãƒ‡ãƒ¼ã‚¿
+	/// @param data_size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 	void set_parameter(camera_id id, camera_parameter::parameter parameter, const void* const data, u32 data_size)
 	{
 		assert(data && data_size);
@@ -438,11 +438,11 @@ namespace dxforge::graphics::d3d12::camera
 		set_functions[parameter](camera, data, data_size);
 	}
 
-	/// @brief ƒJƒƒ‰‚Ìƒpƒ‰ƒ[ƒ^‚ğæ“¾‚·‚éŠÖ”
-	/// @param id æ“¾‘ÎÛ‚ÌƒJƒƒ‰ID
-	/// @param parameter æ“¾‚·‚éƒpƒ‰ƒ[ƒ^
-	/// @param data ƒpƒ‰ƒ[ƒ^‚Ìƒf[ƒ^‚ğŠi”[‚·‚éƒoƒbƒtƒ@
-	/// @param data_size ƒf[ƒ^ƒTƒCƒY
+	/// @brief ã‚«ãƒ¡ãƒ©ã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+	/// @param id å–å¾—å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©ID
+	/// @param parameter å–å¾—ã™ã‚‹ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿
+	/// @param data ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã®ãƒ‡ãƒ¼ã‚¿ã‚’æ ¼ç´ã™ã‚‹ãƒãƒƒãƒ•ã‚¡
+	/// @param data_size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 	void get_parameter(camera_id id, camera_parameter::parameter parameter, void* const data, u32 data_size)
 	{
 		assert(data && data_size);
@@ -451,9 +451,9 @@ namespace dxforge::graphics::d3d12::camera
 		get_functions[parameter](camera, data, data_size);
 	}
 
-	/// @brief ƒJƒƒ‰‚ğæ“¾‚·‚éŠÖ”
-	/// @param id æ“¾‘ÎÛ‚ÌƒJƒƒ‰ID
-	/// @return æ“¾‚µ‚½ƒJƒƒ‰
+	/// @brief ã‚«ãƒ¡ãƒ©ã‚’å–å¾—ã™ã‚‹é–¢æ•°
+	/// @param id å–å¾—å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©ID
+	/// @return å–å¾—ã—ãŸã‚«ãƒ¡ãƒ©
 	d3d12_camera& get(camera_id id)
 	{
 		assert(id::is_valid(id));

@@ -1,25 +1,26 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Utilities.h]
-// ì¬“ú : 2024/08/12
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
+// ä½œæˆæ—¥ : 2024/08/12
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
 //
-// XV—š—ğ
-// 2024/08/12 V‹Kì¬
+// æ›´æ–°å±¥æ­´
+// 2024/08/12 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include <algorithm>
 #define USE_STL_VECTOR 0
 #define USE_STL_DEQUE 1
 #include <algorithm>
+
 
 #if USE_STL_VECTOR
 #include <vector>
 namespace dxforge::utl
 {
 	template<typename T>
-	using vector = std::vector<T>;  // std::vector ‚ğ dxforge::utl –¼‘O‹óŠÔ“à‚Ì vector ‚Æ‚µ‚ÄƒGƒCƒŠƒAƒX
+	using vector = std::vector<T>;  // std::vector ã‚’ dxforge::utl åå‰ç©ºé–“å†…ã® vector ã¨ã—ã¦ã‚¨ã‚¤ãƒªã‚¢ã‚¹
 
 	template<typename T>
 	void erase_unordered(T& v, size_t index)
@@ -54,14 +55,14 @@ namespace dxforge::utl
 namespace dxforge::utl
 {
 	template<typename T>
-	using deque = std::deque<T>;   // std::deque ‚ğ dxforge::utl –¼‘O‹óŠÔ“à‚Ì deque ‚Æ‚µ‚ÄƒGƒCƒŠƒAƒX
+	using deque = std::deque<T>;   // std::deque ã‚’ dxforge::utl åå‰ç©ºé–“å†…ã® deque ã¨ã—ã¦ã‚¨ã‚¤ãƒªã‚¢ã‚¹
 }
 #endif
 
 
 namespace dxforge::util
 {
-	// TODO : “Æ©‚ÌƒRƒ“ƒeƒi‚ğÀ‘•‚·‚é
+	// TODO : ç‹¬è‡ªã®ã‚³ãƒ³ãƒ†ãƒŠã‚’å®Ÿè£…ã™ã‚‹
 }
 
 #include "FreeList.h"

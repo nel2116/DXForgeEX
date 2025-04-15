@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [EngineAPI.cpp]
-// ì¬“ú : 2024/11/14
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// ƒGƒ“ƒWƒ“‚ÌAPI
-// XV—š—ğ
-// 2024/11/14 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/11/14
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// ã‚¨ãƒ³ã‚¸ãƒ³ã®API
+// æ›´æ–°å±¥æ­´
+// 2024/11/14 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "Common.h"
 #include "CommonHeaders.h"
 #include "Components/Script.h"
@@ -32,7 +32,7 @@ namespace
 	using _get_script_names = LPSAFEARRAY(*)(void);
 	_get_script_names get_script_names{ nullptr };
 	utl::vector<graphics::render_surface> surfaces;
-} // “½–¼–¼‘O‹óŠÔ
+} // åŒ¿ååå‰ç©ºé–“
 
 EDITOR_INTERFACE u32 LoadGameCodeDll(const char* dll_path)
 {

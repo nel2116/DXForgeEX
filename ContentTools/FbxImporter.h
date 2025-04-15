@@ -1,14 +1,14 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [FbxImporter.h]
-// ì¬“ú : 2025/01/11
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// FBXƒtƒ@ƒCƒ‹‚ğ“Ç‚İ‚ŞƒNƒ‰ƒX
-// XV—š—ğ
-// 2025/01/11 V‹Kì¬
+// ä½œæˆæ—¥ : 2025/01/11
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// FBXãƒ•ã‚¡ã‚¤ãƒ«ã‚’èª­ã¿è¾¼ã‚€ã‚¯ãƒ©ã‚¹
+// æ›´æ–°å±¥æ­´
+// 2025/01/11 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "ToolsCommon.h"
 #include <fbxsdk.h>
 
@@ -21,12 +21,12 @@ namespace dxforge::tools
 
 	class fbx_context
 	{
-	public:		// ƒpƒuƒŠƒbƒNŠÖ”
+	public:		// ãƒ‘ãƒ–ãƒªãƒƒã‚¯é–¢æ•°
 
-		/// @brief ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-		/// @param file ƒtƒ@ƒCƒ‹–¼
-		/// @param scene ƒV[ƒ“
-		/// @param data ƒV[ƒ“ƒf[ƒ^
+		/// @brief ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+		/// @param file ãƒ•ã‚¡ã‚¤ãƒ«å
+		/// @param scene ã‚·ãƒ¼ãƒ³
+		/// @param data ã‚·ãƒ¼ãƒ³ãƒ‡ãƒ¼ã‚¿
 		fbx_context(const char* file, scene* scene, scene_data* data, progression* const progression)
 			: _scene(scene), _scene_data(data), _progression(progression)
 		{
@@ -38,7 +38,7 @@ namespace dxforge::tools
 			}
 		}
 
-		/// @brief ƒfƒXƒgƒ‰ƒNƒ^
+		/// @brief ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
 		~fbx_context()
 		{
 			_fbx_scene->Destroy();
@@ -49,16 +49,16 @@ namespace dxforge::tools
 
 		void get_scene(FbxNode* root = nullptr);
 
-		/// @brief SceneManager‚ÆScene‚ª—LŒø‚©‚Ç‚¤‚©
-		/// @return —LŒø‚È‚çtrue
+		/// @brief SceneManagerã¨SceneãŒæœ‰åŠ¹ã‹ã©ã†ã‹
+		/// @return æœ‰åŠ¹ãªã‚‰true
 		constexpr bool is_valid() const { return _fbx_manager && _fbx_scene; }
 
-		/// @brief ƒV[ƒ“ƒXƒP[ƒ‹‚ğæ“¾
+		/// @brief ã‚·ãƒ¼ãƒ³ã‚¹ã‚±ãƒ¼ãƒ«ã‚’å–å¾—
 		constexpr f32 scene_scale() const { return _scene_scale; }
 
 		constexpr progression* get_progression() const { return _progression; }
 
-	private:	// ƒvƒ‰ƒCƒx[ƒgŠÖ”
+	private:	// ãƒ—ãƒ©ã‚¤ãƒ™ãƒ¼ãƒˆé–¢æ•°
 		bool initialize_fbx();
 		void load_fbx_file(const char* file);
 		void get_meshes(FbxNode* node, utl::vector<mesh>& meshes, u32 lod_id, f32 lod_threshold);
@@ -66,7 +66,7 @@ namespace dxforge::tools
 		void get_lod_group(FbxNodeAttribute* attribute);
 		bool get_mesh_data(FbxMesh* fbx_mesh, mesh& m);
 
-	private:	// ƒvƒ‰ƒCƒx[ƒg•Ï”
+	private:	// ãƒ—ãƒ©ã‚¤ãƒ™ãƒ¼ãƒˆå¤‰æ•°
 
 		scene* _scene{ nullptr };
 		scene_data* _scene_data{ nullptr };

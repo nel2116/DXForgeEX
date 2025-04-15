@@ -1,22 +1,22 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Entity.h]
-// ì¬“ú : 2024/08/12
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-// 	ƒGƒ“ƒeƒBƒeƒB‚ğ’è‹`‚µ‚½ƒtƒ@ƒCƒ‹
-// XV—š—ğ
-// 2024/08/12 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/08/12
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+// 	ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚’å®šç¾©ã—ãŸãƒ•ã‚¡ã‚¤ãƒ«
+// æ›´æ–°å±¥æ­´
+// 2024/08/12 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "ComponentsCommon.h"
 
 namespace dxforge
 {
-	// INIT_INFO ƒ}ƒNƒ‚ğ’è‹`Fw’è‚³‚ê‚½ component ‚Ì–¼‘O‹óŠÔ‚É init_info \‘¢‘Ì‚ğ’è‹`‚·‚é
+	// INIT_INFO ãƒã‚¯ãƒ­ã‚’å®šç¾©ï¼šæŒ‡å®šã•ã‚ŒãŸ component ã®åå‰ç©ºé–“ã« init_info æ§‹é€ ä½“ã‚’å®šç¾©ã™ã‚‹
 #define INIT_INFO(component) namespace component { struct init_info; }
 
-	// transform –¼‘O‹óŠÔ‚É init_info \‘¢‘Ì‚ğ’è‹`
+	// transform åå‰ç©ºé–“ã« init_info æ§‹é€ ä½“ã‚’å®šç¾©
 	INIT_INFO(transform);
 	INIT_INFO(script);
 	INIT_INFO(geometry);
@@ -24,22 +24,22 @@ namespace dxforge
 #undef INIT_INFO
 
 	namespace game_entity {
-		// entity_info \‘¢‘Ì‚ğ’è‹`FƒQ[ƒ€ƒGƒ“ƒeƒBƒeƒB‚Ì‰Šú‰»î•ñ‚ğŠi”[
+		// entity_info æ§‹é€ ä½“ã‚’å®šç¾©ï¼šã‚²ãƒ¼ãƒ ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®åˆæœŸåŒ–æƒ…å ±ã‚’æ ¼ç´
 		struct entity_info
 		{
-			// transform –¼‘O‹óŠÔ‚Ì init_info Œ^‚Ìƒ|ƒCƒ“ƒ^‚ğéŒ¾A‰Šú‰»‚Í nullptr
+			// transform åå‰ç©ºé–“ã® init_info å‹ã®ãƒã‚¤ãƒ³ã‚¿ã‚’å®£è¨€ã€åˆæœŸåŒ–ã¯ nullptr
 			transform::init_info* transform{ nullptr };
 			script::init_info* script{ nullptr };
 			geometry::init_info* geometry{ nullptr };
 		};
 
-		// ƒQ[ƒ€ƒGƒ“ƒeƒBƒeƒB‚ğì¬‚·‚éŠÖ”
+		// ã‚²ãƒ¼ãƒ ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚’ä½œæˆã™ã‚‹é–¢æ•°
 		entity create(entity_info info);
 
-		// ƒQ[ƒ€ƒGƒ“ƒeƒBƒeƒB‚ğíœ‚·‚éŠÖ”
+		// ã‚²ãƒ¼ãƒ ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚’å‰Šé™¤ã™ã‚‹é–¢æ•°
 		void remove(entity_id id);
 
-		// w’è‚µ‚½ƒGƒ“ƒeƒBƒeƒB‚ª—LŒø‚©‚Ç‚¤‚©‚ğŠm”F‚·‚éŠÖ”
+		// æŒ‡å®šã—ãŸã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ãŒæœ‰åŠ¹ã‹ã©ã†ã‹ã‚’ç¢ºèªã™ã‚‹é–¢æ•°
 		bool is_alive(entity_id id);
 	}
 };

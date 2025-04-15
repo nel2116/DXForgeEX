@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [TextureImpoter.cpp]
-// ì¬“ú : 2025/01/23
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// ƒeƒNƒXƒ`ƒƒ‚ÌƒCƒ“ƒ|[ƒg‚ğs‚¤
-// XV—š—ğ
-// 2025/01/23 V‹Kì¬
+// ä½œæˆæ—¥ : 2025/01/23
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®ã‚¤ãƒ³ãƒãƒ¼ãƒˆã‚’è¡Œã†
+// æ›´æ–°å±¥æ­´
+// 2025/01/23 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "ToolsCommon.h"
 #include "Content/ContentToEngine.h"
 #include "Utilities/IOStream.h"
@@ -54,8 +54,8 @@ namespace dxforge::tools
 
 		struct texture_import_settings
 		{
-			char* sources;		// ƒZƒ~ƒRƒƒ“ ';' ‚Å‹æØ‚ç‚ê‚½1‚ÂˆÈã‚Ìƒtƒ@ƒCƒ‹ƒpƒX‚Ì•¶š—ñB
-			u32 source_count;	// ƒtƒ@ƒCƒ‹ƒpƒX‚Ì”
+			char* sources;		// ã‚»ãƒŸã‚³ãƒ­ãƒ³ ';' ã§åŒºåˆ‡ã‚‰ã‚ŒãŸ1ã¤ä»¥ä¸Šã®ãƒ•ã‚¡ã‚¤ãƒ«ãƒ‘ã‚¹ã®æ–‡å­—åˆ—ã€‚
+			u32 source_count;	// ãƒ•ã‚¡ã‚¤ãƒ«ãƒ‘ã‚¹ã®æ•°
 			u32 dimension;
 			u32 mip_levels;
 			f32 alpha_threshold;
@@ -77,7 +77,7 @@ namespace dxforge::tools
 
 		struct texture_data
 		{
-			constexpr static u32    max_mips{ 14 }; // Å‘å8KƒeƒNƒXƒ`ƒƒ‚ğƒTƒ|[ƒg‚µ‚Ä‚¢‚Ü‚·B
+			constexpr static u32    max_mips{ 14 }; // æœ€å¤§8Kãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’ã‚µãƒãƒ¼ãƒˆã—ã¦ã„ã¾ã™ã€‚
 			u8* subresource_data;
 			u32                     subresource_size;
 			u8* icon;
@@ -98,8 +98,8 @@ namespace dxforge::tools
 		HMODULE dxgi_module{ nullptr };
 		HMODULE d3d11_module{ nullptr };
 
-		/// @brief ƒn[ƒhƒEƒFƒAƒAƒ_ƒvƒ^‚ğæ“¾
-		/// @return ƒn[ƒhƒEƒFƒAƒAƒ_ƒvƒ^‚ÌƒŠƒXƒg
+		/// @brief ãƒãƒ¼ãƒ‰ã‚¦ã‚§ã‚¢ã‚¢ãƒ€ãƒ—ã‚¿ã‚’å–å¾—
+		/// @return ãƒãƒ¼ãƒ‰ã‚¦ã‚§ã‚¢ã‚¢ãƒ€ãƒ—ã‚¿ã®ãƒªã‚¹ãƒˆ
 		utl::vector<ComPtr<IDXGIAdapter>> get_adapters_by_performance()
 		{
 			if (!dxgi_module)
@@ -137,7 +137,7 @@ namespace dxforge::tools
 			return adapters;
 		}
 
-		/// @brief ƒfƒoƒCƒX‚ğì¬
+		/// @brief ãƒ‡ãƒã‚¤ã‚¹ã‚’ä½œæˆ
 		void create_device()
 		{
 			if (d3d11_devices.size()) return;
@@ -173,7 +173,7 @@ namespace dxforge::tools
 
 			for (u32 i{ 0 }; i < devices.size(); ++i)
 			{
-				// NOTE: —v‹‚³‚ê‚½‹@”\ƒŒƒxƒ‹(D3D_FEATURE_LEVEL_11_0)‚ğƒTƒ|[ƒg‚µ‚Ä‚¢‚È‚¢ƒAƒ_ƒvƒ^‚Å‚ÍAƒfƒoƒCƒX‚Ìì¬‚É¸”s‚·‚é‚±‚Æ‚ª‚ ‚é‚½‚ß‚Å‚·B
+				// NOTE: è¦æ±‚ã•ã‚ŒãŸæ©Ÿèƒ½ãƒ¬ãƒ™ãƒ«(D3D_FEATURE_LEVEL_11_0)ã‚’ã‚µãƒãƒ¼ãƒˆã—ã¦ã„ãªã„ã‚¢ãƒ€ãƒ—ã‚¿ã§ã¯ã€ãƒ‡ãƒã‚¤ã‚¹ã®ä½œæˆã«å¤±æ•—ã™ã‚‹ã“ã¨ãŒã‚ã‚‹ãŸã‚ã§ã™ã€‚
 				if (devices[i])
 				{
 					d3d11_devices.emplace_back();
@@ -182,20 +182,20 @@ namespace dxforge::tools
 			}
 		}
 
-		/// @brief ƒfƒoƒCƒX‚ğæ“¾
-		/// @param flags ƒtƒ‰ƒO
-		/// @param flag ƒtƒ‰ƒO
-		/// @param set ƒtƒ‰ƒO‚ğİ’è‚·‚é‚©‚Ç‚¤‚©
+		/// @brief ãƒ‡ãƒã‚¤ã‚¹ã‚’å–å¾—
+		/// @param flags ãƒ•ãƒ©ã‚°
+		/// @param flag ãƒ•ãƒ©ã‚°
+		/// @param set ãƒ•ãƒ©ã‚°ã‚’è¨­å®šã™ã‚‹ã‹ã©ã†ã‹
 		constexpr void set_or_clear_flag(u32& flags, u32 flag, bool set)
 		{
 			if (set) flags |= flag; else flags &= ~flag;
 		}
 
-		/// @brief ƒeƒNƒXƒ`ƒƒ‚ÌÅ‘åƒ~ƒbƒvƒ}ƒbƒv”‚ğæ“¾
-		/// @param width •
-		/// @param height ‚‚³
-		/// @param depth [“x
-		/// @return ƒ~ƒbƒvƒ}ƒbƒv”
+		/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®æœ€å¤§ãƒŸãƒƒãƒ—ãƒãƒƒãƒ—æ•°ã‚’å–å¾—
+		/// @param width å¹…
+		/// @param height é«˜ã•
+		/// @param depth æ·±åº¦
+		/// @return ãƒŸãƒƒãƒ—ãƒãƒƒãƒ—æ•°
 		constexpr u32 get_max_mip_count(u32 width, u32 height, u32 depth)
 		{
 			u32 mip_levels{ 1 };
@@ -211,9 +211,9 @@ namespace dxforge::tools
 			return mip_levels;
 		}
 
-		/// @brief ƒeƒNƒXƒ`ƒƒî•ñ‚ğƒƒ^ƒf[ƒ^‚©‚çæ“¾
-		/// @param metadata ƒƒ^ƒf[ƒ^
-		/// @param info ƒeƒNƒXƒ`ƒƒî•ñ
+		/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£æƒ…å ±ã‚’ãƒ¡ã‚¿ãƒ‡ãƒ¼ã‚¿ã‹ã‚‰å–å¾—
+		/// @param metadata ãƒ¡ã‚¿ãƒ‡ãƒ¼ã‚¿
+		/// @param info ãƒ†ã‚¯ã‚¹ãƒãƒ£æƒ…å ±
 		void texture_info_from_metadata(const TexMetadata& metadata, texture_info& info)
 		{
 			using namespace dxforge::content;
@@ -231,9 +231,9 @@ namespace dxforge::tools
 			set_or_clear_flag(info.flags, texture_flags::is_srgb, IsSRGB(format));
 		}
 
-		/// @brief ƒeƒNƒXƒ`ƒƒî•ñ‚ğİ’è
-		/// @param scratch ƒXƒNƒ‰ƒbƒ`ƒCƒ[ƒW
-		/// @param data ƒeƒNƒXƒ`ƒƒƒf[ƒ^
+		/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£æƒ…å ±ã‚’è¨­å®š
+		/// @param scratch ã‚¹ã‚¯ãƒ©ãƒƒãƒã‚¤ãƒ¡ãƒ¼ã‚¸
+		/// @param data ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ‡ãƒ¼ã‚¿
 		void copy_subresources(const ScratchImage& scratch, texture_data* const data)
 		{
 			const Image* const images{ scratch.GetImages() };
@@ -244,13 +244,13 @@ namespace dxforge::tools
 
 			for (u32 i{ 0 }; i < image_count; ++i)
 			{
-				// 4 x u32 i•A‚‚³Asƒsƒbƒ`AƒXƒ‰ƒCƒXƒsƒbƒ`—p
+				// 4 x u32 ï¼ˆå¹…ã€é«˜ã•ã€è¡Œãƒ”ãƒƒãƒã€ã‚¹ãƒ©ã‚¤ã‚¹ãƒ”ãƒƒãƒç”¨
 				subresource_size += sizeof(u32) * 4 + images[i].slicePitch;
 			}
 
 			if (subresource_size > ~(u32)0)
 			{
-				// ƒŠƒ\[ƒX‚ ‚½‚èÅ‘å4GB‚ğƒTƒ|[ƒgB
+				// ãƒªã‚½ãƒ¼ã‚¹ã‚ãŸã‚Šæœ€å¤§4GBã‚’ã‚µãƒãƒ¼ãƒˆã€‚
 				data->info.import_error = import_error::max_size_exceeded;
 				return;
 			}
@@ -272,9 +272,9 @@ namespace dxforge::tools
 			}
 		}
 
-		/// @brief ƒTƒuƒŠƒ\[ƒXƒf[ƒ^‚ğƒCƒ[ƒW‚É•ÏŠ·
-		/// @param data ƒeƒNƒXƒ`ƒƒƒf[ƒ^
-		/// @return ƒCƒ[ƒWƒŠƒXƒg
+		/// @brief ã‚µãƒ–ãƒªã‚½ãƒ¼ã‚¹ãƒ‡ãƒ¼ã‚¿ã‚’ã‚¤ãƒ¡ãƒ¼ã‚¸ã«å¤‰æ›
+		/// @param data ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ‡ãƒ¼ã‚¿
+		/// @return ã‚¤ãƒ¡ãƒ¼ã‚¸ãƒªã‚¹ãƒˆ
 		[[nodiscard]] utl::vector<Image> subresource_data_to_images(texture_data* const data)
 		{
 			assert(data && data->subresource_data && data->subresource_size);
@@ -319,9 +319,9 @@ namespace dxforge::tools
 			return images;
 		}
 
-		/// @brief ƒAƒCƒRƒ“‚ğƒRƒs[
-		/// @param bc_image ƒRƒs[‚·‚éƒCƒ[ƒW
-		/// @param data ƒeƒNƒXƒ`ƒƒƒf[ƒ^
+		/// @brief ã‚¢ã‚¤ã‚³ãƒ³ã‚’ã‚³ãƒ”ãƒ¼
+		/// @param bc_image ã‚³ãƒ”ãƒ¼ã™ã‚‹ã‚¤ãƒ¡ãƒ¼ã‚¸
+		/// @param data ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ‡ãƒ¼ã‚¿
 		void copy_icon(const Image& bc_image, texture_data* const data)
 		{
 			ScratchImage scratch;
@@ -333,7 +333,7 @@ namespace dxforge::tools
 			assert(scratch.GetImages());
 			const Image& image{ scratch.GetImages()[0] };
 
-			// 4 x u32 i•A‚‚³Asƒsƒbƒ`AƒXƒ‰ƒCƒXƒsƒbƒ`—p
+			// 4 x u32 ï¼ˆå¹…ã€é«˜ã•ã€è¡Œãƒ”ãƒƒãƒã€ã‚¹ãƒ©ã‚¤ã‚¹ãƒ”ãƒƒãƒç”¨
 			data->icon_size = (u32)(sizeof(u32) * 4 + image.slicePitch);
 			data->icon = (u8* const)CoTaskMemRealloc(data->icon, data->icon_size);
 			assert(data->icon);
@@ -346,10 +346,10 @@ namespace dxforge::tools
 			blob.write(image.pixels, image.slicePitch);
 		}
 
-		/// @brief ƒeƒNƒXƒ`ƒƒ‚ğƒ[ƒh
-		/// @param data ƒeƒNƒXƒ`ƒƒƒf[ƒ^
-		/// @param file_name ƒtƒ@ƒCƒ‹–¼
-		/// @return ƒXƒNƒ‰ƒbƒ`ƒCƒ[ƒW
+		/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’ãƒ­ãƒ¼ãƒ‰
+		/// @param data ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ‡ãƒ¼ã‚¿
+		/// @param file_name ãƒ•ã‚¡ã‚¤ãƒ«å
+		/// @return ã‚¹ã‚¯ãƒ©ãƒƒãƒã‚¤ãƒ¡ãƒ¼ã‚¸
 		[[nodiscard]] ScratchImage load_from_file(texture_data* const data, const char* file_name)
 		{
 			using namespace dxforge::content;
@@ -377,24 +377,24 @@ namespace dxforge::tools
 			const wchar_t* const file{ wfile.c_str() };
 			ScratchImage scratch;
 
-			// ‚Ü‚¸WICƒtƒH[ƒ}ƒbƒg‚Ìˆê‚Â‚ğ‚µ‚Ä‚İ‚Ä‚­‚¾‚³‚¢i—áFBMPAJPEGAPNG‚È‚ÇjB
+			// ã¾ãšWICãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆã®ä¸€ã¤ã‚’è©¦ã—ã¦ã¿ã¦ãã ã•ã„ï¼ˆä¾‹ï¼šBMPã€JPEGã€PNGãªã©ï¼‰ã€‚
 			wic_flags |= WIC_FLAGS_FORCE_RGB;
 			HRESULT hr{ LoadFromWICFile(file, wic_flags, nullptr, scratch) };
 
-			// WIC‚ÌƒtƒH[ƒ}ƒbƒg‚Å‚Í‚È‚©‚Á‚½B TGA‚ğ‚µ‚Ä‚İ‚Ä‚­‚¾‚³‚¢B
+			// WICã®ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆã§ã¯ãªã‹ã£ãŸã€‚ TGAã‚’è©¦ã—ã¦ã¿ã¦ãã ã•ã„ã€‚
 			if (FAILED(hr))
 			{
 				hr = LoadFromTGAFile(file, tga_flags, nullptr, scratch);
 			}
 
-			// TGA‚Å‚à‚È‚©‚Á‚½B HDR‚ğ‚µ‚Ä‚İ‚Ä‚­‚¾‚³‚¢B
+			// TGAã§ã‚‚ãªã‹ã£ãŸã€‚ HDRã‚’è©¦ã—ã¦ã¿ã¦ãã ã•ã„ã€‚
 			if (FAILED(hr))
 			{
 				hr = LoadFromHDRFile(file, nullptr, scratch);
 				if (SUCCEEDED(hr)) data->info.flags |= texture_flags::is_hdr;
 			}
 
-			// HDR‚Å‚Í‚È‚©‚Á‚½B DDS‚ğ‚µ‚Ä‚İ‚Ä‚­‚¾‚³‚¢B
+			// HDRã§ã¯ãªã‹ã£ãŸã€‚ DDSã‚’è©¦ã—ã¦ã¿ã¦ãã ã•ã„ã€‚
 			if (FAILED(hr))
 			{
 				hr = LoadFromDDSFile(file, DDS_FLAGS_FORCE_RGB, nullptr, scratch);
@@ -420,10 +420,10 @@ namespace dxforge::tools
 			return scratch;
 		}
 
-		/// @brief ƒeƒNƒXƒ`ƒƒ‚ğ‰Šú‰»
-		/// @param data ƒeƒNƒXƒ`ƒƒƒf[ƒ^
-		/// @param images ƒCƒ[ƒWƒŠƒXƒg
-		/// @return ƒXƒNƒ‰ƒbƒ`ƒCƒ[ƒW
+		/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’åˆæœŸåŒ–
+		/// @param data ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ‡ãƒ¼ã‚¿
+		/// @param images ã‚¤ãƒ¡ãƒ¼ã‚¸ãƒªã‚¹ãƒˆ
+		/// @return ã‚¹ã‚¯ãƒ©ãƒƒãƒã‚¤ãƒ¡ãƒ¼ã‚¸
 		[[nodiscard]] ScratchImage initialize_from_images(texture_data* const data, const utl::vector<Image>& images)
 		{
 			assert(data);
@@ -433,7 +433,7 @@ namespace dxforge::tools
 			HRESULT hr{ S_OK };
 			const u32 array_size{ (u32)images.size() };
 
-			{ // ‰æ‘œ‚ğƒXƒNƒ‰ƒbƒ`ƒCƒ[ƒW‚É•ÏŠ·
+			{ // ç”»åƒã‚’ã‚¹ã‚¯ãƒ©ãƒƒãƒã‚¤ãƒ¡ãƒ¼ã‚¸ã«å¤‰æ›
 				ScratchImage working_scratch{};
 
 				if (settings.dimension == texture_dimension::texture_1d ||
@@ -497,11 +497,11 @@ namespace dxforge::tools
 			return scratch;
 		}
 
-		/// @brief ƒeƒNƒXƒ`ƒƒ‚Ìo—ÍƒtƒH[ƒ}ƒbƒg‚ğŒˆ’è
-		/// @param data ƒeƒNƒXƒ`ƒƒƒf[ƒ^
-		/// @param scratch ƒXƒNƒ‰ƒbƒ`ƒCƒ[ƒW
-		/// @param image ƒCƒ[ƒW
-		/// @return DXGIƒtƒH[ƒ}ƒbƒg
+		/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®å‡ºåŠ›ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆã‚’æ±ºå®š
+		/// @param data ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ‡ãƒ¼ã‚¿
+		/// @param scratch ã‚¹ã‚¯ãƒ©ãƒƒãƒã‚¤ãƒ¡ãƒ¼ã‚¸
+		/// @param image ã‚¤ãƒ¡ãƒ¼ã‚¸
+		/// @return DXGIãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆ
 		DXGI_FORMAT determine_output_format(texture_data* const data, ScratchImage& scratch, const Image* const image)
 		{
 			assert(data && data->import_settings.compress);
@@ -509,7 +509,7 @@ namespace dxforge::tools
 			const DXGI_FORMAT image_format{ image->format };
 			DXGI_FORMAT output_format{ (DXGI_FORMAT)data->import_settings.output_format };
 
-			// ƒCƒ“ƒ|[ƒgİ’è‚ÅƒtƒH[ƒ}ƒbƒg‚ª–¾¦“I‚Éw’è‚³‚ê‚Ä‚¢‚È‚¢ê‡AÅ“K‚ÈƒuƒƒbƒNˆ³kƒtƒH[ƒ}ƒbƒg‚ğŒˆ’è‚·‚éB
+			// ã‚¤ãƒ³ãƒãƒ¼ãƒˆè¨­å®šã§ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆãŒæ˜ç¤ºçš„ã«æŒ‡å®šã•ã‚Œã¦ã„ãªã„å ´åˆã€æœ€é©ãªãƒ–ãƒ­ãƒƒã‚¯åœ§ç¸®ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆã‚’æ±ºå®šã™ã‚‹ã€‚
 			if (output_format != DXGI_FORMAT_UNKNOWN)
 			{
 				goto _done;
@@ -521,13 +521,13 @@ namespace dxforge::tools
 				output_format = DXGI_FORMAT_BC6H_UF16;
 			}
 
-			// ƒ\[ƒX‰æ‘œ‚ªƒOƒŒ[ƒXƒP[ƒ‹‚Ü‚½‚ÍƒVƒ“ƒOƒ‹ƒ`ƒƒƒ“ƒlƒ‹‚ÌƒuƒƒbƒNˆ³kƒtƒH[ƒ}ƒbƒgiBC4j‚Ìê‡Ao—ÍƒtƒH[ƒ}ƒbƒg‚ÍBC4‚É‚È‚è‚Ü‚·B
+			// ã‚½ãƒ¼ã‚¹ç”»åƒãŒã‚°ãƒ¬ãƒ¼ã‚¹ã‚±ãƒ¼ãƒ«ã¾ãŸã¯ã‚·ãƒ³ã‚°ãƒ«ãƒãƒ£ãƒ³ãƒãƒ«ã®ãƒ–ãƒ­ãƒƒã‚¯åœ§ç¸®ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆï¼ˆBC4ï¼‰ã®å ´åˆã€å‡ºåŠ›ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆã¯BC4ã«ãªã‚Šã¾ã™ã€‚
 			else if (image_format == DXGI_FORMAT_R8_UNORM || image_format == DXGI_FORMAT_BC4_UNORM || image_format == DXGI_FORMAT_BC4_SNORM)
 			{
 				output_format = DXGI_FORMAT_BC4_UNORM;
 			}
 
-			// Œ³‰æ‘œ‚ª–@üƒ}ƒbƒv‚©‚Ç‚¤‚©‚ğƒeƒXƒg‚µA–@üƒ}ƒbƒv‚Å‚ ‚ê‚ÎBC5Œ`®‚Åo—Í‚·‚éB
+			// å…ƒç”»åƒãŒæ³•ç·šãƒãƒƒãƒ—ã‹ã©ã†ã‹ã‚’ãƒ†ã‚¹ãƒˆã—ã€æ³•ç·šãƒãƒƒãƒ—ã§ã‚ã‚Œã°BC5å½¢å¼ã§å‡ºåŠ›ã™ã‚‹ã€‚
 			else if (is_normal_map(image) || image_format == DXGI_FORMAT_BC5_UNORM || image_format == DXGI_FORMAT_BC5_SNORM)
 			{
 				data->info.flags |= texture_flags::is_imported_as_normal_map;
@@ -539,7 +539,7 @@ namespace dxforge::tools
 				}
 			}
 
-			// RGBAƒuƒƒbƒNˆ³kƒtƒH[ƒ}ƒbƒg‚ğg—p‚·‚éB
+			// RGBAãƒ–ãƒ­ãƒƒã‚¯åœ§ç¸®ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆã‚’ä½¿ç”¨ã™ã‚‹ã€‚
 			else
 			{
 				output_format = data->import_settings.prefer_bc7 ? DXGI_FORMAT_BC7_UNORM :
@@ -553,9 +553,9 @@ namespace dxforge::tools
 			return IsSRGB(image_format) ? MakeSRGB(output_format) : output_format;
 		}
 
-		/// @brief ƒeƒNƒXƒ`ƒƒ‚ª–@üƒ}ƒbƒv‚©‚Ç‚¤‚©‚ğ”»’è
-		/// @param format ƒtƒH[ƒ}ƒbƒg
-		/// @return –@üƒ}ƒbƒv‚Ìê‡‚Ítrue
+		/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£ãŒæ³•ç·šãƒãƒƒãƒ—ã‹ã©ã†ã‹ã‚’åˆ¤å®š
+		/// @param format ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆ
+		/// @return æ³•ç·šãƒãƒƒãƒ—ã®å ´åˆã¯true
 		bool can_use_gpu(DXGI_FORMAT format)
 		{
 			switch (format)
@@ -582,10 +582,10 @@ namespace dxforge::tools
 			return false;
 		}
 
-		/// @brief ƒeƒNƒXƒ`ƒƒ‚ª–@üƒ}ƒbƒv‚©‚Ç‚¤‚©‚ğ”»’è
-		/// @param data ƒeƒNƒXƒ`ƒƒƒf[ƒ^
-		/// @param scratch ƒXƒNƒ‰ƒbƒ`ƒCƒ[ƒW
-		/// @return –@üƒ}ƒbƒv‚Ìê‡‚Ítrue
+		/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£ãŒæ³•ç·šãƒãƒƒãƒ—ã‹ã©ã†ã‹ã‚’åˆ¤å®š
+		/// @param data ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ‡ãƒ¼ã‚¿
+		/// @param scratch ã‚¹ã‚¯ãƒ©ãƒƒãƒã‚¤ãƒ¡ãƒ¼ã‚¸
+		/// @return æ³•ç·šãƒãƒƒãƒ—ã®å ´åˆã¯true
 		[[nodiscard]] ScratchImage compress_image(texture_data* const data, ScratchImage& scratch)
 		{
 			assert(data && data->import_settings.compress && scratch.GetImages());
@@ -634,9 +634,9 @@ namespace dxforge::tools
 			return bc_scratch;
 		}
 
-	} // “½–¼–¼‘O‹óŠÔ
+	} // åŒ¿ååå‰ç©ºé–“
 
-	/// @brief ƒeƒNƒXƒ`ƒƒƒc[ƒ‹‚ÌI—¹ˆ—
+	/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ„ãƒ¼ãƒ«ã®çµ‚äº†å‡¦ç†
 	void ShutDownTextureTools()
 	{
 		d3d11_devices.clear();
@@ -654,9 +654,9 @@ namespace dxforge::tools
 		}
 	}
 
-	/// @brief ƒeƒNƒXƒ`ƒƒ‚Ì‰ğ“€
-	/// @param data ƒeƒNƒXƒ`ƒƒƒf[ƒ^
-	/// @return ¬Œ÷‚µ‚½ê‡‚Ítrue
+	/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®è§£å‡
+	/// @param data ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ‡ãƒ¼ã‚¿
+	/// @return æˆåŠŸã—ãŸå ´åˆã¯true
 	EDITOR_INTERFACE void Decompress(texture_data* const data)
 	{
 		using namespace dxforge::content;
@@ -678,7 +678,7 @@ namespace dxforge::tools
 			? TEX_ALPHA_MODE_PREMULTIPLIED
 			: info.flags & texture_flags::has_alpha ? TEX_ALPHA_MODE_STRAIGHT : TEX_ALPHA_MODE_OPAQUE;
 		metadata.format = format;
-		// TODO: 1D‚ÌƒeƒNƒXƒ`ƒƒ‚ğƒTƒ|[ƒg‚·‚é
+		// TODO: 1Dã®ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’ã‚µãƒãƒ¼ãƒˆã™ã‚‹
 		metadata.dimension = is_3d ? TEX_DIMENSION_TEXTURE3D : TEX_DIMENSION_TEXTURE2D;
 
 		ScratchImage scratch;
@@ -694,9 +694,9 @@ namespace dxforge::tools
 		}
 	}
 
-	/// @brief ƒeƒNƒXƒ`ƒƒ‚ÌƒCƒ“ƒ|[ƒg
-	/// @param data ƒeƒNƒXƒ`ƒƒƒf[ƒ^
-	/// @return ¬Œ÷‚µ‚½ê‡‚Ítrue
+	/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®ã‚¤ãƒ³ãƒãƒ¼ãƒˆ
+	/// @param data ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ‡ãƒ¼ã‚¿
+	/// @return æˆåŠŸã—ãŸå ´åˆã¯true
 	EDITOR_INTERFACE void Import(texture_data* const data)
 	{
 		const texture_import_settings& settings{ data->import_settings };
@@ -726,14 +726,14 @@ namespace dxforge::tools
 				format = metadata.format;
 			}
 
-			// ‚·‚×‚Ä‚Ì‰æ‘œƒ\[ƒX‚Í“¯‚¶ƒTƒCƒY‚Å‚È‚¯‚ê‚Î‚È‚è‚Ü‚¹‚ñB
+			// ã™ã¹ã¦ã®ç”»åƒã‚½ãƒ¼ã‚¹ã¯åŒã˜ã‚µã‚¤ã‚ºã§ãªã‘ã‚Œã°ãªã‚Šã¾ã›ã‚“ã€‚
 			if (width != metadata.width || height != metadata.height)
 			{
 				data->info.import_error = import_error::size_mismatch;
 				return;
 			}
 
-			// ‚·‚×‚Ä‚Ì‰æ‘œƒ\[ƒX‚Í“¯‚¶ƒtƒH[ƒ}ƒbƒg‚Å‚È‚¯‚ê‚Î‚È‚è‚Ü‚¹‚ñB
+			// ã™ã¹ã¦ã®ç”»åƒã‚½ãƒ¼ã‚¹ã¯åŒã˜ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆã§ãªã‘ã‚Œã°ãªã‚Šã¾ã›ã‚“ã€‚
 			if (format != metadata.format)
 			{
 				data->info.import_error = import_error::format_mismatch;
@@ -773,7 +773,7 @@ namespace dxforge::tools
 			ScratchImage bc_scratch{ compress_image(data, scratch) };
 			if (data->info.import_error) return;
 
-			// ƒAƒCƒRƒ“‚Ég—p‚·‚éÅ‰‚Ì‰æ‘œ‚ğ‰ğ“€‚·‚éB
+			// ã‚¢ã‚¤ã‚³ãƒ³ã«ä½¿ç”¨ã™ã‚‹æœ€åˆã®ç”»åƒã‚’è§£å‡ã™ã‚‹ã€‚
 			assert(bc_scratch.GetImages());
 			copy_icon(bc_scratch.GetImages()[0], data);
 

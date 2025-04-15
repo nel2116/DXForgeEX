@@ -1,14 +1,14 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+﻿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Platform.cpp]
-// �쐬�� : 2024/12/20
-// �쐬�� : �c���~�m��
-// �T�v :
-// �@�v���b�g�t�H�[���̎���
-// �X�V����
-// 2024/12/20 �V�K�쐬
-// 2025/01/19 ���͏����̒ǉ�
+// 作成日 : 2024/12/20
+// 作成者 : 田中ミノル
+// 概要 :
+// 　プラットフォームの実装
+// 更新履歴
+// 2024/12/20 新規作成
+// 2025/01/19 入力処理の追加
 // // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== �C���N���[�h�� ======
+// ====== インクルード部 ======
 #ifdef  _WIN64
 #include "Platform.h"
 #include "PlatformType.h"
@@ -18,8 +18,8 @@ namespace dxforge::platform
 {
 	namespace
 	{
-		/// @brief �E�B���h�E���
-		/// @details �E�B���h�E�̏���ێ�����\����
+		/// @brief ウィンドウ情報
+		/// @details ウィンドウの情報を保持する構造体
 		struct window_info
 		{
 			HWND hwnd{ nullptr };
@@ -32,21 +32,21 @@ namespace dxforge::platform
 			~window_info() { assert(!is_fullscreen); }
 		};
 
-		// �E�B���h�E���̃��X�g
+		// ウィンドウ情報のリスト
 		utl::free_list<window_info> windows;
 
-		/// @brief �E�B���h�E���̎擾
-		/// @param id �E�B���h�EID
-		/// @return window_info�̎Q��
+		/// @brief ウィンドウ情報の取得
+		/// @param id ウィンドウID
+		/// @return window_infoの参照
 		window_info& get_from_id(window_id id)
 		{
 			assert(windows[id].hwnd);
 			return windows[id];
 		}
 
-		/// @brief �E�B���h�E���̎擾
-		/// @param handle �E�B���h�E�n���h��
-		/// @return window_info�̎Q��
+		/// @brief ウィンドウ情報の取得
+		/// @param handle ウィンドウハンドル
+		/// @return window_infoの参照
 		window_info& get_from_handle(window_handle handle)
 		{
 			const window_id id{ (id::id_type)GetWindowLongPtr(handle, GWLP_USERDATA) };
@@ -55,7 +55,7 @@ namespace dxforge::platform
 
 		bool resized{ false };
 
-		/// @brief �E�B���h�E�v���V�[�W��
+		/// @brief ウィンドウプロシージャ
 		/// @param hwnd
 		/// @param msg
 		/// @param wparam
@@ -67,7 +67,7 @@ namespace dxforge::platform
 			{
 			case WM_NCCREATE:
 			{
-				// �E�B���h�E�̃f�[�^�E�o�b�t�@�̃��[�U�[�E�f�[�^�E�t�B�[���h�ɃE�B���h�EID������B
+				// ウィンドウのデータ・バッファのユーザー・データ・フィールドにウィンドウIDを入れる。
 				DEBUG_OP(SetLastError(0));
 				const window_id id{ windows.add() };
 				windows[id].hwnd = hwnd;
@@ -109,12 +109,12 @@ namespace dxforge::platform
 		}
 
 
-		/// @brief �E�B���h�E�̃��T�C�Y
-		/// @param info �E�B���h�E���
-		/// @param rect �E�B���h�E�̃T�C�Y
+		/// @brief ウィンドウのリサイズ
+		/// @param info ウィンドウ情報
+		/// @param rect ウィンドウのサイズ
 		void resize_window(window_info& info, const RECT& area)
 		{
-			// �f�o�C�X�T�C�Y�ɍ��킹�ăE�B���h�E�T�C�Y�𒲐�����
+			// デバイスサイズに合わせてウィンドウサイズを調整する
 			RECT window_rect{ area };
 			AdjustWindowRect(&window_rect, info.style, FALSE);
 
@@ -124,23 +124,23 @@ namespace dxforge::platform
 			MoveWindow(info.hwnd, info.top_left.x, info.top_left.y, width, height, true);
 		}
 
-		/// @brief �E�B���h�E�̃��T�C�Y
-		/// @param id �E�B���h�EID
-		/// @param width �E�B���h�E�̕�
-		/// @param height �E�B���h�E�̍���
+		/// @brief ウィンドウのリサイズ
+		/// @param id ウィンドウID
+		/// @param width ウィンドウの幅
+		/// @param height ウィンドウの高さ
 		void resize_window(window_id id, u32 width, u32 height)
 		{
 			window_info& info{ get_from_id(id) };
 
-			// NOTE: ���x���G�f�B�^�ŃE�B���h�E���z�X�g����Ƃ��A�����f�[�^ (�N���C�A���g�̈�̐��@) ���X�V���܂��B
+			// NOTE: レベルエディタでウィンドウをホストするとき、内部データ (クライアント領域の寸法) を更新します。
 			if (info.style & WS_CHILD)
 			{
-				// �q�E�B���h�E�̏ꍇ�́A�e�E�B���h�E�̃N���C�A���g�̈���擾����
+				// 子ウィンドウの場合は、親ウィンドウのクライアント領域を取得する
 				GetClientRect(info.hwnd, &info.cliant_area);
 			}
 			else
 			{
-				// NOTE: ��ʉ𑜓x���ύX���ꂽ�ꍇ�ɂ��Ή��ł���悤�A�t���X�N���[�����[�h�ł̃��T�C�Y���s���Ă��܂��B
+				// NOTE: 画面解像度が変更された場合にも対応できるよう、フルスクリーンモードでのリサイズも行っています。
 				RECT& area{ info.is_fullscreen ? info.fullscreen_area : info.cliant_area };
 				area.bottom = area.top + height;
 				area.right = area.left + width;
@@ -148,23 +148,23 @@ namespace dxforge::platform
 			}
 		}
 
-		/// @brief �E�B���h�E�̃��T�C�Y
-		/// @param id �E�B���h�EID
-		/// @param is_fullscreen �t���X�N���[���ɂ��邩�ǂ���
+		/// @brief ウィンドウのリサイズ
+		/// @param id ウィンドウID
+		/// @param is_fullscreen フルスクリーンにするかどうか
 		void set_window_fullscreen(window_id id, bool is_fullscreen)
 		{
-			// �E�B���h�E���̎擾
+			// ウィンドウ情報の取得
 			window_info& info{ get_from_id(id) };
 
-			// �t���X�N���[����Ԃ��ύX���ꂽ�Ƃ��̏���
+			// フルスクリーン状態が変更されたときの処理
 			if (info.is_fullscreen != is_fullscreen)
 			{
-				// �t���X�N���[����Ԃ̐ݒ�
+				// フルスクリーン状態の設定
 				info.is_fullscreen = is_fullscreen;
 
 				if (is_fullscreen)
-				{	// �t���X�N���[����Ԃɂ���
-					// ���݂̃E�B���h�E�̃T�C�Y��ۑ����A�t���X�N���[����Ԃ���؂�ւ����Ƃ��ɕ����ł���悤�ɂ���B
+				{	// フルスクリーン状態にする
+					// 現在のウィンドウのサイズを保存し、フルスクリーン状態から切り替えたときに復元できるようにする。
 					GetWindowRect(info.hwnd, &info.cliant_area);
 					RECT rect;
 					GetWindowRect(info.hwnd, &rect);
@@ -174,7 +174,7 @@ namespace dxforge::platform
 					ShowWindow(info.hwnd, SW_MAXIMIZE);
 				}
 				else
-				{	// �E�B���h�E��Ԃɂ���
+				{	// ウィンドウ状態にする
 					SetWindowLongPtr(info.hwnd, GWL_STYLE, info.style);
 					resize_window(info, info.cliant_area);
 					ShowWindow(info.hwnd, SW_SHOWNORMAL);
@@ -211,17 +211,17 @@ namespace dxforge::platform
 			return get_from_id(id).is_closed;
 		}
 
-	}	// �������O���
+	}	// 匿名名前空間
 
-	/// @brief �E�B���h�E�̍쐬
-	/// @param init_info �E�B���h�E�̏��������
+	/// @brief ウィンドウの作成
+	/// @param init_info ウィンドウの初期化情報
 	/// @return window
 	window create_window(const window_init_info* const init_info /* = nullptr */)
 	{
 		window_proc callback{ init_info ? init_info->callback : nullptr };
 		window_handle parent{ init_info ? init_info->parent : nullptr };
 
-		// �E�B���h�E�N���X�̐ݒ�
+		// ウィンドウクラスの設定
 		WNDCLASSEX wc{};
 		ZeroMemory(&wc, sizeof(wc));
 		wc.cbSize = sizeof(WNDCLASSEX);
@@ -237,7 +237,7 @@ namespace dxforge::platform
 		wc.lpszClassName = L"DXForgeWindow";
 		wc.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 
-		// �E�B���h�E�N���X�̓o�^
+		// ウィンドウクラスの登録
 		RegisterClassEx(&wc);
 
 		window_info info{};
@@ -247,7 +247,7 @@ namespace dxforge::platform
 
 		RECT rect{ info.cliant_area };
 
-		// �f�o�C�X�̃T�C�Y�ɍ��킹�ăE�B���h�E�T�C�Y�𒲐�
+		// デバイスのサイズに合わせてウィンドウサイズを調整
 		AdjustWindowRect(&rect, info.style, FALSE);
 
 		const wchar_t* caption{ (init_info && init_info->caption) ? init_info->caption : L"DXForge Game" };
@@ -256,24 +256,24 @@ namespace dxforge::platform
 		const s32 width{ rect.right - rect.left };
 		const s32 height{ rect.bottom - rect.top };
 
-		// �E�B���h�E�N���X�̃C���X�^���X���쐬����
+		// ウィンドウクラスのインスタンスを作成する
 		info.hwnd = CreateWindowEx(
-			0,					// �G�N�X�e���h�X�^�C��
-			wc.lpszClassName,	// �N���X��
-			caption,			// �E�B���h�E��
-			info.style,			// �X�^�C��
-			left,				// �E�B���h�E�̏����ʒu X
-			top,				// �E�B���h�E�̏����ʒu Y
-			width,				// �E�B���h�E�̏�����
-			height,				// �E�B���h�E�̏�������
-			parent,				// �e�E�B���h�E�̃n���h��
-			NULL,				// ���j���[�n���h��
-			NULL,				// ���̃A�v���P�[�V�����̃C���X�^���X
-			NULL);				// ���̑��̃p�����[�^
+			0,					// エクステンドスタイル
+			wc.lpszClassName,	// クラス名
+			caption,			// ウィンドウ名
+			info.style,			// スタイル
+			left,				// ウィンドウの初期位置 X
+			top,				// ウィンドウの初期位置 Y
+			width,				// ウィンドウの初期幅
+			height,				// ウィンドウの初期高さ
+			parent,				// 親ウィンドウのハンドル
+			NULL,				// メニューハンドル
+			NULL,				// このアプリケーションのインスタンス
+			NULL);				// その他のパラメータ
 
 		if (info.hwnd)
 		{
-			// �E�B���h�E�̃��b�Z�[�W����������E�B���h�E�R�[���o�b�N�֐��ւ̃|�C���^�� "extra "�o�C�g�ɃZ�b�g����B
+			// ウィンドウのメッセージを処理するウィンドウコールバック関数へのポインタを "extra "バイトにセットする。
 			DEBUG_OP(SetLastError(0));
 			if (callback) SetWindowLongPtr(info.hwnd, 0, (LONG_PTR)callback);
 			assert(GetLastError() == 0);

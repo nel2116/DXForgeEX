@@ -1,52 +1,52 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12Camera.h]
-// ì¬“ú : 2025/01/12
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// Direct3D12—pƒJƒƒ‰ƒNƒ‰ƒX
-// XV—š—ğ
-// 2025/01/12 V‹Kì¬
-// 2025/01/14 ƒRƒƒ“ƒg‚Ì’Ç‰Á
+// ä½œæˆæ—¥ : 2025/01/12
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// Direct3D12ç”¨ã‚«ãƒ¡ãƒ©ã‚¯ãƒ©ã‚¹
+// æ›´æ–°å±¥æ­´
+// 2025/01/12 æ–°è¦ä½œæˆ
+// 2025/01/14 ã‚³ãƒ¡ãƒ³ãƒˆã®è¿½åŠ 
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12CommonHeaders.h"
 
 namespace dxforge::graphics::d3d12::camera
 {
-	/// @brief Direct3D12ƒJƒƒ‰‚ğŠÇ—‚·‚éƒNƒ‰ƒX
+	/// @brief Direct3D12ã‚«ãƒ¡ãƒ©ã‚’ç®¡ç†ã™ã‚‹ã‚¯ãƒ©ã‚¹
 	class d3d12_camera
 	{
-	public:		// ƒpƒuƒŠƒbƒNŠÖ”
-		/// @brief ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-		/// @param info ‰Šú‰»î•ñ
+	public:		// ãƒ‘ãƒ–ãƒªãƒƒã‚¯é–¢æ•°
+		/// @brief ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+		/// @param info åˆæœŸåŒ–æƒ…å ±
 		explicit d3d12_camera(camera_init_info info);
 
-		/// @brief ƒJƒƒ‰‚ğXV‚·‚é
+		/// @brief ã‚«ãƒ¡ãƒ©ã‚’æ›´æ–°ã™ã‚‹
 		void update();
-		/// @brief ã•ûŒüƒxƒNƒgƒ‹‚ğİ’è‚·‚é
-		/// @param up V‚µ‚¢ã•ûŒüƒxƒNƒgƒ‹
+		/// @brief ä¸Šæ–¹å‘ãƒ™ã‚¯ãƒˆãƒ«ã‚’è¨­å®šã™ã‚‹
+		/// @param up æ–°ã—ã„ä¸Šæ–¹å‘ãƒ™ã‚¯ãƒˆãƒ«
 		void up(math::v3 up);
-		/// @brief ‹–ìŠp‚ğİ’è‚·‚é (ƒp[ƒXƒyƒNƒeƒBƒuƒJƒƒ‰—p)
-		/// @param fov V‚µ‚¢‹–ìŠp
+		/// @brief è¦–é‡è§’ã‚’è¨­å®šã™ã‚‹ (ãƒ‘ãƒ¼ã‚¹ãƒšã‚¯ãƒ†ã‚£ãƒ–ã‚«ãƒ¡ãƒ©ç”¨)
+		/// @param fov æ–°ã—ã„è¦–é‡è§’
 		constexpr void field_of_view(f32 fov);
-		/// @brief ƒAƒXƒyƒNƒg”ä‚ğİ’è‚·‚é (ƒp[ƒXƒyƒNƒeƒBƒuƒJƒƒ‰—p)
-		/// @param aspect_ratio V‚µ‚¢ƒAƒXƒyƒNƒg”ä
+		/// @brief ã‚¢ã‚¹ãƒšã‚¯ãƒˆæ¯”ã‚’è¨­å®šã™ã‚‹ (ãƒ‘ãƒ¼ã‚¹ãƒšã‚¯ãƒ†ã‚£ãƒ–ã‚«ãƒ¡ãƒ©ç”¨)
+		/// @param aspect_ratio æ–°ã—ã„ã‚¢ã‚¹ãƒšã‚¯ãƒˆæ¯”
 		constexpr void aspect_ratio(f32 aspect_ratio);
-		/// @brief ƒrƒ…[•‚ğİ’è‚·‚é (ƒI[ƒ\ƒOƒ‰ƒtƒBƒbƒNƒJƒƒ‰—p)
-		/// @param width V‚µ‚¢ƒrƒ…[•
+		/// @brief ãƒ“ãƒ¥ãƒ¼å¹…ã‚’è¨­å®šã™ã‚‹ (ã‚ªãƒ¼ã‚½ã‚°ãƒ©ãƒ•ã‚£ãƒƒã‚¯ã‚«ãƒ¡ãƒ©ç”¨)
+		/// @param width æ–°ã—ã„ãƒ“ãƒ¥ãƒ¼å¹…
 		constexpr void view_width(f32 width);
-		/// @brief ƒrƒ…[‚‚³‚ğİ’è‚·‚é (ƒI[ƒ\ƒOƒ‰ƒtƒBƒbƒNƒJƒƒ‰—p)
-		/// @param height V‚µ‚¢ƒrƒ…[‚‚³
+		/// @brief ãƒ“ãƒ¥ãƒ¼é«˜ã•ã‚’è¨­å®šã™ã‚‹ (ã‚ªãƒ¼ã‚½ã‚°ãƒ©ãƒ•ã‚£ãƒƒã‚¯ã‚«ãƒ¡ãƒ©ç”¨)
+		/// @param height æ–°ã—ã„ãƒ“ãƒ¥ãƒ¼é«˜ã•
 		constexpr void view_height(f32 height);
-		/// @brief ‹ßƒNƒŠƒbƒsƒ“ƒO•½–Ê‚ğİ’è‚·‚é
-		/// @param near_z V‚µ‚¢‹ßƒNƒŠƒbƒsƒ“ƒO•½–Ê‹——£
+		/// @brief è¿‘ã‚¯ãƒªãƒƒãƒ”ãƒ³ã‚°å¹³é¢ã‚’è¨­å®šã™ã‚‹
+		/// @param near_z æ–°ã—ã„è¿‘ã‚¯ãƒªãƒƒãƒ”ãƒ³ã‚°å¹³é¢è·é›¢
 		constexpr void near_z(f32 near_z);
-		/// @brief ‰“ƒNƒŠƒbƒsƒ“ƒO•½–Ê‚ğİ’è‚·‚é
-		/// @param far_z V‚µ‚¢‰“ƒNƒŠƒbƒsƒ“ƒO•½–Ê‹——£
+		/// @brief é ã‚¯ãƒªãƒƒãƒ”ãƒ³ã‚°å¹³é¢ã‚’è¨­å®šã™ã‚‹
+		/// @param far_z æ–°ã—ã„é ã‚¯ãƒªãƒƒãƒ”ãƒ³ã‚°å¹³é¢è·é›¢
 		constexpr void far_z(f32 far_z);
 
-		// ------ ƒAƒNƒZƒTŠÖ” ------
+		// ------ ã‚¢ã‚¯ã‚»ã‚µé–¢æ•° ------
 		[[nodiscard]] constexpr DirectX::XMMATRIX view() const { return _view; }
 		[[nodiscard]] constexpr DirectX::XMMATRIX projection() const { return _projection; }
 		[[nodiscard]] constexpr DirectX::XMMATRIX inverse_projection() const { return _inverse_projection; }
@@ -64,58 +64,58 @@ namespace dxforge::graphics::d3d12::camera
 		[[nodiscard]] constexpr graphics::camera::type projection_type() const { return _projection_type; }
 		[[nodiscard]] constexpr id::id_type entity_id() const { return _entity_id; }
 
-	private:	// ƒvƒ‰ƒCƒx[ƒg•Ï”
-		DirectX::XMMATRIX _view;					///< ƒrƒ…[s—ñ
-		DirectX::XMMATRIX _projection;				///< ƒvƒƒWƒFƒNƒVƒ‡ƒ“s—ñ
-		DirectX::XMMATRIX _inverse_projection;		///< ‹tƒvƒƒWƒFƒNƒVƒ‡ƒ“s—ñ
-		DirectX::XMMATRIX _view_projection;			///< ƒrƒ…[ƒvƒƒWƒFƒNƒVƒ‡ƒ“s—ñ
-		DirectX::XMMATRIX _inverse_view_projection;	///< ‹tƒrƒ…[ƒvƒƒWƒFƒNƒVƒ‡ƒ“s—ñ
-		DirectX::XMVECTOR _position{};				///< ƒJƒƒ‰‚ÌˆÊ’u
-		DirectX::XMVECTOR _direction{};				///< ƒJƒƒ‰‚ÌŒü‚«
-		DirectX::XMVECTOR _up;						///< ã•ûŒüƒxƒNƒgƒ‹
-		f32 _near_z;								///< ‹ßƒNƒŠƒbƒsƒ“ƒO•½–Ê‹——£
-		f32 _far_z;									///< ‰“ƒNƒŠƒbƒsƒ“ƒO•½–Ê‹——£
+	private:	// ãƒ—ãƒ©ã‚¤ãƒ™ãƒ¼ãƒˆå¤‰æ•°
+		DirectX::XMMATRIX _view;					///< ãƒ“ãƒ¥ãƒ¼è¡Œåˆ—
+		DirectX::XMMATRIX _projection;				///< ãƒ—ãƒ­ã‚¸ã‚§ã‚¯ã‚·ãƒ§ãƒ³è¡Œåˆ—
+		DirectX::XMMATRIX _inverse_projection;		///< é€†ãƒ—ãƒ­ã‚¸ã‚§ã‚¯ã‚·ãƒ§ãƒ³è¡Œåˆ—
+		DirectX::XMMATRIX _view_projection;			///< ãƒ“ãƒ¥ãƒ¼ãƒ—ãƒ­ã‚¸ã‚§ã‚¯ã‚·ãƒ§ãƒ³è¡Œåˆ—
+		DirectX::XMMATRIX _inverse_view_projection;	///< é€†ãƒ“ãƒ¥ãƒ¼ãƒ—ãƒ­ã‚¸ã‚§ã‚¯ã‚·ãƒ§ãƒ³è¡Œåˆ—
+		DirectX::XMVECTOR _position{};				///< ã‚«ãƒ¡ãƒ©ã®ä½ç½®
+		DirectX::XMVECTOR _direction{};				///< ã‚«ãƒ¡ãƒ©ã®å‘ã
+		DirectX::XMVECTOR _up;						///< ä¸Šæ–¹å‘ãƒ™ã‚¯ãƒˆãƒ«
+		f32 _near_z;								///< è¿‘ã‚¯ãƒªãƒƒãƒ”ãƒ³ã‚°å¹³é¢è·é›¢
+		f32 _far_z;									///< é ã‚¯ãƒªãƒƒãƒ”ãƒ³ã‚°å¹³é¢è·é›¢
 		union
 		{
-			f32 _field_of_view;						///< ‹–ìŠp (ƒp[ƒXƒyƒNƒeƒBƒuƒJƒƒ‰—p)
-			f32 _view_width;						///< ƒrƒ…[• (ƒI[ƒ\ƒOƒ‰ƒtƒBƒbƒNƒJƒƒ‰—p)
+			f32 _field_of_view;						///< è¦–é‡è§’ (ãƒ‘ãƒ¼ã‚¹ãƒšã‚¯ãƒ†ã‚£ãƒ–ã‚«ãƒ¡ãƒ©ç”¨)
+			f32 _view_width;						///< ãƒ“ãƒ¥ãƒ¼å¹… (ã‚ªãƒ¼ã‚½ã‚°ãƒ©ãƒ•ã‚£ãƒƒã‚¯ã‚«ãƒ¡ãƒ©ç”¨)
 		};
 		union
 		{
-			f32 _aspect_ratio;						///< ƒAƒXƒyƒNƒg”ä (ƒp[ƒXƒyƒNƒeƒBƒuƒJƒƒ‰—p)
-			f32 _view_height;						///< ƒrƒ…[‚‚³ (ƒI[ƒ\ƒOƒ‰ƒtƒBƒbƒNƒJƒƒ‰—p)
+			f32 _aspect_ratio;						///< ã‚¢ã‚¹ãƒšã‚¯ãƒˆæ¯” (ãƒ‘ãƒ¼ã‚¹ãƒšã‚¯ãƒ†ã‚£ãƒ–ã‚«ãƒ¡ãƒ©ç”¨)
+			f32 _view_height;						///< ãƒ“ãƒ¥ãƒ¼é«˜ã• (ã‚ªãƒ¼ã‚½ã‚°ãƒ©ãƒ•ã‚£ãƒƒã‚¯ã‚«ãƒ¡ãƒ©ç”¨)
 		};
-		graphics::camera::type _projection_type;	///< ƒvƒƒWƒFƒNƒVƒ‡ƒ“‚Ìí—Ş
-		id::id_type _entity_id;						///< ŠÖ˜A•t‚¯‚ç‚ê‚½entity id
-		bool _is_dirty;								///< ó‘Ô‚ª•ÏX‚³‚ê‚½‚©‚ğ¦‚·ƒtƒ‰ƒO
+		graphics::camera::type _projection_type;	///< ãƒ—ãƒ­ã‚¸ã‚§ã‚¯ã‚·ãƒ§ãƒ³ã®ç¨®é¡
+		id::id_type _entity_id;						///< é–¢é€£ä»˜ã‘ã‚‰ã‚ŒãŸentity id
+		bool _is_dirty;								///< çŠ¶æ…‹ãŒå¤‰æ›´ã•ã‚ŒãŸã‹ã‚’ç¤ºã™ãƒ•ãƒ©ã‚°
 	};
 
-	/// @brief ƒJƒƒ‰‚ğ¶¬‚·‚éŠÖ”
-	/// @param info ‰Šú‰»î•ñ
-	/// @return ¶¬‚³‚ê‚½ƒJƒƒ‰
+	/// @brief ã‚«ãƒ¡ãƒ©ã‚’ç”Ÿæˆã™ã‚‹é–¢æ•°
+	/// @param info åˆæœŸåŒ–æƒ…å ±
+	/// @return ç”Ÿæˆã•ã‚ŒãŸã‚«ãƒ¡ãƒ©
 	graphics::camera create(camera_init_info info);
 
-	/// @brief ƒJƒƒ‰‚ğíœ‚·‚éŠÖ”
-	/// @param id íœ‘ÎÛ‚ÌƒJƒƒ‰ID
+	/// @brief ã‚«ãƒ¡ãƒ©ã‚’å‰Šé™¤ã™ã‚‹é–¢æ•°
+	/// @param id å‰Šé™¤å¯¾è±¡ã®ã‚«ãƒ¡ãƒ©ID
 	void remove(camera_id id);
 
-	/// @brief ƒJƒƒ‰‚Ìƒpƒ‰ƒ[ƒ^‚ğİ’è
-	/// @param id ‘ÎÛƒJƒƒ‰‚ÌID
-	/// @param parameter İ’è‚·‚éƒpƒ‰ƒ[ƒ^‚Ìí—Ş
-	/// @param data ƒpƒ‰ƒ[ƒ^ƒf[ƒ^
-	/// @param data_size ƒf[ƒ^ƒTƒCƒY
+	/// @brief ã‚«ãƒ¡ãƒ©ã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã‚’è¨­å®š
+	/// @param id å¯¾è±¡ã‚«ãƒ¡ãƒ©ã®ID
+	/// @param parameter è¨­å®šã™ã‚‹ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã®ç¨®é¡
+	/// @param data ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ãƒ‡ãƒ¼ã‚¿
+	/// @param data_size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 	void set_parameter(camera_id id, camera_parameter::parameter parameter, const void* const data, u32 data_size);
 
-	/// @brief ƒJƒƒ‰‚Ìƒpƒ‰ƒ[ƒ^‚ğæ“¾
-	/// @param id ‘ÎÛƒJƒƒ‰‚ÌID
-	/// @param parameter æ“¾‚·‚éƒpƒ‰ƒ[ƒ^‚Ìí—Ş
-	/// @param data o—Íæƒf[ƒ^
-	/// @param data_size ƒf[ƒ^ƒTƒCƒY
+	/// @brief ã‚«ãƒ¡ãƒ©ã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã‚’å–å¾—
+	/// @param id å¯¾è±¡ã‚«ãƒ¡ãƒ©ã®ID
+	/// @param parameter å–å¾—ã™ã‚‹ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã®ç¨®é¡
+	/// @param data å‡ºåŠ›å…ˆãƒ‡ãƒ¼ã‚¿
+	/// @param data_size ãƒ‡ãƒ¼ã‚¿ã‚µã‚¤ã‚º
 	void get_parameter(camera_id id, camera_parameter::parameter parameter, void* const data, u32 data_size);
 
-	/// @brief ƒJƒƒ‰‚ğæ“¾
-	/// @param id ‘ÎÛƒJƒƒ‰‚ÌID
-	/// @return ƒJƒƒ‰QÆ
+	/// @brief ã‚«ãƒ¡ãƒ©ã‚’å–å¾—
+	/// @param id å¯¾è±¡ã‚«ãƒ¡ãƒ©ã®ID
+	/// @return ã‚«ãƒ¡ãƒ©å‚ç…§
 	[[nodiscard]] d3d12_camera& get(camera_id id);
 }	// namespace dxforge::graphics::direct3d12
 

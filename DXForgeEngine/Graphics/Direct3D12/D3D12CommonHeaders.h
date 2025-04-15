@@ -1,19 +1,19 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12CommonHeaders.h]
-// ì¬“ú : 2024/12/27
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-// @Direct3D12‚Ì‹¤’Êƒwƒbƒ_
-// XV—š—ğ
-// 2024/12/27 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/12/27
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+// ã€€Direct3D12ã®å…±é€šãƒ˜ãƒƒãƒ€
+// æ›´æ–°å±¥æ­´
+// 2024/12/27 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "CommonHeaders.h"
 #include "Graphics/Renderer.h"
 #include "Platform/Window.h"
 
-// windows.h‚Ìmin/maxƒ}ƒNƒ‚Ì’è‹`‚ğƒXƒLƒbƒv‚·‚éB
+// windows.hã®min/maxãƒã‚¯ãƒ­ã®å®šç¾©ã‚’ã‚¹ã‚­ãƒƒãƒ—ã™ã‚‹ã€‚
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif // !NOMINMAX
@@ -27,13 +27,13 @@
 
 namespace dxforge::graphics::d3d12
 {
-	constexpr u32 frame_buffer_count{ 3 };	// ƒtƒŒ[ƒ€ƒoƒbƒtƒ@‚Ì”
+	constexpr u32 frame_buffer_count{ 3 };	// ãƒ•ãƒ¬ãƒ¼ãƒ ãƒãƒƒãƒ•ã‚¡ã®æ•°
 	using id3d12_device = ID3D12Device8;
 	using id3d12_graphics_command_list = ID3D12GraphicsCommandList6;
 }
 
-// ====== ƒ}ƒNƒ’è‹` ======
-// DirectX12‚ÌƒGƒ‰[ƒ`ƒFƒbƒN
+// ====== ãƒã‚¯ãƒ­å®šç¾© ======
+// DirectX12ã®ã‚¨ãƒ©ãƒ¼ãƒã‚§ãƒƒã‚¯
 #ifdef _DEBUG
 #ifndef DXCall
 #define DXCall(x)							\
@@ -57,9 +57,9 @@ __debugbreak();								\
 #endif // _DEBUG
 
 #ifdef _DEBUG
-// COM ƒIƒuƒWƒFƒNƒg‚Ì–¼‘O‚ğİ’è‚µAVisual Studio* ‚Ìo—Íƒpƒlƒ‹‚ÉƒfƒoƒbƒO•¶š—ñ‚ğo—Í‚µ‚Ü‚·B
+// COM ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®åå‰ã‚’è¨­å®šã—ã€Visual Studio* ã®å‡ºåŠ›ãƒ‘ãƒãƒ«ã«ãƒ‡ãƒãƒƒã‚°æ–‡å­—åˆ—ã‚’å‡ºåŠ›ã—ã¾ã™ã€‚
 #define NAME_D3D12_OBJECT(obj, name) obj->SetName(name); OutputDebugString(L"::D3D12 Object Created: "); OutputDebugString(name); OutputDebugString(L"\n");
-// ƒCƒ“ƒfƒbƒNƒX•t‚«ƒoƒŠƒAƒ“ƒg‚ÍAƒIƒuƒWƒFƒNƒg‚Ì–¼‘O‚ÉƒCƒ“ƒfƒbƒNƒX‚ğŠÜ‚ŞB
+// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ä»˜ããƒãƒªã‚¢ãƒ³ãƒˆã¯ã€ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®åå‰ã«ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã‚’å«ã‚€ã€‚
 #define NAME_D3D12_OBJECT_INDEXED(obj, n, name)            \
 {                                                          \
 wchar_t full_name[128];                                    \

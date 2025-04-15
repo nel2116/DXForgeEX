@@ -1,14 +1,14 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [FreeList.h]
-// ì¬“ú : 2024/12/31
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// ƒtƒŠ[ƒŠƒXƒg
-// XV—š—ğ
-// 2024/12/31 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/12/31
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// ãƒ•ãƒªãƒ¼ãƒªã‚¹ãƒˆ
+// æ›´æ–°å±¥æ­´
+// 2024/12/31 æ–°è¦ä½œæˆ
 // // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "CommonHeaders.h"
 
 
@@ -18,24 +18,24 @@ namespace dxforge::utl
 #pragma message("WARNING: using utl::free_list with std::vector result in duplicate calls to class constructor!")
 #endif
 
-	// ====== ƒNƒ‰ƒX ======
-	/// @brief ƒtƒŠ[ƒŠƒXƒg
-	/// @tparam T ƒtƒŠ[ƒŠƒXƒg‚ÉŠi”[‚·‚éŒ^
+	// ====== ã‚¯ãƒ©ã‚¹ ======
+	/// @brief ãƒ•ãƒªãƒ¼ãƒªã‚¹ãƒˆ
+	/// @tparam T ãƒ•ãƒªãƒ¼ãƒªã‚¹ãƒˆã«æ ¼ç´ã™ã‚‹å‹
 	template<typename T>
 	class free_list
 	{
-		static_assert(sizeof(T) >= sizeof(u32));	// T ‚Í u32 ˆÈã‚ÌƒTƒCƒY‚Å‚ ‚é•K—v‚ª‚ ‚é
+		static_assert(sizeof(T) >= sizeof(u32));	// T ã¯ u32 ä»¥ä¸Šã®ã‚µã‚¤ã‚ºã§ã‚ã‚‹å¿…è¦ãŒã‚ã‚‹
 
-		// _/_/_/_/_/_/_/_/ ƒƒ“ƒoŠÖ” _/_/_/_/_/_/_/_/
-	public:		// ====== ƒpƒuƒŠƒbƒNŠÖ” ======
-		/// @brief ƒRƒ“ƒXƒgƒ‰ƒNƒ^
+		// _/_/_/_/_/_/_/_/ ãƒ¡ãƒ³ãƒé–¢æ•° _/_/_/_/_/_/_/_/
+	public:		// ====== ãƒ‘ãƒ–ãƒªãƒƒã‚¯é–¢æ•° ======
+		/// @brief ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
 		free_list() = default;
 		explicit free_list(u32 count)
 		{
 			_array.reserve(count);
 		}
 
-		/// @brief ƒfƒXƒgƒ‰ƒNƒ^
+		/// @brief ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
 		~free_list()
 		{
 			assert(!_size);
@@ -44,10 +44,10 @@ namespace dxforge::utl
 #endif
 		}
 
-		/// @brief ”z—ñ‚É—v‘f‚ğ’Ç‰Á‚·‚é
-		/// @tparam ...param ’Ç‰Á‚·‚é—v‘f‚ÌƒRƒ“ƒXƒgƒ‰ƒNƒ^ˆø”
-		/// @param ...p ’Ç‰Á‚·‚é—v‘f‚ÌƒRƒ“ƒXƒgƒ‰ƒNƒ^ˆø”
-		/// @return ’Ç‰Á‚µ‚½—v‘f‚Ì”Ô†
+		/// @brief é…åˆ—ã«è¦ç´ ã‚’è¿½åŠ ã™ã‚‹
+		/// @tparam ...param è¿½åŠ ã™ã‚‹è¦ç´ ã®ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿å¼•æ•°
+		/// @param ...p è¿½åŠ ã™ã‚‹è¦ç´ ã®ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿å¼•æ•°
+		/// @return è¿½åŠ ã—ãŸè¦ç´ ã®ç•ªå·
 		template<class... param>
 		constexpr u32 add(param&&... p)
 		{
@@ -68,8 +68,8 @@ namespace dxforge::utl
 			return id;
 		}
 
-		/// @brief ”z—ñ‚Ì—v‘f‚ğíœ‚·‚é
-		/// @param id íœ‚·‚é—v‘f‚Ì—v‘f”Ô†
+		/// @brief é…åˆ—ã®è¦ç´ ã‚’å‰Šé™¤ã™ã‚‹
+		/// @param id å‰Šé™¤ã™ã‚‹è¦ç´ ã®è¦ç´ ç•ªå·
 		constexpr void remove(u32 id)
 		{
 			assert(id < _array.size() && !already_removed(id, false));
@@ -81,21 +81,21 @@ namespace dxforge::utl
 			--_size;
 		}
 
-		/// @brief ”z—ñ‚ÌƒTƒCƒY‚ğæ“¾‚·‚é
-		/// @return ”z—ñ‚ÌƒTƒCƒY
+		/// @brief é…åˆ—ã®ã‚µã‚¤ã‚ºã‚’å–å¾—ã™ã‚‹
+		/// @return é…åˆ—ã®ã‚µã‚¤ã‚º
 		constexpr u32 size() const
 		{
 			return _size;
 		}
 
-		/// @brief ”z—ñ‚Ì—e—Ê‚ğæ“¾‚·‚é
+		/// @brief é…åˆ—ã®å®¹é‡ã‚’å–å¾—ã™ã‚‹
 		constexpr u32 capacity() const
 		{
 			return (u32)_array.size();
 		}
 
-		/// @brief ”z—ñ‚ª‹ó‚©‚Ç‚¤‚©‚ğæ“¾‚·‚é
-		/// @return ”z—ñ‚ª‹ó‚Ìê‡ true, ‚»‚êˆÈŠO‚Ìê‡ false
+		/// @brief é…åˆ—ãŒç©ºã‹ã©ã†ã‹ã‚’å–å¾—ã™ã‚‹
+		/// @return é…åˆ—ãŒç©ºã®å ´åˆ true, ãã‚Œä»¥å¤–ã®å ´åˆ false
 		constexpr bool empty() const
 		{
 			return _size == 0;
@@ -113,14 +113,14 @@ namespace dxforge::utl
 			return _array[id];
 		}
 
-	private:	// ====== ƒvƒ‰ƒCƒx[ƒgŠÖ” ======
+	private:	// ====== ãƒ—ãƒ©ã‚¤ãƒ™ãƒ¼ãƒˆé–¢æ•° ======
 
 		constexpr bool already_removed(u32 id, bool return_value_when_sizeof_t_equals_4) const
 		{
-			// NOTE: sizeof(T)==sizeof(u32)‚Ìê‡AƒAƒCƒeƒ€‚ª‚·‚Å‚Éíœ‚³‚ê‚Ä‚¢‚é‚©‚Ç‚¤‚©‚ğƒeƒXƒg‚·‚é‚±‚Æ‚Í‚Å‚«‚Ü‚¹‚ñI
+			// NOTE: sizeof(T)==sizeof(u32)ã®å ´åˆã€ã‚¢ã‚¤ãƒ†ãƒ ãŒã™ã§ã«å‰Šé™¤ã•ã‚Œã¦ã„ã‚‹ã‹ã©ã†ã‹ã‚’ãƒ†ã‚¹ãƒˆã™ã‚‹ã“ã¨ã¯ã§ãã¾ã›ã‚“ï¼
 			if constexpr (sizeof(T) > sizeof(u32))
 			{
-				u32 i{ sizeof(u32) }; // Å‰‚Ì4ƒoƒCƒg‚ğƒXƒLƒbƒv‚·‚éB
+				u32 i{ sizeof(u32) }; // æœ€åˆã®4ãƒã‚¤ãƒˆã‚’ã‚¹ã‚­ãƒƒãƒ—ã™ã‚‹ã€‚
 				const u8* const p{ (const u8* const)std::addressof(_array[id]) };
 				while ((p[i] == 0xcc) && (i < sizeof(T))) ++i;
 				return i == sizeof(T);
@@ -131,14 +131,14 @@ namespace dxforge::utl
 			}
 		}
 
-	private:	// ====== ƒƒ“ƒo•Ï” ======
+	private:	// ====== ãƒ¡ãƒ³ãƒå¤‰æ•° ======
 #if USE_STL_VECTOR
-		std::vector<T> _array;						// ”z—ñ
+		std::vector<T> _array;						// é…åˆ—
 #else
-		utl::vector<T, false> _array;				// ”z—ñ
+		utl::vector<T, false> _array;				// é…åˆ—
 #endif
-		u32 _next_free_index{ u32_invalid_id };		// Ÿ‚Ì‹ó‚«ƒCƒ“ƒfƒbƒNƒX
-		u32 _size{ 0 };								// ”z—ñ‚ÌƒTƒCƒY
+		u32 _next_free_index{ u32_invalid_id };		// æ¬¡ã®ç©ºãã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		u32 _size{ 0 };								// é…åˆ—ã®ã‚µã‚¤ã‚º
 	};
 }
 

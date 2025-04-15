@@ -1,12 +1,12 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [RenderItem.cpp]
-// ì¬“ú : 2025/01/13
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// XV—š—ğ
-// 2025/01/13 V‹Kì¬
+// ä½œæˆæ—¥ : 2025/01/13
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// æ›´æ–°å±¥æ­´
+// 2025/01/13 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include <filesystem>
 #include "CommonHeaders.h"
 #include "Content/ContentToEngine.h"
@@ -88,7 +88,7 @@ namespace
 
 	void load_shaders()
 	{
-		// ƒ}ƒeƒŠƒAƒ‹‚ªƒo[ƒeƒbƒNƒXƒVƒF[ƒ_[‚ÆƒsƒNƒZƒ‹ƒVƒF[ƒ_[‚ğg‚¤‚Æ‚µ‚Ü‚·B
+		// ãƒãƒ†ãƒªã‚¢ãƒ«ãŒãƒãƒ¼ãƒ†ãƒƒã‚¯ã‚¹ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã¨ãƒ”ã‚¯ã‚»ãƒ«ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚’ä½¿ã†ã¨ã—ã¾ã™ã€‚
 		shader_file_info info{};
 		info.file_name = "TestShader.hlsl";
 		info.function = "TestShaderVS";
@@ -176,7 +176,7 @@ namespace
 			content::destroy_resource(model_id, content::asset_type::mesh);
 		}
 	}
-} // “½–¼–¼‘O‹óŠÔ
+} // åŒ¿ååå‰ç©ºé–“
 
 void create_render_items()
 {
@@ -208,7 +208,7 @@ void create_render_items()
 		t.join();
 	}
 
-	// NOTE: ƒ}ƒeƒŠƒAƒ‹‚ğì¬‚·‚é‘O‚ÉAƒVƒF[ƒ_[‚ğ€”õ‚·‚é•K—v‚ª‚ ‚éB
+	// NOTE: ãƒãƒ†ãƒªã‚¢ãƒ«ã‚’ä½œæˆã™ã‚‹å‰ã«ã€ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚’æº–å‚™ã™ã‚‹å¿…è¦ãŒã‚ã‚‹ã€‚
 	create_material();
 	id::id_type materials[]{ default_mtl_id };
 	id::id_type fembot_materials[]{ fembot_mtl_id, fembot_mtl_id };
@@ -263,7 +263,7 @@ void destroy_render_items()
 	remove_model(fembot_model_id);
 	remove_model(sphere_model_id);
 
-	// Material‚ğæ‚èœ‚­
+	// Materialã‚’å–ã‚Šé™¤ã
 	if (id::is_valid(default_mtl_id))
 	{
 		content::destroy_resource(default_mtl_id, content::asset_type::material);
@@ -282,7 +282,7 @@ void destroy_render_items()
 		}
 	}
 
-	// ƒeƒNƒXƒ`ƒƒ‚ğæ‚èœ‚­
+	// ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’å–ã‚Šé™¤ã
 	for (id::id_type id : texture_ids)
 	{
 		if (id::is_valid(id))
@@ -291,7 +291,7 @@ void destroy_render_items()
 		}
 	}
 
-	// ƒVƒF[ƒ_[‚ÆƒeƒNƒXƒ`ƒƒ[‚ğæ‚èœ‚­
+	// ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã¨ãƒ†ã‚¯ã‚¹ãƒãƒ£ãƒ¼ã‚’å–ã‚Šé™¤ã
 	if (id::is_valid(vs_id))
 	{
 		content::remove_shader_group(vs_id);

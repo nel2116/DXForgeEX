@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [EngineWin32.cpp]
-// ì¬“ú : 2024/12/20
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
+// ä½œæˆæ—¥ : 2024/12/20
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
 //
-// XV—š—ğ
-// 2024/12/20 V‹Kì¬
+// æ›´æ–°å±¥æ­´
+// 2024/12/20 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// // ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// // ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #if !defined(SHIPPING) && defined(_WIN64)
 #include "Content/ContentLoader.h"
 #include "Components/Script.h"
@@ -45,41 +45,41 @@ namespace
 		}
 		return DefWindowProc(hwnd, msg, wparam, lparam);
 	}
-}	// “½–¼–¼‘O‹óŠÔ
+}	// åŒ¿ååå‰ç©ºé–“
 
-/// @brief ƒGƒ“ƒWƒ“‚Ì‰Šú‰»
-/// @return ‰Šú‰»‚É¬Œ÷‚µ‚½ê‡‚Ítrue‚ğ•Ô‚·
+/// @brief ã‚¨ãƒ³ã‚¸ãƒ³ã®åˆæœŸåŒ–
+/// @return åˆæœŸåŒ–ã«æˆåŠŸã—ãŸå ´åˆã¯trueã‚’è¿”ã™
 bool engine_initialize()
 {
-	// ƒQ[ƒ€‚ğƒ[ƒh
+	// ã‚²ãƒ¼ãƒ ã‚’ãƒ­ãƒ¼ãƒ‰
 	if (!dxforge::content::load_game())return false;
 
-	// window‚Ìì¬
+	// windowã®ä½œæˆ
 	platform::window_init_info init_info
 	{
-		&win_proc,nullptr,L"DXForge Game"	// TODO: “Ç‚İ‚ñ‚¾ƒQ[ƒ€ƒtƒ@ƒCƒ‹‚©‚çƒQ[ƒ€–¼‚ğæ“¾‚·‚éB
+		&win_proc,nullptr,L"DXForge Game"	// TODO: èª­ã¿è¾¼ã‚“ã ã‚²ãƒ¼ãƒ ãƒ•ã‚¡ã‚¤ãƒ«ã‹ã‚‰ã‚²ãƒ¼ãƒ åã‚’å–å¾—ã™ã‚‹ã€‚
 	};
 	game_window.window = platform::create_window(&init_info);
-	if (!game_window.window.is_valid())return false;			// ƒEƒBƒ“ƒhƒE‚Ìì¬‚É¸”s‚µ‚½ê‡‚Ífalse‚ğ•Ô‚·B
+	if (!game_window.window.is_valid())return false;			// ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®ä½œæˆã«å¤±æ•—ã—ãŸå ´åˆã¯falseã‚’è¿”ã™ã€‚
 
-	// ‚·‚×‚Ä‚Ì‰Šú‰»‚ªŠ®—¹‚µ‚½ê‡‚Ítrue‚ğ•Ô‚·B
+	// ã™ã¹ã¦ã®åˆæœŸåŒ–ãŒå®Œäº†ã—ãŸå ´åˆã¯trueã‚’è¿”ã™ã€‚
 	return true;
 }
 
-/// @brief ƒGƒ“ƒWƒ“‚ÌXV
+/// @brief ã‚¨ãƒ³ã‚¸ãƒ³ã®æ›´æ–°
 void engine_update()
 {
-	// ‰¼‚Ìˆ—
+	// ä»®ã®å‡¦ç†
 	dxforge::script::update(10.0f);
 	std::this_thread::sleep_for(std::chrono::milliseconds(10));
 }
 
-/// @brief ƒGƒ“ƒWƒ“‚ÌI—¹ˆ—
+/// @brief ã‚¨ãƒ³ã‚¸ãƒ³ã®çµ‚äº†å‡¦ç†
 void engine_shutdown()
 {
-	// ƒEƒBƒ“ƒhƒE‚Ì”jŠü
+	// ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã®ç ´æ£„
 	platform::remove_window(game_window.window.get_id());
-	// ƒQ[ƒ€‚ÌƒAƒ“ƒ[ƒh
+	// ã‚²ãƒ¼ãƒ ã®ã‚¢ãƒ³ãƒ­ãƒ¼ãƒ‰
 	dxforge::content::unload_game();
 }
 

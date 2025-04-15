@@ -1,14 +1,14 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Input.h]
-// ì¬“ú : 2025/01/18
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// “ü—Í‚ÌƒCƒ“ƒ^[ƒtƒF[ƒX
-// XV—š—ğ
-// 2025/01/18 V‹Kì¬
+// ä½œæˆæ—¥ : 2025/01/18
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// å…¥åŠ›ã®ã‚¤ãƒ³ã‚¿ãƒ¼ãƒ•ã‚§ãƒ¼ã‚¹
+// æ›´æ–°å±¥æ­´
+// 2025/01/18 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "CommonHeaders.h"
 
 namespace dxforge::input
@@ -199,10 +199,10 @@ namespace dxforge::input
 	{
 		class input_system_base
 		{
-		public:		// ƒpƒuƒŠƒbƒNŠÖ”
+		public:		// ãƒ‘ãƒ–ãƒªãƒƒã‚¯é–¢æ•°
 			virtual void on_event(input_source::type, input_code::code, const input_value&) = 0;
 			virtual void on_event(u64, const input_value&) = 0;
-		protected:	// ƒƒ“ƒo•Ï”
+		protected:	// ãƒ¡ãƒ³ãƒå¤‰æ•°
 			input_system_base();
 			~input_system_base();
 		};
@@ -222,7 +222,7 @@ namespace dxforge::input
 			auto& collection = _input_callbacks[type];
 			for (const auto& func : collection)
 			{
-				// ƒnƒ“ƒhƒ‰[‚ª‚·‚Å‚É’Ç‰Á‚³‚ê‚Ä‚¢‚éê‡‚ÍAÄ“x’Ç‰Á‚µ‚È‚¢B
+				// ãƒãƒ³ãƒ‰ãƒ©ãƒ¼ãŒã™ã§ã«è¿½åŠ ã•ã‚Œã¦ã„ã‚‹å ´åˆã¯ã€å†åº¦è¿½åŠ ã—ãªã„ã€‚
 				if (func.instance == instance && func.callback == callback) return;
 			}
 			collection.emplace_back(input_callback{ instance, callback });
@@ -233,7 +233,7 @@ namespace dxforge::input
 			assert(instance && callback);
 			for (const auto& func : _binding_callbacks)
 			{
-				// ƒnƒ“ƒhƒ‰[‚ª‚·‚Å‚É’Ç‰Á‚³‚ê‚Ä‚¢‚éê‡‚ÍAÄ“x’Ç‰Á‚µ‚È‚¢B
+				// ãƒãƒ³ãƒ‰ãƒ©ãƒ¼ãŒã™ã§ã«è¿½åŠ ã•ã‚Œã¦ã„ã‚‹å ´åˆã¯ã€å†åº¦è¿½åŠ ã—ãªã„ã€‚
 				if (func.binding == binding && func.instance == instance && func.callback == callback) return;
 			}
 			_binding_callbacks.emplace_back(binding_callback{ binding, instance, callback });
@@ -259,7 +259,7 @@ namespace dxforge::input
 			}
 		}
 
-	private:	// \‘¢‘Ì’è‹`
+	private:	// æ§‹é€ ä½“å®šç¾©
 		struct input_callback
 		{
 			T* instance;
@@ -273,7 +273,7 @@ namespace dxforge::input
 			binding_callback_t callback;
 		};
 
-	private:	// ƒƒ“ƒo•Ï”
+	private:	// ãƒ¡ãƒ³ãƒå¤‰æ•°
 		utl::vector<input_callback> _input_callbacks[input_source::count];
 		utl::vector<binding_callback> _binding_callbacks;
 	};

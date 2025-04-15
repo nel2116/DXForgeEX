@@ -1,57 +1,57 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12Resource.cpp]
-// ì¬“ú : 2024/12/30
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// Direct3D12‚ÌƒŠƒ\[ƒXŠÇ—
-// XV—š—ğ
-// 2024/12/30 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/12/30
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// Direct3D12ã®ãƒªã‚½ãƒ¼ã‚¹ç®¡ç†
+// æ›´æ–°å±¥æ­´
+// 2024/12/30 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12Resource.h"
 #include "D3D12Core.h"
 
 namespace dxforge::graphics::d3d12
 {
 	//_/_/_/_/_/_/_/_/ DESCRIPTOR HEAP _/_/_/_/_/_/_/_/
-	/// @brief ‰Šú‰»ˆ—
-	/// @param capacity ƒLƒƒƒpƒVƒeƒB
-	/// @param is_shader_visible ƒVƒF[ƒ_[‚ªŒ©‚¦‚é‚©‚Ç‚¤‚©
+	/// @brief åˆæœŸåŒ–å‡¦ç†
+	/// @param capacity ã‚­ãƒ£ãƒ‘ã‚·ãƒ†ã‚£
+	/// @param is_shader_visible ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãŒè¦‹ãˆã‚‹ã‹ã©ã†ã‹
 	bool descriptor_heap::initialize(u32 capacity, bool is_shader_visible)
 	{
-		// ƒƒbƒN
+		// ãƒ­ãƒƒã‚¯
 		std::lock_guard lock{ _mutex };
 
-		// ƒLƒƒƒpƒVƒeƒB‚ª³‚µ‚¢‚©Šm”F
+		// ã‚­ãƒ£ãƒ‘ã‚·ãƒ†ã‚£ãŒæ­£ã—ã„ã‹ç¢ºèª
 		assert(capacity && capacity < D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_2);
 		assert(!(_type == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER && capacity > D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE));
 
-		// ƒVƒF[ƒ_[‚ªŒ©‚¦‚é‚©‚Ç‚¤‚©‚ğŠm”F
+		// ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãŒè¦‹ãˆã‚‹ã‹ã©ã†ã‹ã‚’ç¢ºèª
 		if (_type == D3D12_DESCRIPTOR_HEAP_TYPE_DSV || _type == D3D12_DESCRIPTOR_HEAP_TYPE_RTV)
 		{
 			is_shader_visible = false;
 		}
 
-		// ‘O‚Ìƒq[ƒv‚ª‚ ‚ê‚Î‰ğ•ú
+		// å‰ã®ãƒ’ãƒ¼ãƒ—ãŒã‚ã‚Œã°è§£æ”¾
 		release();
 
-		// ƒfƒoƒCƒX‚ğæ“¾
+		// ãƒ‡ãƒã‚¤ã‚¹ã‚’å–å¾—
 		id3d12_device* const device{ core::device() };
 		assert(device);
 
-		// ƒq[ƒv‚Ìİ’è
+		// ãƒ’ãƒ¼ãƒ—ã®è¨­å®š
 		D3D12_DESCRIPTOR_HEAP_DESC desc{};
 		desc.Flags = is_shader_visible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 		desc.NumDescriptors = capacity;
 		desc.Type = _type;
 		desc.NodeMask = 0;
 
-		// ƒq[ƒv‚ğì¬
+		// ãƒ’ãƒ¼ãƒ—ã‚’ä½œæˆ
 		HRESULT hr{ S_OK };
 		DXCall(hr = device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&_heap)));
 		if (FAILED(hr)) return false;
 
-		// ƒq[ƒv‚ÌŠJnƒAƒhƒŒƒX‚ğæ“¾
+		// ãƒ’ãƒ¼ãƒ—ã®é–‹å§‹ã‚¢ãƒ‰ãƒ¬ã‚¹ã‚’å–å¾—
 		_free_handles = std::make_unique<u32[]>(capacity);
 		_capacity = capacity;
 		_size = 0;
@@ -66,19 +66,19 @@ namespace dxforge::graphics::d3d12
 		return true;
 	}
 
-	/// @brief ŠJ•úˆ—
+	/// @brief é–‹æ”¾å‡¦ç†
 	void descriptor_heap::release()
 	{
 		assert(!_size);
-		// ’x‰„‰ğ•ú‚ğs‚¤
+		// é…å»¶è§£æ”¾ã‚’è¡Œã†
 		core::deferred_release(_heap);
 	}
 
-	/// @brief ’x‰„‰ğ•úƒtƒ‰ƒO‚ğİ’è
-	/// @param frame_index ƒtƒŒ[ƒ€ƒCƒ“ƒfƒbƒNƒX
+	/// @brief é…å»¶è§£æ”¾ãƒ•ãƒ©ã‚°ã‚’è¨­å®š
+	/// @param frame_index ãƒ•ãƒ¬ãƒ¼ãƒ ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
 	void descriptor_heap::process_deferred_free(u32 frame_index)
 	{
-		// ƒƒbƒN
+		// ãƒ­ãƒƒã‚¯
 		std::lock_guard lock{ _mutex };
 		assert(frame_index < frame_buffer_count);
 
@@ -95,34 +95,34 @@ namespace dxforge::graphics::d3d12
 		}
 	}
 
-	/// @brief ƒfƒBƒXƒNƒŠƒvƒ^‚ÌŠ„‚è“–‚Ä
-	/// @return ƒfƒBƒXƒNƒŠƒvƒ^ƒnƒ“ƒhƒ‹
+	/// @brief ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ã®å‰²ã‚Šå½“ã¦
+	/// @return ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒãƒ³ãƒ‰ãƒ«
 	descriptor_handle descriptor_heap::allocate()
 	{
-		// ƒƒbƒN
+		// ãƒ­ãƒƒã‚¯
 		std::lock_guard lock{ _mutex };
-		// ƒq[ƒv‚ª‚ ‚é‚©Šm”F
+		// ãƒ’ãƒ¼ãƒ—ãŒã‚ã‚‹ã‹ç¢ºèª
 		assert(_heap);
 		assert(_size < _capacity);
 
-		// ƒnƒ“ƒhƒ‹‚ğæ“¾
+		// ãƒãƒ³ãƒ‰ãƒ«ã‚’å–å¾—
 		const u32 index{ _free_handles[_size] };
 		const u32 offset{ index * _descriptor_size };
 		++_size;
 
-		// ƒnƒ“ƒhƒ‹‚ğİ’è
+		// ãƒãƒ³ãƒ‰ãƒ«ã‚’è¨­å®š
 		descriptor_handle handle{};
 		handle.cpu.ptr = _cpu_start.ptr + offset;
 		if (is_shader_visible()) handle.gpu.ptr = _gpu_start.ptr + offset;
 		handle.index = index;
 
-		// ƒfƒoƒbƒOî•ñ‚ğİ’è
+		// ãƒ‡ãƒãƒƒã‚°æƒ…å ±ã‚’è¨­å®š
 		DEBUG_OP(handle.container = this);
 		return handle;
 	}
 
-	/// @brief ƒfƒBƒXƒNƒŠƒvƒ^‚Ì‰ğ•ú
-	/// @param handle ƒfƒBƒXƒNƒŠƒvƒ^ƒnƒ“ƒhƒ‹
+	/// @brief ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ã®è§£æ”¾
+	/// @param handle ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒãƒ³ãƒ‰ãƒ«
 	void descriptor_heap::free(descriptor_handle& handle)
 	{
 		if (!handle.is_valid()) return;
@@ -142,9 +142,9 @@ namespace dxforge::graphics::d3d12
 	}
 
 	//_/_/_/_/_/_/_/_/ D3D12 BUFFER _/_/_/_/_/_/_/_/
-	/// @brief ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-	/// @param info ƒoƒbƒtƒ@‰Šú‰»î•ñ
-	/// @param is_cpu_accessible CPUƒAƒNƒZƒX‰Â”\‚©‚Ç‚¤‚©
+	/// @brief ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+	/// @param info ãƒãƒƒãƒ•ã‚¡åˆæœŸåŒ–æƒ…å ±
+	/// @param is_cpu_accessible CPUã‚¢ã‚¯ã‚»ã‚¹å¯èƒ½ã‹ã©ã†ã‹
 	d3d12_buffer::d3d12_buffer(const d3d12_buffer_init_info& info, bool is_cpu_accessible)
 	{
 		assert(!_buffer && info.size && info.alignment);
@@ -155,7 +155,7 @@ namespace dxforge::graphics::d3d12
 		NAME_D3D12_OBJECT_INDEXED(_buffer, _size, L"D3D12 Buffer - size");
 	}
 
-	/// @brief ŠJ•úˆ—
+	/// @brief é–‹æ”¾å‡¦ç†
 	void d3d12_buffer::release()
 	{
 		core::deferred_release(_buffer);
@@ -164,8 +164,8 @@ namespace dxforge::graphics::d3d12
 	}
 
 	//_/_/_/_/_/_/_/_/ CONSTANT BUFFER _/_/_/_/_/_/_/_/
-	/// @brief ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-	/// @param info ƒoƒbƒtƒ@‰Šú‰»î•ñ
+	/// @brief ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+	/// @param info ãƒãƒƒãƒ•ã‚¡åˆæœŸåŒ–æƒ…å ±
 	constant_buffer::constant_buffer(const d3d12_buffer_init_info& info)
 		: _buffer{ info,true }
 	{
@@ -176,9 +176,9 @@ namespace dxforge::graphics::d3d12
 		assert(_cpu_address);
 	}
 
-	/// @brief ƒƒ‚ƒŠŠm•Û
-	/// @param size ƒTƒCƒY
-	/// @return ƒƒ‚ƒŠƒAƒhƒŒƒX
+	/// @brief ãƒ¡ãƒ¢ãƒªç¢ºä¿
+	/// @param size ã‚µã‚¤ã‚º
+	/// @return ãƒ¡ãƒ¢ãƒªã‚¢ãƒ‰ãƒ¬ã‚¹
 	u8* const constant_buffer::allocate(u32 size)
 	{
 		std::lock_guard lock{ _mutex };
@@ -225,8 +225,8 @@ namespace dxforge::graphics::d3d12
 	}
 
 	//_/_/_/_/_/_/_/_/ D3D12 TEXTURE _/_/_/_/_/_/_/_/
-	/// @brief ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-	/// @param info ƒeƒNƒXƒ`ƒƒ‰Šú‰»î•ñ
+	/// @brief ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+	/// @param info ãƒ†ã‚¯ã‚¹ãƒãƒ£åˆæœŸåŒ–æƒ…å ±
 	d3d12_texture::d3d12_texture(d3d12_texture_init_info info)
 	{
 		auto* const device{ core::device() };
@@ -265,7 +265,7 @@ namespace dxforge::graphics::d3d12
 		device->CreateShaderResourceView(_resource, info.srv_desc, _srv.cpu);
 	}
 
-	/// @brief ŠJ•úˆ—
+	/// @brief é–‹æ”¾å‡¦ç†
 	void d3d12_texture::release()
 	{
 		core::srv_heap().free(_srv);
@@ -274,17 +274,17 @@ namespace dxforge::graphics::d3d12
 
 	//_/_/_/_/_/_/_/_/ RENDER TEXTURE _/_/_/_/_/_/_/_/
 
-	/// @brief ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-	/// @param info ƒeƒNƒXƒ`ƒƒ‰Šú‰»î•ñ
+	/// @brief ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+	/// @param info ãƒ†ã‚¯ã‚¹ãƒãƒ£åˆæœŸåŒ–æƒ…å ±
 	d3d12_render_texture::d3d12_render_texture(d3d12_texture_init_info info)
 		: _texture{ info }
 	{
-		// ƒ~ƒbƒvƒŒƒxƒ‹‚ğæ“¾
+		// ãƒŸãƒƒãƒ—ãƒ¬ãƒ™ãƒ«ã‚’å–å¾—
 		assert(info.desc);
 		_mip_count = resource()->GetDesc().MipLevels;
 		assert(_mip_count && _mip_count <= d3d12_texture::max_mips);
 
-		// ƒŒƒ“ƒ_[ƒ^[ƒQƒbƒgƒrƒ…[‚ğì¬
+		// ãƒ¬ãƒ³ãƒ€ãƒ¼ã‚¿ãƒ¼ã‚²ãƒƒãƒˆãƒ“ãƒ¥ãƒ¼ã‚’ä½œæˆ
 		descriptor_heap& rtv_heap{ core::rtv_heap() };
 		D3D12_RENDER_TARGET_VIEW_DESC desc{};
 		desc.Format = info.desc->Format;
@@ -302,7 +302,7 @@ namespace dxforge::graphics::d3d12
 		}
 	}
 
-	/// @brief ŠJ•úˆ—
+	/// @brief é–‹æ”¾å‡¦ç†
 	void d3d12_render_texture::release()
 	{
 		for (u32 i{ 0 }; i < _mip_count; ++i)core::rtv_heap().free(_rtv[i]);
@@ -312,11 +312,11 @@ namespace dxforge::graphics::d3d12
 
 	//_/_/_/_/_/_/_/_/ DEPTH BUFFER _/_/_/_/_/_/_/_/
 
-	/// @brief ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-	/// @param info ƒeƒNƒXƒ`ƒƒ‰Šú‰»î•ñ
+	/// @brief ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+	/// @param info ãƒ†ã‚¯ã‚¹ãƒãƒ£åˆæœŸåŒ–æƒ…å ±
 	d3d12_depth_buffer::d3d12_depth_buffer(d3d12_texture_init_info info)
 	{
-		// ƒeƒNƒXƒ`ƒƒ‚ğì¬
+		// ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’ä½œæˆ
 		assert(info.desc);
 		const DXGI_FORMAT dsv_format{ info.desc->Format };
 
@@ -334,12 +334,12 @@ namespace dxforge::graphics::d3d12
 		srv_desc.Texture2D.PlaneSlice = 0;
 		srv_desc.Texture2D.ResourceMinLODClamp = 0.0f;
 
-		// ƒeƒNƒXƒ`ƒƒ‚ğİ’è
+		// ãƒ†ã‚¯ã‚¹ãƒãƒ£ã‚’è¨­å®š
 		assert(!info.srv_desc && !info.resource);
 		info.srv_desc = &srv_desc;
 		_texture = d3d12_texture(info);
 
-		// ƒfƒvƒXƒXƒeƒ“ƒVƒ‹ƒrƒ…[‚ğì¬
+		// ãƒ‡ãƒ—ã‚¹ã‚¹ãƒ†ãƒ³ã‚·ãƒ«ãƒ“ãƒ¥ãƒ¼ã‚’ä½œæˆ
 		D3D12_DEPTH_STENCIL_VIEW_DESC dsv_desc{};
 		dsv_desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 		dsv_desc.Flags = D3D12_DSV_FLAG_NONE;
@@ -353,7 +353,7 @@ namespace dxforge::graphics::d3d12
 		device->CreateDepthStencilView(resource(), &dsv_desc, _dsv.cpu);
 	}
 
-	/// @brief ŠJ•úˆ—
+	/// @brief é–‹æ”¾å‡¦ç†
 	void d3d12_depth_buffer::release()
 	{
 		core::dsv_heap().free(_dsv);

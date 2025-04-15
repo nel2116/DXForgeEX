@@ -1,21 +1,21 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [FbxImporter.cpp]
-// ì¬“ú : 2025/01/11
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// FBXƒtƒ@ƒCƒ‹‚ğ“Ç‚İ‚ŞƒNƒ‰ƒX
-// XV—š—ğ
-// 2025/01/11 V‹Kì¬
+// ä½œæˆæ—¥ : 2025/01/11
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// FBXãƒ•ã‚¡ã‚¤ãƒ«ã‚’èª­ã¿è¾¼ã‚€ã‚¯ãƒ©ã‚¹
+// æ›´æ–°å±¥æ­´
+// 2025/01/11 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "FbxImporter.h"
 #include "Geometry.h"
 
-// ====== ƒŠƒ“ƒN•” ======
-// ƒRƒ“ƒpƒCƒ‹ƒGƒ‰[‚âƒŠƒ“ƒJ[ƒGƒ‰[‚ª”­¶‚µ‚½ê‡‚ÍAŸ‚Ì‚±‚Æ‚ğŠm”F‚µ‚Ä‚­‚¾‚³‚¢B
-// 1) FBX SDK 2020.3.7ˆÈ~‚ªƒCƒ“ƒXƒg[ƒ‹‚³‚ê‚Ä‚¢‚é‚±‚ÆB
-// 2) fbxsdk.h‚Ö‚ÌƒCƒ“ƒNƒ‹[ƒhƒpƒX‚ªu’Ç‰ÁƒCƒ“ƒNƒ‹[ƒhƒfƒBƒŒƒNƒgƒŠviƒRƒ“ƒpƒCƒ‰‚Ìİ’èj‚É’Ç‰Á‚³‚ê‚Ä‚¢‚é‚±‚ÆB
-// 3) Ÿ‚ÌƒZƒNƒVƒ‡ƒ“‚Ìƒ‰ƒCƒuƒ‰ƒŠEƒpƒX‚ÍA³‚µ‚¢êŠ‚ğw‚µ‚Ä‚¢‚é‚±‚ÆB
+// ====== ãƒªãƒ³ã‚¯éƒ¨ ======
+// ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«ã‚¨ãƒ©ãƒ¼ã‚„ãƒªãƒ³ã‚«ãƒ¼ã‚¨ãƒ©ãƒ¼ãŒç™ºç”Ÿã—ãŸå ´åˆã¯ã€æ¬¡ã®ã“ã¨ã‚’ç¢ºèªã—ã¦ãã ã•ã„ã€‚
+// 1) FBX SDK 2020.3.7ä»¥é™ãŒã‚¤ãƒ³ã‚¹ãƒˆãƒ¼ãƒ«ã•ã‚Œã¦ã„ã‚‹ã“ã¨ã€‚
+// 2) fbxsdk.hã¸ã®ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰ãƒ‘ã‚¹ãŒã€Œè¿½åŠ ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªã€ï¼ˆã‚³ãƒ³ãƒ‘ã‚¤ãƒ©ã®è¨­å®šï¼‰ã«è¿½åŠ ã•ã‚Œã¦ã„ã‚‹ã“ã¨ã€‚
+// 3) æ¬¡ã®ã‚»ã‚¯ã‚·ãƒ§ãƒ³ã®ãƒ©ã‚¤ãƒ–ãƒ©ãƒªãƒ»ãƒ‘ã‚¹ã¯ã€æ­£ã—ã„å ´æ‰€ã‚’æŒ‡ã—ã¦ã„ã‚‹ã“ã¨ã€‚
 #if _DEBUG
 #pragma comment(lib,"C:\\Program Files\\Autodesk\\FBX\\FBX SDK\\2020.3.7\\lib\\x64\\debug\\libfbxsdk-md.lib")
 #pragma comment(lib,"C:\\Program Files\\Autodesk\\FBX\\FBX SDK\\2020.3.7\\lib\\x64\\debug\\libxml2-md.lib")
@@ -25,21 +25,21 @@
 #pragma comment(lib,"C:\\Program Files\\Autodesk\\FBX\\FBX SDK\\2020.3.7\\lib\\x64\\release\\libxml2-md.lib")
 #pragma comment(lib,"C:\\Program Files\\Autodesk\\FBX\\FBX SDK\\2020.3.7\\lib\\x64\\release\\zlib-md.lib")
 #endif
-// LNK4099 PDB not foundŒx‚ÍAFBX SDK PDB‚ğƒCƒ“ƒXƒg[ƒ‹i•Ê“rƒ_ƒEƒ“ƒ[ƒhj‚·‚é‚©AƒŠƒ“ƒJ[ƒIƒvƒVƒ‡ƒ“‚Å‚±‚ÌŒx‚ğ–³Œø‚É‚·‚éiƒŠƒ“ƒJ[ƒRƒ}ƒ“ƒhƒ‰ƒCƒ“F/ignore:4099j‚±‚Æ‚Å‰ğŒˆ‚Å‚«‚Ü‚·B
+// LNK4099 PDB not foundè­¦å‘Šã¯ã€FBX SDK PDBã‚’ã‚¤ãƒ³ã‚¹ãƒˆãƒ¼ãƒ«ï¼ˆåˆ¥é€”ãƒ€ã‚¦ãƒ³ãƒ­ãƒ¼ãƒ‰ï¼‰ã™ã‚‹ã‹ã€ãƒªãƒ³ã‚«ãƒ¼ã‚ªãƒ—ã‚·ãƒ§ãƒ³ã§ã“ã®è­¦å‘Šã‚’ç„¡åŠ¹ã«ã™ã‚‹ï¼ˆãƒªãƒ³ã‚«ãƒ¼ã‚³ãƒãƒ³ãƒ‰ãƒ©ã‚¤ãƒ³ï¼š/ignore:4099ï¼‰ã“ã¨ã§è§£æ±ºã§ãã¾ã™ã€‚
 
-// ====== –¼‘O‹óŠÔ ======
+// ====== åå‰ç©ºé–“ ======
 namespace dxforge::tools
 {
 	namespace
 	{
 		std::mutex fbx_mutex{};
 
-	}	// “½–¼–¼‘O‹óŠÔ
+	}	// åŒ¿ååå‰ç©ºé–“
 
-	// ====== ƒƒ“ƒoŠÖ” ======
+	// ====== ãƒ¡ãƒ³ãƒé–¢æ•° ======
 
-	/// @brief FBX SDK‚Ì‰Šú‰»
-	/// @return ‰Šú‰»‚É¬Œ÷‚µ‚½‚©‚Ç‚¤‚©
+	/// @brief FBX SDKã®åˆæœŸåŒ–
+	/// @return åˆæœŸåŒ–ã«æˆåŠŸã—ãŸã‹ã©ã†ã‹
 	bool fbx_context::initialize_fbx()
 	{
 		assert(!is_valid());
@@ -57,8 +57,8 @@ namespace dxforge::tools
 		return true;
 	}
 
-	/// @brief FBXƒtƒ@ƒCƒ‹‚Ì“Ç‚İ‚İ
-	/// @param file ƒtƒ@ƒCƒ‹–¼
+	/// @brief FBXãƒ•ã‚¡ã‚¤ãƒ«ã®èª­ã¿è¾¼ã¿
+	/// @param file ãƒ•ã‚¡ã‚¤ãƒ«å
 	void fbx_context::load_fbx_file(const char* file)
 	{
 		assert(_fbx_manager && !_fbx_scene);
@@ -78,12 +78,12 @@ namespace dxforge::tools
 
 		importer->Destroy();
 
-		// ƒV[ƒ“‚ÌƒXƒP[ƒ‹‚ğƒ[ƒgƒ‹’PˆÊ‚Åæ“¾‚·‚éB
+		// ã‚·ãƒ¼ãƒ³ã®ã‚¹ã‚±ãƒ¼ãƒ«ã‚’ãƒ¡ãƒ¼ãƒˆãƒ«å˜ä½ã§å–å¾—ã™ã‚‹ã€‚
 		_scene_scale = (f32)_fbx_scene->GetGlobalSettings().GetSystemUnit().GetConversionFactorTo(FbxSystemUnit::m);
 	}
 
-	/// @brief ƒV[ƒ“‚Ìæ“¾
-	/// @param root ƒ‹[ƒgƒm[ƒh
+	/// @brief ã‚·ãƒ¼ãƒ³ã®å–å¾—
+	/// @param root ãƒ«ãƒ¼ãƒˆãƒãƒ¼ãƒ‰
 	void fbx_context::get_scene(FbxNode* root /*= nullptr*/)
 	{
 		assert(is_valid());
@@ -138,11 +138,11 @@ namespace dxforge::tools
 		}
 	}
 
-	/// @brief ƒƒbƒVƒ…‚Ìæ“¾
-	/// @param node ƒm[ƒh
-	/// @param meshes ƒƒbƒVƒ…ƒŠƒXƒg
+	/// @brief ãƒ¡ãƒƒã‚·ãƒ¥ã®å–å¾—
+	/// @param node ãƒãƒ¼ãƒ‰
+	/// @param meshes ãƒ¡ãƒƒã‚·ãƒ¥ãƒªã‚¹ãƒˆ
 	/// @param lod_id LOD ID
-	/// @param lod_threshold LODè‡’l
+	/// @param lod_threshold LODé–¾å€¤
 	void fbx_context::get_meshes(FbxNode* node, utl::vector<mesh>& meshes, u32 lod_id, f32 lod_threshold)
 	{
 		assert(node && lod_id != u32_invalid_id);
@@ -178,11 +178,11 @@ namespace dxforge::tools
 		}
 	}
 
-	/// @brief ƒƒbƒVƒ…‚Ìæ“¾
-	/// @param attribute ƒm[ƒh‘®«
-	/// @param meshes ƒƒbƒVƒ…ƒŠƒXƒg
+	/// @brief ãƒ¡ãƒƒã‚·ãƒ¥ã®å–å¾—
+	/// @param attribute ãƒãƒ¼ãƒ‰å±æ€§
+	/// @param meshes ãƒ¡ãƒƒã‚·ãƒ¥ãƒªã‚¹ãƒˆ
 	/// @param lod_id LOD ID
-	/// @param lod_threshold LODè‡’l
+	/// @param lod_threshold LODé–¾å€¤
 	void fbx_context::get_mesh(FbxNodeAttribute* attribute, utl::vector<mesh>& meshes, u32 lod_id, f32 lod_threshold)
 	{
 		assert(attribute);
@@ -190,7 +190,7 @@ namespace dxforge::tools
 		FbxMesh* fbx_mesh{ (FbxMesh*)attribute };
 		if (fbx_mesh->RemoveBadPolygons() < 0) return;
 
-		// •K—v‚Å‚ ‚ê‚ÎƒƒbƒVƒ…‚ğOŠpŒ`‰»‚·‚éB
+		// å¿…è¦ã§ã‚ã‚Œã°ãƒ¡ãƒƒã‚·ãƒ¥ã‚’ä¸‰è§’å½¢åŒ–ã™ã‚‹ã€‚
 		FbxGeometryConverter gc{ _fbx_manager };
 		fbx_mesh = (FbxMesh*)gc.Triangulate(fbx_mesh, true);
 		if (!fbx_mesh || fbx_mesh->RemoveBadPolygons() < 0) return;
@@ -209,8 +209,8 @@ namespace dxforge::tools
 		}
 	}
 
-	/// @brief LODƒOƒ‹[ƒv‚Ìæ“¾
-	/// @param attribute ƒm[ƒh‘®«
+	/// @brief LODã‚°ãƒ«ãƒ¼ãƒ—ã®å–å¾—
+	/// @param attribute ãƒãƒ¼ãƒ‰å±æ€§
 	void fbx_context::get_lod_group(FbxNodeAttribute* attribute)
 	{
 		assert(attribute);
@@ -219,7 +219,7 @@ namespace dxforge::tools
 		FbxNode* const node{ lod_grp->GetNode() };
 		lod_group lod{};
 		lod.name = (node->GetName()[0] != '\0') ? node->GetName() : lod_grp->GetName();
-		// NOTE: LOD‚Ì”‚Íƒx[ƒXƒƒbƒVƒ…iLOD 0jê—p‚Å‚·B
+		// NOTE: LODã®æ•°ã¯ãƒ™ãƒ¼ã‚¹ãƒ¡ãƒƒã‚·ãƒ¥ï¼ˆLOD 0ï¼‰å°‚ç”¨ã§ã™ã€‚
 		const s32 num_nodes{ node->GetChildCount() };
 		assert(num_nodes > 0 && lod_grp->GetNumThresholds() == (num_nodes - 1));
 
@@ -239,10 +239,10 @@ namespace dxforge::tools
 		if (lod.meshes.size()) _scene->lod_groups.emplace_back(lod);
 	}
 
-	/// @brief ƒƒbƒVƒ…ƒf[ƒ^‚Ìæ“¾
-	/// @param fbx_mesh FBXƒƒbƒVƒ…
-	/// @param m ƒƒbƒVƒ…ƒf[ƒ^
-	/// @return ¬Œ÷‚µ‚½‚©‚Ç‚¤‚©
+	/// @brief ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ã®å–å¾—
+	/// @param fbx_mesh FBXãƒ¡ãƒƒã‚·ãƒ¥
+	/// @param m ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿
+	/// @return æˆåŠŸã—ãŸã‹ã©ã†ã‹
 	bool fbx_context::get_mesh_data(FbxMesh* fbx_mesh, mesh& m)
 	{
 		assert(fbx_mesh);
@@ -260,7 +260,7 @@ namespace dxforge::tools
 		const s32 num_polys{ fbx_mesh->GetPolygonCount() };
 		if (num_polys <= 0) return false;
 
-		// ’¸“_‚Ìæ“¾
+		// é ‚ç‚¹ã®å–å¾—
 		const s32 num_vertices{ fbx_mesh->GetControlPointsCount() };
 		FbxVector4* vertices{ fbx_mesh->GetControlPoints() };
 		const s32 num_indices{ fbx_mesh->GetPolygonVertexCount() };
@@ -276,7 +276,7 @@ namespace dxforge::tools
 		{
 			const u32 v_idx{ (u32)indices[i] };
 
-			// ’¸“_QÆ‚ª‘¶İ‚·‚éê‡‚ÍA‚»‚ÌƒCƒ“ƒfƒbƒNƒX‚ğg—p‚µ‚Ü‚·B
+			// é ‚ç‚¹å‚ç…§ãŒå­˜åœ¨ã™ã‚‹å ´åˆã¯ã€ãã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã‚’ä½¿ç”¨ã—ã¾ã™ã€‚
 			if (vertex_ref[v_idx] != u32_invalid_id)
 			{
 				m.raw_indices[i] = vertex_ref[v_idx];
@@ -292,7 +292,7 @@ namespace dxforge::tools
 
 		assert(m.raw_indices.size() % 3 == 0);
 
-		// ƒ|ƒŠƒSƒ“‚²‚Æ‚ÌŞ—¿ƒCƒ“ƒfƒbƒNƒX‚ğæ“¾
+		// ãƒãƒªã‚´ãƒ³ã”ã¨ã®ææ–™ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã‚’å–å¾—
 		assert(num_polys > 0);
 		FbxLayerElementArrayTemplate<s32>* mtl_indices;
 		if (fbx_mesh->GetMaterialIndices(&mtl_indices))
@@ -309,16 +309,16 @@ namespace dxforge::tools
 			}
 		}
 
-		// –@ü‚ÌƒCƒ“ƒ|[ƒg‚ÍƒfƒtƒHƒ‹ƒg‚ÅƒIƒ“
+		// æ³•ç·šã®ã‚¤ãƒ³ãƒãƒ¼ãƒˆã¯ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã§ã‚ªãƒ³
 		const bool import_normals{ !_scene_data->settings.calculate_normals };
-		// Úü‚ÌƒCƒ“ƒ|[ƒg‚ÍƒfƒtƒHƒ‹ƒg‚ÅƒIƒt
+		// æ¥ç·šã®ã‚¤ãƒ³ãƒãƒ¼ãƒˆã¯ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã§ã‚ªãƒ•
 		const bool import_tangents{ !_scene_data->settings.calculate_tangents };
 
-		// –@ü‚ÌƒCƒ“ƒ|[ƒg
+		// æ³•ç·šã®ã‚¤ãƒ³ãƒãƒ¼ãƒˆ
 		if (import_normals)
 		{
 			FbxArray<FbxVector4> normals;
-			// FBX‚Ì‘g‚İ‚İƒƒ\ƒbƒh‚ğg—p‚µ‚Ä–@ü‚ğŒvZ‚µ‚Ü‚·‚ªA–@üƒf[ƒ^‚ª‚·‚Å‚É‘¶İ‚µ‚È‚¢ê‡‚ÉŒÀ‚è‚Ü‚·B
+			// FBXã®çµ„ã¿è¾¼ã¿ãƒ¡ã‚½ãƒƒãƒ‰ã‚’ä½¿ç”¨ã—ã¦æ³•ç·šã‚’è¨ˆç®—ã—ã¾ã™ãŒã€æ³•ç·šãƒ‡ãƒ¼ã‚¿ãŒã™ã§ã«å­˜åœ¨ã—ãªã„å ´åˆã«é™ã‚Šã¾ã™ã€‚
 			if (fbx_mesh->GenerateNormals() &&
 				fbx_mesh->GetPolygonVertexNormals(normals) && normals.Size() > 0)
 			{
@@ -332,19 +332,19 @@ namespace dxforge::tools
 			}
 			else
 			{
-				// FBX‚©‚ç–@ü‚ğƒCƒ“ƒ|[ƒg‚·‚éÛ‚É‰½‚©–â‘è‚ª”­¶‚µ‚½B
-				// “Æ©‚Ì–@üŒvZ•û–@‚É–ß‚éB
+				// FBXã‹ã‚‰æ³•ç·šã‚’ã‚¤ãƒ³ãƒãƒ¼ãƒˆã™ã‚‹éš›ã«ä½•ã‹å•é¡ŒãŒç™ºç”Ÿã—ãŸã€‚
+				// ç‹¬è‡ªã®æ³•ç·šè¨ˆç®—æ–¹æ³•ã«æˆ»ã‚‹ã€‚
 				_scene_data->settings.calculate_normals = true;
 			}
 		}
 
-		// ƒ^ƒ“ƒWƒFƒ“ƒg‚ğƒCƒ“ƒ|[ƒg‚·‚é
+		// ã‚¿ãƒ³ã‚¸ã‚§ãƒ³ãƒˆã‚’ã‚¤ãƒ³ãƒãƒ¼ãƒˆã™ã‚‹
 		if (import_tangents)
 		{
 			FbxLayerElementArrayTemplate<FbxVector4>* tangents{ nullptr };
-			// FBX‚Ì‘g‚İ‚İƒƒ\ƒbƒh‚ğg—p‚µ‚Äƒ^ƒ“ƒWƒFƒ“ƒg‚ğŒvZ‚µ‚Ü‚·‚ªAƒ^ƒ“ƒWƒFƒ“ƒgƒf[ƒ^‚ª‚·‚Å‚É‘¶İ‚µ‚È‚¢ê‡‚ÉŒÀ‚è‚Ü‚·B
-			// NOTE: ƒhƒLƒ…ƒƒ“ƒg‚É‚æ‚é‚ÆA‚±‚ÌŠÖ”‚ÍÚüƒf[ƒ^‚ª‚·‚Å‚É‘¶İ‚µApOverwrite == false‚Ìê‡‚Étrue‚ğ•Ô‚·B
-			//		‚±‚ê‚ÍŠÔˆá‚Á‚Ä‚¢‚éi‚Â‚Ü‚èA‚»‚Ìê‡‚Ífalse‚ğ•Ô‚·jI
+			// FBXã®çµ„ã¿è¾¼ã¿ãƒ¡ã‚½ãƒƒãƒ‰ã‚’ä½¿ç”¨ã—ã¦ã‚¿ãƒ³ã‚¸ã‚§ãƒ³ãƒˆã‚’è¨ˆç®—ã—ã¾ã™ãŒã€ã‚¿ãƒ³ã‚¸ã‚§ãƒ³ãƒˆãƒ‡ãƒ¼ã‚¿ãŒã™ã§ã«å­˜åœ¨ã—ãªã„å ´åˆã«é™ã‚Šã¾ã™ã€‚
+			// NOTE: ãƒ‰ã‚­ãƒ¥ãƒ¡ãƒ³ãƒˆã«ã‚ˆã‚‹ã¨ã€ã“ã®é–¢æ•°ã¯æ¥ç·šãƒ‡ãƒ¼ã‚¿ãŒã™ã§ã«å­˜åœ¨ã—ã€pOverwrite == falseã®å ´åˆã«trueã‚’è¿”ã™ã€‚
+			//		ã“ã‚Œã¯é–“é•ã£ã¦ã„ã‚‹ï¼ˆã¤ã¾ã‚Šã€ãã®å ´åˆã¯falseã‚’è¿”ã™ï¼‰ï¼
 			fbx_mesh->GenerateTangentsData();
 
 			if (fbx_mesh->GetTangents(&tangents) && tangents &&
@@ -353,7 +353,7 @@ namespace dxforge::tools
 				const s32 num_tangent{ tangents->GetCount() };
 				for (s32 i{ 0 }; i < num_tangent; ++i)
 				{
-					// TODO: ‚±‚Ì•ÏŠ·‚ª³‚µ‚¢‚©‚Ç‚¤‚©‚Í‚í‚©‚ç‚È‚¢B
+					// TODO: ã“ã®å¤‰æ›ãŒæ­£ã—ã„ã‹ã©ã†ã‹ã¯ã‚ã‹ã‚‰ãªã„ã€‚
 					FbxVector4 t{ tangents->GetAt(i) };
 					const f32 handedness{ (f32)t[3] };
 					t[3] = 0.0;
@@ -364,17 +364,17 @@ namespace dxforge::tools
 			}
 			else
 			{
-				// FBX‚©‚çƒ^ƒ“ƒWƒFƒ“ƒg‚ğƒCƒ“ƒ|[ƒg‚·‚é‚Æ‚«‚É‰½‚©–â‘è‚ª”­¶‚µ‚½B
-				// “Æ©‚Ìƒ^ƒ“ƒWƒFƒ“ƒgŒvZ•û–@‚É–ß‚éB
+				// FBXã‹ã‚‰ã‚¿ãƒ³ã‚¸ã‚§ãƒ³ãƒˆã‚’ã‚¤ãƒ³ãƒãƒ¼ãƒˆã™ã‚‹ã¨ãã«ä½•ã‹å•é¡ŒãŒç™ºç”Ÿã—ãŸã€‚
+				// ç‹¬è‡ªã®ã‚¿ãƒ³ã‚¸ã‚§ãƒ³ãƒˆè¨ˆç®—æ–¹æ³•ã«æˆ»ã‚‹ã€‚
 				_scene_data->settings.calculate_tangents = true;
 			}
 		}
 
-		// UV‚ğæ“¾‚·‚é
+		// UVã‚’å–å¾—ã™ã‚‹
 		FbxStringList uv_names;
 		fbx_mesh->GetUVSetNames(uv_names);
 		const s32 uv_set_count{ uv_names.GetCount() };
-		// NOTE: UVƒZƒbƒg‚ª‚È‚­‚Ä‚à‘åä•v‚¾B —á‚¦‚ÎA”­Œõ‚·‚éƒIƒuƒWƒFƒNƒg‚Ì’†‚É‚ÍAuvƒ}ƒbƒv‚ğ•K—v‚Æ‚µ‚È‚¢‚à‚Ì‚ª‚ ‚éB
+		// NOTE: UVã‚»ãƒƒãƒˆãŒãªãã¦ã‚‚å¤§ä¸ˆå¤«ã ã€‚ ä¾‹ãˆã°ã€ç™ºå…‰ã™ã‚‹ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®ä¸­ã«ã¯ã€uvãƒãƒƒãƒ—ã‚’å¿…è¦ã¨ã—ãªã„ã‚‚ã®ãŒã‚ã‚‹ã€‚
 		m.uv_sets.resize(uv_set_count);
 
 		for (s32 i{ 0 }; i < uv_set_count; ++i)
@@ -385,8 +385,8 @@ namespace dxforge::tools
 				const s32 num_uvs{ uvs.Size() };
 				for (s32 j{ 0 }; j < num_uvs; ++j)
 				{
-					// FBX UV‚ÌŒ´“_‚ªí‚É¶‰º‚É‚ ‚é‚Æ‰¼’è‚·‚é‚ÆADirectX‚Í¶ã‹÷‚ğŒ´“_‚Æ‚µ‚Äg—p‚·‚é‚½‚ßA
-					// V²‚Í”½“]‚·‚é‚Í‚¸‚Å‚·B
+					// FBX UVã®åŸç‚¹ãŒå¸¸ã«å·¦ä¸‹ã«ã‚ã‚‹ã¨ä»®å®šã™ã‚‹ã¨ã€DirectXã¯å·¦ä¸Šéš…ã‚’åŸç‚¹ã¨ã—ã¦ä½¿ç”¨ã™ã‚‹ãŸã‚ã€
+					// Vè»¸ã¯åè»¢ã™ã‚‹ã¯ãšã§ã™ã€‚
 					m.uv_sets[i].emplace_back((f32)uvs[j][0], 1.f - (f32)uvs[j][1]);
 				}
 			}
@@ -395,18 +395,18 @@ namespace dxforge::tools
 		return true;
 	}
 
-	/// @brief fbxƒ‚ƒfƒ‹‚ğ“Ç‚İ‚Ş
-	/// @param file FBXƒtƒ@ƒCƒ‹–¼
-	/// @param data ƒV[ƒ“ƒf[ƒ^
-	/// @param callback i’»ƒR[ƒ‹ƒoƒbƒN
-	/// @return ¬Œ÷‚µ‚½ê‡‚Ítrue
+	/// @brief fbxãƒ¢ãƒ‡ãƒ«ã‚’èª­ã¿è¾¼ã‚€
+	/// @param file FBXãƒ•ã‚¡ã‚¤ãƒ«å
+	/// @param data ã‚·ãƒ¼ãƒ³ãƒ‡ãƒ¼ã‚¿
+	/// @param callback é€²æ—ã‚³ãƒ¼ãƒ«ãƒãƒƒã‚¯
+	/// @return æˆåŠŸã—ãŸå ´åˆã¯true
 	EDITOR_INTERFACE void ImportFbx(const char* file, scene_data* data, progression::progress_callback callback)
 	{
 		assert(file && data);
 		scene scene{};
 		progression progression{ callback };
 
-		// NOTE: FBX SDK‚ğg—p‚·‚é‚à‚Ì‚ÍAƒVƒ“ƒOƒ‹ƒXƒŒƒbƒh‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B
+		// NOTE: FBX SDKã‚’ä½¿ç”¨ã™ã‚‹ã‚‚ã®ã¯ã€ã‚·ãƒ³ã‚°ãƒ«ã‚¹ãƒ¬ãƒƒãƒ‰ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚
 		{
 			std::lock_guard lock{ fbx_mutex };
 			fbx_context fbx_context{ file, &scene, data, &progression };
@@ -418,7 +418,7 @@ namespace dxforge::tools
 
 		if (scene.lod_groups.empty())
 		{
-			// TODO: ¸”sƒƒOƒƒbƒZ[ƒW‚ğƒGƒfƒBƒ^[‚É‘—‚é
+			// TODO: å¤±æ•—ãƒ­ã‚°ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ã‚’ã‚¨ãƒ‡ã‚£ã‚¿ãƒ¼ã«é€ã‚‹
 			return;
 		}
 

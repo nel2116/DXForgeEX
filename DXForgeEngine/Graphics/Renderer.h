@@ -1,18 +1,18 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Renderer.h]
-// ì¬“ú : 2024/12/20
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-// @ƒŒƒ“ƒ_ƒ‰[
-// XV—š—ğ
-// 2024/12/20 V‹Kì¬
-// 2025/01/12 add_submesh()Aremove_submesh()‚Ì’Ç‰Á
-// 2025/01/12 ƒJƒƒ‰ŠÖ˜A‚ÌŠÖ”‚ğ’Ç‰Á
-// 2025/01/13 add_material()Aremove_material()‚Ì’Ç‰Á
-// 2025/01/18 lightŠÖ˜A‚Ì\‘¢‘ÌAŠÖ”‚ğ’Ç‰Á
+// ä½œæˆæ—¥ : 2024/12/20
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+// ã€€ãƒ¬ãƒ³ãƒ€ãƒ©ãƒ¼
+// æ›´æ–°å±¥æ­´
+// 2024/12/20 æ–°è¦ä½œæˆ
+// 2025/01/12 add_submesh()ã€remove_submesh()ã®è¿½åŠ 
+// 2025/01/12 ã‚«ãƒ¡ãƒ©é–¢é€£ã®é–¢æ•°ã‚’è¿½åŠ 
+// 2025/01/13 add_material()ã€remove_material()ã®è¿½åŠ 
+// 2025/01/18 lighté–¢é€£ã®æ§‹é€ ä½“ã€é–¢æ•°ã‚’è¿½åŠ 
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "CommonHeaders.h"
 #include "Platform/Window.h"
 #include "EngineAPI/Camera.h"
@@ -33,8 +33,8 @@ namespace dxforge::graphics
 
 	DEFINE_TYPED_ID(surface_id);
 
-	/// @brief ƒT[ƒtƒFƒX
-	/// @details ƒOƒ‰ƒtƒBƒbƒN‚ğƒƒCƒ“ƒEƒBƒ“ƒhƒE‚É•\¦‚·‚é‚½‚ß‚ÌƒNƒ‰ƒX
+	/// @brief ã‚µãƒ¼ãƒ•ã‚§ã‚¹
+	/// @details ã‚°ãƒ©ãƒ•ã‚£ãƒƒã‚¯ã‚’ãƒ¡ã‚¤ãƒ³ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ã«è¡¨ç¤ºã™ã‚‹ãŸã‚ã®ã‚¯ãƒ©ã‚¹
 	class surface
 	{
 	public:
@@ -69,9 +69,9 @@ namespace dxforge::graphics
 	{
 		math::v3 attenuation;
 		f32 range;
-		// ƒ‰ƒWƒAƒ“’PˆÊ‚ÌƒAƒ“ƒuƒ‰Šp [0, pin
+		// ãƒ©ã‚¸ã‚¢ãƒ³å˜ä½ã®ã‚¢ãƒ³ãƒ–ãƒ©è§’ [0, piï¼½
 		f32 umbra;
-		// ƒ‰ƒWƒAƒ“’PˆÊ‚Ìƒyƒiƒ“ƒuƒ‰Šp [umbra, pin
+		// ãƒ©ã‚¸ã‚¢ãƒ³å˜ä½ã®ãƒšãƒŠãƒ³ãƒ–ãƒ©è§’ [umbra, piï¼½
 		f32 penumbra;
 	};
 
@@ -134,21 +134,21 @@ namespace dxforge::graphics
 
 	struct camera_init_info
 	{
-		id::id_type entity_id{ id::invalid_id };	// ƒJƒƒ‰‚ªƒAƒ^ƒbƒ`‚³‚ê‚éƒGƒ“ƒeƒBƒeƒB‚ÌID
-		camera::type type{};						// ƒJƒƒ‰‚Ìí—Ş
-		math::v3 up;								// ƒJƒƒ‰‚Ìã•ûŒü
+		id::id_type entity_id{ id::invalid_id };	// ã‚«ãƒ¡ãƒ©ãŒã‚¢ã‚¿ãƒƒãƒã•ã‚Œã‚‹ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®ID
+		camera::type type{};						// ã‚«ãƒ¡ãƒ©ã®ç¨®é¡
+		math::v3 up;								// ã‚«ãƒ¡ãƒ©ã®ä¸Šæ–¹å‘
 		union
 		{
-			f32 field_of_view;						// ‹–ìŠp
-			f32 view_width;							// ‹–ì‚Ì•
+			f32 field_of_view;						// è¦–é‡è§’
+			f32 view_width;							// è¦–é‡ã®å¹…
 		};
 		union
 		{
-			f32 aspect_ratio;						// ƒAƒXƒyƒNƒg”ä
-			f32 view_height;						// ‹–ì‚Ì‚‚³
+			f32 aspect_ratio;						// ã‚¢ã‚¹ãƒšã‚¯ãƒˆæ¯”
+			f32 view_height;						// è¦–é‡ã®é«˜ã•
 		};
-		f32 near_z{ 0.0f };							// ‹ßƒNƒŠƒbƒv–Ê
-		f32 far_z{ 0.0f };							// ‰“ƒNƒŠƒbƒv–Ê
+		f32 near_z{ 0.0f };							// è¿‘ã‚¯ãƒªãƒƒãƒ—é¢
+		f32 far_z{ 0.0f };							// é ã‚¯ãƒªãƒƒãƒ—é¢
 	};
 
 	struct perspective_camera_init_info : public camera_init_info
@@ -241,7 +241,7 @@ namespace dxforge::graphics
 		id::id_type* texture_ids;
 		material_surface    surface;
 		material_type::type type;
-		u32                 texture_count; // NOTE: texture‚ÍƒIƒvƒVƒ‡ƒ“‚È‚Ì‚ÅAtexture count‚Í0Atexture_ids‚Ínullptr‚Å‚à‚æ‚¢B
+		u32                 texture_count; // NOTE: textureã¯ã‚ªãƒ—ã‚·ãƒ§ãƒ³ãªã®ã§ã€texture countã¯0ã€texture_idsã¯nullptrã§ã‚‚ã‚ˆã„ã€‚
 		id::id_type         shader_ids[shader_type::count]{ id::invalid_id, id::invalid_id, id::invalid_id, id::invalid_id, id::invalid_id, id::invalid_id, id::invalid_id, id::invalid_id };
 	};
 
@@ -268,12 +268,12 @@ namespace dxforge::graphics
 	bool initialize(graphics_platform platform);
 	void shutdown();
 
-	// ƒRƒ“ƒpƒCƒ‹‚³‚ê‚½ƒGƒ“ƒWƒ“ƒVƒF[ƒ_[‚ÌêŠ‚ğAÀsƒtƒ@ƒCƒ‹‚ÌƒpƒX‚©‚ç‘Š‘Î“I‚Éæ“¾‚·‚éB
-	// ‚±‚ÌƒpƒX‚ÍAŒ»İg—p‚³‚ê‚Ä‚¢‚éƒOƒ‰ƒtƒBƒbƒNƒXAPI‚Ì‚à‚Ì‚Å‚·B
+	// ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«ã•ã‚ŒãŸã‚¨ãƒ³ã‚¸ãƒ³ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã®å ´æ‰€ã‚’ã€å®Ÿè¡Œãƒ•ã‚¡ã‚¤ãƒ«ã®ãƒ‘ã‚¹ã‹ã‚‰ç›¸å¯¾çš„ã«å–å¾—ã™ã‚‹ã€‚
+	// ã“ã®ãƒ‘ã‚¹ã¯ã€ç¾åœ¨ä½¿ç”¨ã•ã‚Œã¦ã„ã‚‹ã‚°ãƒ©ãƒ•ã‚£ãƒƒã‚¯ã‚¹APIã®ã‚‚ã®ã§ã™ã€‚
 	const char* get_engine_shaders_path();
 
-	// w’è‚³‚ê‚½ƒvƒ‰ƒbƒgƒtƒH[ƒ€—p‚ÉƒRƒ“ƒpƒCƒ‹‚³‚ê‚½ƒGƒ“ƒWƒ“ƒVƒF[ƒ_[‚ÌêŠ‚ğAÀsƒtƒ@ƒCƒ‹‚ÌƒpƒX‚©‚ç‘Š‘Î“I‚Éæ“¾‚µ‚Ü‚·B
-	// ‚±‚ÌƒpƒX‚ÍAŒ»İg—p‚³‚ê‚Ä‚¢‚éƒOƒ‰ƒtƒBƒbƒNƒXAPI‚Ì‚à‚Ì‚Å‚·B
+	// æŒ‡å®šã•ã‚ŒãŸãƒ—ãƒ©ãƒƒãƒˆãƒ•ã‚©ãƒ¼ãƒ ç”¨ã«ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«ã•ã‚ŒãŸã‚¨ãƒ³ã‚¸ãƒ³ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã®å ´æ‰€ã‚’ã€å®Ÿè¡Œãƒ•ã‚¡ã‚¤ãƒ«ã®ãƒ‘ã‚¹ã‹ã‚‰ç›¸å¯¾çš„ã«å–å¾—ã—ã¾ã™ã€‚
+	// ã“ã®ãƒ‘ã‚¹ã¯ã€ç¾åœ¨ä½¿ç”¨ã•ã‚Œã¦ã„ã‚‹ã‚°ãƒ©ãƒ•ã‚£ãƒƒã‚¯ã‚¹APIã®ã‚‚ã®ã§ã™ã€‚
 	const char* get_engine_shaders_path(graphics_platform platform);
 
 	surface create_surface(platform::window window);

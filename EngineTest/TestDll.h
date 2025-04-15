@@ -1,14 +1,14 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [TestDll.h]
-// ì¬“ú : 2024/12/21
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// @DLL‚ÌƒeƒXƒg
-// XV—š—ğ
-// 2024/12/21 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/12/21
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// ã€€DLLã®ãƒ†ã‚¹ãƒˆ
+// æ›´æ–°å±¥æ­´
+// 2024/12/21 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "Test.h"
 #include <Windows.h>
 #include <iostream>
@@ -22,10 +22,10 @@ class engine_test : public test
 public:
 	bool initialize() override
 	{
-		// ƒ_ƒ~[‚ÌƒEƒBƒ“ƒhƒEƒnƒ“ƒhƒ‹‚ğg—p
+		// ãƒ€ãƒŸãƒ¼ã®ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦ãƒãƒ³ãƒ‰ãƒ«ã‚’ä½¿ç”¨
 		HWND dummyHwnd = (HWND)0x12345678;
 
-		// ƒT[ƒtƒFƒCƒX‚ğì¬
+		// ã‚µãƒ¼ãƒ•ã‚§ã‚¤ã‚¹ã‚’ä½œæˆ
 		unsigned int surfaceId = CreateRenderSurface(dummyHwnd, 800, 600);
 		if (surfaceId == 0)
 		{
@@ -35,7 +35,7 @@ public:
 
 		std::cout << "Surface created with ID: " << surfaceId << std::endl;
 
-		// GetWindowHandleŠÖ”‚ğƒeƒXƒg
+		// GetWindowHandleé–¢æ•°ã‚’ãƒ†ã‚¹ãƒˆ
 		HWND handle = DXForge_GetWindowHandle(surfaceId);
 		if (handle != nullptr)
 		{
@@ -46,7 +46,7 @@ public:
 			std::cerr << "GetWindowHandle failed." << std::endl;
 		}
 
-		// ƒT[ƒtƒFƒCƒX‚ğíœ
+		// ã‚µãƒ¼ãƒ•ã‚§ã‚¤ã‚¹ã‚’å‰Šé™¤
 		RemoveRenderSurface(surfaceId);
 		std::cout << "Surface removed." << std::endl;
 		return true;

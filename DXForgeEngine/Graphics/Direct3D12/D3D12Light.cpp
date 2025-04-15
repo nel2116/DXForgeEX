@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12Light.cpp]
-// ì¬“ú : 2025/01/18
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// Direct3D12‚Ìƒ‰ƒCƒgƒNƒ‰ƒX
-// XV—š—ğ
-// 2025/01/18 V‹Kì¬
+// ä½œæˆæ—¥ : 2025/01/18
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// Direct3D12ã®ãƒ©ã‚¤ãƒˆã‚¯ãƒ©ã‚¹
+// æ›´æ–°å±¥æ­´
+// 2025/01/18 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12Light.h"
 #include "D3D12Core.h"
 #include "Shaders/SharedTypes.h"
@@ -32,12 +32,12 @@ namespace dxforge::graphics::d3d12::light
 			constexpr static const u32 bits{ 0 };
 		};
 
-		// ƒtƒŒ[ƒ€ƒoƒbƒtƒ@‚Ì”‚ª8–¢–‚Å‚ ‚é‚±‚Æ‚ğŠm”F
+		// ãƒ•ãƒ¬ãƒ¼ãƒ ãƒãƒƒãƒ•ã‚¡ã®æ•°ãŒ8æœªæº€ã§ã‚ã‚‹ã“ã¨ã‚’ç¢ºèª
 		static_assert(u32_set_bits<frame_buffer_count>::bits < (1 << 8), "That's quite a large frame buffer count!");
 
 		constexpr u8 dirty_bits_mask{ (u8)u32_set_bits<frame_buffer_count>::bits };
 
-		/// @brief ƒ‰ƒCƒg‚ÌŠ—LÒ
+		/// @brief ãƒ©ã‚¤ãƒˆã®æ‰€æœ‰è€…
 		struct light_owner
 		{
 			game_entity::entity_id entity_id{ id::invalid_id };
@@ -53,19 +53,19 @@ namespace dxforge::graphics::d3d12::light
 #define		CONSTEXPR constexpr
 #endif
 
-		/// @brief ƒ‰ƒCƒgƒZƒbƒg
+		/// @brief ãƒ©ã‚¤ãƒˆã‚»ãƒƒãƒˆ
 		class light_set
 		{
-		public:		// ƒpƒuƒŠƒbƒNŠÖ”
-			/// @brief ƒ‰ƒCƒg‚ğ’Ç‰Á‚·‚é
-			/// @param info ƒ‰ƒCƒg‚Ì‰Šú‰»î•ñ
-			/// @return ’Ç‰Á‚µ‚½ƒ‰ƒCƒg‚ÌID
+		public:		// ãƒ‘ãƒ–ãƒªãƒƒã‚¯é–¢æ•°
+			/// @brief ãƒ©ã‚¤ãƒˆã‚’è¿½åŠ ã™ã‚‹
+			/// @param info ãƒ©ã‚¤ãƒˆã®åˆæœŸåŒ–æƒ…å ±
+			/// @return è¿½åŠ ã—ãŸãƒ©ã‚¤ãƒˆã®ID
 			constexpr graphics::light add(const light_init_info& info)
 			{
 				if (info.type == graphics::light::directional)
 				{
 					u32 index{ u32_invalid_id };
-					// ”z—ñ‚É‹ó‚¢‚Ä‚¢‚éƒXƒƒbƒg‚ª‚ ‚ê‚Î’T‚·B
+					// é…åˆ—ã«ç©ºã„ã¦ã„ã‚‹ã‚¹ãƒ­ãƒƒãƒˆãŒã‚ã‚Œã°æ¢ã™ã€‚
 					for (u32 i{ 0 }; i < _non_cullable_owners.size(); ++i)
 					{
 						if (!id::is_valid(_non_cullable_owners[i]))
@@ -77,7 +77,7 @@ namespace dxforge::graphics::d3d12::light
 
 					if (index == u32_invalid_id)
 					{
-						// ‹ó‚¢‚Ä‚¢‚éƒXƒƒbƒg‚ª‚È‚¢ê‡‚ÍV‚µ‚­’Ç‰Á‚·‚éB
+						// ç©ºã„ã¦ã„ã‚‹ã‚¹ãƒ­ãƒƒãƒˆãŒãªã„å ´åˆã¯æ–°ã—ãè¿½åŠ ã™ã‚‹ã€‚
 						index = (u32)_non_cullable_owners.size();
 						_non_cullable_owners.emplace_back();
 						_non_cullable_lights.emplace_back();
@@ -97,7 +97,7 @@ namespace dxforge::graphics::d3d12::light
 				{
 					u32 index{ u32_invalid_id };
 
-					// ‹ó‚«ƒXƒƒbƒg‚ğ’T‚·
+					// ç©ºãã‚¹ãƒ­ãƒƒãƒˆã‚’æ¢ã™
 					for (u32 i{ _enabled_light_count }; i < _cullable_owners.size(); ++i)
 					{
 						if (!id::is_valid(_cullable_owners[i]))
@@ -107,7 +107,7 @@ namespace dxforge::graphics::d3d12::light
 						}
 					}
 
-					// ‹ó‚ÌƒXƒƒbƒg‚ªŒ©‚Â‚©‚ç‚È‚¯‚ê‚ÎAV‚µ‚¢ƒAƒCƒeƒ€‚ğ’Ç‰Á‚·‚éB
+					// ç©ºã®ã‚¹ãƒ­ãƒƒãƒˆãŒè¦‹ã¤ã‹ã‚‰ãªã‘ã‚Œã°ã€æ–°ã—ã„ã‚¢ã‚¤ãƒ†ãƒ ã‚’è¿½åŠ ã™ã‚‹ã€‚
 					if (index == u32_invalid_id)
 					{
 						index = (u32)_cullable_owners.size();
@@ -137,8 +137,8 @@ namespace dxforge::graphics::d3d12::light
 				}
 			}
 
-			/// @brief ƒ‰ƒCƒg‚ğíœ‚·‚é
-			/// @param id íœ‚·‚éƒ‰ƒCƒg‚ÌID
+			/// @brief ãƒ©ã‚¤ãƒˆã‚’å‰Šé™¤ã™ã‚‹
+			/// @param id å‰Šé™¤ã™ã‚‹ãƒ©ã‚¤ãƒˆã®ID
 			constexpr void remove(light_id id)
 			{
 				enable(id, false);
@@ -150,17 +150,17 @@ namespace dxforge::graphics::d3d12::light
 				}
 				else
 				{
-					// ‚»‚Ì‘¼‚Ìƒ‰ƒCƒg‚Ìˆ—
+					// ãã®ä»–ã®ãƒ©ã‚¤ãƒˆã®å‡¦ç†
 					assert(_owners[_cullable_owners[owner.data_index]].data_index == owner.data_index);
 					_cullable_owners[owner.data_index] = light_id{ u32_invalid_id };
 				}
 				_owners.remove(id);
 			}
 
-			/// @brief ƒ‰ƒCƒg‚Ìtransform‚ğXV‚·‚é
+			/// @brief ãƒ©ã‚¤ãƒˆã®transformã‚’æ›´æ–°ã™ã‚‹
 			void uptdate_transforms()
 			{
-				// ƒJƒŠƒ“ƒO•s”\ƒ‰ƒCƒg‚Ì•ûŒü«‚ğXV
+				// ã‚«ãƒªãƒ³ã‚°ä¸èƒ½ãƒ©ã‚¤ãƒˆã®æ–¹å‘æ€§ã‚’æ›´æ–°
 				for (const auto& id : _non_cullable_owners)
 				{
 					if (!id::is_valid(id)) continue;
@@ -174,7 +174,7 @@ namespace dxforge::graphics::d3d12::light
 					}
 				}
 
-				// ƒJƒŠƒ“ƒO‰Â”\‚Èƒ‰ƒCƒg‚ÌˆÊ’u‚Æ•ûŒü‚ğXV
+				// ã‚«ãƒªãƒ³ã‚°å¯èƒ½ãªãƒ©ã‚¤ãƒˆã®ä½ç½®ã¨æ–¹å‘ã‚’æ›´æ–°
 				const u32 count{ _enabled_light_count };
 				if (!count) return;
 
@@ -191,9 +191,9 @@ namespace dxforge::graphics::d3d12::light
 				}
 			}
 
-			/// @brief ƒ‰ƒCƒg‚Ì—LŒø–³Œø‚ğİ’è‚·‚é
-			/// @param id ƒ‰ƒCƒgID
-			/// @param is_enabled ƒ‰ƒCƒg‚ª—LŒø‚©‚Ç‚¤‚©
+			/// @brief ãƒ©ã‚¤ãƒˆã®æœ‰åŠ¹ç„¡åŠ¹ã‚’è¨­å®šã™ã‚‹
+			/// @param id ãƒ©ã‚¤ãƒˆID
+			/// @param is_enabled ãƒ©ã‚¤ãƒˆãŒæœ‰åŠ¹ã‹ã©ã†ã‹
 			constexpr void enable(light_id id, bool is_enabled)
 			{
 				_owners[id].is_enabled = is_enabled;
@@ -202,13 +202,13 @@ namespace dxforge::graphics::d3d12::light
 					return;
 				}
 
-				// ‚»‚Ì‘¼‚Ìƒ‰ƒCƒg‚Ìˆ—
+				// ãã®ä»–ã®ãƒ©ã‚¤ãƒˆã®å‡¦ç†
 				const u32 data_index{ _owners[id].data_index };
 
-				// NOTE: ‚±‚ê‚Í_enabled_light_count‚Ö‚ÌQÆ‚Å‚ ‚èA‚»‚Ì’l‚ğ•ÏX‚·‚éB
+				// NOTE: ã“ã‚Œã¯_enabled_light_countã¸ã®å‚ç…§ã§ã‚ã‚Šã€ãã®å€¤ã‚’å¤‰æ›´ã™ã‚‹ã€‚
 				u32& count{ _enabled_light_count };
 
-				// NOTE: dirty_bits‚Íswap_cullable_lights‚É‚æ‚Á‚Äİ’è‚³‚ê‚é‚Ì‚ÅA‚±‚±‚Å‚Íİ’è‚µ‚È‚¢B
+				// NOTE: dirty_bitsã¯swap_cullable_lightsã«ã‚ˆã£ã¦è¨­å®šã•ã‚Œã‚‹ã®ã§ã€ã“ã“ã§ã¯è¨­å®šã—ãªã„ã€‚
 				if (is_enabled)
 				{
 					if (data_index > count)
@@ -237,9 +237,9 @@ namespace dxforge::graphics::d3d12::light
 				}
 			}
 
-			/// @brief ƒ‰ƒCƒg‚Ì‹­“x‚ğİ’è‚·‚é
-			/// @param id ƒ‰ƒCƒgID
-			/// @param intensity ƒ‰ƒCƒg‚Ì‹­“x
+			/// @brief ãƒ©ã‚¤ãƒˆã®å¼·åº¦ã‚’è¨­å®šã™ã‚‹
+			/// @param id ãƒ©ã‚¤ãƒˆID
+			/// @param intensity ãƒ©ã‚¤ãƒˆã®å¼·åº¦
 			constexpr void Intensity(light_id id, f32 intensity)
 			{
 				if (intensity < 0.0f)intensity = 0.0f;
@@ -260,9 +260,9 @@ namespace dxforge::graphics::d3d12::light
 				}
 			}
 
-			/// @brief ƒ‰ƒCƒg‚ÌF‚ğİ’è‚·‚é
-			/// @param id ƒ‰ƒCƒgID
-			/// @param color ƒ‰ƒCƒg‚ÌF
+			/// @brief ãƒ©ã‚¤ãƒˆã®è‰²ã‚’è¨­å®šã™ã‚‹
+			/// @param id ãƒ©ã‚¤ãƒˆID
+			/// @param color ãƒ©ã‚¤ãƒˆã®è‰²
 			constexpr void color(light_id id, math::v3 color)
 			{
 				assert(color.x >= 0.0f && color.y >= 0.0f && color.z >= 0.0f);
@@ -285,8 +285,8 @@ namespace dxforge::graphics::d3d12::light
 				}
 			}
 
-			/// @brief ƒ‰ƒCƒg‚ÌŒ¸Š‚ğİ’è‚·‚é
-			/// @param id ƒ‰ƒCƒgID
+			/// @brief ãƒ©ã‚¤ãƒˆã®æ¸›è¡°ã‚’è¨­å®šã™ã‚‹
+			/// @param id ãƒ©ã‚¤ãƒˆID
 			CONSTEXPR void attenuation(light_id id, math::v3 attenuation)
 			{
 				assert(attenuation.x >= 0.0f && attenuation.y >= 0.0f && attenuation.z >= 0.0f);
@@ -299,8 +299,8 @@ namespace dxforge::graphics::d3d12::light
 				make_dirty(index);
 			}
 
-			/// @brief ƒ‰ƒCƒg‚Ì”ÍˆÍ‚ğİ’è‚·‚é
-			/// @param id ƒ‰ƒCƒgID
+			/// @brief ãƒ©ã‚¤ãƒˆã®ç¯„å›²ã‚’è¨­å®šã™ã‚‹
+			/// @param id ãƒ©ã‚¤ãƒˆID
 			CONSTEXPR void range(light_id id, f32 range)
 			{
 				assert(range > 0.0f);
@@ -330,9 +330,9 @@ namespace dxforge::graphics::d3d12::light
 				}
 			}
 
-			/// @brief ƒ‰ƒCƒg‚ÌŒõ‚ÌŠp“x‚ğİ’è‚·‚é
-			/// @param id ƒ‰ƒCƒgID
-			/// @param umbra ƒ‰ƒCƒg‚ÌŒõ‚ÌŠp“x
+			/// @brief ãƒ©ã‚¤ãƒˆã®å…‰éŒã®è§’åº¦ã‚’è¨­å®šã™ã‚‹
+			/// @param id ãƒ©ã‚¤ãƒˆID
+			/// @param umbra ãƒ©ã‚¤ãƒˆã®å…‰éŒã®è§’åº¦
 			void umbra(light_id id, f32 umbra)
 			{
 				const light_owner& owner{ _owners[id] };
@@ -351,9 +351,9 @@ namespace dxforge::graphics::d3d12::light
 				}
 			}
 
-			/// @brief ƒ‰ƒCƒg‚Ìƒyƒiƒ“ƒuƒ‰‚ÌŠp“x‚ğİ’è‚·‚é
-			/// @param id ƒ‰ƒCƒgID
-			/// @param penumbra ƒ‰ƒCƒg‚Ìƒyƒiƒ“ƒuƒ‰‚ÌŠp“x
+			/// @brief ãƒ©ã‚¤ãƒˆã®ãƒšãƒŠãƒ³ãƒ–ãƒ©ã®è§’åº¦ã‚’è¨­å®šã™ã‚‹
+			/// @param id ãƒ©ã‚¤ãƒˆID
+			/// @param penumbra ãƒ©ã‚¤ãƒˆã®ãƒšãƒŠãƒ³ãƒ–ãƒ©ã®è§’åº¦
 			void penumbra(light_id id, f32 penumbra)
 			{
 				const light_owner& owner{ _owners[id] };
@@ -374,17 +374,17 @@ namespace dxforge::graphics::d3d12::light
 				make_dirty(index);
 			}
 
-			/// @brief ƒ‰ƒCƒg‚ª—LŒø‚©‚Ç‚¤‚©‚ğæ“¾‚·‚é
-			/// @param id ƒ‰ƒCƒgID
-			/// @return ƒ‰ƒCƒg‚ª—LŒø‚©‚Ç‚¤‚©
+			/// @brief ãƒ©ã‚¤ãƒˆãŒæœ‰åŠ¹ã‹ã©ã†ã‹ã‚’å–å¾—ã™ã‚‹
+			/// @param id ãƒ©ã‚¤ãƒˆID
+			/// @return ãƒ©ã‚¤ãƒˆãŒæœ‰åŠ¹ã‹ã©ã†ã‹
 			constexpr bool is_enabled(light_id id) const
 			{
 				return _owners[id].is_enabled;
 			}
 
-			/// @brief ƒ‰ƒCƒg‚Ì‹­“x‚ğæ“¾‚·‚é
-			/// @param id ƒ‰ƒCƒgID
-			/// @return ƒ‰ƒCƒg‚Ì‹­“x
+			/// @brief ãƒ©ã‚¤ãƒˆã®å¼·åº¦ã‚’å–å¾—ã™ã‚‹
+			/// @param id ãƒ©ã‚¤ãƒˆID
+			/// @return ãƒ©ã‚¤ãƒˆã®å¼·åº¦
 			constexpr f32 intensity(light_id id) const
 			{
 				const light_owner& owner{ _owners[id] };
@@ -401,9 +401,9 @@ namespace dxforge::graphics::d3d12::light
 				return _cullable_lights[index].Intensity;
 			}
 
-			/// @brief ƒ‰ƒCƒg‚ÌF‚ğæ“¾‚·‚é
-			/// @param id ƒ‰ƒCƒgID
-			/// @return ƒ‰ƒCƒg‚ÌF
+			/// @brief ãƒ©ã‚¤ãƒˆã®è‰²ã‚’å–å¾—ã™ã‚‹
+			/// @param id ãƒ©ã‚¤ãƒˆID
+			/// @return ãƒ©ã‚¤ãƒˆã®è‰²
 			constexpr math::v3 color(light_id id) const
 			{
 				const light_owner& owner{ _owners[id] };
@@ -420,9 +420,9 @@ namespace dxforge::graphics::d3d12::light
 				return _cullable_lights[index].Color;
 			}
 
-			/// @brief ƒ‰ƒCƒg‚ÌŒ¸Š‚ğæ“¾‚·‚é
-			/// @param id ƒ‰ƒCƒgID
-			/// @return ƒ‰ƒCƒg‚ÌŒ¸Š
+			/// @brief ãƒ©ã‚¤ãƒˆã®æ¸›è¡°ã‚’å–å¾—ã™ã‚‹
+			/// @param id ãƒ©ã‚¤ãƒˆID
+			/// @return ãƒ©ã‚¤ãƒˆã®æ¸›è¡°
 			CONSTEXPR math::v3 attenuation(light_id id) const
 			{
 				const light_owner& owner{ _owners[id] };
@@ -433,9 +433,9 @@ namespace dxforge::graphics::d3d12::light
 				return _cullable_lights[index].Attenuation;
 			}
 
-			/// @brief ƒ‰ƒCƒg‚Ì”ÍˆÍ‚ğæ“¾‚·‚é
-			/// @param id ƒ‰ƒCƒgID
-			/// @return ƒ‰ƒCƒg‚Ì”ÍˆÍ
+			/// @brief ãƒ©ã‚¤ãƒˆã®ç¯„å›²ã‚’å–å¾—ã™ã‚‹
+			/// @param id ãƒ©ã‚¤ãƒˆID
+			/// @return ãƒ©ã‚¤ãƒˆã®ç¯„å›²
 			CONSTEXPR f32 range(light_id id) const
 			{
 				const light_owner& owner{ _owners[id] };
@@ -446,9 +446,9 @@ namespace dxforge::graphics::d3d12::light
 				return _cullable_lights[index].Range;
 			}
 
-			/// @brief ƒ‰ƒCƒg‚ÌŒõ‚ÌŠp“x‚ğæ“¾‚·‚é
-			/// @param id ƒ‰ƒCƒgID
-			/// @return ƒ‰ƒCƒg‚ÌŒõ‚ÌŠp“x
+			/// @brief ãƒ©ã‚¤ãƒˆã®å…‰éŒã®è§’åº¦ã‚’å–å¾—ã™ã‚‹
+			/// @param id ãƒ©ã‚¤ãƒˆID
+			/// @return ãƒ©ã‚¤ãƒˆã®å…‰éŒã®è§’åº¦
 			f32 umbra(light_id id) const
 			{
 				const light_owner& owner{ _owners[id] };
@@ -459,9 +459,9 @@ namespace dxforge::graphics::d3d12::light
 				return DirectX::XMScalarACos(_cullable_lights[index].CosUmbra) * 2.0f;
 			}
 
-			/// @brief ƒ‰ƒCƒg‚Ìƒyƒiƒ“ƒuƒ‰‚ÌŠp“x‚ğæ“¾‚·‚é
-			/// @param id ƒ‰ƒCƒgID
-			/// @return ƒ‰ƒCƒg‚Ìƒyƒiƒ“ƒuƒ‰‚ÌŠp“x
+			/// @brief ãƒ©ã‚¤ãƒˆã®ãƒšãƒŠãƒ³ãƒ–ãƒ©ã®è§’åº¦ã‚’å–å¾—ã™ã‚‹
+			/// @param id ãƒ©ã‚¤ãƒˆID
+			/// @return ãƒ©ã‚¤ãƒˆã®ãƒšãƒŠãƒ³ãƒ–ãƒ©ã®è§’åº¦
 			f32 penumbra(light_id id) const
 			{
 				const light_owner& owner{ _owners[id] };
@@ -472,24 +472,24 @@ namespace dxforge::graphics::d3d12::light
 				return DirectX::XMScalarACos(_cullable_lights[index].CosPenumbra) * 2.0f;
 			}
 
-			/// @brief ƒ‰ƒCƒg‚Ìí—Ş‚ğæ“¾‚·‚é
-			/// @param id ƒ‰ƒCƒgID
-			/// @return ƒ‰ƒCƒg‚Ìí—Ş
+			/// @brief ãƒ©ã‚¤ãƒˆã®ç¨®é¡ã‚’å–å¾—ã™ã‚‹
+			/// @param id ãƒ©ã‚¤ãƒˆID
+			/// @return ãƒ©ã‚¤ãƒˆã®ç¨®é¡
 			constexpr graphics::light::type type(light_id id) const
 			{
 				return _owners[id].type;
 			}
 
-			/// @brief ƒ‰ƒCƒg‚ªƒAƒ^ƒbƒ`‚³‚ê‚Ä‚¢‚éƒGƒ“ƒeƒBƒeƒB‚ÌID‚ğæ“¾‚·‚é
-			/// @param id ƒ‰ƒCƒgID
-			/// @return ƒ‰ƒCƒg‚ªƒAƒ^ƒbƒ`‚³‚ê‚Ä‚¢‚éƒGƒ“ƒeƒBƒeƒB‚ÌID
+			/// @brief ãƒ©ã‚¤ãƒˆãŒã‚¢ã‚¿ãƒƒãƒã•ã‚Œã¦ã„ã‚‹ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®IDã‚’å–å¾—ã™ã‚‹
+			/// @param id ãƒ©ã‚¤ãƒˆID
+			/// @return ãƒ©ã‚¤ãƒˆãŒã‚¢ã‚¿ãƒƒãƒã•ã‚Œã¦ã„ã‚‹ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®ID
 			constexpr id::id_type entity_id(light_id id) const
 			{
 				return _owners[id].entity_id;
 			}
 
-			/// @brief —LŒø‚Èƒ‰ƒCƒg‚Ì”‚ğæ“¾‚·‚é
-			/// @return@—LŒø‚Èƒ‰ƒCƒg‚Ì”
+			/// @brief æœ‰åŠ¹ãªãƒ©ã‚¤ãƒˆã®æ•°ã‚’å–å¾—ã™ã‚‹
+			/// @returnã€€æœ‰åŠ¹ãªãƒ©ã‚¤ãƒˆã®æ•°
 			CONSTEXPR u32 non_cullable_light_count() const
 			{
 				u32 count{ 0 };
@@ -529,7 +529,7 @@ namespace dxforge::graphics::d3d12::light
 				return _owners.size() > 0;
 			}
 
-		private:	// ƒvƒ‰ƒCƒx[ƒgŠÖ”
+		private:	// ãƒ—ãƒ©ã‚¤ãƒ™ãƒ¼ãƒˆé–¢æ•°
 
 			f32 calculate_cone_radius(f32 range, f32 cos_penumbra)
 			{
@@ -683,7 +683,7 @@ namespace dxforge::graphics::d3d12::light
 					assert(_owners[_cullable_owners[index1]].entity_id == _cullable_entity_ids[index1]);
 					assert(_owners[_cullable_owners[index2]].entity_id == _cullable_entity_ids[index2]);
 
-					// dirty bits‚ğİ’è
+					// dirty bitsã‚’è¨­å®š
 					make_dirty(index1);
 					make_dirty(index2);
 				}
@@ -695,29 +695,29 @@ namespace dxforge::graphics::d3d12::light
 				_something_is_dirty = _dirty_bits[index] = dirty_bits_mask;
 			}
 
-		private:	// ƒƒ“ƒo•Ï”
-			// NOTE: ‚±‚ê‚ÍƒpƒbƒLƒ“ƒO‚³‚ê‚Ä‚¢‚È‚¢
-			utl::free_list<light_owner> _owners;								///< ƒ‰ƒCƒg‚ÌŠ—LÒ
-			utl::vector<hlsl::DirectionalLightParameters> _non_cullable_lights;	///< •ÀsŒõŒ¹
-			utl::vector<light_id> _non_cullable_owners;							///< ƒJƒŠƒ“ƒO‚³‚ê‚Ä‚¢‚È‚¢ƒ‰ƒCƒg‚ÌŠ—LÒ
+		private:	// ãƒ¡ãƒ³ãƒå¤‰æ•°
+			// NOTE: ã“ã‚Œã¯ãƒ‘ãƒƒã‚­ãƒ³ã‚°ã•ã‚Œã¦ã„ãªã„
+			utl::free_list<light_owner> _owners;								///< ãƒ©ã‚¤ãƒˆã®æ‰€æœ‰è€…
+			utl::vector<hlsl::DirectionalLightParameters> _non_cullable_lights;	///< ä¸¦è¡Œå…‰æº
+			utl::vector<light_id> _non_cullable_owners;							///< ã‚«ãƒªãƒ³ã‚°ã•ã‚Œã¦ã„ãªã„ãƒ©ã‚¤ãƒˆã®æ‰€æœ‰è€…
 
-			// NOTE: ƒpƒbƒLƒ“ƒO‚³‚ê‚Ä‚¢‚é
-			utl::vector<hlsl::LightParameters> _cullable_lights;				///< ƒJƒŠƒ“ƒO‚³‚ê‚½ƒ‰ƒCƒg
-			utl::vector<hlsl::LightCullingLightInfo> _culling_info;				///< ƒ‰ƒCƒg‚ÌƒJƒŠƒ“ƒOî•ñ
-			utl::vector<hlsl::Sphere> _bounding_spheres;						///< ƒ‰ƒCƒg‚ÌƒJƒŠƒ“ƒO—p‚Ì‹…
-			utl::vector<game_entity::entity_id> _cullable_entity_ids;			///< ƒJƒŠƒ“ƒO‚³‚ê‚½ƒ‰ƒCƒg‚ÌƒGƒ“ƒeƒBƒeƒBID
-			utl::vector<light_id> _cullable_owners;								///< ƒJƒŠƒ“ƒO‚³‚ê‚½ƒ‰ƒCƒg‚ÌŠ—LÒ
-			utl::vector<u8> _dirty_bits;										///< ƒ‰ƒCƒg‚ÌXVƒtƒ‰ƒO
-			utl::vector<u8> _transform_flags_cache;								///< ƒ‰ƒCƒg‚Ìtransform‚ÌXVƒtƒ‰ƒO
-			u32 _enabled_light_count{ 0 };										///< —LŒø‚Èƒ‰ƒCƒg‚Ì”
-			u8 _something_is_dirty{ 0 };										///< ƒ‰ƒCƒg‚ªXV‚³‚ê‚½‚©‚Ç‚¤‚©
+			// NOTE: ãƒ‘ãƒƒã‚­ãƒ³ã‚°ã•ã‚Œã¦ã„ã‚‹
+			utl::vector<hlsl::LightParameters> _cullable_lights;				///< ã‚«ãƒªãƒ³ã‚°ã•ã‚ŒãŸãƒ©ã‚¤ãƒˆ
+			utl::vector<hlsl::LightCullingLightInfo> _culling_info;				///< ãƒ©ã‚¤ãƒˆã®ã‚«ãƒªãƒ³ã‚°æƒ…å ±
+			utl::vector<hlsl::Sphere> _bounding_spheres;						///< ãƒ©ã‚¤ãƒˆã®ã‚«ãƒªãƒ³ã‚°ç”¨ã®çƒ
+			utl::vector<game_entity::entity_id> _cullable_entity_ids;			///< ã‚«ãƒªãƒ³ã‚°ã•ã‚ŒãŸãƒ©ã‚¤ãƒˆã®ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ID
+			utl::vector<light_id> _cullable_owners;								///< ã‚«ãƒªãƒ³ã‚°ã•ã‚ŒãŸãƒ©ã‚¤ãƒˆã®æ‰€æœ‰è€…
+			utl::vector<u8> _dirty_bits;										///< ãƒ©ã‚¤ãƒˆã®æ›´æ–°ãƒ•ãƒ©ã‚°
+			utl::vector<u8> _transform_flags_cache;								///< ãƒ©ã‚¤ãƒˆã®transformã®æ›´æ–°ãƒ•ãƒ©ã‚°
+			u32 _enabled_light_count{ 0 };										///< æœ‰åŠ¹ãªãƒ©ã‚¤ãƒˆã®æ•°
+			u8 _something_is_dirty{ 0 };										///< ãƒ©ã‚¤ãƒˆãŒæ›´æ–°ã•ã‚ŒãŸã‹ã©ã†ã‹
 
 			friend class d3d12_light_buffer;
 		};
 
 		class d3d12_light_buffer
 		{
-		public:		// ƒpƒuƒŠƒbƒNŠÖ”
+		public:		// ãƒ‘ãƒ–ãƒªãƒƒã‚¯é–¢æ•°
 			d3d12_light_buffer() = default;
 			CONSTEXPR void update_light_buffers(light_set& set, u64 light_set_key, u32 frame_index)
 			{
@@ -737,7 +737,7 @@ namespace dxforge::graphics::d3d12::light
 						_buffers[light_buffer::non_cullable_light].buffer.size());
 				}
 
-				// ƒJƒŠƒ“ƒO‰Â”\‚Èƒ‰ƒCƒg‚Ìƒoƒbƒtƒ@‚ğXV‚·‚é
+				// ã‚«ãƒªãƒ³ã‚°å¯èƒ½ãªãƒ©ã‚¤ãƒˆã®ãƒãƒƒãƒ•ã‚¡ã‚’æ›´æ–°ã™ã‚‹
 				const u32 cullable_light_count{ set.cullable_light_count() };
 
 				if (cullable_light_count)
@@ -750,8 +750,8 @@ namespace dxforge::graphics::d3d12::light
 					bool buffers_resized{ false };
 					if (current_light_buffer_size < needed_light_buffer_size)
 					{
-						// NOTE: ”ŒÂ‚Ìƒ‰ƒCƒg‚ª’Ç‰Á‚³‚ê‚é‚½‚Ñ‚ÉÄì¬‚³‚ê‚é‚Ì‚ğ”ğ‚¯‚é‚½‚ß
-						//		•K—v‚Èƒoƒbƒtƒ@[‚Ì150“‚Ù‚Ç‚Ì‘å‚«‚³‚Ìƒoƒbƒtƒ@[‚ğì¬‚·‚éB
+						// NOTE: æ•°å€‹ã®ãƒ©ã‚¤ãƒˆãŒè¿½åŠ ã•ã‚Œã‚‹ãŸã³ã«å†ä½œæˆã•ã‚Œã‚‹ã®ã‚’é¿ã‘ã‚‹ãŸã‚
+						//		å¿…è¦ãªãƒãƒƒãƒ•ã‚¡ãƒ¼ã®150ï¼…ã»ã©ã®å¤§ãã•ã®ãƒãƒƒãƒ•ã‚¡ãƒ¼ã‚’ä½œæˆã™ã‚‹ã€‚
 						resize_buffer(light_buffer::cullable_light, (needed_light_buffer_size * 3) >> 1, frame_index);
 						resize_buffer(light_buffer::culling_info, (needed_culling_buffer_size * 3) >> 1, frame_index);
 						resize_buffer(light_buffer::bounding_spheres, (needed_spheres_buffer_size * 3) >> 1, frame_index);
@@ -825,7 +825,7 @@ namespace dxforge::graphics::d3d12::light
 				return _buffers[light_buffer::bounding_spheres].buffer.gpu_address();
 			}
 
-		private:	// \‘¢‘Ì’è‹`
+		private:	// æ§‹é€ ä½“å®šç¾©
 			struct light_buffer
 			{
 				enum type :u32
@@ -842,7 +842,7 @@ namespace dxforge::graphics::d3d12::light
 				u8* cpu_address{ nullptr };
 			};
 
-		private:	// ƒvƒ‰ƒCƒx[ƒgŠÖ”
+		private:	// ãƒ—ãƒ©ã‚¤ãƒ™ãƒ¼ãƒˆé–¢æ•°
 			void resize_buffer(light_buffer::type type, u32 size, [[maybe_unused]] u32 frame_index)
 			{
 				assert(type < light_buffer::count);
@@ -859,16 +859,16 @@ namespace dxforge::graphics::d3d12::light
 				assert(_buffers[type].cpu_address);
 			}
 
-		private:	// ƒƒ“ƒo•Ï”
-			light_buffer _buffers[light_buffer::count]{};	///< ƒ‰ƒCƒgƒoƒbƒtƒ@
-			u64 _current_light_set_key{ 0 };				///< Œ»İ‚Ìƒ‰ƒCƒgƒZƒbƒg‚ÌƒL[
+		private:	// ãƒ¡ãƒ³ãƒå¤‰æ•°
+			light_buffer _buffers[light_buffer::count]{};	///< ãƒ©ã‚¤ãƒˆãƒãƒƒãƒ•ã‚¡
+			u64 _current_light_set_key{ 0 };				///< ç¾åœ¨ã®ãƒ©ã‚¤ãƒˆã‚»ãƒƒãƒˆã®ã‚­ãƒ¼
 		};
 
-		// ====== •Ï”éŒ¾ ======
-		std::unordered_map<u64, light_set> light_sets;			///< ƒ‰ƒCƒgƒZƒbƒg
-		d3d12_light_buffer light_buffers[frame_buffer_count];	///< ƒ‰ƒCƒgƒoƒbƒtƒ@
+		// ====== å¤‰æ•°å®£è¨€ ======
+		std::unordered_map<u64, light_set> light_sets;			///< ãƒ©ã‚¤ãƒˆã‚»ãƒƒãƒˆ
+		d3d12_light_buffer light_buffers[frame_buffer_count];	///< ãƒ©ã‚¤ãƒˆãƒãƒƒãƒ•ã‚¡
 
-		// ====== ŠÖ”’è‹` ======
+		// ====== é–¢æ•°å®šç¾© ======
 		constexpr void set_is_enabled(light_set& set, light_id id, const void* const data, [[maybe_unused]] u32 size)
 		{
 			bool is_enabled{ *(bool*)data };
@@ -985,11 +985,11 @@ namespace dxforge::graphics::d3d12::light
 		{
 		}
 
-		// ƒ‰ƒCƒg‚Ìƒpƒ‰ƒ[ƒ^İ’èŠÖ”
+		// ãƒ©ã‚¤ãƒˆã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿è¨­å®šé–¢æ•°
 		using set_function = void(*)(light_set&, light_id, const void* const, u32);
-		// ƒ‰ƒCƒg‚Ìƒpƒ‰ƒ[ƒ^æ“¾ŠÖ”
+		// ãƒ©ã‚¤ãƒˆã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿å–å¾—é–¢æ•°
 		using get_function = void(*)(const light_set&, light_id, void* const, u32);
-		// ƒ‰ƒCƒg‚Ìƒpƒ‰ƒ[ƒ^İ’èŠÖ””z—ñ
+		// ãƒ©ã‚¤ãƒˆã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿è¨­å®šé–¢æ•°é…åˆ—
 		constexpr set_function set_functions[]
 		{
 			set_is_enabled,
@@ -1005,7 +1005,7 @@ namespace dxforge::graphics::d3d12::light
 
 		static_assert(_countof(set_functions) == light_parameter::count);
 
-		// ƒ‰ƒCƒg‚Ìƒpƒ‰ƒ[ƒ^æ“¾ŠÖ””z—ñ
+		// ãƒ©ã‚¤ãƒˆã®ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿å–å¾—é–¢æ•°é…åˆ—
 		constexpr get_function get_functions[]
 		{
 			get_is_enabled,
@@ -1023,7 +1023,7 @@ namespace dxforge::graphics::d3d12::light
 
 #undef		CONSTEXPR
 
-	}	// “½–¼–¼‘O‹óŠÔ
+	}	// åŒ¿ååå‰ç©ºé–“
 
 	bool initialize()
 	{

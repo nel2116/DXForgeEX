@@ -1,36 +1,36 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Transform.cpp]
-// ì¬“ú : 2024/11/11
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-// @Transform‚ğÀ‘•‚µ‚½ƒtƒ@ƒCƒ‹
-// XV—š—ğ
-// 2024/11/11 V‹Kì¬
-// 2025/01/07 ƒRƒƒ“ƒg‚ÌC³
-// 2525/01/12 Orientation‚ÌŒvZ‚ğ’Ç‰Á
-// 2025/01/14 ƒRƒƒ“ƒg‚Ì’Ç‰Á
+// ä½œæˆæ—¥ : 2024/11/11
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+// ã€€Transformã‚’å®Ÿè£…ã—ãŸãƒ•ã‚¡ã‚¤ãƒ«
+// æ›´æ–°å±¥æ­´
+// 2024/11/11 æ–°è¦ä½œæˆ
+// 2025/01/07 ã‚³ãƒ¡ãƒ³ãƒˆã®ä¿®æ­£
+// 2525/01/12 Orientationã®è¨ˆç®—ã‚’è¿½åŠ 
+// 2025/01/14 ã‚³ãƒ¡ãƒ³ãƒˆã®è¿½åŠ 
 // /_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "Transform.h"
 #include "Entity.h"
 
 namespace dxforge::transform
 {
-	// “½–¼–¼‘O‹óŠÔ‚ÉŠeíƒxƒNƒ^[‚ğ’è‹`
+	// åŒ¿ååå‰ç©ºé–“ã«å„ç¨®ãƒ™ã‚¯ã‚¿ãƒ¼ã‚’å®šç¾©
 	namespace
 	{
-		utl::vector<math::m4x4> to_world;				///< ƒ[ƒ‹ƒhs—ñ‚ğŠi”[‚·‚éƒxƒNƒ^[
-		utl::vector<math::m4x4> inv_world;				///< ƒ[ƒ‹ƒhs—ñ‚Ì‹ts—ñ‚ğŠi”[‚·‚éƒxƒNƒ^[
-		utl::vector<math::v4> rotations;				///< ŠeƒGƒ“ƒeƒBƒeƒB‚Ì‰ñ“]î•ñ‚ğŠi”[‚·‚éƒxƒNƒ^[
-		utl::vector<math::v3> orientations;				///< ŠeƒGƒ“ƒeƒBƒeƒB‚ÌŒü‚«‚ğŠi”[‚·‚éƒxƒNƒ^[
-		utl::vector<math::v3> positions;				///< ŠeƒGƒ“ƒeƒBƒeƒB‚ÌˆÊ’u‚ğŠi”[‚·‚éƒxƒNƒ^[
-		utl::vector<math::v3> scales;					///< ŠeƒGƒ“ƒeƒBƒeƒB‚ÌƒXƒP[ƒ‹î•ñ‚ğŠi”[‚·‚éƒxƒNƒ^[
-		utl::vector<u8> has_transform;					///< ŒvZÏ‚İ‚©‚Ç‚¤‚©‚ğ¦‚·ƒtƒ‰ƒO (0: –¢ŒvZ, 1: ŒvZÏ‚İ)
-		utl::vector<u8> changes_from_previous_frame;	///< ‘O‰ñ‚ÌƒtƒŒ[ƒ€‚©‚ç‚Ì•ÏX‚ğ¦‚·ƒtƒ‰ƒO (0: •ÏX‚È‚µ, 1: •ÏX‚ ‚è)
-		u8 read_write_flags;							///< “Ç‚İ‘‚«ƒtƒ‰ƒO
+		utl::vector<math::m4x4> to_world;				///< ãƒ¯ãƒ¼ãƒ«ãƒ‰è¡Œåˆ—ã‚’æ ¼ç´ã™ã‚‹ãƒ™ã‚¯ã‚¿ãƒ¼
+		utl::vector<math::m4x4> inv_world;				///< ãƒ¯ãƒ¼ãƒ«ãƒ‰è¡Œåˆ—ã®é€†è¡Œåˆ—ã‚’æ ¼ç´ã™ã‚‹ãƒ™ã‚¯ã‚¿ãƒ¼
+		utl::vector<math::v4> rotations;				///< å„ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®å›è»¢æƒ…å ±ã‚’æ ¼ç´ã™ã‚‹ãƒ™ã‚¯ã‚¿ãƒ¼
+		utl::vector<math::v3> orientations;				///< å„ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®å‘ãã‚’æ ¼ç´ã™ã‚‹ãƒ™ã‚¯ã‚¿ãƒ¼
+		utl::vector<math::v3> positions;				///< å„ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®ä½ç½®ã‚’æ ¼ç´ã™ã‚‹ãƒ™ã‚¯ã‚¿ãƒ¼
+		utl::vector<math::v3> scales;					///< å„ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®ã‚¹ã‚±ãƒ¼ãƒ«æƒ…å ±ã‚’æ ¼ç´ã™ã‚‹ãƒ™ã‚¯ã‚¿ãƒ¼
+		utl::vector<u8> has_transform;					///< è¨ˆç®—æ¸ˆã¿ã‹ã©ã†ã‹ã‚’ç¤ºã™ãƒ•ãƒ©ã‚° (0: æœªè¨ˆç®—, 1: è¨ˆç®—æ¸ˆã¿)
+		utl::vector<u8> changes_from_previous_frame;	///< å‰å›ã®ãƒ•ãƒ¬ãƒ¼ãƒ ã‹ã‚‰ã®å¤‰æ›´ã‚’ç¤ºã™ãƒ•ãƒ©ã‚° (0: å¤‰æ›´ãªã—, 1: å¤‰æ›´ã‚ã‚Š)
+		u8 read_write_flags;							///< èª­ã¿æ›¸ããƒ•ãƒ©ã‚°
 
-		/// @brief w’è‚³‚ê‚½ƒCƒ“ƒfƒbƒNƒX‚ÌTransforms—ñ‚ğŒvZ
-		/// @param index ŒvZ‘ÎÛ‚ÌƒGƒ“ƒeƒBƒeƒBƒCƒ“ƒfƒbƒNƒX
+		/// @brief æŒ‡å®šã•ã‚ŒãŸã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã®Transformè¡Œåˆ—ã‚’è¨ˆç®—
+		/// @param index è¨ˆç®—å¯¾è±¡ã®ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
 		void calculate_transform_matrices(id::id_type index)
 		{
 			assert(rotations.size() >= index);
@@ -38,27 +38,27 @@ namespace dxforge::transform
 			assert(scales.size() >= index);
 
 			using namespace DirectX;
-			// ‰ñ“]AˆÊ’uAƒXƒP[ƒ‹‚ÌDirectXƒxƒNƒ^[‚ğƒ[ƒh
+			// å›è»¢ã€ä½ç½®ã€ã‚¹ã‚±ãƒ¼ãƒ«ã®DirectXãƒ™ã‚¯ã‚¿ãƒ¼ã‚’ãƒ­ãƒ¼ãƒ‰
 			XMVECTOR r{ XMLoadFloat4(&rotations[index]) };
 			XMVECTOR t{ XMLoadFloat3(&positions[index]) };
 			XMVECTOR s{ XMLoadFloat3(&scales[index]) };
 
-			// ƒAƒtƒBƒ“•ÏŠ·s—ñ‚ğ¶¬
+			// ã‚¢ãƒ•ã‚£ãƒ³å¤‰æ›è¡Œåˆ—ã‚’ç”Ÿæˆ
 			XMMATRIX world{ XMMatrixAffineTransformation(s, XMQuaternionIdentity(), r, t) };
 			XMStoreFloat4x4(&to_world[index], world);
 
 			// NOTE: (F. Luna) Intro to DirectX 12, section 8.2.2
-			// ‹ts—ñ‚ğŒvZ‚µŠi”[
+			// é€†è¡Œåˆ—ã‚’è¨ˆç®—ã—æ ¼ç´
 			world.r[3] = XMVectorSet(0.f, 0.f, 0.f, 1.f);
 			XMMATRIX inverse_world{ XMMatrixInverse(nullptr, world) };
 			XMStoreFloat4x4(&inv_world[index], inverse_world);
 
-			has_transform[index] = 1;// ŒvZÏ‚İ‚Éİ’è
+			has_transform[index] = 1;// è¨ˆç®—æ¸ˆã¿ã«è¨­å®š
 		}
 
-		/// @brief ‰ñ“]ƒxƒNƒgƒ‹‚©‚çŒü‚«‚ğŒvZ
-		/// @param rotation ‰ñ“]ƒNƒH[ƒ^ƒjƒIƒ“
-		/// @return Œü‚«‚ÌƒxƒNƒgƒ‹
+		/// @brief å›è»¢ãƒ™ã‚¯ãƒˆãƒ«ã‹ã‚‰å‘ãã‚’è¨ˆç®—
+		/// @param rotation å›è»¢ã‚¯ã‚©ãƒ¼ã‚¿ãƒ‹ã‚ªãƒ³
+		/// @return å‘ãã®ãƒ™ã‚¯ãƒˆãƒ«
 		math::v3 calculate_orientation(math::v4 rotation)
 		{
 			using namespace DirectX;
@@ -69,7 +69,7 @@ namespace dxforge::transform
 			return orientation;
 		}
 
-	} // “½–¼–¼‘O‹óŠÔ
+	} // åŒ¿ååå‰ç©ºé–“
 
 	void set_rotation(transform_id id, const math::v4& rotation_quaternion)
 	{
@@ -101,16 +101,16 @@ namespace dxforge::transform
 	}
 
 
-	/// @brief TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚ğì¬
-	/// @param info ‰Šú‰»î•ñ
-	/// @param entity ŠÖ˜A•t‚¯‚éƒGƒ“ƒeƒBƒeƒB
-	/// @return ì¬‚³‚ê‚½TransformƒRƒ“ƒ|[ƒlƒ“ƒg
+	/// @brief Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’ä½œæˆ
+	/// @param info åˆæœŸåŒ–æƒ…å ±
+	/// @param entity é–¢é€£ä»˜ã‘ã‚‹ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£
+	/// @return ä½œæˆã•ã‚ŒãŸTransformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆ
 	component create(init_info info, game_entity::entity entity)
 	{
 		assert(entity.is_valid());
 		const id::id_type entity_index{ id::index(entity.get_id()) };
 
-		// ƒGƒ“ƒeƒBƒeƒB‚ÌƒCƒ“ƒfƒbƒNƒX‚ÉŠî‚Ã‚¢‚Äƒf[ƒ^‚ğ‰Šú‰»‚Ü‚½‚Í’Ç‰Á
+		// ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã«åŸºã¥ã„ã¦ãƒ‡ãƒ¼ã‚¿ã‚’åˆæœŸåŒ–ã¾ãŸã¯è¿½åŠ 
 		if (positions.size() > entity_index)
 		{
 			math::v4 rotation{ info.rotation };
@@ -134,23 +134,23 @@ namespace dxforge::transform
 			changes_from_previous_frame.emplace_back((u8)component_flags::all);
 		}
 
-		// NOTE: ŠeƒGƒ“ƒeƒBƒeƒB‚Íƒgƒ‰ƒ“ƒXƒtƒH[ƒ€ƒRƒ“ƒ|[ƒlƒ“ƒg‚ğ‚ÂB
-		//		‚µ‚½‚ª‚Á‚ÄAƒgƒ‰ƒ“ƒXƒtƒH[ƒ€ƒRƒ“ƒ|[ƒlƒ“ƒg‚Ìid‚ÍAƒGƒ“ƒeƒBƒeƒB‚Ìid‚Æ‚Ü‚Á‚½‚­“¯‚¶‚Å‚·B
-		// TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚ÌID‚ğ•Ô‚·
+		// NOTE: å„ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã¯ãƒˆãƒ©ãƒ³ã‚¹ãƒ•ã‚©ãƒ¼ãƒ ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’æŒã¤ã€‚
+		//		ã—ãŸãŒã£ã¦ã€ãƒˆãƒ©ãƒ³ã‚¹ãƒ•ã‚©ãƒ¼ãƒ ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®idã¯ã€ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®idã¨ã¾ã£ãŸãåŒã˜ã§ã™ã€‚
+		// Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®IDã‚’è¿”ã™
 		return component{ transform_id{ entity.get_id() } };
 	}
 
-	/// @brief TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚ğíœ
-	/// @param c íœ‘ÎÛ‚ÌƒRƒ“ƒ|[ƒlƒ“ƒg
+	/// @brief Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’å‰Šé™¤
+	/// @param c å‰Šé™¤å¯¾è±¡ã®ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆ
 	void remove([[maybe_unused]] component c)
 	{
 		assert(c.is_valid());
 	}
 
-	/// @brief Transforms—ñ‚ğæ“¾
-	/// @param id ƒGƒ“ƒeƒBƒeƒBID
-	/// @param world ¢ŠEs—ñ‚ÌQÆ
-	/// @param inverse_world ‹ts—ñ‚ÌQÆ
+	/// @brief Transformè¡Œåˆ—ã‚’å–å¾—
+	/// @param id ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ID
+	/// @param world ä¸–ç•Œè¡Œåˆ—ã®å‚ç…§
+	/// @param inverse_world é€†è¡Œåˆ—ã®å‚ç…§
 	void get_transform_matrices(const game_entity::entity_id id, math::m4x4& world, math::m4x4& inverse_world)
 	{
 		assert(game_entity::entity{ id }.is_valid());
@@ -181,9 +181,9 @@ namespace dxforge::transform
 	{
 		assert(cache && count);
 
-		// NOTE: "changes_from_previous_frame"‚ğƒNƒŠƒA‚·‚é‚Ì‚ÍA“Ç‚İ‚İ‚ª‚È‚­A
-		//		‚±‚ÌŠÖ”‚ğŒÄ‚Ño‚·‚±‚Æ‚Å•ÏX‚ª“K—p‚³‚ê‚æ‚¤‚Æ‚µ‚Ä‚¢‚é‚Æ‚«
-		//		i‚Â‚Ü‚èAŒ»İ‚ÌƒtƒŒ[ƒ€‚Ìc‚è‚Í‘‚«‚İ‚Ì‚İj‚ÉAƒtƒŒ[ƒ€‚²‚Æ‚Éˆê“x‚¾‚¯‹N‚±‚éB
+		// NOTE: "changes_from_previous_frame"ã‚’ã‚¯ãƒªã‚¢ã™ã‚‹ã®ã¯ã€èª­ã¿è¾¼ã¿ãŒãªãã€
+		//		ã“ã®é–¢æ•°ã‚’å‘¼ã³å‡ºã™ã“ã¨ã§å¤‰æ›´ãŒé©ç”¨ã•ã‚Œã‚ˆã†ã¨ã—ã¦ã„ã‚‹ã¨ã
+		//		ï¼ˆã¤ã¾ã‚Šã€ç¾åœ¨ã®ãƒ•ãƒ¬ãƒ¼ãƒ ã®æ®‹ã‚Šã¯æ›¸ãè¾¼ã¿ã®ã¿ï¼‰ã«ã€ãƒ•ãƒ¬ãƒ¼ãƒ ã”ã¨ã«ä¸€åº¦ã ã‘èµ·ã“ã‚‹ã€‚
 		if (read_write_flags)
 		{
 			memset(changes_from_previous_frame.data(), 0, changes_from_previous_frame.size());
@@ -215,32 +215,32 @@ namespace dxforge::transform
 
 	}
 
-	/// @brief ƒRƒ“ƒ|[ƒlƒ“ƒg‚Ì‰ñ“]‚ğæ“¾
-	/// @return ‰ñ“]ƒxƒNƒgƒ‹
+	/// @brief ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®å›è»¢ã‚’å–å¾—
+	/// @return å›è»¢ãƒ™ã‚¯ãƒˆãƒ«
 	math::v4 component::rotation() const
 	{
 		assert(is_valid());
 		return rotations[id::index(_id)];
 	}
 
-	/// @brief ƒRƒ“ƒ|[ƒlƒ“ƒg‚ÌŒü‚«‚ğæ“¾
-	/// @return Œü‚«‚ÌƒxƒNƒgƒ‹
+	/// @brief ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®å‘ãã‚’å–å¾—
+	/// @return å‘ãã®ãƒ™ã‚¯ãƒˆãƒ«
 	math::v3 component::orientation() const
 	{
 		assert(is_valid());
 		return orientations[id::index(_id)];
 	}
 
-	/// @brief ƒRƒ“ƒ|[ƒlƒ“ƒg‚ÌˆÊ’u‚ğæ“¾
-	/// @return ˆÊ’uƒxƒNƒgƒ‹
+	/// @brief ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ä½ç½®ã‚’å–å¾—
+	/// @return ä½ç½®ãƒ™ã‚¯ãƒˆãƒ«
 	math::v3 component::position() const
 	{
 		assert(is_valid());
 		return positions[id::index(_id)];
 	}
 
-	/// @brief ƒRƒ“ƒ|[ƒlƒ“ƒg‚ÌƒXƒP[ƒ‹‚ğæ“¾
-	/// @return ƒXƒP[ƒ‹ƒxƒNƒgƒ‹
+	/// @brief ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ã‚¹ã‚±ãƒ¼ãƒ«ã‚’å–å¾—
+	/// @return ã‚¹ã‚±ãƒ¼ãƒ«ãƒ™ã‚¯ãƒˆãƒ«
 	math::v3 component::scale() const
 	{
 		assert(is_valid());

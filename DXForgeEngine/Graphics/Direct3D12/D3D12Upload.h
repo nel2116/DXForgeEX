@@ -1,38 +1,38 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12Upload.h]
-// ì¬“ú : 2025/01/12
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// ƒAƒbƒvƒ[ƒhƒq[ƒv‚ÌƒTƒuƒ‚ƒWƒ…[ƒ‹
-// XV—š—ğ
-// 2025/01/12 V‹Kì¬
+// ä½œæˆæ—¥ : 2025/01/12
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ãƒ’ãƒ¼ãƒ—ã®ã‚µãƒ–ãƒ¢ã‚¸ãƒ¥ãƒ¼ãƒ«
+// æ›´æ–°å±¥æ­´
+// 2025/01/12 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12CommonHeaders.h"
 
 namespace dxforge::graphics::d3d12::upload
 {
 	class d3d12_upload_context
 	{
-	public:	// ƒpƒuƒŠƒbƒNŠÖ”
+	public:	// ãƒ‘ãƒ–ãƒªãƒƒã‚¯é–¢æ•°
 		d3d12_upload_context(u32 aligned_size);
 		DISABLE_COPY_AND_MOVE(d3d12_upload_context);
 		~d3d12_upload_context() { assert(_frame_index == u32_invalid_id); }
 
 		void end_upload();
 
-		// ====== ƒAƒNƒZƒT ======
+		// ====== ã‚¢ã‚¯ã‚»ã‚µ ======
 		[[nodiscard]] constexpr id3d12_graphics_command_list* const command_list() const { return _cmd_list; }
 		[[nodiscard]] constexpr ID3D12Resource* const upload_buffer() const { return _upload_buffer; }
 		[[nodiscard]] constexpr void* const cpu_address() const { return _cpu_address; }
 
-	private:	// ƒƒ“ƒo•Ï”
+	private:	// ãƒ¡ãƒ³ãƒå¤‰æ•°
 		DEBUG_OP(d3d12_upload_context() = default);
-		id3d12_graphics_command_list* _cmd_list{ nullptr };	// ƒRƒ}ƒ“ƒhƒŠƒXƒg
-		ID3D12Resource* _upload_buffer{ nullptr };			// ƒAƒbƒvƒ[ƒhƒoƒbƒtƒ@
-		void* _cpu_address{ nullptr };						// CPUƒAƒhƒŒƒX
-		u32 _frame_index{ u32_invalid_id };					// ƒtƒŒ[ƒ€ƒCƒ“ƒfƒbƒNƒX
+		id3d12_graphics_command_list* _cmd_list{ nullptr };	// ã‚³ãƒãƒ³ãƒ‰ãƒªã‚¹ãƒˆ
+		ID3D12Resource* _upload_buffer{ nullptr };			// ã‚¢ãƒƒãƒ—ãƒ­ãƒ¼ãƒ‰ãƒãƒƒãƒ•ã‚¡
+		void* _cpu_address{ nullptr };						// CPUã‚¢ãƒ‰ãƒ¬ã‚¹
+		u32 _frame_index{ u32_invalid_id };					// ãƒ•ãƒ¬ãƒ¼ãƒ ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
 	};
 
 	bool initialize();

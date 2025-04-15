@@ -1,37 +1,37 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12Resource.h]
-// ì¬“ú : 2024/12/30
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// Direct3D12‚ÌƒŠƒ\[ƒXŠÇ—
-// XV—š—ğ
-// 2024/12/30 V‹Kì¬
-// 2025/01/02 d3d12_textureƒNƒ‰ƒX‚Ì’Ç‰Á
-// 2025/01/02 d3d12_render_textureƒNƒ‰ƒX‚Ì’Ç‰Á
-// 2025/01/02 d3d12_depth_bufferƒNƒ‰ƒX‚Ì’Ç‰Á
-// 2025/01/14 d3d12_bufferƒNƒ‰ƒX‚Ì’Ç‰Á
-// 2025/01/14 constant_bufferƒNƒ‰ƒX‚Ì’Ç‰Á
+// ä½œæˆæ—¥ : 2024/12/30
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// Direct3D12ã®ãƒªã‚½ãƒ¼ã‚¹ç®¡ç†
+// æ›´æ–°å±¥æ­´
+// 2024/12/30 æ–°è¦ä½œæˆ
+// 2025/01/02 d3d12_textureã‚¯ãƒ©ã‚¹ã®è¿½åŠ 
+// 2025/01/02 d3d12_render_textureã‚¯ãƒ©ã‚¹ã®è¿½åŠ 
+// 2025/01/02 d3d12_depth_bufferã‚¯ãƒ©ã‚¹ã®è¿½åŠ 
+// 2025/01/14 d3d12_bufferã‚¯ãƒ©ã‚¹ã®è¿½åŠ 
+// 2025/01/14 constant_bufferã‚¯ãƒ©ã‚¹ã®è¿½åŠ 
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12CommonHeaders.h"
 
 namespace dxforge::graphics::d3d12
 {
-	// ====== \‘¢‘Ì’è‹` ======
-	/// @brief ƒfƒBƒXƒNƒŠƒvƒ^ƒnƒ“ƒhƒ‹
+	// ====== æ§‹é€ ä½“å®šç¾© ======
+	/// @brief ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒãƒ³ãƒ‰ãƒ«
 	struct descriptor_handle
 	{
-		D3D12_CPU_DESCRIPTOR_HANDLE cpu{};												// CPUƒfƒBƒXƒNƒŠƒvƒ^ƒnƒ“ƒhƒ‹
-		D3D12_GPU_DESCRIPTOR_HANDLE gpu{};												// GPUƒfƒBƒXƒNƒŠƒvƒ^ƒnƒ“ƒhƒ‹
-		u32 index{ u32_invalid_id };													// ƒCƒ“ƒfƒbƒNƒX
+		D3D12_CPU_DESCRIPTOR_HANDLE cpu{};												// CPUãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒãƒ³ãƒ‰ãƒ«
+		D3D12_GPU_DESCRIPTOR_HANDLE gpu{};												// GPUãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒãƒ³ãƒ‰ãƒ«
+		u32 index{ u32_invalid_id };													// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
 
-		[[nodiscard]] constexpr bool is_valid() const { return cpu.ptr != 0; }			// —LŒø‚©‚Ç‚¤‚©
-		[[nodiscard]] constexpr bool is_shader_visible() const { return gpu.ptr != 0; }	// ƒVƒF[ƒ_[‚©‚çŒ©‚¦‚é‚©‚Ç‚¤‚©
+		[[nodiscard]] constexpr bool is_valid() const { return cpu.ptr != 0; }			// æœ‰åŠ¹ã‹ã©ã†ã‹
+		[[nodiscard]] constexpr bool is_shader_visible() const { return gpu.ptr != 0; }	// ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‹ã‚‰è¦‹ãˆã‚‹ã‹ã©ã†ã‹
 
 #ifdef _DEBUG
-		friend class descriptor_heap;													// ƒfƒoƒbƒO—p‚ÉƒtƒŒƒ“ƒh‰»
-		descriptor_heap* container{ nullptr };											// ƒfƒBƒXƒNƒŠƒvƒ^ƒq[ƒv
+		friend class descriptor_heap;													// ãƒ‡ãƒãƒƒã‚°ç”¨ã«ãƒ•ãƒ¬ãƒ³ãƒ‰åŒ–
+		descriptor_heap* container{ nullptr };											// ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒ’ãƒ¼ãƒ—
 
 #endif // _DEBUG
 	};
@@ -39,26 +39,26 @@ namespace dxforge::graphics::d3d12
 	class descriptor_heap
 	{
 	public:
-		// ------ ƒRƒ“ƒXƒgƒ‰ƒNƒ^ ------
+		// ------ ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ ------
 		explicit descriptor_heap(D3D12_DESCRIPTOR_HEAP_TYPE type) : _type{ type } {}
 		DISABLE_COPY_AND_MOVE(descriptor_heap);
 		~descriptor_heap() { assert(!_heap); }
 
-		// ------ ŠÖ” ------
-		/// @brief ƒfƒBƒXƒNƒŠƒvƒ^ƒq[ƒv‚Ì‰Šú‰»
+		// ------ é–¢æ•° ------
+		/// @brief ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒ’ãƒ¼ãƒ—ã®åˆæœŸåŒ–
 		bool initialize(u32 capacity, bool is_shader_visible);
-		/// @brief ƒfƒBƒXƒNƒŠƒvƒ^ƒq[ƒv‚Ì‰ğ•ú
+		/// @brief ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒ’ãƒ¼ãƒ—ã®è§£æ”¾
 		void release();
-		/// @brief ’x‰„‰ğ•úƒtƒ‰ƒO‚ğİ’è
-		/// @param frame_index ƒtƒŒ[ƒ€ƒCƒ“ƒfƒbƒNƒX
+		/// @brief é…å»¶è§£æ”¾ãƒ•ãƒ©ã‚°ã‚’è¨­å®š
+		/// @param frame_index ãƒ•ãƒ¬ãƒ¼ãƒ ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
 		void process_deferred_free(u32 frame_index);
 
-		/// @brief ƒfƒBƒXƒNƒŠƒvƒ^‚ÌŠ„‚è“–‚Ä
+		/// @brief ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ã®å‰²ã‚Šå½“ã¦
 		[[nodiscard]] descriptor_handle allocate();
-		/// @brief ƒfƒBƒXƒNƒŠƒvƒ^‚Ì‰ğ•ú
+		/// @brief ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ã®è§£æ”¾
 		void free(descriptor_handle& handle);
 
-		// ------ ƒAƒNƒZƒT ------
+		// ------ ã‚¢ã‚¯ã‚»ã‚µ ------
 		[[nodiscard]] constexpr D3D12_DESCRIPTOR_HEAP_TYPE type() const { return _type; }
 		[[nodiscard]] constexpr D3D12_CPU_DESCRIPTOR_HANDLE cpu_start() const { return _cpu_start; }
 		[[nodiscard]] constexpr D3D12_GPU_DESCRIPTOR_HANDLE gpu_start() const { return _gpu_start; }
@@ -69,32 +69,32 @@ namespace dxforge::graphics::d3d12
 		[[nodiscard]] constexpr bool is_shader_visible() const { return _gpu_start.ptr != 0; }
 
 	private:
-		ID3D12DescriptorHeap* _heap{ nullptr };												///< ƒfƒBƒXƒNƒŠƒvƒ^ƒq[ƒv
-		D3D12_CPU_DESCRIPTOR_HANDLE         _cpu_start{};									///< CPUƒfƒBƒXƒNƒŠƒvƒ^ƒnƒ“ƒhƒ‹‚ÌŠJnˆÊ’u
-		D3D12_GPU_DESCRIPTOR_HANDLE         _gpu_start{};									///< GPUƒfƒBƒXƒNƒŠƒvƒ^ƒnƒ“ƒhƒ‹‚ÌŠJnˆÊ’u
-		std::unique_ptr<u32[]>              _free_handles{};								///< ‹ó‚«ƒnƒ“ƒhƒ‹
-		utl::vector<u32>                    _deferred_free_indices[frame_buffer_count]{};	///< ’x‰„‰ğ•úƒCƒ“ƒfƒbƒNƒX
-		std::mutex                          _mutex{};										///< ƒ~ƒ…[ƒeƒbƒNƒX
-		u32                                 _capacity{ 0 };									///< —e—Ê
-		u32                                 _size{ 0 };										///< ƒTƒCƒY
-		u32                                 _descriptor_size{};								///< ƒfƒBƒXƒNƒŠƒvƒ^ƒTƒCƒY
-		const D3D12_DESCRIPTOR_HEAP_TYPE    _type{};										///< ƒq[ƒv‚Ìí—Ş
+		ID3D12DescriptorHeap* _heap{ nullptr };												///< ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒ’ãƒ¼ãƒ—
+		D3D12_CPU_DESCRIPTOR_HANDLE         _cpu_start{};									///< CPUãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒãƒ³ãƒ‰ãƒ«ã®é–‹å§‹ä½ç½®
+		D3D12_GPU_DESCRIPTOR_HANDLE         _gpu_start{};									///< GPUãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ãƒãƒ³ãƒ‰ãƒ«ã®é–‹å§‹ä½ç½®
+		std::unique_ptr<u32[]>              _free_handles{};								///< ç©ºããƒãƒ³ãƒ‰ãƒ«
+		utl::vector<u32>                    _deferred_free_indices[frame_buffer_count]{};	///< é…å»¶è§£æ”¾ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		std::mutex                          _mutex{};										///< ãƒŸãƒ¥ãƒ¼ãƒ†ãƒƒã‚¯ã‚¹
+		u32                                 _capacity{ 0 };									///< å®¹é‡
+		u32                                 _size{ 0 };										///< ã‚µã‚¤ã‚º
+		u32                                 _descriptor_size{};								///< ãƒ‡ã‚£ã‚¹ã‚¯ãƒªãƒ—ã‚¿ã‚µã‚¤ã‚º
+		const D3D12_DESCRIPTOR_HEAP_TYPE    _type{};										///< ãƒ’ãƒ¼ãƒ—ã®ç¨®é¡
 	};
 
 	struct d3d12_buffer_init_info
 	{
-		ID3D12Heap1* heap{ nullptr };														///< ƒq[ƒv
-		const void* data{ nullptr };														///< ƒf[ƒ^
-		D3D12_RESOURCE_ALLOCATION_INFO1 allocation_info{ };									///< ƒŠƒ\[ƒX‚ÌƒAƒƒP[ƒVƒ‡ƒ“î•ñ
-		D3D12_RESOURCE_STATES initial_state{ D3D12_RESOURCE_STATE_COMMON };					///< ‰Šúó‘Ô
-		D3D12_RESOURCE_FLAGS flags{ D3D12_RESOURCE_FLAG_NONE };								///< ƒtƒ‰ƒO
-		u32 size{ 0 };																		///< ƒTƒCƒY
-		u32 alignment{ 0 };																	///< ƒAƒ‰ƒCƒƒ“ƒg
+		ID3D12Heap1* heap{ nullptr };														///< ãƒ’ãƒ¼ãƒ—
+		const void* data{ nullptr };														///< ãƒ‡ãƒ¼ã‚¿
+		D3D12_RESOURCE_ALLOCATION_INFO1 allocation_info{ };									///< ãƒªã‚½ãƒ¼ã‚¹ã®ã‚¢ãƒ­ã‚±ãƒ¼ã‚·ãƒ§ãƒ³æƒ…å ±
+		D3D12_RESOURCE_STATES initial_state{ D3D12_RESOURCE_STATE_COMMON };					///< åˆæœŸçŠ¶æ…‹
+		D3D12_RESOURCE_FLAGS flags{ D3D12_RESOURCE_FLAG_NONE };								///< ãƒ•ãƒ©ã‚°
+		u32 size{ 0 };																		///< ã‚µã‚¤ã‚º
+		u32 alignment{ 0 };																	///< ã‚¢ãƒ©ã‚¤ãƒ¡ãƒ³ãƒˆ
 	};
 
 	class d3d12_buffer
 	{
-	public:		// ƒpƒuƒŠƒbƒNŠÖ”
+	public:		// ãƒ‘ãƒ–ãƒªãƒƒã‚¯é–¢æ•°
 		d3d12_buffer() = default;
 		explicit d3d12_buffer(const d3d12_buffer_init_info& info, bool is_cpu_accessible);
 		DISABLE_COPY(d3d12_buffer);
@@ -118,12 +118,12 @@ namespace dxforge::graphics::d3d12
 		~d3d12_buffer() { release(); }
 
 		void release();
-		// ------ ƒAƒNƒZƒT ------
+		// ------ ã‚¢ã‚¯ã‚»ã‚µ ------
 		[[nodiscard]] constexpr ID3D12Resource* const buffer() const { return _buffer; }
 		[[nodiscard]] constexpr D3D12_GPU_VIRTUAL_ADDRESS gpu_address() const { return _gpu_address; }
 		[[nodiscard]] constexpr u32 size() const { return _size; }
 
-	private:	// ƒvƒ‰ƒCƒx[ƒgŠÖ”
+	private:	// ãƒ—ãƒ©ã‚¤ãƒ™ãƒ¼ãƒˆé–¢æ•°
 
 		constexpr void move(d3d12_buffer& o)
 		{
@@ -140,15 +140,15 @@ namespace dxforge::graphics::d3d12
 			_size = 0;
 		}
 
-	private:	// ƒƒ“ƒo•Ï”
-		ID3D12Resource* _buffer{ nullptr };												///< ƒoƒbƒtƒ@
-		D3D12_GPU_VIRTUAL_ADDRESS _gpu_address{ 0 };									///< GPUƒAƒhƒŒƒX
-		u32 _size{ 0 };																	///< ƒTƒCƒY
+	private:	// ãƒ¡ãƒ³ãƒå¤‰æ•°
+		ID3D12Resource* _buffer{ nullptr };												///< ãƒãƒƒãƒ•ã‚¡
+		D3D12_GPU_VIRTUAL_ADDRESS _gpu_address{ 0 };									///< GPUã‚¢ãƒ‰ãƒ¬ã‚¹
+		u32 _size{ 0 };																	///< ã‚µã‚¤ã‚º
 	};
 
 	class constant_buffer
 	{
-	public:		// ƒpƒuƒŠƒbƒNŠÖ”
+	public:		// ãƒ‘ãƒ–ãƒªãƒƒã‚¯é–¢æ•°
 		constant_buffer() = default;
 		explicit constant_buffer(const d3d12_buffer_init_info& info);
 		DISABLE_COPY_AND_MOVE(constant_buffer);
@@ -170,7 +170,7 @@ namespace dxforge::graphics::d3d12
 			return (T* const)(allocate(sizeof(T)));
 		}
 
-		// ------ ƒAƒNƒZƒT ------
+		// ------ ã‚¢ã‚¯ã‚»ã‚µ ------
 		[[nodiscard]] constexpr ID3D12Resource* const buffer() const { return _buffer.buffer(); }
 		[[nodiscard]] constexpr D3D12_GPU_VIRTUAL_ADDRESS gpu_address() const { return _buffer.gpu_address(); }
 		[[nodiscard]] constexpr u32 size() const { return _buffer.size(); }
@@ -199,16 +199,16 @@ namespace dxforge::graphics::d3d12
 			return info;
 		}
 
-	private:	// ƒƒ“ƒo•Ï”
-		d3d12_buffer _buffer{};															///< ƒoƒbƒtƒ@
-		u8* _cpu_address{ nullptr };													///< CPUƒAƒhƒŒƒX
-		u32 _cpu_offset{ 0 };															///< CPUƒIƒtƒZƒbƒg
-		std::mutex _mutex{};															///< ƒ~ƒ…[ƒeƒbƒNƒX
+	private:	// ãƒ¡ãƒ³ãƒå¤‰æ•°
+		d3d12_buffer _buffer{};															///< ãƒãƒƒãƒ•ã‚¡
+		u8* _cpu_address{ nullptr };													///< CPUã‚¢ãƒ‰ãƒ¬ã‚¹
+		u32 _cpu_offset{ 0 };															///< CPUã‚ªãƒ•ã‚»ãƒƒãƒˆ
+		std::mutex _mutex{};															///< ãƒŸãƒ¥ãƒ¼ãƒ†ãƒƒã‚¯ã‚¹
 	};
 
 	class uav_clearble_buffer
 	{
-	public:		// ƒpƒuƒŠƒbƒNŠÖ”
+	public:		// ãƒ‘ãƒ–ãƒªãƒƒã‚¯é–¢æ•°
 		uav_clearble_buffer() = default;
 		explicit uav_clearble_buffer(const d3d12_buffer_init_info& info);
 		DISABLE_COPY(uav_clearble_buffer);
@@ -263,7 +263,7 @@ namespace dxforge::graphics::d3d12
 			return info;
 		}
 
-	private:	// ƒvƒ‰ƒCƒx[ƒgŠÖ”
+	private:	// ãƒ—ãƒ©ã‚¤ãƒ™ãƒ¼ãƒˆé–¢æ•°
 		constexpr void move(uav_clearble_buffer& o)
 		{
 			_buffer = std::move(o._buffer);
@@ -278,7 +278,7 @@ namespace dxforge::graphics::d3d12
 			_uav_shader_visible = {};
 		}
 
-	private:	// ƒƒ“ƒo•Ï”
+	private:	// ãƒ¡ãƒ³ãƒå¤‰æ•°
 		d3d12_buffer _buffer{};
 		descriptor_handle _uav{};
 		descriptor_handle _uav_shader_visible{};
@@ -287,22 +287,22 @@ namespace dxforge::graphics::d3d12
 
 	struct d3d12_texture_init_info
 	{
-		ID3D12Heap1* heap{ nullptr };													///< ƒq[ƒv
-		ID3D12Resource* resource{ nullptr };											///< ƒŠƒ\[ƒX
-		D3D12_SHADER_RESOURCE_VIEW_DESC* srv_desc{ nullptr };							///< ƒVƒF[ƒ_[ƒŠƒ\[ƒXƒrƒ…[‚Ìİ’è
-		D3D12_RESOURCE_DESC* desc{ nullptr };											///< ƒŠƒ\[ƒX‚Ìİ’è
-		D3D12_RESOURCE_ALLOCATION_INFO1 allocation_info{ };								///< ƒŠƒ\[ƒX‚ÌƒAƒƒP[ƒVƒ‡ƒ“î•ñ
-		D3D12_RESOURCE_STATES initial_state{};											///< ‰Šúó‘Ô
-		D3D12_CLEAR_VALUE clear_value{};												///< ƒNƒŠƒA’l
+		ID3D12Heap1* heap{ nullptr };													///< ãƒ’ãƒ¼ãƒ—
+		ID3D12Resource* resource{ nullptr };											///< ãƒªã‚½ãƒ¼ã‚¹
+		D3D12_SHADER_RESOURCE_VIEW_DESC* srv_desc{ nullptr };							///< ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãƒªã‚½ãƒ¼ã‚¹ãƒ“ãƒ¥ãƒ¼ã®è¨­å®š
+		D3D12_RESOURCE_DESC* desc{ nullptr };											///< ãƒªã‚½ãƒ¼ã‚¹ã®è¨­å®š
+		D3D12_RESOURCE_ALLOCATION_INFO1 allocation_info{ };								///< ãƒªã‚½ãƒ¼ã‚¹ã®ã‚¢ãƒ­ã‚±ãƒ¼ã‚·ãƒ§ãƒ³æƒ…å ±
+		D3D12_RESOURCE_STATES initial_state{};											///< åˆæœŸçŠ¶æ…‹
+		D3D12_CLEAR_VALUE clear_value{};												///< ã‚¯ãƒªã‚¢å€¤
 	};
 
 	class d3d12_texture
 	{
-	public:		// ’è”’è‹`
-		constexpr static u32 max_mips{ 14 };	// 16K‰ğ‘œ“x‚Ü‚ÅƒTƒ|[ƒg
+	public:		// å®šæ•°å®šç¾©
+		constexpr static u32 max_mips{ 14 };	// 16Kè§£åƒåº¦ã¾ã§ã‚µãƒãƒ¼ãƒˆ
 
-	public:		// ƒpƒuƒŠƒbƒNŠÖ”
-		// ------ ƒRƒ“ƒXƒgƒ‰ƒNƒ^ ------
+	public:		// ãƒ‘ãƒ–ãƒªãƒƒã‚¯é–¢æ•°
+		// ------ ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ ------
 		d3d12_texture() = default;
 		explicit d3d12_texture(d3d12_texture_init_info info);
 		DISABLE_COPY(d3d12_texture);
@@ -327,11 +327,11 @@ namespace dxforge::graphics::d3d12
 
 		void release();
 
-		// ------ ƒAƒNƒZƒT ------
+		// ------ ã‚¢ã‚¯ã‚»ã‚µ ------
 		[[nodiscard]] constexpr ID3D12Resource* const resource() const { return _resource; }
 		[[nodiscard]] constexpr descriptor_handle srv() const { return _srv; }
 
-	private:	// ƒvƒ‰ƒCƒx[ƒgŠÖ”
+	private:	// ãƒ—ãƒ©ã‚¤ãƒ™ãƒ¼ãƒˆé–¢æ•°
 		constexpr void move(d3d12_texture& o)
 		{
 			_resource = o._resource;
@@ -345,15 +345,15 @@ namespace dxforge::graphics::d3d12
 			_srv = {};
 		}
 
-	private:	// ƒƒ“ƒo•Ï”
-		ID3D12Resource* _resource{ nullptr };											///< ƒŠƒ\[ƒX
-		descriptor_handle _srv;															///< ƒVƒF[ƒ_[ƒŠƒ\[ƒXƒrƒ…[
+	private:	// ãƒ¡ãƒ³ãƒå¤‰æ•°
+		ID3D12Resource* _resource{ nullptr };											///< ãƒªã‚½ãƒ¼ã‚¹
+		descriptor_handle _srv;															///< ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ãƒªã‚½ãƒ¼ã‚¹ãƒ“ãƒ¥ãƒ¼
 	};
 
 	class d3d12_render_texture
 	{
-	public:		// ƒpƒuƒŠƒbƒNŠÖ”
-		// ------ ƒRƒ“ƒXƒgƒ‰ƒNƒ^ ------
+	public:		// ãƒ‘ãƒ–ãƒªãƒƒã‚¯é–¢æ•°
+		// ------ ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ ------
 		d3d12_render_texture() = default;
 		explicit d3d12_render_texture(d3d12_texture_init_info info);
 		DISABLE_COPY(d3d12_render_texture);
@@ -379,13 +379,13 @@ namespace dxforge::graphics::d3d12
 
 		void release();
 
-		// ------ ƒAƒNƒZƒT ------
+		// ------ ã‚¢ã‚¯ã‚»ã‚µ ------
 		[[nodiscard]] constexpr u32 mip_count() const { return _mip_count; }
 		[[nodiscard]] constexpr D3D12_CPU_DESCRIPTOR_HANDLE rtv(u32 mip_index) const { assert(mip_index < _mip_count); return _rtv[mip_index].cpu; }
 		[[nodiscard]] constexpr descriptor_handle srv() const { return _texture.srv(); }
 		[[nodiscard]] constexpr ID3D12Resource* const resource() const { return _texture.resource(); }
 
-	private:	// ƒvƒ‰ƒCƒx[ƒgŠÖ”
+	private:	// ãƒ—ãƒ©ã‚¤ãƒ™ãƒ¼ãƒˆé–¢æ•°
 		constexpr void move(d3d12_render_texture& o)
 		{
 			_texture = std::move(o._texture);
@@ -400,16 +400,16 @@ namespace dxforge::graphics::d3d12
 			_mip_count = 0;
 		}
 
-	private:	// ƒƒ“ƒo•Ï”
-		d3d12_texture _texture;															///< ƒeƒNƒXƒ`ƒƒ
-		descriptor_handle _rtv[d3d12_texture::max_mips]{};								///< ƒŒƒ“ƒ_[ƒ^[ƒQƒbƒgƒrƒ…[
-		u32 _mip_count{ 0 };															///< ƒ~ƒbƒvƒŒƒxƒ‹
+	private:	// ãƒ¡ãƒ³ãƒå¤‰æ•°
+		d3d12_texture _texture;															///< ãƒ†ã‚¯ã‚¹ãƒãƒ£
+		descriptor_handle _rtv[d3d12_texture::max_mips]{};								///< ãƒ¬ãƒ³ãƒ€ãƒ¼ã‚¿ãƒ¼ã‚²ãƒƒãƒˆãƒ“ãƒ¥ãƒ¼
+		u32 _mip_count{ 0 };															///< ãƒŸãƒƒãƒ—ãƒ¬ãƒ™ãƒ«
 	};
 
 	class d3d12_depth_buffer
 	{
-	public:		// ƒpƒuƒŠƒbƒNŠÖ”
-		// ------ ƒRƒ“ƒXƒgƒ‰ƒNƒ^ ------
+	public:		// ãƒ‘ãƒ–ãƒªãƒƒã‚¯é–¢æ•°
+		// ------ ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ ------
 		d3d12_depth_buffer() = default;
 		explicit d3d12_depth_buffer(d3d12_texture_init_info info);
 		DISABLE_COPY(d3d12_depth_buffer);
@@ -435,12 +435,12 @@ namespace dxforge::graphics::d3d12
 
 		void release();
 
-		// ------ ƒAƒNƒZƒT ------
+		// ------ ã‚¢ã‚¯ã‚»ã‚µ ------
 		[[nodiscard]] constexpr D3D12_CPU_DESCRIPTOR_HANDLE dsv() const { return _dsv.cpu; }
 		[[nodiscard]] constexpr descriptor_handle srv() const { return _texture.srv(); }
 		[[nodiscard]] constexpr ID3D12Resource* const resource() const { return _texture.resource(); };
 
-	private:	// ƒvƒ‰ƒCƒx[ƒgŠÖ”
+	private:	// ãƒ—ãƒ©ã‚¤ãƒ™ãƒ¼ãƒˆé–¢æ•°
 		constexpr void move(d3d12_depth_buffer& o)
 		{
 			_texture = std::move(o._texture);
@@ -452,9 +452,9 @@ namespace dxforge::graphics::d3d12
 			_dsv = {};
 		}
 
-	private:	// ƒƒ“ƒo•Ï”
-		d3d12_texture _texture{};														///< ƒeƒNƒXƒ`ƒƒ
-		descriptor_handle _dsv{};														///< ƒfƒvƒXƒXƒeƒ“ƒVƒ‹ƒrƒ…[
+	private:	// ãƒ¡ãƒ³ãƒå¤‰æ•°
+		d3d12_texture _texture{};														///< ãƒ†ã‚¯ã‚¹ãƒãƒ£
+		descriptor_handle _dsv{};														///< ãƒ‡ãƒ—ã‚¹ã‚¹ãƒ†ãƒ³ã‚·ãƒ«ãƒ“ãƒ¥ãƒ¼
 	};
 
 }	// namespace dxforge::graphics::d3d12

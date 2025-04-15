@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [EngineAPI.cpp]
-// ì¬“ú : 2024/12/10
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// ƒGƒ“ƒeƒBƒeƒB‚ÌAPI
-// XV—š—ğ
-// 2024/12/10 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/12/10
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®API
+// æ›´æ–°å±¥æ­´
+// 2024/12/10 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "Common.h"
 #include "CommonHeaders.h"
 #include "Id.h"
@@ -32,7 +32,7 @@ namespace
 			memcpy(&info.position[0], &position[0], sizeof(position));
 			memcpy(&info.scale[0], &scale[0], sizeof(scale));
 
-			// ƒGƒfƒBƒ^[‘¤‚Å’è‹`‚³‚ê‚Ä‚¢‚érotation‚Ìf32[3](ƒIƒCƒ‰[Šp)‚ğƒGƒ“ƒWƒ“‘¤‚Åg‚¦‚é‚æ‚¤‚Éf32[4](ƒNƒH[ƒ^ƒjƒIƒ“)‚É•ÏŠ·
+			// ã‚¨ãƒ‡ã‚£ã‚¿ãƒ¼å´ã§å®šç¾©ã•ã‚Œã¦ã„ã‚‹rotationã®f32[3](ã‚ªã‚¤ãƒ©ãƒ¼è§’)ã‚’ã‚¨ãƒ³ã‚¸ãƒ³å´ã§ä½¿ãˆã‚‹ã‚ˆã†ã«f32[4](ã‚¯ã‚©ãƒ¼ã‚¿ãƒ‹ã‚ªãƒ³)ã«å¤‰æ›
 			XMFLOAT3A rot{ &rotation[0] };
 			XMVECTOR quat{ XMQuaternionRotationRollPitchYawFromVector(XMLoadFloat3A(&rot)) };
 			XMFLOAT4A rot_quat{};
@@ -61,15 +61,15 @@ namespace
 		script_component script;
 	};
 
-	// ƒGƒ“ƒeƒBƒeƒBID‚©‚çƒGƒ“ƒeƒBƒeƒB‚ğæ“¾‚·‚é
+	// ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£IDã‹ã‚‰ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚’å–å¾—ã™ã‚‹
 	game_entity::entity entity_from_id(id::id_type id)
 	{
 		return game_entity::entity{ game_entity::entity_id{id} };
 	};
 
-}	// “½–¼–¼‘O‹óŠÔ
+}	// åŒ¿ååå‰ç©ºé–“
 
-// ƒQ[ƒ€ƒGƒ“ƒeƒBƒeƒB‚ğ¶¬‚·‚é
+// ã‚²ãƒ¼ãƒ ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚’ç”Ÿæˆã™ã‚‹
 EDITOR_INTERFACE id::id_type CreateGameEntity(game_entity_descriptor* e)
 {
 	assert(e);

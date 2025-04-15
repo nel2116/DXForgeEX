@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Main.cpp]
-// ì¬“ú : 2024/12/2
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-// @ƒGƒ“ƒWƒ“‚Ì’ñ‹Ÿ‚·‚éƒGƒ“ƒgƒŠ[ƒ|ƒCƒ“ƒg
-// XV—š—ğ
-// 2024/12/2 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/12/2
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+// ã€€ã‚¨ãƒ³ã‚¸ãƒ³ã®æä¾›ã™ã‚‹ã‚¨ãƒ³ãƒˆãƒªãƒ¼ãƒã‚¤ãƒ³ãƒˆ
+// æ›´æ–°å±¥æ­´
+// 2024/12/2 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// // ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// // ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #ifdef  _WIN64
 #include "CommonHeaders.h"
 #include <filesystem>
@@ -20,10 +20,10 @@
 
 namespace
 {
-	// TODO: IOƒ†[ƒeƒBƒŠƒeƒBEƒwƒbƒ_/ƒ‰ƒCƒuƒ‰ƒŠ‚ğ—pˆÓ‚µ‚ÄA‚±‚ÌŠÖ”‚ğ‚»‚±‚ÉˆÚ“®‚³‚¹‚½•û‚ª‚¢‚¢‚©‚à‚µ‚ê‚È‚¢B
+	// TODO: IOãƒ¦ãƒ¼ãƒ†ã‚£ãƒªãƒ†ã‚£ãƒ»ãƒ˜ãƒƒãƒ€/ãƒ©ã‚¤ãƒ–ãƒ©ãƒªã‚’ç”¨æ„ã—ã¦ã€ã“ã®é–¢æ•°ã‚’ãã“ã«ç§»å‹•ã•ã›ãŸæ–¹ãŒã„ã„ã‹ã‚‚ã—ã‚Œãªã„ã€‚
 	std::filesystem::path set_current_directory_to_executable_path()
 	{
-		// ì‹ÆƒfƒBƒŒƒNƒgƒŠ‚ğÀsƒpƒX‚Éİ’è‚·‚é
+		// ä½œæ¥­ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªã‚’å®Ÿè¡Œãƒ‘ã‚¹ã«è¨­å®šã™ã‚‹
 		wchar_t path[MAX_PATH]{};
 		const u32 length{ GetModuleFileName(0, &path[0], MAX_PATH) };
 		if (!length || GetLastError() == ERROR_INSUFFICIENT_BUFFER) return {};
@@ -39,37 +39,37 @@ extern bool engine_initialize();
 extern void engine_update();
 extern void engine_shutdown();
 
-// ƒGƒ“ƒgƒŠ[ƒ|ƒCƒ“ƒg
+// ã‚¨ãƒ³ãƒˆãƒªãƒ¼ãƒã‚¤ãƒ³ãƒˆ
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
-	// ƒfƒoƒbƒO‚Éƒƒ‚ƒŠƒŠ[ƒNŒŸo
+	// ãƒ‡ãƒãƒƒã‚°æ™‚ã«ãƒ¡ãƒ¢ãƒªãƒªãƒ¼ã‚¯æ¤œå‡º
 #if _DEBUG
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif // _DEBUG
 
-	// ì‹ÆƒfƒBƒŒƒNƒgƒŠ‚ğÀsƒpƒX‚Éİ’è
+	// ä½œæ¥­ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªã‚’å®Ÿè¡Œãƒ‘ã‚¹ã«è¨­å®š
 	set_current_directory_to_executable_path();
 
-	// ƒGƒ“ƒWƒ“‚Ì‰Šú‰»
+	// ã‚¨ãƒ³ã‚¸ãƒ³ã®åˆæœŸåŒ–
 	if (engine_initialize())
-	{	// ‰Šú‰»‚É¬Œ÷‚µ‚½ê‡AƒƒCƒ“ƒ‹[ƒv‚É“ü‚é
+	{	// åˆæœŸåŒ–ã«æˆåŠŸã—ãŸå ´åˆã€ãƒ¡ã‚¤ãƒ³ãƒ«ãƒ¼ãƒ—ã«å…¥ã‚‹
 		MSG msg{};
 		bool is_running{ true };
-		// ƒƒCƒ“ƒ‹[ƒv
+		// ãƒ¡ã‚¤ãƒ³ãƒ«ãƒ¼ãƒ—
 		while (is_running)
 		{
-			// Windows‚ÌƒƒbƒZ[ƒW‚ğˆ—
+			// Windowsã®ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ã‚’å‡¦ç†
 			while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
 			{
 				TranslateMessage(&msg);
 				DispatchMessage(&msg);
-				is_running &= (msg.message != WM_QUIT);	// I—¹ƒƒbƒZ[ƒW‚ª—ˆ‚½‚çƒ‹[ƒv‚ğ”²‚¯‚é
+				is_running &= (msg.message != WM_QUIT);	// çµ‚äº†ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ãŒæ¥ãŸã‚‰ãƒ«ãƒ¼ãƒ—ã‚’æŠœã‘ã‚‹
 			}
 
-			engine_update();	// ƒGƒ“ƒWƒ“‚ÌXV
+			engine_update();	// ã‚¨ãƒ³ã‚¸ãƒ³ã®æ›´æ–°
 		}
 	}
-	// ƒGƒ“ƒWƒ“‚ÌI—¹ˆ—
+	// ã‚¨ãƒ³ã‚¸ãƒ³ã®çµ‚äº†å‡¦ç†
 	engine_shutdown();
 	return 0;
 }

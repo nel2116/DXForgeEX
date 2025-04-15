@@ -1,6 +1,31 @@
-﻿  Transform.cpp
-  Input.cpp
-  InputWin32.cpp
+﻿  Entity.cpp
+  Geometry.cpp
+  Script.cpp
+  Transform.cpp
+  ContentLoader.cpp
+  ContentToEngine.cpp
+  EngineWin32.cpp
+  MainWin32.cpp
+  Camera.cpp
+  D3D12Camera.cpp
+  D3D12Content.cpp
+  D3D12Core.cpp
+  D3D12GPass.cpp
+  D3D12Helpers.cpp
+  D3D12Interface.cpp
+  D3D12Light.cpp
 F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(83,56): warning C4100: 'orientation_vector': 引数は関数の本体部で 1 度も参照されません。
 F:\HAL\ThirdYear\DXForgeEX\DXForgeEngine\Components\Transform.cpp(83,36): warning C4100: 'id': 引数は関数の本体部で 1 度も参照されません。
+  D3D12LightCulling.cpp
+  D3D12PostProcess.cpp
+  D3D12Resource.cpp
+  D3D12Shaders.cpp
+  D3D12Surface.cpp
+  D3D12Upload.cpp
+  OpenGLInterface.cpp
+  Renderer.cpp
+  VulkanInterface.cpp
+  Input.cpp
+  InputWin32.cpp
+  PlatformWin32.cpp
   DXForgeEngine.vcxproj -> F:\HAL\ThirdYear\DXForgeEX\x64\Debug\DXForgeEngine.lib

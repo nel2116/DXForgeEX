@@ -1,14 +1,14 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12GPass.h]
-// ì¬“ú : 2025/01/07
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// GPass‚Ìƒwƒbƒ_ƒtƒ@ƒCƒ‹
-// XV—š—ğ
-// 2025/01/07 V‹Kì¬
+// ä½œæˆæ—¥ : 2025/01/07
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// GPassã®ãƒ˜ãƒƒãƒ€ãƒ•ã‚¡ã‚¤ãƒ«
+// æ›´æ–°å±¥æ­´
+// 2025/01/07 æ–°è¦ä½œæˆ
 // // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12CommonHeaders.h"
 
 namespace dxforge::graphics::d3d12
@@ -19,8 +19,8 @@ namespace dxforge::graphics::d3d12
 namespace dxforge::graphics::d3d12::gpass
 {
 
-	constexpr DXGI_FORMAT main_buffer_format{ DXGI_FORMAT_R16G16B16A16_FLOAT };	// ƒƒCƒ“ƒoƒbƒtƒ@‚ÌƒtƒH[ƒ}ƒbƒg
-	constexpr DXGI_FORMAT depth_buffer_format{ DXGI_FORMAT_D32_FLOAT };			// ƒfƒvƒXƒoƒbƒtƒ@‚ÌƒtƒH[ƒ}ƒbƒg
+	constexpr DXGI_FORMAT main_buffer_format{ DXGI_FORMAT_R16G16B16A16_FLOAT };	// ãƒ¡ã‚¤ãƒ³ãƒãƒƒãƒ•ã‚¡ã®ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆ
+	constexpr DXGI_FORMAT depth_buffer_format{ DXGI_FORMAT_D32_FLOAT };			// ãƒ‡ãƒ—ã‚¹ãƒãƒƒãƒ•ã‚¡ã®ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆ
 
 	struct opaque_root_parameter
 	{
@@ -46,7 +46,7 @@ namespace dxforge::graphics::d3d12::gpass
 	[[nodiscard]] const d3d12_render_texture& main_buffer(void);
 	[[nodiscard]] const d3d12_depth_buffer& depth_buffer(void);
 
-	// NOTE: gpass‚Å‰½‚©‚ğƒŒƒ“ƒ_ƒŠƒ“ƒO‚·‚é‘O‚ÉA–ˆƒtƒŒ[ƒ€‚±‚ê‚ğŒÄ‚Ño‚·B
+	// NOTE: gpassã§ä½•ã‹ã‚’ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°ã™ã‚‹å‰ã«ã€æ¯ãƒ•ãƒ¬ãƒ¼ãƒ ã“ã‚Œã‚’å‘¼ã³å‡ºã™ã€‚
 	void set_size(math::u32v2 size);
 	void depth_prepass(id3d12_graphics_command_list* cmd_list, const d3d12_frame_info& d3d12_info);
 	void render(id3d12_graphics_command_list* cmd_list, const d3d12_frame_info& d3d12_info);

@@ -1,14 +1,14 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12PostProcess.cpp]
-// ì¬“ú : 2025/01/08
-// ì¬ŽÒ : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// ƒ|ƒXƒgƒvƒƒZƒX‚Ìƒ\[ƒXƒtƒ@ƒCƒ‹
-// XV—š—ð
-// 2025/01/08 V‹Kì¬
+// ä½œæˆæ—¥ : 2025/01/08
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒŽãƒ«
+// æ¦‚è¦ :
+// ãƒã‚¹ãƒˆãƒ—ãƒ­ã‚»ã‚¹ã®ã‚½ãƒ¼ã‚¹ãƒ•ã‚¡ã‚¤ãƒ«
+// æ›´æ–°å±¥æ­´
+// 2025/01/08 æ–°è¦ä½œæˆ
 // // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12PostProcess.h"
 #include "D3D12Core.h"
 #include "D3D12Shaders.h"
@@ -26,7 +26,7 @@ namespace dxforge::graphics::d3d12::fx
 				global_shader_data,
 				root_constants,
 
-				// TODO: ƒ‰ƒCƒg‚ÌƒJƒŠƒ“ƒO‚ðŽ‹Šo‰»‚·‚é‚½‚ß‚ÌˆêŽž“I‚È‚à‚ÌB Œã‚ÅŽæ‚èœ‚­B
+				// TODO: ãƒ©ã‚¤ãƒˆã®ã‚«ãƒªãƒ³ã‚°ã‚’è¦–è¦šåŒ–ã™ã‚‹ãŸã‚ã®ä¸€æ™‚çš„ãªã‚‚ã®ã€‚ å¾Œã§å–ã‚Šé™¤ãã€‚
 				frustums,
 				light_grid_opaque,
 
@@ -34,15 +34,15 @@ namespace dxforge::graphics::d3d12::fx
 			};
 		};
 
-		ID3D12RootSignature* fx_root_sig{ nullptr };	// ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ
-		ID3D12PipelineState* fx_pso{ nullptr };		// ƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒg
+		ID3D12RootSignature* fx_root_sig{ nullptr };	// ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£
+		ID3D12PipelineState* fx_pso{ nullptr };		// ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆ
 
-		/// @brief ƒ|ƒXƒgƒvƒƒZƒX‚ÌPSO‚Æƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚ðì¬
-		/// @return ì¬‚É¬Œ÷‚µ‚½‚çtrue
+		/// @brief ãƒã‚¹ãƒˆãƒ—ãƒ­ã‚»ã‚¹ã®PSOã¨ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ã‚’ä½œæˆ
+		/// @return ä½œæˆã«æˆåŠŸã—ãŸã‚‰true
 		bool create_fx_pso_and_root_signature()
 		{
 			assert(!fx_root_sig && !fx_pso);
-			// FXƒ‹[ƒgƒVƒOƒlƒ`ƒƒ[ì¬
+			// FXãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ãƒ¼ä½œæˆ
 			using idx = fx_root_param_indices;
 			d3dx::d3d12_root_parameter parameters[idx::count]{};
 			parameters[idx::global_shader_data].as_cbv(D3D12_SHADER_VISIBILITY_PIXEL, 0);
@@ -78,17 +78,17 @@ namespace dxforge::graphics::d3d12::fx
 			return fx_root_sig && fx_pso;
 		}
 
-	}	// “½–¼–¼‘O‹óŠÔ
+	}	// åŒ¿ååå‰ç©ºé–“
 
 	bool initialize()
 	{
-		// ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚ÆƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒg‚ðì¬
+		// ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ã¨ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚’ä½œæˆ
 		return create_fx_pso_and_root_signature();
 	}
 
 	void shutdown()
 	{
-		// ƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚ÆƒpƒCƒvƒ‰ƒCƒ“ƒXƒe[ƒg‚ð‰ð•ú
+		// ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ã¨ãƒ‘ã‚¤ãƒ—ãƒ©ã‚¤ãƒ³ã‚¹ãƒ†ãƒ¼ãƒˆã‚’è§£æ”¾
 		core::release(fx_pso);
 		core::release(fx_root_sig);
 	}
@@ -98,7 +98,7 @@ namespace dxforge::graphics::d3d12::fx
 		const u32 frame_index{ d3d12_info.frame_index };
 		const id::id_type light_culling_id{ d3d12_info.light_culling_id };
 
-		// ƒ|ƒXƒgƒvƒƒZƒX‚ÌPSO‚Æƒ‹[ƒgƒVƒOƒlƒ`ƒƒ‚ðÝ’è
+		// ãƒã‚¹ãƒˆãƒ—ãƒ­ã‚»ã‚¹ã®PSOã¨ãƒ«ãƒ¼ãƒˆã‚·ã‚°ãƒãƒãƒ£ã‚’è¨­å®š
 		cmd_list->SetGraphicsRootSignature(fx_root_sig);
 		cmd_list->SetPipelineState(fx_pso);
 
@@ -108,8 +108,8 @@ namespace dxforge::graphics::d3d12::fx
 		cmd_list->SetGraphicsRootShaderResourceView(idx::frustums, delight::frustums(light_culling_id, frame_index));
 		cmd_list->SetGraphicsRootShaderResourceView(idx::light_grid_opaque, delight::light_grid_opaque(light_culling_id, frame_index));
 		cmd_list->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		// NOTE: ŠeƒsƒNƒZƒ‹‚ÍgpassƒƒCƒ“ƒoƒbƒtƒ@‚©‚ç‚ÌƒsƒNƒZƒ‹‚Åã‘‚«‚³‚ê‚é‚Ì‚ÅA
-		//		ƒŒƒ“ƒ_[ƒ^[ƒQƒbƒg‚ðƒNƒŠƒA‚·‚é•K—v‚ ‚è‚Ü‚¹‚ñB ‚Ü‚½A[“xƒoƒbƒtƒ@‚à•K—v‚ ‚è‚Ü‚¹‚ñB
+		// NOTE: å„ãƒ”ã‚¯ã‚»ãƒ«ã¯gpassãƒ¡ã‚¤ãƒ³ãƒãƒƒãƒ•ã‚¡ã‹ã‚‰ã®ãƒ”ã‚¯ã‚»ãƒ«ã§ä¸Šæ›¸ãã•ã‚Œã‚‹ã®ã§ã€
+		//		ãƒ¬ãƒ³ãƒ€ãƒ¼ã‚¿ãƒ¼ã‚²ãƒƒãƒˆã‚’ã‚¯ãƒªã‚¢ã™ã‚‹å¿…è¦ã‚ã‚Šã¾ã›ã‚“ã€‚ ã¾ãŸã€æ·±åº¦ãƒãƒƒãƒ•ã‚¡ã‚‚å¿…è¦ã‚ã‚Šã¾ã›ã‚“ã€‚
 		cmd_list->OMSetRenderTargets(1, &target_rtv, 1, nullptr);
 		cmd_list->DrawInstanced(3, 1, 0, 0);
 	}

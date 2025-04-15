@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Geometry.cpp]
-// ì¬“ú : 2025/02/10
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-// ƒQ[ƒ€ƒGƒ“ƒeƒBƒeƒB‚ÌGeometryƒRƒ“ƒ|[ƒlƒ“ƒg‚ğŠÇ—‚·‚é
-// XV—š—ğ
-// 2025/02/10 V‹Kì¬
+// ä½œæˆæ—¥ : 2025/02/10
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+// ã‚²ãƒ¼ãƒ ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®Geometryã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’ç®¡ç†ã™ã‚‹
+// æ›´æ–°å±¥æ­´
+// 2025/02/10 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "Geometry.h"
 #include "Entity.h"
 #include "Graphics/Renderer.h"
@@ -16,18 +16,18 @@ namespace dxforge::geometry
 {
 	namespace
 	{
-		utl::vector<u32>                    active_lod;			///< —LŒø‰»‚³‚ê‚Ä‚¢‚éLOD
-		utl::vector<id::id_type>            render_item_ids;	///< ƒŒƒ“ƒ_[ƒAƒCƒeƒ€‚ÌID
-		utl::vector<geometry_id>            owner_ids;			///< ƒI[ƒi[‚ÌID
-		utl::vector<id::id_type>            id_mapping;			///< IDƒ}ƒbƒsƒ“ƒO
+		utl::vector<u32>                    active_lod;			///< æœ‰åŠ¹åŒ–ã•ã‚Œã¦ã„ã‚‹LOD
+		utl::vector<id::id_type>            render_item_ids;	///< ãƒ¬ãƒ³ãƒ€ãƒ¼ã‚¢ã‚¤ãƒ†ãƒ ã®ID
+		utl::vector<geometry_id>            owner_ids;			///< ã‚ªãƒ¼ãƒŠãƒ¼ã®ID
+		utl::vector<id::id_type>            id_mapping;			///< IDãƒãƒƒãƒ”ãƒ³ã‚°
 
-		utl::vector<id::generation_type>    generations;		///< ¢‘ã
-		utl::deque<geometry_id>             free_ids;			///< ‰ğ•ú‚³‚ê‚½ID
+		utl::vector<id::generation_type>    generations;		///< ä¸–ä»£
+		utl::deque<geometry_id>             free_ids;			///< è§£æ”¾ã•ã‚ŒãŸID
 
 #if _DEBUG
-		/// @brief ID‚ª‘¶İ‚·‚é‚©‚Ç‚¤‚©
+		/// @brief IDãŒå­˜åœ¨ã™ã‚‹ã‹ã©ã†ã‹
 		/// @param id ID
-		/// @return ‘¶İ‚·‚é‚©‚Ç‚¤‚©
+		/// @return å­˜åœ¨ã™ã‚‹ã‹ã©ã†ã‹
 		bool exists(geometry_id id)
 		{
 			assert(id::is_valid(id));
@@ -37,7 +37,7 @@ namespace dxforge::geometry
 			return (generations[index] == id::generation(id)) && id::is_valid(id_mapping[index]) && id::is_valid(render_item_ids[id_mapping[index]]);
 		}
 #endif
-	} // “½–¼–¼‘O‹óŠÔ
+	} // åŒ¿ååå‰ç©ºé–“
 
 	component create(init_info info, game_entity::entity entity)
 	{

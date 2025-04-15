@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [PrimitiveMesh.cpp]
-// ì¬“ú : 2024/12/24
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
+// ä½œæˆæ—¥ : 2024/12/24
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
 //
-// XV—š—ğ
-// 2024/12/24 V‹Kì¬
+// æ›´æ–°å±¥æ­´
+// 2024/12/24 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "PrimitiveMesh.h"
 #include "Geometry.h"
 
@@ -15,12 +15,12 @@ namespace dxforge::tools
 {
 	namespace
 	{
-		using namespace math;		// ”ŠwŠÖ”
-		using namespace DirectX;	// DirectXŠÖ”
-		// ŠÖ”ƒ|ƒCƒ“ƒ^Œ^
+		using namespace math;		// æ•°å­¦é–¢æ•°
+		using namespace DirectX;	// DirectXé–¢æ•°
+		// é–¢æ•°ãƒã‚¤ãƒ³ã‚¿å‹
 		using primitive_mesh_creator = void(*)(scene&, const primitive_init_info& info);
 
-		// ƒvƒŠƒ~ƒeƒBƒuƒƒbƒVƒ…¶¬ŠÖ”
+		// ãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ç”Ÿæˆé–¢æ•°
 		void create_plane(scene& scene, const primitive_init_info& info);
 		void create_cube(scene& scene, const primitive_init_info& info);
 		void create_uv_sphere(scene& scene, const primitive_init_info& info);
@@ -28,7 +28,7 @@ namespace dxforge::tools
 		void create_cylinder(scene& scene, const primitive_init_info& info);
 		void create_capsule(scene& scene, const primitive_init_info& info);
 
-		// ƒvƒŠƒ~ƒeƒBƒuƒƒbƒVƒ…¶¬ŠÖ””z—ñ
+		// ãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ç”Ÿæˆé–¢æ•°é…åˆ—
 		primitive_mesh_creator creators[]
 		{
 			create_plane,
@@ -39,7 +39,7 @@ namespace dxforge::tools
 			create_capsule
 		};
 
-		// ”z—ñ‚Ì—v‘f”‚ªprimitive_mesh_type::count‚Æˆê’v‚µ‚Ä‚¢‚é‚±‚Æ‚ğŠm”F
+		// é…åˆ—ã®è¦ç´ æ•°ãŒprimitive_mesh_type::countã¨ä¸€è‡´ã—ã¦ã„ã‚‹ã“ã¨ã‚’ç¢ºèª
 		static_assert(_countof(creators) == primitive_mesh_type::count);
 
 		struct axis
@@ -52,24 +52,24 @@ namespace dxforge::tools
 			};
 		};
 
-		/// @brief •½–ÊƒƒbƒVƒ…¶¬
-		/// @param info ƒvƒŠƒ~ƒeƒBƒu‰Šú‰»î•ñ
-		/// @param horizontal_index …•½ƒCƒ“ƒfƒbƒNƒX
-		/// @param vertical_index ‚’¼ƒCƒ“ƒfƒbƒNƒX
-		/// @param flip_winding –Ê”½“]
-		/// @param offset ƒIƒtƒZƒbƒg
-		/// @param u_range u”ÍˆÍ
-		/// @param v_range v”ÍˆÍ
-		/// @return ¶¬‚³‚ê‚½ƒƒbƒVƒ…
+		/// @brief å¹³é¢ãƒ¡ãƒƒã‚·ãƒ¥ç”Ÿæˆ
+		/// @param info ãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–åˆæœŸåŒ–æƒ…å ±
+		/// @param horizontal_index æ°´å¹³ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		/// @param vertical_index å‚ç›´ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		/// @param flip_winding é¢åè»¢
+		/// @param offset ã‚ªãƒ•ã‚»ãƒƒãƒˆ
+		/// @param u_range uç¯„å›²
+		/// @param v_range vç¯„å›²
+		/// @return ç”Ÿæˆã•ã‚ŒãŸãƒ¡ãƒƒã‚·ãƒ¥
 		mesh create_plane(const primitive_init_info& info,
 			u32 horizontal_index = axis::x, u32 vertical_index = axis::z, bool flip_winding = false,
 			v3 offset = { -0.5f,0.0f,-0.5f }, v2 u_range = { 0.0f,1.0f }, v2 v_range = { 0.0f,1.0f })
 		{
-			// ƒCƒ“ƒfƒbƒNƒXƒ`ƒFƒbƒN
+			// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒã‚§ãƒƒã‚¯
 			assert(horizontal_index < 3 && vertical_index < 3);
 			assert(horizontal_index != vertical_index);
 
-			// ƒZƒOƒƒ“ƒg”
+			// ã‚»ã‚°ãƒ¡ãƒ³ãƒˆæ•°
 			const u32 horizontal_count{ clamp(info.segments[horizontal_index],1u,10u) };
 			const u32 vertical_count{ clamp(info.segments[vertical_index],1u,10u) };
 			const f32 horizontal_step{ 1.0f / horizontal_count };
@@ -77,22 +77,22 @@ namespace dxforge::tools
 			const f32 u_step{ (u_range.y - u_range.x) / horizontal_count };
 			const f32 v_step{ (v_range.y - v_range.x) / vertical_count };
 
-			// ƒƒbƒVƒ…¶¬
+			// ãƒ¡ãƒƒã‚·ãƒ¥ç”Ÿæˆ
 			mesh m{};
 			utl::vector<v2> uvs;
-			// ’¸“_¶¬
+			// é ‚ç‚¹ç”Ÿæˆ
 			for (u32 j{ 0 }; j <= vertical_count; ++j)
 			{
 				for (u32 i{ 0 }; i <= horizontal_count; ++i)
 				{
-					// ˆÊ’u
+					// ä½ç½®
 					v3 position{ offset };
 					f32* const as_array{ &position.x };
 					as_array[horizontal_index] += i * horizontal_step;
 					as_array[vertical_index] += j * vertical_step;
 					m.positions.emplace_back(position.x * info.size.x, position.y * info.size.y, position.z * info.size.z);
 
-					// UVÀ•W
+					// UVåº§æ¨™
 					v2 uv{ u_range.x,1.0f - v_range.x };
 					uv.x += i * u_step;
 					uv.y -= j * v_step;
@@ -102,8 +102,8 @@ namespace dxforge::tools
 
 			assert(m.positions.size() == (((u64)horizontal_count + 1) * ((u64)vertical_count + 1)));
 
-			// ƒCƒ“ƒfƒbƒNƒX¶¬
-			const u32 row_length{ horizontal_count + 1 };	// 1s‚Ì’¸“_”
+			// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ç”Ÿæˆ
+			const u32 row_length{ horizontal_count + 1 };	// 1è¡Œã®é ‚ç‚¹æ•°
 			for (u32 j{ 0 }; j < vertical_count; ++j)
 			{
 				for (u32 i{ 0 }; i < horizontal_count; ++i)
@@ -125,13 +125,13 @@ namespace dxforge::tools
 					m.raw_indices.emplace_back(index[flip_winding ? 1 : 3]);
 				}
 			}
-			// ƒCƒ“ƒfƒbƒNƒX”
+			// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°
 			const u32 num_indices{ 3 * 2 * horizontal_count * vertical_count };
 			assert(m.raw_indices.size() == num_indices);
 
-			m.uv_sets.resize(1);	// UVƒZƒbƒg
+			m.uv_sets.resize(1);	// UVã‚»ãƒƒãƒˆ
 
-			// UVƒZƒbƒg
+			// UVã‚»ãƒƒãƒˆ
 			for (u32 i{ 0 }; i < num_indices; ++i)
 			{
 				m.uv_sets[0].emplace_back(uvs[m.raw_indices[i]]);
@@ -153,11 +153,11 @@ namespace dxforge::tools
 			m.name = "uv_sphere";
 			m.positions.resize(num_vertices);
 
-			// ˆê”Ôã‚Ì’¸“_‚ğ’Ç‰Á‚·‚é
+			// ä¸€ç•ªä¸Šã®é ‚ç‚¹ã‚’è¿½åŠ ã™ã‚‹
 			u32 c{ 0 };
 			m.positions[c++] = { 0.0f, info.size.y, 0.0f };
 
-			// ’†ŠÔ‚Ì’¸“_‚ğ’Ç‰Á‚·‚é
+			// ä¸­é–“ã®é ‚ç‚¹ã‚’è¿½åŠ ã™ã‚‹
 			for (u32 j{ 1 }; j <= (theta_count - 1); ++j)
 			{
 				const f32 theta{ j * theta_step };
@@ -173,18 +173,18 @@ namespace dxforge::tools
 				}
 			}
 
-			// ˆê”Ô‰º‚Ì’¸“_‚ğ’Ç‰Á‚·‚é
+			// ä¸€ç•ªä¸‹ã®é ‚ç‚¹ã‚’è¿½åŠ ã™ã‚‹
 			m.positions[c++] = { 0.0f,-info.size.y,0.0f };
 			assert(c == num_vertices);
 
-			// ƒCƒ“ƒfƒbƒNƒX¶¬
+			// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ç”Ÿæˆ
 			c = 0;
 			m.raw_indices.resize(num_indices);
 			utl::vector<v2> uvs(num_indices);
 			const f32 inv_theta_count{ 1.0f / theta_count };
 			const f32 inv_phi_count{ 1.0f / phi_count };
 
-			// ˆê”Ôã‚Ì’¸“_‚Æ‘æ1ƒŠƒ“ƒO‚ğŒ‹‚ÔƒgƒbƒvƒLƒƒƒbƒv‚Ìw•W
+			// ä¸€ç•ªä¸Šã®é ‚ç‚¹ã¨ç¬¬1ãƒªãƒ³ã‚°ã‚’çµã¶ãƒˆãƒƒãƒ—ã‚­ãƒ£ãƒƒãƒ—ã®æŒ‡æ¨™
 			for (u32 i{ 0 }; i < (phi_count - 1); ++i)
 			{
 				uvs[c] = { (2 * i + 1) * 0.5f * inv_phi_count, 1.0f };
@@ -202,7 +202,7 @@ namespace dxforge::tools
 			uvs[c] = { 1.0f, 1.0f - inv_theta_count };
 			m.raw_indices[c++] = 1;
 
-			// ƒgƒbƒvƒŠƒ“ƒO‚Æƒ{ƒgƒ€ƒŠƒ“ƒO‚ÌŠÔ‚Ì‹——£‚Ìw•W
+			// ãƒˆãƒƒãƒ—ãƒªãƒ³ã‚°ã¨ãƒœãƒˆãƒ ãƒªãƒ³ã‚°ã®é–“ã®è·é›¢ã®æŒ‡æ¨™
 			for (u32 j{ 0 }; j < (theta_count - 2); ++j)
 			{
 				for (u32 i{ 0 }; i < (phi_count - 1); ++i)
@@ -253,7 +253,7 @@ namespace dxforge::tools
 				m.raw_indices[c++] = index[3];
 			}
 
-			// ƒ{ƒgƒ‹ƒLƒƒƒbƒv‚ÌƒCƒ“ƒfƒbƒNƒXA“ìƒ|ƒ[ƒbƒVƒ‡ƒ“‚ÆÅŒã‚ÌƒŠƒ“ƒO‚ğŒ‹‚Ô
+			// ãƒœãƒˆãƒ«ã‚­ãƒ£ãƒƒãƒ—ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã€å—ãƒã‚¼ãƒƒã‚·ãƒ§ãƒ³ã¨æœ€å¾Œã®ãƒªãƒ³ã‚°ã‚’çµã¶
 			const u32 south_pole_index{ (u32)m.positions.size() - 1 };
 			for (u32 i{ 0 }; i < (phi_count - 1); ++i)
 			{
@@ -279,8 +279,8 @@ namespace dxforge::tools
 			return m;
 		}
 
-		// ƒvƒŠƒ~ƒeƒBƒuƒƒbƒVƒ…¶¬ŠÖ”
-		// •½–Ê
+		// ãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ç”Ÿæˆé–¢æ•°
+		// å¹³é¢
 		void create_plane(scene& scene, const primitive_init_info& info)
 		{
 			lod_group lod{};
@@ -289,12 +289,12 @@ namespace dxforge::tools
 			scene.lod_groups.emplace_back(lod);
 		}
 
-		// —§•û‘Ì
+		// ç«‹æ–¹ä½“
 		void create_cube(scene& /*scene*/, const primitive_init_info& /*info*/)
 		{
 		}
 
-		// UV‹…
+		// UVçƒ
 		void create_uv_sphere(scene& scene, const primitive_init_info& info)
 		{
 			lod_group lod{};
@@ -303,33 +303,33 @@ namespace dxforge::tools
 			scene.lod_groups.emplace_back(lod);
 		}
 
-		// ICO‹…
+		// ICOçƒ
 		void create_ico_sphere(scene& /*scene*/, const primitive_init_info& /*info*/)
 		{
 		}
 
-		// ‰~’Œ
+		// å††æŸ±
 		void create_cylinder(scene& /*scene*/, const primitive_init_info& /*info*/)
 		{
 		}
 
-		// ƒJƒvƒZƒ‹
+		// ã‚«ãƒ—ã‚»ãƒ«
 		void create_capsule(scene& /*scene*/, const primitive_init_info& /*info*/)
 		{
 		}
 
-	} // “½–¼–¼‘O‹óŠÔ
+	} // åŒ¿ååå‰ç©ºé–“
 
 
 	EDITOR_INTERFACE void CreatePrimitiveMesh(scene_data* data, primitive_init_info* info)
 	{
-		// ˆø”ƒ`ƒFƒbƒN
+		// å¼•æ•°ãƒã‚§ãƒƒã‚¯
 		assert(data && info);
 		assert(info->type < primitive_mesh_type::count);
 
-		// ƒV[ƒ“ƒf[ƒ^‚Ì‰Šú‰»
+		// ã‚·ãƒ¼ãƒ³ãƒ‡ãƒ¼ã‚¿ã®åˆæœŸåŒ–
 		scene scene{};
-		// ƒvƒŠƒ~ƒeƒBƒuƒƒbƒVƒ…¶¬
+		// ãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ç”Ÿæˆ
 		creators[info->type](scene, *info);
 
 		progression progression{};

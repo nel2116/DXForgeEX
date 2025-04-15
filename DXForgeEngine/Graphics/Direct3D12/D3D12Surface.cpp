@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12Surface.cpp]
-// ì¬“ú : 2024/12/30
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-// @Direct3D12ƒT[ƒtƒFƒX
-// XV—š—ğ
-// 2024/12/30 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/12/30
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+// ã€€Direct3D12ã‚µãƒ¼ãƒ•ã‚§ã‚¹
+// æ›´æ–°å±¥æ­´
+// 2024/12/30 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12Surface.h"
 #include "D3D12Core.h"
 #include "D3D12LightCulling.h"
@@ -21,7 +21,7 @@ namespace dxforge::graphics::d3d12
 			if (format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB) return DXGI_FORMAT_R8G8B8A8_UNORM;
 			return format;
 		}
-	}	// “½–¼–¼‘O‹óŠÔ
+	}	// åŒ¿ååå‰ç©ºé–“
 
 	void d3d12_surface::create_swap_chain(IDXGIFactory7* factory, ID3D12CommandQueue* cmd_queue)
 	{
@@ -93,7 +93,7 @@ namespace dxforge::graphics::d3d12
 
 	void d3d12_surface::finalize()
 	{
-		// ƒoƒbƒNƒoƒbƒtƒ@—p‚ÌRTV‚ğì¬‚·‚é
+		// ãƒãƒƒã‚¯ãƒãƒƒãƒ•ã‚¡ç”¨ã®RTVã‚’ä½œæˆã™ã‚‹
 		for (u32 i{ 0 }; i < buffer_count; ++i)
 		{
 			render_target_data& data{ _render_target_data[i] };
@@ -105,14 +105,14 @@ namespace dxforge::graphics::d3d12
 			core::device()->CreateRenderTargetView(data.resource, &desc, data.rtv.cpu);
 		}
 
-		// ƒXƒƒbƒvƒ`ƒFƒCƒ“‚Ìİ’è
+		// ã‚¹ãƒ¯ãƒƒãƒ—ãƒã‚§ã‚¤ãƒ³ã®è¨­å®š
 		DXGI_SWAP_CHAIN_DESC desc{};
 		DXCall(_swap_chain->GetDesc(&desc));
 		const u32 width{ desc.BufferDesc.Width };
 		const u32 height{ desc.BufferDesc.Height };
 		assert(_window.width() == width && _window.height() == height);
 
-		// ƒrƒ…[ƒ|[ƒg‚ÆƒVƒU[‹éŒ`‚ğİ’è‚·‚é
+		// ãƒ“ãƒ¥ãƒ¼ãƒãƒ¼ãƒˆã¨ã‚·ã‚¶ãƒ¼çŸ©å½¢ã‚’è¨­å®šã™ã‚‹
 		_viewport.TopLeftX = 0.0f;
 		_viewport.TopLeftY = 0.0f;
 		_viewport.Width = (f32)width;

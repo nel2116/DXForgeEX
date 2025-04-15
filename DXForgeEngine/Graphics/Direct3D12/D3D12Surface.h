@@ -1,25 +1,25 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12Surface.h]
-// ì¬“ú : 2024/12/30
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-// @Direct3D12ƒT[ƒtƒFƒX
-// XV—š—ğ
-// 2024/12/30 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/12/30
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+// ã€€Direct3D12ã‚µãƒ¼ãƒ•ã‚§ã‚¹
+// æ›´æ–°å±¥æ­´
+// 2024/12/30 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12CommonHeaders.h"
 
 namespace dxforge::graphics::d3d12
 {
 	class d3d12_surface
 	{
-	public:	// ’è”
-		constexpr static DXGI_FORMAT default_back_buffer_format{ DXGI_FORMAT_R16G16B16A16_FLOAT };	// ƒfƒtƒHƒ‹ƒg‚ÌƒoƒbƒNƒoƒbƒtƒ@ƒtƒH[ƒ}ƒbƒg
-		constexpr static u32 buffer_count{ 3 };	// ƒoƒbƒtƒ@”
+	public:	// å®šæ•°
+		constexpr static DXGI_FORMAT default_back_buffer_format{ DXGI_FORMAT_R16G16B16A16_FLOAT };	// ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã®ãƒãƒƒã‚¯ãƒãƒƒãƒ•ã‚¡ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆ
+		constexpr static u32 buffer_count{ 3 };	// ãƒãƒƒãƒ•ã‚¡æ•°
 
-	public:	// ƒƒ\ƒbƒh
+	public:	// ãƒ¡ã‚½ãƒƒãƒ‰
 		explicit d3d12_surface(platform::window window)
 			: _window{ window }
 		{
@@ -57,16 +57,16 @@ namespace dxforge::graphics::d3d12
 
 		~d3d12_surface() { release(); }
 
-		/// @brief ƒXƒƒbƒvƒ`ƒFƒCƒ“‚Ìì¬
+		/// @brief ã‚¹ãƒ¯ãƒƒãƒ—ãƒã‚§ã‚¤ãƒ³ã®ä½œæˆ
 		void create_swap_chain(IDXGIFactory7* factory, ID3D12CommandQueue* cmd_queue);
 
-		/// @brief ƒT[ƒtƒFƒX‚Ì•\¦
+		/// @brief ã‚µãƒ¼ãƒ•ã‚§ã‚¹ã®è¡¨ç¤º
 		void present() const;
 
-		/// @brief ƒT[ƒtƒFƒX‚ÌƒŠƒTƒCƒY
+		/// @brief ã‚µãƒ¼ãƒ•ã‚§ã‚¹ã®ãƒªã‚µã‚¤ã‚º
 		void resize();
 
-		// ------ ƒAƒNƒZƒT ------
+		// ------ ã‚¢ã‚¯ã‚»ã‚µ ------
 		[[nodiscard]] constexpr u32 width() const { return (u32)_viewport.Width; }
 		[[nodiscard]] constexpr u32 height() const { return (u32)_viewport.Height; }
 		[[nodiscard]] constexpr ID3D12Resource* const back_buffer() const { return _render_target_data[_current_bb_index].resource; }
@@ -79,7 +79,7 @@ namespace dxforge::graphics::d3d12
 
 		void finalize();
 
-		/// @brief ƒŠƒ\[ƒX‚Ì‰ğ•ú
+		/// @brief ãƒªã‚½ãƒ¼ã‚¹ã®è§£æ”¾
 		void release();
 
 #if USE_STL_VECTOR
@@ -116,24 +116,24 @@ namespace dxforge::graphics::d3d12
 		}
 #endif	// USE_STL_VECTOR
 
-		// ------ \‘¢‘Ì’è‹` ------
+		// ------ æ§‹é€ ä½“å®šç¾© ------
 		struct render_target_data
 		{
-			ID3D12Resource* resource{ nullptr };						// ƒŠƒ\[ƒX
+			ID3D12Resource* resource{ nullptr };						// ãƒªã‚½ãƒ¼ã‚¹
 			descriptor_handle rtv{};									// RTV
 		};
 
-		// ------ •Ï” ------
-			// NOTE: ‚±‚±‚ÉV‚µ‚¢ƒƒ“ƒo[Eƒf[ƒ^‚ğ’Ç‰Á‚·‚éê‡‚ÍAˆÚ“®ƒRƒ“ƒXƒgƒ‰ƒNƒ^‚ğXV‚µAˆÚ“®()ŠÖ”‚ÆƒŠƒZƒbƒg()ŠÖ”‚ğXV‚·‚é‚±‚Æ‚ğ–Y‚ê‚È‚¢‚Å‚­‚¾‚³‚¢B
-			//		‚±‚ê‚ÍAiSTL‚©‚çjstd::vector‚ğg—p‚·‚éÛ‚É³‚µ‚¢“®ì‚ğ‚³‚¹‚é‚½‚ß‚Å‚·B
-		IDXGISwapChain4* _swap_chain{ nullptr };						// ƒXƒƒbƒvƒ`ƒFƒCƒ“
-		render_target_data _render_target_data[buffer_count]{};			// ƒŒƒ“ƒ_[ƒ^[ƒQƒbƒgƒf[ƒ^
-		platform::window _window{};										// ƒEƒBƒ“ƒhƒE
-		mutable u32 _current_bb_index{ 0 };								// Œ»İ‚ÌƒoƒbƒNƒoƒbƒtƒ@ƒCƒ“ƒfƒbƒNƒX
-		u32 _allow_tearing{ 0 };										// ƒeƒBƒAƒŠƒ“ƒO‚ğ‹–‰Â‚·‚é‚©‚Ç‚¤‚©
-		u32 _present_flags{ 0 };										// ƒvƒŒƒ[ƒ“ƒgƒtƒ‰ƒO
-		D3D12_VIEWPORT _viewport{};										// ƒrƒ…[ƒ|[ƒg
-		D3D12_RECT _scissor_rect{};										// ƒVƒU[‹éŒ`
-		id::id_type _light_culling_id{ id::invalid_id };				// ƒ‰ƒCƒgƒJƒŠƒ“ƒOID
+		// ------ å¤‰æ•° ------
+			// NOTE: ã“ã“ã«æ–°ã—ã„ãƒ¡ãƒ³ãƒãƒ¼ãƒ»ãƒ‡ãƒ¼ã‚¿ã‚’è¿½åŠ ã™ã‚‹å ´åˆã¯ã€ç§»å‹•ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ã‚’æ›´æ–°ã—ã€ç§»å‹•()é–¢æ•°ã¨ãƒªã‚»ãƒƒãƒˆ()é–¢æ•°ã‚’æ›´æ–°ã™ã‚‹ã“ã¨ã‚’å¿˜ã‚Œãªã„ã§ãã ã•ã„ã€‚
+			//		ã“ã‚Œã¯ã€ï¼ˆSTLã‹ã‚‰ï¼‰std::vectorã‚’ä½¿ç”¨ã™ã‚‹éš›ã«æ­£ã—ã„å‹•ä½œã‚’ã•ã›ã‚‹ãŸã‚ã§ã™ã€‚
+		IDXGISwapChain4* _swap_chain{ nullptr };						// ã‚¹ãƒ¯ãƒƒãƒ—ãƒã‚§ã‚¤ãƒ³
+		render_target_data _render_target_data[buffer_count]{};			// ãƒ¬ãƒ³ãƒ€ãƒ¼ã‚¿ãƒ¼ã‚²ãƒƒãƒˆãƒ‡ãƒ¼ã‚¿
+		platform::window _window{};										// ã‚¦ã‚£ãƒ³ãƒ‰ã‚¦
+		mutable u32 _current_bb_index{ 0 };								// ç¾åœ¨ã®ãƒãƒƒã‚¯ãƒãƒƒãƒ•ã‚¡ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		u32 _allow_tearing{ 0 };										// ãƒ†ã‚£ã‚¢ãƒªãƒ³ã‚°ã‚’è¨±å¯ã™ã‚‹ã‹ã©ã†ã‹
+		u32 _present_flags{ 0 };										// ãƒ—ãƒ¬ã‚¼ãƒ³ãƒˆãƒ•ãƒ©ã‚°
+		D3D12_VIEWPORT _viewport{};										// ãƒ“ãƒ¥ãƒ¼ãƒãƒ¼ãƒˆ
+		D3D12_RECT _scissor_rect{};										// ã‚·ã‚¶ãƒ¼çŸ©å½¢
+		id::id_type _light_culling_id{ id::invalid_id };				// ãƒ©ã‚¤ãƒˆã‚«ãƒªãƒ³ã‚°ID
 	};
 }

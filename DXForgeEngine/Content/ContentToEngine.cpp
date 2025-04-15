@@ -1,16 +1,16 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [ContentToEngine.cpp]
-// ì¬“ú : 2025/01/12
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// Direct3D12‚ÌƒRƒ“ƒeƒ“ƒc‚©‚çƒGƒ“ƒWƒ“‚Ö‚Ì•ÏŠ·
-// XV—š—ğ
-// 2025/01/12 V‹Kì¬
-// 2025/01/13 ƒVƒF[ƒ_[‚Ì’Ç‰Á‚Æíœ‚ÌŠÖ”‚ğ’Ç‰Á
-// 2025/01/13 ƒ}ƒeƒŠƒAƒ‹‚Ì’Ç‰Á‚Æíœ‚ÌŠÖ”‚ğ’Ç‰Á
+// ä½œæˆæ—¥ : 2025/01/12
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// Direct3D12ã®ã‚³ãƒ³ãƒ†ãƒ³ãƒ„ã‹ã‚‰ã‚¨ãƒ³ã‚¸ãƒ³ã¸ã®å¤‰æ›
+// æ›´æ–°å±¥æ­´
+// 2025/01/12 æ–°è¦ä½œæˆ
+// 2025/01/13 ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã®è¿½åŠ ã¨å‰Šé™¤ã®é–¢æ•°ã‚’è¿½åŠ 
+// 2025/01/13 ãƒãƒ†ãƒªã‚¢ãƒ«ã®è¿½åŠ ã¨å‰Šé™¤ã®é–¢æ•°ã‚’è¿½åŠ 
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ===
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ===
 #include "ContentToEngine.h"
 #include "Graphics/Renderer.h"
 #include "Utilities/IOStream.h"
@@ -19,16 +19,16 @@ namespace dxforge::content
 {
 	namespace
 	{
-		/// @brief ƒ}ƒeƒŠƒAƒ‹‚ÌƒXƒgƒŠ[ƒ€‚ğ•\‚·\‘¢‘Ì
+		/// @brief ãƒãƒ†ãƒªã‚¢ãƒ«ã®ã‚¹ãƒˆãƒªãƒ¼ãƒ ã‚’è¡¨ã™æ§‹é€ ä½“
 		class geometry_hierarchy_stream
 		{
-		public:		// ƒpƒuƒŠƒbƒNŠÖ”
-			// ƒNƒ‰ƒX‚ÌˆÚ“®‚ÆƒRƒs[‚ğ‹Ö~
+		public:		// ãƒ‘ãƒ–ãƒªãƒƒã‚¯é–¢æ•°
+			// ã‚¯ãƒ©ã‚¹ã®ç§»å‹•ã¨ã‚³ãƒ”ãƒ¼ã‚’ç¦æ­¢
 			DISABLE_COPY_AND_MOVE(geometry_hierarchy_stream);
 
-			/// @brief ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-			/// @param buffer ƒoƒbƒtƒ@
-			/// @param lods LOD‚Ì”
+			/// @brief ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+			/// @param buffer ãƒãƒƒãƒ•ã‚¡
+			/// @param lods LODã®æ•°
 			explicit geometry_hierarchy_stream(u8* const buffer, u32 lods = u32_invalid_id)
 			{
 				assert(buffer && lods);
@@ -43,10 +43,10 @@ namespace dxforge::content
 				_gpu_ids = (id::id_type*)(&_lod_offsets[_lod_count]);
 			}
 
-			/// @brief LOD‚Ìè‡’l‚ğæ“¾‚·‚éŠÖ”
+			/// @brief LODã®é–¾å€¤ã‚’å–å¾—ã™ã‚‹é–¢æ•°
 			/// @param lod LOD
 			/// @param ids ID
-			/// @param id_count ID‚Ì”
+			/// @param id_count IDã®æ•°
 			constexpr void gpu_ids(u32 lod, id::id_type*& ids, u32& id_count)
 			{
 				assert(lod < _lod_count);
@@ -54,8 +54,8 @@ namespace dxforge::content
 				id_count = _lod_offsets[lod].count;
 			}
 
-			/// @brief è‡’l‚©‚çLOD‚ğæ“¾‚·‚éŠÖ”
-			/// @param threshold è‡’l
+			/// @brief é–¾å€¤ã‹ã‚‰LODã‚’å–å¾—ã™ã‚‹é–¢æ•°
+			/// @param threshold é–¾å€¤
 			/// @return LOD
 			[[nodiscard]] constexpr u32 lod_from_threshold(f32 threshold)
 			{
@@ -70,21 +70,21 @@ namespace dxforge::content
 				return 0;
 			}
 
-			// ====== ƒAƒNƒZƒTŠÖ” ======
+			// ====== ã‚¢ã‚¯ã‚»ã‚µé–¢æ•° ======
 			[[nodiscard]] constexpr u32 lod_count() const { return _lod_count; }
 			[[nodiscard]] constexpr f32* thresholds() const { return _thresholds; }
 			[[nodiscard]] constexpr lod_offset* lod_offsets() const { return _lod_offsets; }
 			[[nodiscard]] constexpr id::id_type* gpu_ids() const { return _gpu_ids; }
 
-		private:	// ƒvƒ‰ƒCƒx[ƒgŠÖ”
-			f32* _thresholds;			// è‡’l
-			lod_offset* _lod_offsets;	// LOD‚ÌƒIƒtƒZƒbƒg
-			id::id_type* _gpu_ids;		// GPU‚ÌID
-			u32 _lod_count;				// LOD‚Ì”
+		private:	// ãƒ—ãƒ©ã‚¤ãƒ™ãƒ¼ãƒˆé–¢æ•°
+			f32* _thresholds;			// é–¾å€¤
+			lod_offset* _lod_offsets;	// LODã®ã‚ªãƒ•ã‚»ãƒƒãƒˆ
+			id::id_type* _gpu_ids;		// GPUã®ID
+			u32 _lod_count;				// LODã®æ•°
 		};
 
-		// ====== \‘¢‘Ì’è‹` ======
-		// NOTE: ‚±‚ê‚ÍSTLƒxƒNƒ^[‚Æ‚ÌŒİŠ·«‚ğˆÛ‚·‚é‚½‚ß‚É•K—v‚Å‚ ‚éB
+		// ====== æ§‹é€ ä½“å®šç¾© ======
+		// NOTE: ã“ã‚Œã¯STLãƒ™ã‚¯ã‚¿ãƒ¼ã¨ã®äº’æ›æ€§ã‚’ç¶­æŒã™ã‚‹ãŸã‚ã«å¿…è¦ã§ã‚ã‚‹ã€‚
 		struct noexcept_map
 		{
 			std::unordered_map<u32, std::unique_ptr<u8[]>> map;
@@ -95,45 +95,45 @@ namespace dxforge::content
 			noexcept_map& operator=(noexcept_map&&) noexcept = default;
 		};
 
-		// ====== ƒ[ƒJƒ‹•Ï” ======
-		// ‚±‚Ì’è”‚ÍAgeometry_hierarchies‚Ì—v‘f‚ªƒ|ƒCƒ“ƒ^‚Å‚Í‚È‚­gpu_id‚Å‚ ‚é‚±‚Æ‚ğ¦‚·B
-		constexpr uintptr_t single_mesh_marker{ (uintptr_t)0x01 };	// 1ƒrƒbƒg–Ú‚ğg—p‚·‚é
-		utl::free_list<u8*> geometry_hierarchies;					// ƒWƒIƒƒgƒŠ‚ÌŠK‘w
-		std::mutex geometry_mutex;									// ƒWƒIƒƒgƒŠ—pƒ~ƒ…[ƒeƒbƒNƒX
-		utl::free_list<noexcept_map> shader_groups;					// ƒVƒF[ƒ_[ƒOƒ‹[ƒv
-		std::mutex shader_mutex;									// ƒVƒF[ƒ_[—pƒ~ƒ…[ƒeƒbƒNƒX
+		// ====== ãƒ­ãƒ¼ã‚«ãƒ«å¤‰æ•° ======
+		// ã“ã®å®šæ•°ã¯ã€geometry_hierarchiesã®è¦ç´ ãŒãƒã‚¤ãƒ³ã‚¿ã§ã¯ãªãgpu_idã§ã‚ã‚‹ã“ã¨ã‚’ç¤ºã™ã€‚
+		constexpr uintptr_t single_mesh_marker{ (uintptr_t)0x01 };	// 1ãƒ“ãƒƒãƒˆç›®ã‚’ä½¿ç”¨ã™ã‚‹
+		utl::free_list<u8*> geometry_hierarchies;					// ã‚¸ã‚ªãƒ¡ãƒˆãƒªã®éšå±¤
+		std::mutex geometry_mutex;									// ã‚¸ã‚ªãƒ¡ãƒˆãƒªç”¨ãƒŸãƒ¥ãƒ¼ãƒ†ãƒƒã‚¯ã‚¹
+		utl::free_list<noexcept_map> shader_groups;					// ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚°ãƒ«ãƒ¼ãƒ—
+		std::mutex shader_mutex;									// ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ç”¨ãƒŸãƒ¥ãƒ¼ãƒ†ãƒƒã‚¯ã‚¹
 
-		// NOTE: create_geometry_resource() ‚Æ“¯‚¶ƒf[ƒ^‚ğŠú‘Ò‚·‚éB
-		/// @brief ƒWƒIƒƒgƒŠ‚ÌŠK‘wƒoƒbƒtƒ@‚ÌƒTƒCƒY‚ğæ“¾‚·‚éŠÖ”
-		/// @param data ƒf[ƒ^
-		/// @return ƒTƒCƒY
+		// NOTE: create_geometry_resource() ã¨åŒã˜ãƒ‡ãƒ¼ã‚¿ã‚’æœŸå¾…ã™ã‚‹ã€‚
+		/// @brief ã‚¸ã‚ªãƒ¡ãƒˆãƒªã®éšå±¤ãƒãƒƒãƒ•ã‚¡ã®ã‚µã‚¤ã‚ºã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param data ãƒ‡ãƒ¼ã‚¿
+		/// @return ã‚µã‚¤ã‚º
 		u32 get_geometry_hierarchy_buffer_size(const void* const data)
 		{
 			assert(data);
 			utl::blob_stream_reader blob{ (const u8*)data };
 			const u32 lod_count{ blob.read<u32>() };
 			assert(lod_count);
-			// lod_countAthresholdAlod offsets‚ÌƒTƒCƒY‚ğŠK‘w‚ÌƒTƒCƒY‚É’Ç‰Á‚·‚éB
+			// lod_countã€thresholdã€lod offsetsã®ã‚µã‚¤ã‚ºã‚’éšå±¤ã®ã‚µã‚¤ã‚ºã«è¿½åŠ ã™ã‚‹ã€‚
 			u32 size{ sizeof(u32) + (sizeof(f32) + sizeof(lod_offset)) * lod_count };
 
 			for (u32 lod_idx{ 0 }; lod_idx < lod_count; ++lod_idx)
 			{
-				// è‡’lƒXƒLƒbƒv
+				// é–¾å€¤ã‚¹ã‚­ãƒƒãƒ—
 				blob.skip(sizeof(f32));
-				// gpu_ids‚ÌƒTƒCƒY‚ğ’Ç‰Á (sizeof(id::id_type) * submesh_count)
+				// gpu_idsã®ã‚µã‚¤ã‚ºã‚’è¿½åŠ  (sizeof(id::id_type) * submesh_count)
 				size += sizeof(id::id_type) * blob.read<u32>();
-				// ƒTƒuƒƒbƒVƒ…‚Ìƒf[ƒ^‚ğƒXƒLƒbƒv‚µAŸ‚ÌLOD‚Éi‚ŞB
+				// ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã®ãƒ‡ãƒ¼ã‚¿ã‚’ã‚¹ã‚­ãƒƒãƒ—ã—ã€æ¬¡ã®LODã«é€²ã‚€ã€‚
 				blob.skip(blob.read<u32>());
 			}
 
 			return size;
 		}
 
-		// •¡”‚Ì LOD ‚¨‚æ‚Ñ/‚Ü‚½‚Í•¡”‚ÌƒTƒuƒƒbƒVƒ…‚ğ‚ÂƒWƒIƒƒgƒŠ‚ÌŠK‘wƒXƒgƒŠ[ƒ€‚ğì¬‚µ‚Ü‚·B
-		// NOTE: create_geometry_resource() ‚Æ“¯‚¶ƒf[ƒ^‚ğŠú‘Ò‚·‚éB
-		/// @brief ƒWƒIƒƒgƒŠ‚ÌŠK‘w‚ğì¬‚·‚éŠÖ”
-		/// @param data ƒf[ƒ^
-		/// @return ¶¬‚³‚ê‚½ƒWƒIƒƒgƒŠ‚ÌŠK‘w
+		// è¤‡æ•°ã® LOD ãŠã‚ˆã³/ã¾ãŸã¯è¤‡æ•°ã®ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã‚’æŒã¤ã‚¸ã‚ªãƒ¡ãƒˆãƒªã®éšå±¤ã‚¹ãƒˆãƒªãƒ¼ãƒ ã‚’ä½œæˆã—ã¾ã™ã€‚
+		// NOTE: create_geometry_resource() ã¨åŒã˜ãƒ‡ãƒ¼ã‚¿ã‚’æœŸå¾…ã™ã‚‹ã€‚
+		/// @brief ã‚¸ã‚ªãƒ¡ãƒˆãƒªã®éšå±¤ã‚’ä½œæˆã™ã‚‹é–¢æ•°
+		/// @param data ãƒ‡ãƒ¼ã‚¿
+		/// @return ç”Ÿæˆã•ã‚ŒãŸã‚¸ã‚ªãƒ¡ãƒˆãƒªã®éšå±¤
 		id::id_type create_mesh_hierarchy(const void* const data)
 		{
 			assert(data);
@@ -153,7 +153,7 @@ namespace dxforge::content
 				const u32 id_count{ blob.read<u32>() };
 				assert(id_count < (1 << 16));
 				stream.lod_offsets()[lod_idx] = { (u16)submesh_index, (u16)id_count };
-				blob.skip(sizeof(u32)); // ƒTƒuƒƒbƒVƒ…‚ÌƒTƒCƒY•ªƒXƒLƒbƒv‚·‚é
+				blob.skip(sizeof(u32)); // ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã®ã‚µã‚¤ã‚ºåˆ†ã‚¹ã‚­ãƒƒãƒ—ã™ã‚‹
 				for (u32 id_idx{ 0 }; id_idx < id_count; ++id_idx)
 				{
 					const u8* at{ blob.position() };
@@ -179,21 +179,21 @@ namespace dxforge::content
 			return geometry_hierarchies.add(hierarchy_buffer);
 		}
 
-		// ’Pˆê‚ÌƒTƒuƒƒbƒVƒ…‚ğì¬‚·‚é gpu_id
-		// NOTE: create_geometry_resource() ‚Æ“¯‚¶ƒf[ƒ^‚ğŠú‘Ò‚·‚éB
-		/// @brief ’Pˆê‚ÌƒTƒuƒƒbƒVƒ…‚ğì¬‚·‚éŠÖ”
-		/// @param data ƒf[ƒ^
-		/// @return ¶¬‚³‚ê‚½ƒTƒuƒƒbƒVƒ…
+		// å˜ä¸€ã®ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã‚’ä½œæˆã™ã‚‹ gpu_id
+		// NOTE: create_geometry_resource() ã¨åŒã˜ãƒ‡ãƒ¼ã‚¿ã‚’æœŸå¾…ã™ã‚‹ã€‚
+		/// @brief å˜ä¸€ã®ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã‚’ä½œæˆã™ã‚‹é–¢æ•°
+		/// @param data ãƒ‡ãƒ¼ã‚¿
+		/// @return ç”Ÿæˆã•ã‚ŒãŸã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥
 		id::id_type create_single_submesh(const void* const data)
 		{
 			assert(data);
 			utl::blob_stream_reader blob{ (const u8*)data };
-			// lod_countAlod_thresholdAsubmesh_countAsize_of_submeshes‚ğƒXƒLƒbƒv‚·‚éB
+			// lod_countã€lod_thresholdã€submesh_countã€size_of_submeshesã‚’ã‚¹ã‚­ãƒƒãƒ—ã™ã‚‹ã€‚
 			blob.skip(sizeof(u32) + sizeof(f32) + sizeof(u32) + sizeof(u32));
 			const u8* at{ blob.position() };
 			const id::id_type gpu_id{ graphics::add_submesh(at) };
 
-			// ‹U‚Ìƒ|ƒCƒ“ƒ^[‚ğì¬‚µAgeometry_hierarchies‚É’u‚­B
+			// å½ã®ãƒã‚¤ãƒ³ã‚¿ãƒ¼ã‚’ä½œæˆã—ã€geometry_hierarchiesã«ç½®ãã€‚
 			static_assert(sizeof(uintptr_t) > sizeof(id::id_type));
 			constexpr u8 shift_bits{ (sizeof(uintptr_t) - sizeof(id::id_type)) << 3 };
 			u8* const fake_pointer{ (u8* const)((((uintptr_t)gpu_id) << shift_bits) | single_mesh_marker) };
@@ -201,11 +201,11 @@ namespace dxforge::content
 			return geometry_hierarchies.add(fake_pointer);
 		}
 
-		// ‚±‚ÌƒWƒIƒƒgƒŠ‚ª’Pˆê‚ÌƒTƒuƒƒbƒVƒ…‚ğ‚Â’Pˆê‚Ìƒƒbƒh‚ğ‚Â‚©‚Ç‚¤‚©‚ğ”»’f‚·‚é
-		// NOTE: create_geometry_resource() ‚Æ“¯‚¶ƒf[ƒ^‚ğŠú‘Ò‚·‚éB
-		/// @brief ƒWƒIƒƒgƒŠ‚ª’Pˆê‚ÌƒƒbƒVƒ…‚©‚Ç‚¤‚©‚ğ”»’f‚·‚éŠÖ”
-		/// @param data ƒf[ƒ^
-		/// @return ’Pˆê‚Ìƒƒbƒh‚È‚çtrue
+		// ã“ã®ã‚¸ã‚ªãƒ¡ãƒˆãƒªãŒå˜ä¸€ã®ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã‚’æŒã¤å˜ä¸€ã®ãƒ­ãƒƒãƒ‰ã‚’æŒã¤ã‹ã©ã†ã‹ã‚’åˆ¤æ–­ã™ã‚‹
+		// NOTE: create_geometry_resource() ã¨åŒã˜ãƒ‡ãƒ¼ã‚¿ã‚’æœŸå¾…ã™ã‚‹ã€‚
+		/// @brief ã‚¸ã‚ªãƒ¡ãƒˆãƒªãŒå˜ä¸€ã®ãƒ¡ãƒƒã‚·ãƒ¥ã‹ã©ã†ã‹ã‚’åˆ¤æ–­ã™ã‚‹é–¢æ•°
+		/// @param data ãƒ‡ãƒ¼ã‚¿
+		/// @return å˜ä¸€ã®ãƒ­ãƒƒãƒ‰ãªã‚‰true
 		bool is_single_mesh(const void* const data)
 		{
 			assert(data);
@@ -214,15 +214,15 @@ namespace dxforge::content
 			assert(lod_count);
 			if (lod_count > 1) return false;
 
-			// è‡’l‚ğ’´‚¦‚é
+			// é–¾å€¤ã‚’è¶…ãˆã‚‹
 			blob.skip(sizeof(f32));
 			const u32 submesh_count{ blob.read<u32>() };
 			assert(submesh_count);
 			return submesh_count == 1;
 		}
 
-		/// @brief ‹U‚Ìƒ|ƒCƒ“ƒ^[‚©‚çGPU ID‚ğæ“¾‚·‚éŠÖ”
-		/// @param pointer ‹U‚Ìƒ|ƒCƒ“ƒ^[
+		/// @brief å½ã®ãƒã‚¤ãƒ³ã‚¿ãƒ¼ã‹ã‚‰GPU IDã‚’å–å¾—ã™ã‚‹é–¢æ•°
+		/// @param pointer å½ã®ãƒã‚¤ãƒ³ã‚¿ãƒ¼
 		/// @return GPU ID
 		constexpr id::id_type gpu_id_from_fake_pointer(u8* const pointer)
 		{
@@ -232,7 +232,7 @@ namespace dxforge::content
 			return (((uintptr_t)pointer) >> shift_bits) & (uintptr_t)id::invalid_id;
 		}
 
-		// NOTE: 'data'‚ÉˆÈ‰º‚Ì‚±‚Æ‚ªŠÜ‚Ü‚ê‚é‚±‚Æ‚ğŠú‘Ò‚·‚é
+		// NOTE: 'data'ã«ä»¥ä¸‹ã®ã“ã¨ãŒå«ã¾ã‚Œã‚‹ã“ã¨ã‚’æœŸå¾…ã™ã‚‹
 		// struct{
 		//     u32 lod_count,
 		//     struct {
@@ -242,16 +242,16 @@ namespace dxforge::content
 		//         struct {
 		//             u32 element_size, u32 vertex_count,
 		//             u32 index_count, u32 elements_type, u32 primitive_topology
-		//             u8 positions[sizeof(f32) * 3 * vertex_count],     // sizeof(positions)‚Í4ƒoƒCƒg‚Ì”{”‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B •K—v‚È‚çƒpƒbƒh‚·‚éB
-		//             u8 elements[sizeof(element_size) * vertex_count], // sizeof(elements)‚Í4ƒoƒCƒg‚Ì”{”‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B •K—v‚Å‚ ‚ê‚Îƒpƒbƒh‚µ‚Ä‚­‚¾‚³‚¢B
+		//             u8 positions[sizeof(f32) * 3 * vertex_count],     // sizeof(positions)ã¯4ãƒã‚¤ãƒˆã®å€æ•°ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚ å¿…è¦ãªã‚‰ãƒ‘ãƒƒãƒ‰ã™ã‚‹ã€‚
+		//             u8 elements[sizeof(element_size) * vertex_count], // sizeof(elements)ã¯4ãƒã‚¤ãƒˆã®å€æ•°ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚ å¿…è¦ã§ã‚ã‚Œã°ãƒ‘ãƒƒãƒ‰ã—ã¦ãã ã•ã„ã€‚
 		//             u8 indices[index_size * index_count]
 		//         } submeshes[submesh_count]
 		//     } mesh_lods[lod_count]
 		// } geometry;
 		//
-		// o—ÍƒtƒH[ƒ}ƒbƒg
+		// å‡ºåŠ›ãƒ•ã‚©ãƒ¼ãƒãƒƒãƒˆ
 		//
-		// ƒWƒIƒƒgƒŠ‚É•¡”‚ÌLOD‚Ü‚½‚ÍƒTƒuƒƒbƒVƒ…‚ª‚ ‚éê‡F
+		// ã‚¸ã‚ªãƒ¡ãƒˆãƒªã«è¤‡æ•°ã®LODã¾ãŸã¯ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ãŒã‚ã‚‹å ´åˆï¼š
 		// struct {
 		//     u32 lod_count,
 		//     f32 thresholds[lod_count]
@@ -262,19 +262,19 @@ namespace dxforge::content
 		//     id::id_type gpu_ids[total_number_of_submeshes]
 		// } geometry_hierarchy
 		//
-		// ƒWƒIƒƒgƒŠ‚ª’Pˆê‚ÌLOD‚ÆƒTƒuƒƒbƒVƒ…‚ğ‚Âê‡F
+		// ã‚¸ã‚ªãƒ¡ãƒˆãƒªãŒå˜ä¸€ã®LODã¨ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã‚’æŒã¤å ´åˆï¼š
 		//
 		// (gpu_id << 32) | 0x01
-		/// @brief ƒWƒIƒƒgƒŠ‚ÌƒŠƒ\[ƒX‚ğì¬‚·‚éŠÖ”
-		/// @param data ƒf[ƒ^
-		/// @return ¶¬‚³‚ê‚½ƒŠƒ\[ƒX
+		/// @brief ã‚¸ã‚ªãƒ¡ãƒˆãƒªã®ãƒªã‚½ãƒ¼ã‚¹ã‚’ä½œæˆã™ã‚‹é–¢æ•°
+		/// @param data ãƒ‡ãƒ¼ã‚¿
+		/// @return ç”Ÿæˆã•ã‚ŒãŸãƒªã‚½ãƒ¼ã‚¹
 		[[nodiscard]] id::id_type create_geometry_resource(const void* const data)
 		{
 			assert(data);
 			return is_single_mesh(data) ? create_single_submesh(data) : create_mesh_hierarchy(data);
 		}
 
-		/// @brief ƒWƒIƒƒgƒŠ‚ÌƒŠƒ\[ƒX‚ğ”jŠü‚·‚éŠÖ”
+		/// @brief ã‚¸ã‚ªãƒ¡ãƒˆãƒªã®ãƒªã‚½ãƒ¼ã‚¹ã‚’ç ´æ£„ã™ã‚‹é–¢æ•°
 		/// @param id ID
 		void destroy_geometry_resource(id::id_type id)
 		{
@@ -303,30 +303,30 @@ namespace dxforge::content
 			geometry_hierarchies.remove(id);
 		}
 
-		// NOTE: 'data'‚ÉˆÈ‰º‚Ì‚±‚Æ‚ªŠÜ‚Ü‚ê‚é‚±‚Æ‚ğŠú‘Ò‚·‚é
+		// NOTE: 'data'ã«ä»¥ä¸‹ã®ã“ã¨ãŒå«ã¾ã‚Œã‚‹ã“ã¨ã‚’æœŸå¾…ã™ã‚‹
 		// struct {
 		//  material_type::type type,
 		//  u32                 texture_count,
 		//  id::id_type         shader_ids[shader_type::count],
 		//  id::id_type*        texture_ids;
 		// } material_init_info
-		/// @brief ƒ}ƒeƒŠƒAƒ‹‚ÌƒŠƒ\[ƒX‚ğì¬‚·‚éŠÖ”
-		/// @param data ƒf[ƒ^
-		/// @return ¶¬‚³‚ê‚½ƒŠƒ\[ƒX
+		/// @brief ãƒãƒ†ãƒªã‚¢ãƒ«ã®ãƒªã‚½ãƒ¼ã‚¹ã‚’ä½œæˆã™ã‚‹é–¢æ•°
+		/// @param data ãƒ‡ãƒ¼ã‚¿
+		/// @return ç”Ÿæˆã•ã‚ŒãŸãƒªã‚½ãƒ¼ã‚¹
 		[[nodiscard]] id::id_type create_material_resource(const void* const data)
 		{
 			assert(data);
 			return graphics::add_material(*(const graphics::material_init_info* const)data);
 		}
 
-		/// @brief ƒ}ƒeƒŠƒAƒ‹‚ÌƒŠƒ\[ƒX‚ğ”jŠü‚·‚éŠÖ”
+		/// @brief ãƒãƒ†ãƒªã‚¢ãƒ«ã®ãƒªã‚½ãƒ¼ã‚¹ã‚’ç ´æ£„ã™ã‚‹é–¢æ•°
 		/// @param id ID
 		void destroy_material_resource(id::id_type id)
 		{
 			graphics::remove_material(id);
 		}
 
-		// NOTE: 'data'‚ÉˆÈ‰º‚Ì‚±‚Æ‚ªŠÜ‚Ü‚ê‚é‚±‚Æ‚ğŠú‘Ò‚·‚é
+		// NOTE: 'data'ã«ä»¥ä¸‹ã®ã“ã¨ãŒå«ã¾ã‚Œã‚‹ã“ã¨ã‚’æœŸå¾…ã™ã‚‹
 		// struct {
 		//     u32 width, height, array_size (or depth), flags, mip_levels, format,
 		//     struct {
@@ -334,28 +334,28 @@ namespace dxforge::content
 		//         u8 image[mip_level][slice_pitch * depth_per_mip],
 		//     } images[]
 		// } texture
-		/// @brief ƒeƒNƒXƒ`ƒƒ‚ÌƒŠƒ\[ƒX‚ğì¬‚·‚éŠÖ”
-		/// @param data ƒf[ƒ^
-		/// @return ¶¬‚³‚ê‚½ƒŠƒ\[ƒX
+		/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®ãƒªã‚½ãƒ¼ã‚¹ã‚’ä½œæˆã™ã‚‹é–¢æ•°
+		/// @param data ãƒ‡ãƒ¼ã‚¿
+		/// @return ç”Ÿæˆã•ã‚ŒãŸãƒªã‚½ãƒ¼ã‚¹
 		[[nodiscard]] id::id_type create_texture_resource(const void* const data)
 		{
 			assert(data);
 			return graphics::add_texture((const u8* const)data);
 		}
 
-		/// @brief ƒeƒNƒXƒ`ƒƒ‚ÌƒŠƒ\[ƒX‚ğ”jŠü‚·‚éŠÖ”
+		/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£ã®ãƒªã‚½ãƒ¼ã‚¹ã‚’ç ´æ£„ã™ã‚‹é–¢æ•°
 		/// @param id ID
 		void destroy_texture_resource(id::id_type id)
 		{
 			graphics::remove_texture(id);
 		}
 
-	} // “½–¼–¼‘O‹óŠÔ
+	} // åŒ¿ååå‰ç©ºé–“
 
-	/// @brief ƒŠƒ\[ƒX‚ğì¬‚·‚éŠÖ”
-	/// @param data ƒf[ƒ^
-	/// @param type ƒ^ƒCƒv
-	/// @return ¶¬‚³‚ê‚½ƒŠƒ\[ƒX
+	/// @brief ãƒªã‚½ãƒ¼ã‚¹ã‚’ä½œæˆã™ã‚‹é–¢æ•°
+	/// @param data ãƒ‡ãƒ¼ã‚¿
+	/// @param type ã‚¿ã‚¤ãƒ—
+	/// @return ç”Ÿæˆã•ã‚ŒãŸãƒªã‚½ãƒ¼ã‚¹
 	id::id_type create_resource(const void* const data, asset_type::type type)
 	{
 		assert(data);
@@ -375,9 +375,9 @@ namespace dxforge::content
 		return id;
 	}
 
-	/// @brief ƒŠƒ\[ƒX‚ğ”jŠü‚·‚éŠÖ”
+	/// @brief ãƒªã‚½ãƒ¼ã‚¹ã‚’ç ´æ£„ã™ã‚‹é–¢æ•°
 	/// @param id ID
-	/// @param type ƒ^ƒCƒv
+	/// @param type ã‚¿ã‚¤ãƒ—
 	void destroy_resource(id::id_type id, asset_type::type type)
 	{
 		assert(id::is_valid(id));
@@ -395,11 +395,11 @@ namespace dxforge::content
 		}
 	}
 
-	// NOTE: ƒVƒF[ƒ_[‚Ícompiled_shaders‚Ö‚Ìƒ|ƒCƒ“ƒ^[‚Ì”z—ñ‚Å‚ ‚é‚±‚Æ‚ğŠú‘Ò‚·‚éB
-	// NOTE: ƒGƒfƒBƒ^[‚ÍAƒVƒF[ƒ_[‚Ìd•¡‚ª‚È‚¢‚±‚Æ‚ğŠm”F‚·‚éÓ”C‚ª‚ ‚è‚Ü‚·B ‚à‚µ‚ ‚ê‚ÎAŠì‚ñ‚Å’Ç‰Á‚µ‚Ü‚·I
-	/// @brief ƒVƒF[ƒ_[ƒOƒ‹[ƒv‚ğ’Ç‰Á‚·‚éŠÖ”
-	/// @param shaders ƒVƒF[ƒ_[
-	/// @return ¶¬‚³‚ê‚½ID
+	// NOTE: ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã¯compiled_shadersã¸ã®ãƒã‚¤ãƒ³ã‚¿ãƒ¼ã®é…åˆ—ã§ã‚ã‚‹ã“ã¨ã‚’æœŸå¾…ã™ã‚‹ã€‚
+	// NOTE: ã‚¨ãƒ‡ã‚£ã‚¿ãƒ¼ã¯ã€ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã®é‡è¤‡ãŒãªã„ã“ã¨ã‚’ç¢ºèªã™ã‚‹è²¬ä»»ãŒã‚ã‚Šã¾ã™ã€‚ ã‚‚ã—ã‚ã‚Œã°ã€å–œã‚“ã§è¿½åŠ ã—ã¾ã™ï¼
+	/// @brief ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚°ãƒ«ãƒ¼ãƒ—ã‚’è¿½åŠ ã™ã‚‹é–¢æ•°
+	/// @param shaders ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼
+	/// @return ç”Ÿæˆã•ã‚ŒãŸID
 	id::id_type add_shader_group(const u8* const* shaders, u32 num_shaders, const u32* const keys)
 	{
 		assert(shaders && num_shaders && keys);
@@ -417,7 +417,7 @@ namespace dxforge::content
 		return shader_groups.add(std::move(group));
 	}
 
-	/// @brief ƒVƒF[ƒ_[ƒOƒ‹[ƒv‚ğíœ‚·‚éŠÖ”
+	/// @brief ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚°ãƒ«ãƒ¼ãƒ—ã‚’å‰Šé™¤ã™ã‚‹é–¢æ•°
 	/// @param id ID
 	void remove_shader_group(id::id_type id)
 	{
@@ -428,10 +428,10 @@ namespace dxforge::content
 		shader_groups.remove(id);
 	}
 
-	/// @brief ƒVƒF[ƒ_[‚ğæ“¾‚·‚éŠÖ”
+	/// @brief ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚’å–å¾—ã™ã‚‹é–¢æ•°
 	/// @param id ID
-	/// @param shader_key ƒVƒF[ƒ_[ƒL[
-	/// @return ƒVƒF[ƒ_[
+	/// @param shader_key ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã‚­ãƒ¼
+	/// @return ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼
 	compiled_shader_ptr get_shader(id::id_type id, u32 shader_key)
 	{
 		std::lock_guard lock{ shader_mutex };
@@ -445,13 +445,13 @@ namespace dxforge::content
 			}
 		}
 
-		assert(false); // ‚±‚±‚É‚Í—ˆ‚È‚¢‚Í‚¸
+		assert(false); // ã“ã“ã«ã¯æ¥ãªã„ã¯ãš
 		return nullptr;
 	}
 
-	/// @brief ƒTƒuƒƒbƒVƒ…‚ÌGPU ID‚ğæ“¾‚·‚éŠÖ”
-	/// @param geometry_content_id ƒWƒIƒƒgƒŠ‚ÌID
-	/// @param id_count ID‚Ì”
+	/// @brief ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã®GPU IDã‚’å–å¾—ã™ã‚‹é–¢æ•°
+	/// @param geometry_content_id ã‚¸ã‚ªãƒ¡ãƒˆãƒªã®ID
+	/// @param id_count IDã®æ•°
 	/// @param gpu_ids GPU ID
 	void get_submesh_gpu_ids(id::id_type geometry_content_id, u32 id_count, id::id_type* const gpu_ids)
 	{
@@ -478,11 +478,11 @@ namespace dxforge::content
 		}
 	}
 
-	/// @brief LOD‚ÌƒIƒtƒZƒbƒg‚ğæ“¾‚·‚éŠÖ”
-	/// @param geometry_ids ƒWƒIƒƒgƒŠ‚ÌID
-	/// @param thresholds è‡’l
-	/// @param id_count ID‚Ì”
-	/// @param offsets ƒIƒtƒZƒbƒg
+	/// @brief LODã®ã‚ªãƒ•ã‚»ãƒƒãƒˆã‚’å–å¾—ã™ã‚‹é–¢æ•°
+	/// @param geometry_ids ã‚¸ã‚ªãƒ¡ãƒˆãƒªã®ID
+	/// @param thresholds é–¾å€¤
+	/// @param id_count IDã®æ•°
+	/// @param offsets ã‚ªãƒ•ã‚»ãƒƒãƒˆ
 	void get_lod_offsets(const id::id_type* const geometry_ids, const f32* const thresholds, u32 id_count, utl::vector<lod_offset>& offsets)
 	{
 		assert(geometry_ids && thresholds && id_count);

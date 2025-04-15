@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Script.cpp]
-// ì¬“ú : 2025/01/18
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
+// ä½œæˆæ—¥ : 2025/01/18
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
 //
-// XV—š—ğ
-// 2025/01/18 V‹Kì¬
+// æ›´æ–°å±¥æ­´
+// 2025/01/18 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "Components/Entity.h"
 #include "Components/Transform.h"
 #include "Components/Script.h"
@@ -111,7 +111,7 @@ public:
 	void begin_play() override {}
 	void update(f32 dt) override
 	{
-		// ˆê’è‚ÌŠm—¦‚Åƒ‰ƒ“ƒ_ƒ€‚ÉˆÚ“®
+		// ä¸€å®šã®ç¢ºç‡ã§ãƒ©ãƒ³ãƒ€ãƒ ã«ç§»å‹•
 		if (!_is_move)
 		{
 			if (random(0.1f) > 0.99f)
@@ -147,7 +147,7 @@ public:
 
 private:
 
-	// –Ú“I’n‚ğƒ‰ƒ“ƒ_ƒ€‚Éİ’è
+	// ç›®çš„åœ°ã‚’ãƒ©ãƒ³ãƒ€ãƒ ã«è¨­å®š
 	void set_random_destination()
 	{
 		math::v3 pos{ position() };
@@ -156,7 +156,7 @@ private:
 		_destination = pos;
 	}
 
-	// –Ú“I’n‚Ü‚ÅˆÚ“®‚µ‚½‚©‚Ç‚¤‚©
+	// ç›®çš„åœ°ã¾ã§ç§»å‹•ã—ãŸã‹ã©ã†ã‹
 	bool is_destination() const
 	{
 		math::v3 pos{ position() };
@@ -218,7 +218,7 @@ public:
 		}
 	}
 
-private:	// ƒvƒ‰ƒCƒx[ƒgŠÖ”
+private:	// ãƒ—ãƒ©ã‚¤ãƒ™ãƒ¼ãƒˆé–¢æ•°
 
 	void on_move(u64 binding, const input::input_value& value)
 	{
@@ -286,7 +286,7 @@ private:	// ƒvƒ‰ƒCƒx[ƒgŠÖ”
 		}
 	}
 
-private:	// ƒƒ“ƒo•Ï”
+private:	// ãƒ¡ãƒ³ãƒå¤‰æ•°
 	input::input_system<camera_script> _input_system{};
 
 	DirectX::XMVECTOR _desired_position{};

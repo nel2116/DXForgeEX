@@ -1,18 +1,19 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [MathType.h]
-// ì¬“ú : 2024/11/11
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
+// ä½œæˆæ—¥ : 2024/11/11
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
 //
-// XV—š—ğ
-// 2024/11/11 V‹Kì¬
+// æ›´æ–°å±¥æ­´
+// 2024/11/11 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "CommonHeaders.h"
 
 namespace dxforge::math
 {
+	// ====== å®šæ•°å®šç¾© ======
 	constexpr f32 pi{ 3.1415926535897932384626433832795f };
 	constexpr f32 half_pi{ pi * 0.5f };
 	constexpr f32 two_pi{ 2.f * pi };
@@ -31,7 +32,7 @@ namespace dxforge::math
 	using s32v2 = DirectX::XMINT2;
 	using s32v3 = DirectX::XMINT3;
 	using s32v4 = DirectX::XMINT4;
-	using m3x3 = DirectX::XMFLOAT3X3;	// NOTE : DirectXMath‚É‚Í®—ñ‚³‚ê‚½3x3s—ñ‚ª‚È‚¢
+	using m3x3 = DirectX::XMFLOAT3X3;	// NOTE : DirectXMathã«ã¯æ•´åˆ—ã•ã‚ŒãŸ3x3è¡Œåˆ—ãŒãªã„
 	using m4x4 = DirectX::XMFLOAT4X4;
 	using m4x4a = DirectX::XMFLOAT4X4A;
 

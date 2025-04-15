@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Main.cpp]
-// ì¬“ú : 2024/11/11
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// ƒGƒ“ƒWƒ“‚ğƒeƒXƒg‚·‚é‚½‚ß‚ÌƒvƒƒOƒ‰ƒ€
-// XV—š—ğ
-// 2024/11/11 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/11/11
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// ã‚¨ãƒ³ã‚¸ãƒ³ã‚’ãƒ†ã‚¹ãƒˆã™ã‚‹ãŸã‚ã®ãƒ—ãƒ­ã‚°ãƒ©ãƒ 
+// æ›´æ–°å±¥æ­´
+// 2024/11/11 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "Test.h"
 #pragma comment(lib, "DXForgeEngine.lib")
 
@@ -20,7 +20,7 @@
 #elif TEST_RENDERER
 #include "TestRenderer.h"
 #else
-#error ‚¢‚¸‚ê‚©‚ÌƒeƒXƒg‚ğ—LŒø‚É‚·‚é•K—v‚ª‚ ‚è‚Ü‚·
+#error ã„ãšã‚Œã‹ã®ãƒ†ã‚¹ãƒˆã‚’æœ‰åŠ¹ã«ã™ã‚‹å¿…è¦ãŒã‚ã‚Šã¾ã™
 #endif	// TEST_ENTITY_COMPONENTS
 
 
@@ -28,10 +28,10 @@
 #include <Windows.h>
 #include <filesystem>
 
-// TODO: IOƒ†[ƒeƒBƒŠƒeƒBEƒwƒbƒ_/ƒ‰ƒCƒuƒ‰ƒŠ‚ğ—pˆÓ‚µ‚ÄA‚±‚ÌŠÖ”‚ğ‚»‚±‚ÉˆÚ“®‚³‚¹‚½•û‚ª‚¢‚¢‚©‚à‚µ‚ê‚È‚¢B
+// TODO: IOãƒ¦ãƒ¼ãƒ†ã‚£ãƒªãƒ†ã‚£ãƒ»ãƒ˜ãƒƒãƒ€/ãƒ©ã‚¤ãƒ–ãƒ©ãƒªã‚’ç”¨æ„ã—ã¦ã€ã“ã®é–¢æ•°ã‚’ãã“ã«ç§»å‹•ã•ã›ãŸæ–¹ãŒã„ã„ã‹ã‚‚ã—ã‚Œãªã„ã€‚
 std::filesystem::path set_current_directory_to_executable_path()
 {
-	// ì‹ÆƒfƒBƒŒƒNƒgƒŠ‚ğÀsƒpƒX‚Éİ’è‚·‚é
+	// ä½œæ¥­ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªã‚’å®Ÿè¡Œãƒ‘ã‚¹ã«è¨­å®šã™ã‚‹
 	wchar_t path[MAX_PATH]{};
 	const uint32_t length{ GetModuleFileName(0, &path[0], MAX_PATH) };
 	if (!length || GetLastError() == ERROR_INSUFFICIENT_BUFFER) return {};
@@ -40,42 +40,42 @@ std::filesystem::path set_current_directory_to_executable_path()
 	return std::filesystem::current_path();
 }
 
-// ƒGƒ“ƒgƒŠ[ƒ|ƒCƒ“ƒg
+// ã‚¨ãƒ³ãƒˆãƒªãƒ¼ãƒã‚¤ãƒ³ãƒˆ
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
-	// ƒfƒoƒbƒO‚Éƒƒ‚ƒŠƒŠ[ƒNŒŸo
+	// ãƒ‡ãƒãƒƒã‚°æ™‚ã«ãƒ¡ãƒ¢ãƒªãƒªãƒ¼ã‚¯æ¤œå‡º
 #if _DEBUG
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif // _DEBUG
 
-	// ì‹ÆƒfƒBƒŒƒNƒgƒŠ‚ğÀsƒpƒX‚Éİ’è
+	// ä½œæ¥­ãƒ‡ã‚£ãƒ¬ã‚¯ãƒˆãƒªã‚’å®Ÿè¡Œãƒ‘ã‚¹ã«è¨­å®š
 	set_current_directory_to_executable_path();
 
-	// ƒeƒXƒg‚Ì‰Šú‰»
+	// ãƒ†ã‚¹ãƒˆã®åˆæœŸåŒ–
 	engine_test test{};
 
-	// ‰Šú‰»
+	// åˆæœŸåŒ–
 	if (test.initialize())
-	{	// ‰Šú‰»‚É¬Œ÷‚µ‚½ê‡AƒƒCƒ“ƒ‹[ƒv‚É“ü‚é
+	{	// åˆæœŸåŒ–ã«æˆåŠŸã—ãŸå ´åˆã€ãƒ¡ã‚¤ãƒ³ãƒ«ãƒ¼ãƒ—ã«å…¥ã‚‹
 		MSG msg{};
 		bool is_running{ true };
-		// ƒƒCƒ“ƒ‹[ƒv
+		// ãƒ¡ã‚¤ãƒ³ãƒ«ãƒ¼ãƒ—
 		while (is_running)
 		{
-			// Windows‚ÌƒƒbƒZ[ƒW‚ğˆ—
+			// Windowsã®ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ã‚’å‡¦ç†
 			while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
 			{
 				TranslateMessage(&msg);
 				DispatchMessage(&msg);
-				is_running &= (msg.message != WM_QUIT);	// I—¹ƒƒbƒZ[ƒW‚ª—ˆ‚½‚çƒ‹[ƒv‚ğ”²‚¯‚é
+				is_running &= (msg.message != WM_QUIT);	// çµ‚äº†ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ãŒæ¥ãŸã‚‰ãƒ«ãƒ¼ãƒ—ã‚’æŠœã‘ã‚‹
 			}
 
-			// ƒeƒXƒg‚ÌÀs
+			// ãƒ†ã‚¹ãƒˆã®å®Ÿè¡Œ
 			test.run();
 		}
 	}
 
-	// I—¹ˆ—
+	// çµ‚äº†å‡¦ç†
 	test.shutdown();
 	return 0;
 }
@@ -85,7 +85,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 int main()
 {
 #if _DEBUG
-	// ƒƒ‚ƒŠƒŠ[ƒNƒ`ƒFƒbƒN
+	// ãƒ¡ãƒ¢ãƒªãƒªãƒ¼ã‚¯ãƒã‚§ãƒƒã‚¯
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif // _DEBUG
 

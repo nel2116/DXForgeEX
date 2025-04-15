@@ -1,15 +1,15 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Geometry.cpp]
-// ì¬“ú : 2024/12/26
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
+// ä½œæˆæ—¥ : 2024/12/26
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
 //
-// XV—š—ğ
-// 2024/12/26 V‹Kì¬
-// 2025/01/12 ƒƒbƒVƒ…ƒf[ƒ^‚ÌƒpƒbƒNˆ—‚Ì•ÏX
-// 2025/01/12 IOStream.h‚Ìblob_stream_reader‚ğg—p‚·‚é‚æ‚¤‚É•ÏX
+// æ›´æ–°å±¥æ­´
+// 2024/12/26 æ–°è¦ä½œæˆ
+// 2025/01/12 ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ã®ãƒ‘ãƒƒã‚¯å‡¦ç†ã®å¤‰æ›´
+// 2025/01/12 IOStream.hã®blob_stream_readerã‚’ä½¿ç”¨ã™ã‚‹ã‚ˆã†ã«å¤‰æ›´
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "Geometry.h"
 #include "MikkTSpace/mikktspace.h"
 #include "Utilities/IOStream.h"
@@ -22,29 +22,29 @@ namespace dxforge::tools
 		using namespace DirectX;
 
 		/// @brief
-		/// @param context ƒRƒ“ƒeƒLƒXƒg
-		/// @return –Ê”
+		/// @param context ã‚³ãƒ³ãƒ†ã‚­ã‚¹ãƒˆ
+		/// @return é¢æ•°
 		s32 mikk_get_num_faces(const SMikkTSpaceContext* context)
 		{
 			const mesh& m{ *(mesh*)(context->m_pUserData) };
 			return (s32)m.indices.size() / 3;
 		}
 
-		/// @brief –Ê‚Ì’¸“_”‚ğæ“¾
-		/// @param context ƒRƒ“ƒeƒLƒXƒg
-		/// @param face_index –ÊƒCƒ“ƒfƒbƒNƒX
-		/// @return ’¸“_”
+		/// @brief é¢ã®é ‚ç‚¹æ•°ã‚’å–å¾—
+		/// @param context ã‚³ãƒ³ãƒ†ã‚­ã‚¹ãƒˆ
+		/// @param face_index é¢ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		/// @return é ‚ç‚¹æ•°
 		s32 mikk_get_num_vertices_of_face([[maybe_unused]] const SMikkTSpaceContext* context, [[maybe_unused]] s32 face_index)
 		{
-			// g—p‚·‚éƒƒbƒVƒ…‚ÍOŠpŒ`‚Ì‚İB
+			// ä½¿ç”¨ã™ã‚‹ãƒ¡ãƒƒã‚·ãƒ¥ã¯ä¸‰è§’å½¢ã®ã¿ã€‚
 			return 3;
 		}
 
-		/// @brief ˆÊ’u‚ğæ“¾
-		/// @param context ƒRƒ“ƒeƒLƒXƒg
-		/// @param position ˆÊ’u
-		/// @param face_index –ÊƒCƒ“ƒfƒbƒNƒX
-		/// @param vert_index ’¸“_ƒCƒ“ƒfƒbƒNƒX
+		/// @brief ä½ç½®ã‚’å–å¾—
+		/// @param context ã‚³ãƒ³ãƒ†ã‚­ã‚¹ãƒˆ
+		/// @param position ä½ç½®
+		/// @param face_index é¢ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		/// @param vert_index é ‚ç‚¹ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
 		void mikk_get_position(const SMikkTSpaceContext* context, f32 position[3], s32 face_index, s32 vert_index)
 		{
 			const mesh& m{ *(mesh*)(context->m_pUserData) };
@@ -55,11 +55,11 @@ namespace dxforge::tools
 			position[2] = p.z;
 		}
 
-		/// @brief –@ü‚ğæ“¾
-		/// @param context ƒRƒ“ƒeƒLƒXƒg
-		/// @param normal –@ü
-		/// @param face_index –ÊƒCƒ“ƒfƒbƒNƒX
-		/// @param vert_index ’¸“_ƒCƒ“ƒfƒbƒNƒX
+		/// @brief æ³•ç·šã‚’å–å¾—
+		/// @param context ã‚³ãƒ³ãƒ†ã‚­ã‚¹ãƒˆ
+		/// @param normal æ³•ç·š
+		/// @param face_index é¢ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		/// @param vert_index é ‚ç‚¹ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
 		void mikk_get_normal(const SMikkTSpaceContext* context, f32 normal[3], s32 face_index, s32 vert_index)
 		{
 			const mesh& m{ *(mesh*)(context->m_pUserData) };
@@ -70,11 +70,11 @@ namespace dxforge::tools
 			normal[2] = n.z;
 		}
 
-		/// @brief ƒeƒNƒXƒ`ƒƒÀ•W‚ğæ“¾
-		/// @param context ƒRƒ“ƒeƒLƒXƒg
-		/// @param texture ƒeƒNƒXƒ`ƒƒÀ•W
-		/// @param face_index –ÊƒCƒ“ƒfƒbƒNƒX
-		/// @param vert_index ’¸“_ƒCƒ“ƒfƒbƒNƒX
+		/// @brief ãƒ†ã‚¯ã‚¹ãƒãƒ£åº§æ¨™ã‚’å–å¾—
+		/// @param context ã‚³ãƒ³ãƒ†ã‚­ã‚¹ãƒˆ
+		/// @param texture ãƒ†ã‚¯ã‚¹ãƒãƒ£åº§æ¨™
+		/// @param face_index é¢ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		/// @param vert_index é ‚ç‚¹ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
 		void mikk_get_tex_coord(const SMikkTSpaceContext* context, f32 texture[2], s32 face_index, s32 vert_index)
 		{
 			const mesh& m{ *(mesh*)(context->m_pUserData) };
@@ -84,12 +84,12 @@ namespace dxforge::tools
 			texture[1] = uv.y;
 		}
 
-		/// @brief Úü‚ğİ’è
-		/// @param context ƒRƒ“ƒeƒLƒXƒg
-		/// @param tangent Úü
-		/// @param sign •„†
-		/// @param face_index –ÊƒCƒ“ƒfƒbƒNƒX
-		/// @param vert_index ’¸“_ƒCƒ“ƒfƒbƒNƒX
+		/// @brief æ¥ç·šã‚’è¨­å®š
+		/// @param context ã‚³ãƒ³ãƒ†ã‚­ã‚¹ãƒˆ
+		/// @param tangent æ¥ç·š
+		/// @param sign ç¬¦å·
+		/// @param face_index é¢ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		/// @param vert_index é ‚ç‚¹ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
 		void mikk_set_tspace_basic(const SMikkTSpaceContext* context, const f32 tangent[3], f32 sign, s32 face_index, s32 vert_index)
 		{
 			mesh& m{ *(mesh*)(context->m_pUserData) };
@@ -101,11 +101,11 @@ namespace dxforge::tools
 			t.w = sign;
 		}
 
-		/// @brief Úü‚ğİ’è
-		/// @param m ƒƒbƒVƒ…
+		/// @brief æ¥ç·šã‚’è¨­å®š
+		/// @param m ãƒ¡ãƒƒã‚·ãƒ¥
 		void calculate_mikk_tspace(mesh& m)
 		{
-			// ƒCƒ“ƒ|[ƒgƒ^ƒ“ƒWƒFƒ“ƒg‚ğg—p‚µ‚È‚¢
+			// ã‚¤ãƒ³ãƒãƒ¼ãƒˆã‚¿ãƒ³ã‚¸ã‚§ãƒ³ãƒˆã‚’ä½¿ç”¨ã—ãªã„
 			m.tangents.clear();
 
 			SMikkTSpaceInterface mikk_interface{};
@@ -124,11 +124,11 @@ namespace dxforge::tools
 			genTangSpaceDefault(&mikk_context);
 		}
 
-		/// @brief Úü‚ğŒvZ
-		/// @param m ƒƒbƒVƒ…
+		/// @brief æ¥ç·šã‚’è¨ˆç®—
+		/// @param m ãƒ¡ãƒƒã‚·ãƒ¥
 		void calculate_tangents(mesh& m)
 		{
-			// ƒCƒ“ƒ|[ƒgƒ^ƒ“ƒWƒFƒ“ƒg‚ğg—p‚µ‚È‚¢
+			// ã‚¤ãƒ³ãƒãƒ¼ãƒˆã‚¿ãƒ³ã‚¸ã‚§ãƒ³ãƒˆã‚’ä½¿ç”¨ã—ãªã„
 			m.tangents.clear();
 
 			const u32 num_indices{ (u32)m.raw_indices.size() };
@@ -176,7 +176,7 @@ namespace dxforge::tools
 				bitangents[i2] += b;
 			}
 
-			// ³‹K’¼—ñ‰»‚µAƒnƒ“ƒhƒlƒX‚ğŒvZ‚·‚é
+			// æ­£è¦ç›´åˆ—åŒ–ã—ã€ãƒãƒ³ãƒ‰ãƒã‚¹ã‚’è¨ˆç®—ã™ã‚‹
 			for (u32 i{ 0 }; i < num_indices; ++i)
 			{
 				const XMVECTOR& t{ tangents[i] };
@@ -194,8 +194,8 @@ namespace dxforge::tools
 			}
 		}
 
-		/// @brief –@ü‚ğÄŒvZ
-		/// @param m ƒƒbƒVƒ…
+		/// @brief æ³•ç·šã‚’å†è¨ˆç®—
+		/// @param m ãƒ¡ãƒƒã‚·ãƒ¥
 		void recalculate_normals(mesh& m)
 		{
 			const u32 num_indices{ (u32)m.raw_indices.size() };
@@ -221,9 +221,9 @@ namespace dxforge::tools
 			}
 		}
 
-		/// @brief –@ü‚ğˆ—
-		/// @param m ƒƒbƒVƒ…
-		/// @param smoothing_angle ƒXƒ€[ƒWƒ“ƒOŠp“x
+		/// @brief æ³•ç·šã‚’å‡¦ç†
+		/// @param m ãƒ¡ãƒƒã‚·ãƒ¥
+		/// @param smoothing_angle ã‚¹ãƒ ãƒ¼ã‚¸ãƒ³ã‚°è§’åº¦
 		void process_normals(mesh& m, f32 smoothing_angle)
 		{
 			const f32 cos_alpha{ XMScalarCos(math::pi - smoothing_angle * math::pi / 180.f) };
@@ -254,13 +254,13 @@ namespace dxforge::tools
 					{
 						for (u32 k{ j + 1 }; k < num_refs; ++k)
 						{
-							// ‚±‚Ì’l‚Í–@üŠÔ‚ÌŠp“x‚Ì—]Œ·‚ğ•\‚·B
+							// ã“ã®å€¤ã¯æ³•ç·šé–“ã®è§’åº¦ã®ä½™å¼¦ã‚’è¡¨ã™ã€‚
 							f32 cos_theta{ 0.f };
 							XMVECTOR n2{ XMLoadFloat3(&m.normals[refs[k]]) };
 							if (!is_soft_edge)
 							{
-								// NOTE: n1‚Ì’·‚³‚Í‚±‚Ìƒ‹[ƒv‚ÌŒJ‚è•Ô‚µ‚Å•Ï‰»‚·‚é‰Â”\«‚ª‚ ‚é‚½‚ßA‚±‚ÌŒvZ‚Å‚Ín1‚Ì’·‚³‚ğl—¶‚µ‚Ä‚¢‚éB
-								//		n2‚Ì’·‚³‚Í’PˆÊ‚Æ‚·‚éB cos(angle) = dot(n1, n2) / (||n1||*|n2||)
+								// NOTE: n1ã®é•·ã•ã¯ã“ã®ãƒ«ãƒ¼ãƒ—ã®ç¹°ã‚Šè¿”ã—ã§å¤‰åŒ–ã™ã‚‹å¯èƒ½æ€§ãŒã‚ã‚‹ãŸã‚ã€ã“ã®è¨ˆç®—ã§ã¯n1ã®é•·ã•ã‚’è€ƒæ…®ã—ã¦ã„ã‚‹ã€‚
+								//		n2ã®é•·ã•ã¯å˜ä½ã¨ã™ã‚‹ã€‚ cos(angle) = dot(n1, n2) / (||n1||*|n2||)
 								XMStoreFloat(&cos_theta, XMVector3Dot(n1, n2) * XMVector3ReciprocalLength(n1));
 							}
 
@@ -280,8 +280,8 @@ namespace dxforge::tools
 			}
 		}
 
-		/// @brief UV‚ğˆ—
-		/// @param m ƒƒbƒVƒ…
+		/// @brief UVã‚’å‡¦ç†
+		/// @param m ãƒ¡ãƒƒã‚·ãƒ¥
 		void process_uvs(mesh& m)
 		{
 			utl::vector<vertex> old_vertices;
@@ -324,8 +324,8 @@ namespace dxforge::tools
 			}
 		}
 
-		/// @brief Úü‚ğˆ—
-		/// @param m ƒƒbƒVƒ…
+		/// @brief æ¥ç·šã‚’å‡¦ç†
+		/// @param m ãƒ¡ãƒƒã‚·ãƒ¥
 		void process_tangents(mesh& m)
 		{
 			if (m.tangents.size() != m.raw_indices.size())
@@ -376,9 +376,9 @@ namespace dxforge::tools
 			}
 		}
 
-		/// @brief ƒƒbƒVƒ…‚ğƒpƒbƒN
-		/// @param elements_type —v‘fƒ^ƒCƒv
-		/// @return ƒpƒbƒN‚³‚ê‚½ƒƒbƒVƒ…
+		/// @brief ãƒ¡ãƒƒã‚·ãƒ¥ã‚’ãƒ‘ãƒƒã‚¯
+		/// @param elements_type è¦ç´ ã‚¿ã‚¤ãƒ—
+		/// @return ãƒ‘ãƒƒã‚¯ã•ã‚ŒãŸãƒ¡ãƒƒã‚·ãƒ¥
 		u64 get_vertex_elements_size(elements::elements_type::type elements_type)
 		{
 			using namespace elements;
@@ -398,8 +398,8 @@ namespace dxforge::tools
 			return 0;
 		}
 
-		/// @brief ’¸“_‚ğƒpƒbƒN
-		/// @param m ƒƒbƒVƒ…
+		/// @brief é ‚ç‚¹ã‚’ãƒ‘ãƒƒã‚¯
+		/// @param m ãƒ¡ãƒƒã‚·ãƒ¥
 		void pack_vertices(mesh& m)
 		{
 			const u32 num_vertices{ (u32)m.vertices.size() };
@@ -446,13 +446,13 @@ namespace dxforge::tools
 				for (u32 i{ 0 }; i < num_vertices; ++i)
 				{
 					vertex& v{ m.vertices[i] };
-					// ƒpƒbƒNƒWƒ‡ƒCƒ“ƒgƒEƒFƒCƒgi[0.0, 1.0] ‚©‚ç [0..255] ‚Ü‚Åj
+					// ãƒ‘ãƒƒã‚¯ã‚¸ãƒ§ã‚¤ãƒ³ãƒˆã‚¦ã‚§ã‚¤ãƒˆï¼ˆ[0.0, 1.0] ã‹ã‚‰ [0..255] ã¾ã§ï¼‰
 					joint_weights[i] = {
 						(u8)math::pack_unit_float<8>(v.joint_weights.x),
 						(u8)math::pack_unit_float<8>(v.joint_weights.y),
 						(u8)math::pack_unit_float<8>(v.joint_weights.z) };
 
-					// NOTE: w3‚ÍƒVƒF[ƒ_[‚ÅŒvZ‚³‚ê‚éB
+					// NOTE: w3ã¯ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã§è¨ˆç®—ã•ã‚Œã‚‹ã€‚
 				}
 			}
 
@@ -574,9 +574,9 @@ namespace dxforge::tools
 			}
 		}
 
-		/// @brief —v‘fƒ^ƒCƒv‚ğŒˆ’è
-		/// @param m ƒƒbƒVƒ…
-		/// @return —v‘fƒ^ƒCƒv
+		/// @brief è¦ç´ ã‚¿ã‚¤ãƒ—ã‚’æ±ºå®š
+		/// @param m ãƒ¡ãƒƒã‚·ãƒ¥
+		/// @return è¦ç´ ã‚¿ã‚¤ãƒ—
 		elements::elements_type::type determine_elements_type(const mesh& m)
 		{
 			using namespace elements;
@@ -598,13 +598,13 @@ namespace dxforge::tools
 				type = elements_type::static_color;
 			}
 
-			// TODO: œŠiƒƒbƒVƒ…‚Ìƒf[ƒ^‚ª‚È‚¢B œŠiƒƒbƒVƒ…‚É‚Â‚¢‚Ä‚ÍŒã‚ÅŠg’£‚·‚éB
+			// TODO: éª¨æ ¼ãƒ¡ãƒƒã‚·ãƒ¥ã®ãƒ‡ãƒ¼ã‚¿ãŒãªã„ã€‚ éª¨æ ¼ãƒ¡ãƒƒã‚·ãƒ¥ã«ã¤ã„ã¦ã¯å¾Œã§æ‹¡å¼µã™ã‚‹ã€‚
 			return type;
 		}
 
-		/// @brief ’¸“_‚ğˆ—
-		/// @param m ƒƒbƒVƒ…
-		/// @param settings ƒWƒIƒƒgƒŠƒCƒ“ƒ|[ƒgİ’è
+		/// @brief é ‚ç‚¹ã‚’å‡¦ç†
+		/// @param m ãƒ¡ãƒƒã‚·ãƒ¥
+		/// @param settings ã‚¸ã‚ªãƒ¡ãƒˆãƒªã‚¤ãƒ³ãƒãƒ¼ãƒˆè¨­å®š
 		void process_vertices(mesh& m, const geometry_import_settings& settings)
 		{
 			assert((m.raw_indices.size() % 3) == 0);
@@ -627,9 +627,9 @@ namespace dxforge::tools
 				//calculate_tangents(m);
 			}
 
-			// NOTE: m.tangents‚É‚ÍAƒCƒ“ƒ|[ƒg‚³‚ê‚½ÚüƒxƒNƒgƒ‹‚Ì’l‚ªŠi”[‚³‚ê‚Ü‚·B
-			//		ƒ^ƒ“ƒWƒFƒ“ƒg‚ªŒvZ‚³‚ê‚½ê‡‚Í‹ó‚É‚È‚è‚Ü‚·B
-			//		‚µ‚½‚ª‚Á‚ÄAprocess_tangents‚ÍAƒ\[ƒXƒtƒ@ƒCƒ‹‚©‚çƒ^ƒ“ƒWƒFƒ“ƒg‚ªƒCƒ“ƒ|[ƒg‚³‚ê‚½‚Æ‚«‚É‚Ì‚İŒÄ‚Ño‚³‚ê‚Ü‚·B
+			// NOTE: m.tangentsã«ã¯ã€ã‚¤ãƒ³ãƒãƒ¼ãƒˆã•ã‚ŒãŸæ¥ç·šãƒ™ã‚¯ãƒˆãƒ«ã®å€¤ãŒæ ¼ç´ã•ã‚Œã¾ã™ã€‚
+			//		ã‚¿ãƒ³ã‚¸ã‚§ãƒ³ãƒˆãŒè¨ˆç®—ã•ã‚ŒãŸå ´åˆã¯ç©ºã«ãªã‚Šã¾ã™ã€‚
+			//		ã—ãŸãŒã£ã¦ã€process_tangentsã¯ã€ã‚½ãƒ¼ã‚¹ãƒ•ã‚¡ã‚¤ãƒ«ã‹ã‚‰ã‚¿ãƒ³ã‚¸ã‚§ãƒ³ãƒˆãŒã‚¤ãƒ³ãƒãƒ¼ãƒˆã•ã‚ŒãŸã¨ãã«ã®ã¿å‘¼ã³å‡ºã•ã‚Œã¾ã™ã€‚
 			if (!m.tangents.empty())
 			{
 				process_tangents(m);
@@ -639,9 +639,9 @@ namespace dxforge::tools
 			pack_vertices(m);
 		}
 
-		/// @brief ƒƒbƒVƒ…ƒTƒCƒY‚ğæ“¾
-		/// @param m ƒƒbƒVƒ…
-		/// @return ƒƒbƒVƒ…ƒTƒCƒY
+		/// @brief ãƒ¡ãƒƒã‚·ãƒ¥ã‚µã‚¤ã‚ºã‚’å–å¾—
+		/// @param m ãƒ¡ãƒƒã‚·ãƒ¥
+		/// @return ãƒ¡ãƒƒã‚·ãƒ¥ã‚µã‚¤ã‚º
 		u64 get_mesh_size(const mesh& m)
 		{
 			const u64 num_vertices{ m.vertices.size() };
@@ -653,41 +653,41 @@ namespace dxforge::tools
 			const u64 index_buffer_size{ index_size * m.indices.size() };
 			constexpr u64 su32{ sizeof(u32) };
 			const u64 size{
-				su32 + m.name.size() +	// ƒƒbƒVƒ…–¼‚Ì’·‚³‚ÆƒƒbƒVƒ…–¼•¶š—ñ‚ÌƒXƒy[ƒX
-				su32 +					// ƒƒbƒgID
-				su32 +					// ’¸“_—v‘fƒTƒCƒYiˆÊ’u—v‘f‚ğœ‚¢‚½’¸“_ƒTƒCƒYj
-				su32 +					// —v‘fŒ^—ñ‹“
-				su32 +					// ’¸“_”
-				su32 +					// ƒCƒ“ƒfƒbƒNƒXƒTƒCƒYi16ƒrƒbƒg‚Ü‚½‚Í32ƒrƒbƒgj
-				su32 +					// ƒCƒ“ƒfƒbƒNƒX”
-				sizeof(f32) +			// LOD‚µ‚«‚¢’l
-				position_buffer_size +	// ’¸“_ˆÊ’u‚Ì
-				element_buffer_size +	// ’¸“_—v‘f‚Ì
-				index_buffer_size		// ƒCƒ“ƒfƒbƒNƒX‚Ì
+				su32 + m.name.size() +	// ãƒ¡ãƒƒã‚·ãƒ¥åã®é•·ã•ã¨ãƒ¡ãƒƒã‚·ãƒ¥åæ–‡å­—åˆ—ã®ã‚¹ãƒšãƒ¼ã‚¹
+				su32 +					// ãƒ­ãƒƒãƒˆID
+				su32 +					// é ‚ç‚¹è¦ç´ ã‚µã‚¤ã‚ºï¼ˆä½ç½®è¦ç´ ã‚’é™¤ã„ãŸé ‚ç‚¹ã‚µã‚¤ã‚ºï¼‰
+				su32 +					// è¦ç´ å‹åˆ—æŒ™
+				su32 +					// é ‚ç‚¹æ•°
+				su32 +					// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã‚µã‚¤ã‚ºï¼ˆ16ãƒ“ãƒƒãƒˆã¾ãŸã¯32ãƒ“ãƒƒãƒˆï¼‰
+				su32 +					// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°
+				sizeof(f32) +			// LODã—ãã„å€¤
+				position_buffer_size +	// é ‚ç‚¹ä½ç½®ã®
+				element_buffer_size +	// é ‚ç‚¹è¦ç´ ã®
+				index_buffer_size		// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã®
 			};
 
 			return size;
 		}
 
-		/// @brief ƒV[ƒ“ƒTƒCƒY‚ğæ“¾
-		/// @param scene ƒV[ƒ“
-		/// @return ƒV[ƒ“ƒTƒCƒY
+		/// @brief ã‚·ãƒ¼ãƒ³ã‚µã‚¤ã‚ºã‚’å–å¾—
+		/// @param scene ã‚·ãƒ¼ãƒ³
+		/// @return ã‚·ãƒ¼ãƒ³ã‚µã‚¤ã‚º
 		u64 get_scene_size(const scene& scene)
 		{
 			constexpr u64 su32{ sizeof(u32) };
 			u64 size
 			{
-				su32 +              // –¼‘O‚Ì’·‚³
-				scene.name.size() + // ƒV[ƒ“–¼•¶š—ñ‚Ì•”‰®
-				su32                // LOD”
+				su32 +              // åå‰ã®é•·ã•
+				scene.name.size() + // ã‚·ãƒ¼ãƒ³åæ–‡å­—åˆ—ã®éƒ¨å±‹
+				su32                // LODæ•°
 			};
 
 			for (const auto& lod : scene.lod_groups)
 			{
 				u64 lod_size
 				{
-					su32 + lod.name.size() + // LOD–¼‚Ì’·‚³‚ÆLPD–¼•¶š—ñ‚ÌƒXƒy[ƒX
-					su32                     // ‚±‚ÌLOD‚ÌƒƒbƒVƒ…”
+					su32 + lod.name.size() + // LODåã®é•·ã•ã¨LPDåæ–‡å­—åˆ—ã®ã‚¹ãƒšãƒ¼ã‚¹
+					su32                     // ã“ã®LODã®ãƒ¡ãƒƒã‚·ãƒ¥æ•°
 				};
 
 				for (const auto& m : lod.meshes)
@@ -701,39 +701,39 @@ namespace dxforge::tools
 			return size;
 		}
 
-		/// @brief ƒƒbƒVƒ…ƒf[ƒ^‚ğƒpƒbƒN
-		/// @param m ƒƒbƒVƒ…
-		/// @param blob ƒoƒCƒiƒŠƒXƒgƒŠ[ƒ€ƒ‰ƒCƒ^[
+		/// @brief ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ã‚’ãƒ‘ãƒƒã‚¯
+		/// @param m ãƒ¡ãƒƒã‚·ãƒ¥
+		/// @param blob ãƒã‚¤ãƒŠãƒªã‚¹ãƒˆãƒªãƒ¼ãƒ ãƒ©ã‚¤ã‚¿ãƒ¼
 		void pack_mesh_data(const mesh& m, utl::blob_stream_writer& blob)
 		{
-			// ƒƒbƒVƒ…–¼
+			// ãƒ¡ãƒƒã‚·ãƒ¥å
 			blob.write((u32)m.name.size());
 			blob.write(m.name.c_str(), m.name.size());
-			// ƒƒbƒgID
+			// ãƒ­ãƒƒãƒˆID
 			blob.write(m.lod_id);
-			// ’¸“_—v‘fƒTƒCƒY
+			// é ‚ç‚¹è¦ç´ ã‚µã‚¤ã‚º
 			const u32 elements_size{ (u32)get_vertex_elements_size(m.elements_type) };
 			blob.write(elements_size);
-			// —v‘fƒ^ƒCƒv—ñ‹“
+			// è¦ç´ ã‚¿ã‚¤ãƒ—åˆ—æŒ™
 			blob.write((u32)m.elements_type);
-			// ’¸“_”
+			// é ‚ç‚¹æ•°
 			const u32 num_vertices{ (u32)m.vertices.size() };
 			blob.write(num_vertices);
-			// ƒCƒ“ƒfƒbƒNƒXƒTƒCƒYi16ƒrƒbƒg‚Ü‚½‚Í32ƒrƒbƒgj
+			// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã‚µã‚¤ã‚ºï¼ˆ16ãƒ“ãƒƒãƒˆã¾ãŸã¯32ãƒ“ãƒƒãƒˆï¼‰
 			const u32 index_size{ (num_vertices < (1 << 16)) ? sizeof(u16) : sizeof(u32) };
 			blob.write(index_size);
-			// ƒCƒ“ƒfƒbƒNƒX”
+			// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ•°
 			const u32 num_indices{ (u32)m.indices.size() };
 			blob.write(num_indices);
-			// LOD‚µ‚«‚¢’l
+			// LODã—ãã„å€¤
 			blob.write(m.lod_threshold);
-			// ƒ|ƒWƒVƒ‡ƒ“ƒoƒbƒtƒ@
+			// ãƒã‚¸ã‚·ãƒ§ãƒ³ãƒãƒƒãƒ•ã‚¡
 			assert(m.position_buffer.size() == sizeof(math::v3) * num_vertices);
 			blob.write(m.position_buffer.data(), m.position_buffer.size());
-			// —v‘fƒoƒbƒtƒ@
+			// è¦ç´ ãƒãƒƒãƒ•ã‚¡
 			assert(m.element_buffer.size() == elements_size * num_vertices);
 			blob.write(m.element_buffer.data(), m.element_buffer.size());
-			// ƒCƒ“ƒfƒbƒNƒXƒf[ƒ^
+			// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ‡ãƒ¼ã‚¿
 			const u32 index_buffer_size{ index_size * num_indices };
 			const u8* data{ (const u8*)m.indices.data() };
 			utl::vector<u16> indices;
@@ -747,11 +747,11 @@ namespace dxforge::tools
 			blob.write(data, index_buffer_size);
 		}
 
-		/// @brief ƒƒbƒVƒ…ƒf[ƒ^‚ğƒAƒ“ƒpƒbƒN
-		/// @param material_idx ƒ}ƒeƒŠƒAƒ‹ƒCƒ“ƒfƒbƒNƒX
-		/// @param m ƒƒbƒVƒ…
-		/// @param submesh ƒTƒuƒƒbƒVƒ…
-		/// @return ƒTƒuƒƒbƒVƒ…‚ª‹ó‚Å‚È‚¢ê‡‚Ítrue‚ğ•Ô‚µ‚Ü‚·B
+		/// @brief ãƒ¡ãƒƒã‚·ãƒ¥ãƒ‡ãƒ¼ã‚¿ã‚’ã‚¢ãƒ³ãƒ‘ãƒƒã‚¯
+		/// @param material_idx ãƒãƒ†ãƒªã‚¢ãƒ«ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		/// @param m ãƒ¡ãƒƒã‚·ãƒ¥
+		/// @param submesh ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥
+		/// @return ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ãŒç©ºã§ãªã„å ´åˆã¯trueã‚’è¿”ã—ã¾ã™ã€‚
 		bool split_meshes_by_material(u32 material_idx, const mesh& m, mesh& submesh)
 		{
 			submesh.name = m.name;
@@ -807,9 +807,9 @@ namespace dxforge::tools
 			return !submesh.raw_indices.empty();
 		}
 
-		/// @brief ƒƒbƒVƒ…‚ğƒ}ƒeƒŠƒAƒ‹‚²‚Æ‚É•ªŠ„
-		/// @param scene ƒV[ƒ“
-		/// @param progression isó‹µ
+		/// @brief ãƒ¡ãƒƒã‚·ãƒ¥ã‚’ãƒãƒ†ãƒªã‚¢ãƒ«ã”ã¨ã«åˆ†å‰²
+		/// @param scene ã‚·ãƒ¼ãƒ³
+		/// @param progression é€²è¡ŒçŠ¶æ³
 		void split_meshes_by_material(scene& scene, progression* const progression)
 		{
 			assert(progression);
@@ -821,7 +821,7 @@ namespace dxforge::tools
 
 				for (const auto& m : lod.meshes)
 				{
-					// ‚±‚ÌƒƒbƒVƒ…‚É•¡”‚Ìƒ}ƒeƒŠƒAƒ‹‚ªg—p‚³‚ê‚Ä‚¢‚éê‡‚ÍAƒTƒuƒƒbƒVƒ…‚É•ªŠ„‚µ‚Ü‚·B
+					// ã“ã®ãƒ¡ãƒƒã‚·ãƒ¥ã«è¤‡æ•°ã®ãƒãƒ†ãƒªã‚¢ãƒ«ãŒä½¿ç”¨ã•ã‚Œã¦ã„ã‚‹å ´åˆã¯ã€ã‚µãƒ–ãƒ¡ãƒƒã‚·ãƒ¥ã«åˆ†å‰²ã—ã¾ã™ã€‚
 					const u32 num_materials{ (u32)m.material_used.size() };
 					if (num_materials > 1)
 					{
@@ -845,10 +845,10 @@ namespace dxforge::tools
 			}
 		}
 
-		/// @brief ƒxƒNƒgƒ‹‚É’Ç‰Á
-		/// @tparam T —v‘f‚ÌŒ^
-		/// @param dst ƒxƒNƒgƒ‹
-		/// @param src ’Ç‰Á‚·‚éƒxƒNƒgƒ‹
+		/// @brief ãƒ™ã‚¯ãƒˆãƒ«ã«è¿½åŠ 
+		/// @tparam T è¦ç´ ã®å‹
+		/// @param dst ãƒ™ã‚¯ãƒˆãƒ«
+		/// @param src è¿½åŠ ã™ã‚‹ãƒ™ã‚¯ãƒˆãƒ«
 		template <typename T> void append_to_vector_pod(utl::vector<T>& dst, const utl::vector<T>& src)
 		{
 			if (src.empty()) return;
@@ -857,12 +857,12 @@ namespace dxforge::tools
 			memcpy(&dst[num_elements], src.data(), src.size() * sizeof(T));
 		}
 
-	} // “½–¼–¼‘O‹óŠÔ
+	} // åŒ¿ååå‰ç©ºé–“
 
-	/// @brief ƒV[ƒ“‚ğˆ—
-	/// @param scene ƒV[ƒ“
-	/// @param settings ƒWƒIƒƒgƒŠƒCƒ“ƒ|[ƒgİ’è
-	/// @param progression isó‹µ
+	/// @brief ã‚·ãƒ¼ãƒ³ã‚’å‡¦ç†
+	/// @param scene ã‚·ãƒ¼ãƒ³
+	/// @param settings ã‚¸ã‚ªãƒ¡ãƒˆãƒªã‚¤ãƒ³ãƒãƒ¼ãƒˆè¨­å®š
+	/// @param progression é€²è¡ŒçŠ¶æ³
 	void process_scene(scene& scene, const geometry_import_settings& settings, progression* const progression)
 	{
 		assert(progression);
@@ -876,9 +876,9 @@ namespace dxforge::tools
 			}
 	}
 
-	/// @brief ƒV[ƒ“ƒf[ƒ^‚ğƒpƒbƒN
-	/// @param scene ƒV[ƒ“
-	/// @param data ƒV[ƒ“ƒf[ƒ^
+	/// @brief ã‚·ãƒ¼ãƒ³ãƒ‡ãƒ¼ã‚¿ã‚’ãƒ‘ãƒƒã‚¯
+	/// @param scene ã‚·ãƒ¼ãƒ³
+	/// @param data ã‚·ãƒ¼ãƒ³ãƒ‡ãƒ¼ã‚¿
 	void pack_data(const scene& scene, scene_data& data)
 	{
 		const u64 scene_size{ get_scene_size(scene) };
@@ -888,18 +888,18 @@ namespace dxforge::tools
 
 		utl::blob_stream_writer blob{ data.buffer, data.buffer_size };
 
-		// ƒV[ƒ“–¼
+		// ã‚·ãƒ¼ãƒ³å
 		blob.write((u32)scene.name.size());
 		blob.write(scene.name.c_str(), scene.name.size());
-		// LOD”
+		// LODæ•°
 		blob.write((u32)scene.lod_groups.size());
 
 		for (const auto& lod : scene.lod_groups)
 		{
-			// LOD–¼
+			// LODå
 			blob.write((u32)lod.name.size());
 			blob.write(lod.name.c_str(), lod.name.size());
-			// ‚±‚ÌLOD‚ÌƒƒbƒVƒ…”
+			// ã“ã®LODã®ãƒ¡ãƒƒã‚·ãƒ¥æ•°
 			blob.write((u32)lod.meshes.size());
 
 			for (const auto& m : lod.meshes)
@@ -911,11 +911,11 @@ namespace dxforge::tools
 		assert(scene_size == blob.offset());
 	}
 
-	/// @brief ƒƒbƒVƒ…‚ğŒ‹‡
+	/// @brief ãƒ¡ãƒƒã‚·ãƒ¥ã‚’çµåˆ
 	/// @param lod LOD
-	/// @param combined_mesh Œ‹‡‚³‚ê‚½ƒƒbƒVƒ…
-	/// @param progression isó‹µ
-	/// @return ƒƒbƒVƒ…‚ªŒ‹‡‚³‚ê‚½ê‡‚Ítrue‚ğ•Ô‚µ‚Ü‚·B
+	/// @param combined_mesh çµåˆã•ã‚ŒãŸãƒ¡ãƒƒã‚·ãƒ¥
+	/// @param progression é€²è¡ŒçŠ¶æ³
+	/// @return ãƒ¡ãƒƒã‚·ãƒ¥ãŒçµåˆã•ã‚ŒãŸå ´åˆã¯trueã‚’è¿”ã—ã¾ã™ã€‚
 	bool coalesce_meshes(const lod_group& lod, mesh& combined_mesh, progression* const progression)
 	{
 		assert(lod.meshes.size());

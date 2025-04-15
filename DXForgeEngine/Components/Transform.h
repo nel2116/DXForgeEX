@@ -1,65 +1,65 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Transform.h]
-// ì¬“ú : 2024/08/12
-// ì¬ŽÒ : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-// @TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚ð’è‹`‚µ‚½ƒtƒ@ƒCƒ‹
-// XV—š—ð
-// 2024/08/12 V‹Kì¬
-// 2025/01/14 ƒRƒƒ“ƒg‚Ì’Ç‰Á
+// ä½œæˆæ—¥ : 2024/08/12
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒŽãƒ«
+// æ¦‚è¦
+// ã€€Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’å®šç¾©ã—ãŸãƒ•ã‚¡ã‚¤ãƒ«
+// æ›´æ–°å±¥æ­´
+// 2024/08/12 æ–°è¦ä½œæˆ
+// 2025/01/14 ã‚³ãƒ¡ãƒ³ãƒˆã®è¿½åŠ 
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
-#include "ComponentsCommon.h" // ‹¤’ÊƒRƒ“ƒ|[ƒlƒ“ƒgƒwƒbƒ_[‚ÌƒCƒ“ƒNƒ‹[ƒh
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
+#include "ComponentsCommon.h" // å…±é€šã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆãƒ˜ãƒƒãƒ€ãƒ¼ã®ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰
 
 namespace dxforge::transform
 {
-	/// @brief TransformƒRƒ“ƒ|[ƒlƒ“ƒg‰Šú‰»î•ñ‚ðŠi”[‚·‚é\‘¢‘Ì
+	/// @brief Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆåˆæœŸåŒ–æƒ…å ±ã‚’æ ¼ç´ã™ã‚‹æ§‹é€ ä½“
 	struct init_info
 	{
-		f32 position[3]{};				///< ˆÊ’uî•ñ (x, y, z)
-		f32 rotation[4]{};				///< ‰ñ“]î•ñ (ƒNƒH[ƒ^ƒjƒIƒ“Œ`Ž®: x, y, z, w)
-		f32 scale[3]{ 1.f, 1.f, 1.f };	///< ƒXƒP[ƒ‹î•ñ (ƒfƒtƒHƒ‹ƒg‚Í1.0)
+		f32 position[3]{};				///< ä½ç½®æƒ…å ± (x, y, z)
+		f32 rotation[4]{};				///< å›žè»¢æƒ…å ± (ã‚¯ã‚©ãƒ¼ã‚¿ãƒ‹ã‚ªãƒ³å½¢å¼: x, y, z, w)
+		f32 scale[3]{ 1.f, 1.f, 1.f };	///< ã‚¹ã‚±ãƒ¼ãƒ«æƒ…å ± (ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã¯1.0)
 	};
 
 	struct component_flags
 	{
 		enum flags : u32
 		{
-			rotation = 0x01,	///< ‰ñ“]’l‚ª•ÏX‚³‚ê‚½
-			orientation = 0x02,	///< Œü‚«‚ª•ÏX‚³‚ê‚½
-			position = 0x04,	///< ˆÊ’u‚ª•ÏX‚³‚ê‚½
-			scale = 0x08,		///< Šg‘å—¦‚ª•ÏX‚³‚ê‚½
+			rotation = 0x01,	///< å›žè»¢å€¤ãŒå¤‰æ›´ã•ã‚ŒãŸ
+			orientation = 0x02,	///< å‘ããŒå¤‰æ›´ã•ã‚ŒãŸ
+			position = 0x04,	///< ä½ç½®ãŒå¤‰æ›´ã•ã‚ŒãŸ
+			scale = 0x08,		///< æ‹¡å¤§çŽ‡ãŒå¤‰æ›´ã•ã‚ŒãŸ
 
-			all = rotation | orientation | position | scale,	///< ‘S‚Ä‚Ìƒtƒ‰ƒO
+			all = rotation | orientation | position | scale,	///< å…¨ã¦ã®ãƒ•ãƒ©ã‚°
 		};
 	};
 
-	/// @brief TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚ÌƒLƒƒƒbƒVƒ…î•ñ‚ðŠi”[‚·‚é\‘¢‘Ì
+	/// @brief Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ã‚­ãƒ£ãƒƒã‚·ãƒ¥æƒ…å ±ã‚’æ ¼ç´ã™ã‚‹æ§‹é€ ä½“
 	struct component_cache
 	{
-		math::v4 rotation;		///< ‰ñ“]’l
-		math::v3 orientation;	///< Œü‚«
-		math::v3 position;		///< ˆÊ’u
-		math::v3 scale;			///< Šg‘å—¦
-		transform_id id;		///< TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚ÌID
-		u32 flags;				///< •ÏX‚³‚ê‚½‚©‚Ç‚¤‚©‚Ìƒtƒ‰ƒO
+		math::v4 rotation;		///< å›žè»¢å€¤
+		math::v3 orientation;	///< å‘ã
+		math::v3 position;		///< ä½ç½®
+		math::v3 scale;			///< æ‹¡å¤§çŽ‡
+		transform_id id;		///< Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ID
+		u32 flags;				///< å¤‰æ›´ã•ã‚ŒãŸã‹ã©ã†ã‹ã®ãƒ•ãƒ©ã‚°
 	};
 
-	/// @brief V‚µ‚¢TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚ðì¬
-	/// @param info ‰Šú‰»î•ñ
-	/// @param entity ŠÖ˜A•t‚¯‚éƒGƒ“ƒeƒBƒeƒB
-	/// @return ì¬‚³‚ê‚½TransformƒRƒ“ƒ|[ƒlƒ“ƒg
+	/// @brief æ–°ã—ã„Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’ä½œæˆ
+	/// @param info åˆæœŸåŒ–æƒ…å ±
+	/// @param entity é–¢é€£ä»˜ã‘ã‚‹ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£
+	/// @return ä½œæˆã•ã‚ŒãŸTransformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆ
 	component create(init_info info, game_entity::entity entity);
 
-	/// @brief Žw’è‚³‚ê‚½TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚ðíœ
-	/// @param c íœ‚·‚éTransformƒRƒ“ƒ|[ƒlƒ“ƒg
+	/// @brief æŒ‡å®šã•ã‚ŒãŸTransformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’å‰Šé™¤
+	/// @param c å‰Šé™¤ã™ã‚‹Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆ
 	void remove(component c);
 
-	/// @brief ƒGƒ“ƒeƒBƒeƒB‚ÌTransforms—ñ‚ðŽæ“¾
-	/// @param id ƒGƒ“ƒeƒBƒeƒBID
-	/// @param world ¢ŠEs—ñ (o—Í)
-	/// @param inverse_world ¢ŠEs—ñ‚Ì‹ts—ñ (o—Í)
+	/// @brief ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã®Transformè¡Œåˆ—ã‚’å–å¾—
+	/// @param id ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ID
+	/// @param world ä¸–ç•Œè¡Œåˆ— (å‡ºåŠ›)
+	/// @param inverse_world ä¸–ç•Œè¡Œåˆ—ã®é€†è¡Œåˆ— (å‡ºåŠ›)
 	void get_transform_matrices(const game_entity::entity_id id, math::m4x4& world, math::m4x4& inverse_world);
 
 	void get_updated_component_flags(const game_entity::entity_id* const ids, u32 count, u8* const flags);

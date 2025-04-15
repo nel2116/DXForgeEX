@@ -1,70 +1,71 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Vector.h]
-// ì¬“ú : 2024/12/31
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-// ƒxƒNƒgƒ‹”z—ñ
-// XV—š—ğ
-// 2024/12/31 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/12/31
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
+// ãƒ™ã‚¯ãƒˆãƒ«é…åˆ—
+// æ›´æ–°å±¥æ­´
+// 2024/12/31 æ–°è¦ä½œæˆ
+// 2025/04/15 ã‚³ãƒ¡ãƒ³ãƒˆè¿½åŠ 
 // // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "CommonHeaders.h"
-
 
 namespace dxforge::utl
 {
-	// ====== ƒNƒ‰ƒX ======
-	/// @brief ƒxƒNƒgƒ‹”z—ñ
-	/// @tparam T ƒxƒNƒgƒ‹”z—ñ‚ÉŠi”[‚·‚éŒ^
-	/// std::vector‚É—‚½”z—ñƒNƒ‰ƒX‚ÅAŠî–{“I‚È‹@”\‚ğ‚ÂB
-	/// ƒ†[ƒU[‚Íƒeƒ“ƒvƒŒ[ƒgˆø”‚ÅA—v‘f‚ÌƒfƒXƒgƒ‰ƒNƒ^‚ğíœ‚ÉŒÄ‚Ño‚·‚©
-	/// ”z—ñ‚ÌƒNƒŠƒA/ƒfƒXƒgƒ‰ƒNƒ^‚ğŒÄ‚Ño‚·‚©‚ğw’è‚Å‚«‚éB
+	// ====== ã‚¯ãƒ©ã‚¹ ======
+
+	/// @brief ãƒ™ã‚¯ãƒˆãƒ«é…åˆ—
+	/// @tparam T ãƒ™ã‚¯ãƒˆãƒ«é…åˆ—ã«æ ¼ç´ã™ã‚‹å‹
+	/// std::vectorã«ä¼¼ãŸé…åˆ—ã‚¯ãƒ©ã‚¹ã§ã€åŸºæœ¬çš„ãªæ©Ÿèƒ½ã‚’æŒã¤ã€‚
+	/// ãƒ¦ãƒ¼ã‚¶ãƒ¼ã¯ãƒ†ãƒ³ãƒ—ãƒ¬ãƒ¼ãƒˆå¼•æ•°ã§ã€è¦ç´ ã®ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ã‚’å‰Šé™¤æ™‚ã«å‘¼ã³å‡ºã™ã‹
+	/// é…åˆ—ã®ã‚¯ãƒªã‚¢/ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ã‚’å‘¼ã³å‡ºã™ã‹ã‚’æŒ‡å®šã§ãã‚‹ã€‚
 	template<typename T, bool destruct = true>
 	class vector
 	{
-		// _/_/_/_/_/_/_/_/ ƒƒ“ƒoŠÖ” _/_/_/_/_/_/_/_/
-	public:		// ====== ƒpƒuƒŠƒbƒNŠÖ” ======
-		/// @brief ƒfƒtƒHƒ‹ƒg‚ÌƒRƒ“ƒXƒgƒ‰ƒNƒ^B ƒƒ‚ƒŠ‚ğŠ„‚è“–‚Ä‚È‚¢B
+		// _/_/_/_/_/_/_/_/ ãƒ¡ãƒ³ãƒé–¢æ•° _/_/_/_/_/_/_/_/
+	public:		// ====== ãƒ‘ãƒ–ãƒªãƒƒã‚¯é–¢æ•° ======
+		/// @brief ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆã®ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ã€‚ ãƒ¡ãƒ¢ãƒªã‚’å‰²ã‚Šå½“ã¦ãªã„ã€‚
 		constexpr vector() = default;
 
-		/// @brief ”z—ñ‚ÌƒTƒCƒY‚ğ•ÏX‚·‚éƒRƒ“ƒXƒgƒ‰ƒNƒ^
-		/// @param count ”z—ñ‚ÌƒTƒCƒY
-		/// 'count' —v‘f‚ğ‰Šú‰»‚µ‚Ü‚·B
+		/// @brief é…åˆ—ã®ã‚µã‚¤ã‚ºã‚’å¤‰æ›´ã™ã‚‹ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+		/// @param count é…åˆ—ã®ã‚µã‚¤ã‚º
+		/// 'count' è¦ç´ ã‚’åˆæœŸåŒ–ã—ã¾ã™ã€‚
 		constexpr explicit vector(u64 count)
 		{
 			resize(count);
 		}
 
-		/// @brief ”z—ñ‚ÌƒTƒCƒY‚ğ•ÏX‚·‚éƒRƒ“ƒXƒgƒ‰ƒNƒ^
-		/// @param count ”z—ñ‚ÌƒTƒCƒY
-		/// @param value ‰Šú‰»‚·‚é’l
-		/// 'count' —v‘f‚ğ 'value' ‚Å‰Šú‰»‚µ‚Ü‚·B
+		/// @brief é…åˆ—ã®ã‚µã‚¤ã‚ºã‚’å¤‰æ›´ã™ã‚‹ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+		/// @param count é…åˆ—ã®ã‚µã‚¤ã‚º
+		/// @param value åˆæœŸåŒ–ã™ã‚‹å€¤
+		/// 'count' è¦ç´ ã‚’ 'value' ã§åˆæœŸåŒ–ã—ã¾ã™ã€‚
 		constexpr explicit vector(u64 count, const T& value)
 		{
 			resize(count, value);
 		}
 
 
-		/// @brief ƒRƒs[ƒRƒ“ƒXƒgƒ‰ƒNƒ^
-		/// @param o ƒRƒs[Œ³‚Ì”z—ñ
-		/// •Ê‚Ì”z—ñ‚ğƒRƒs[‚µ‚Ä\’z‚·‚éB ƒRƒs[‚³‚ê‚½”z—ñ‚Ì€–Ú‚ÍƒRƒs[‰Â”\‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B
+		/// @brief ã‚³ãƒ”ãƒ¼ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+		/// @param o ã‚³ãƒ”ãƒ¼å…ƒã®é…åˆ—
+		/// åˆ¥ã®é…åˆ—ã‚’ã‚³ãƒ”ãƒ¼ã—ã¦æ§‹ç¯‰ã™ã‚‹ã€‚ ã‚³ãƒ”ãƒ¼ã•ã‚ŒãŸé…åˆ—ã®é …ç›®ã¯ã‚³ãƒ”ãƒ¼å¯èƒ½ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚
 		constexpr vector(const vector& o)
 		{
 			*this = o;
 		}
 
-		/// @brief MoveƒRƒ“ƒXƒgƒ‰ƒNƒ^
-		/// @param o ƒRƒs[Œ³‚Ì”z—ñ
-		/// •Ê‚Ì”z—ñ‚ğˆÚ“®‚³‚¹‚Ä\’z‚·‚éB ˆÚ“®Œã‚ÌŒ³‚Ì”z—ñ‚Í‹ó‚É‚È‚éB
+		/// @brief Moveã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+		/// @param o ã‚³ãƒ”ãƒ¼å…ƒã®é…åˆ—
+		/// åˆ¥ã®é…åˆ—ã‚’ç§»å‹•ã•ã›ã¦æ§‹ç¯‰ã™ã‚‹ã€‚ ç§»å‹•å¾Œã®å…ƒã®é…åˆ—ã¯ç©ºã«ãªã‚‹ã€‚
 		constexpr vector(vector&& o)
 			: _capacity{ o._capacity }, _size{ o._size }, _data{ o._data }
 		{
 			o.reset();
 		}
 
-		/// @brief ƒRƒs[Š„‚è“–‚Ä‰‰Zq
-		/// ‚±‚Ì”z—ñ‚ğÁ‹‚µA•Ê‚Ì”z—ñ‚©‚ç—v‘f‚ğƒRƒs[‚·‚éB —v‘f‚ÍƒRƒs[‰Â”\‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B
+		/// @brief ã‚³ãƒ”ãƒ¼å‰²ã‚Šå½“ã¦æ¼”ç®—å­
+		/// ã“ã®é…åˆ—ã‚’æ¶ˆå»ã—ã€åˆ¥ã®é…åˆ—ã‹ã‚‰è¦ç´ ã‚’ã‚³ãƒ”ãƒ¼ã™ã‚‹ã€‚ è¦ç´ ã¯ã‚³ãƒ”ãƒ¼å¯èƒ½ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚
 		constexpr vector& operator=(const vector& o)
 		{
 			assert(this != std::addressof(o));
@@ -81,8 +82,8 @@ namespace dxforge::utl
 			return *this;
 		}
 
-		/// @brief MoveŠ„‚è“–‚Ä‰‰Zq
-		/// ‚±‚Ì”z—ñ‚ğÁ‹‚µA•Ê‚Ì”z—ñ‚©‚ç—v‘f‚ğˆÚ“®‚·‚éB —v‘f‚ÍˆÚ“®‰Â”\‚Å‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B
+		/// @brief Moveå‰²ã‚Šå½“ã¦æ¼”ç®—å­
+		/// ã“ã®é…åˆ—ã‚’æ¶ˆå»ã—ã€åˆ¥ã®é…åˆ—ã‹ã‚‰è¦ç´ ã‚’ç§»å‹•ã™ã‚‹ã€‚ è¦ç´ ã¯ç§»å‹•å¯èƒ½ã§ãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚
 		constexpr vector& operator=(vector&& o)
 		{
 			assert(this != std::addressof(o));
@@ -94,26 +95,26 @@ namespace dxforge::utl
 			return *this;
 		}
 
-		/// @brief ƒfƒXƒgƒ‰ƒNƒ^
-		/// ƒeƒ“ƒvƒŒ[ƒgˆø”‚Åw’è‚³‚ê‚½ƒxƒNƒgƒ‹‚Æ‚»‚Ì—v‘f‚ğ”jŠü‚·‚éB
+		/// @brief ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+		/// ãƒ†ãƒ³ãƒ—ãƒ¬ãƒ¼ãƒˆå¼•æ•°ã§æŒ‡å®šã•ã‚ŒãŸãƒ™ã‚¯ãƒˆãƒ«ã¨ãã®è¦ç´ ã‚’ç ´æ£„ã™ã‚‹ã€‚
 		~vector() { destroy(); }
 
-		/// @brief value‚ğƒRƒs[‚µ‚ÄA”z—ñ‚Ì––”ö‚É—v‘f‚ğ‘}“ü‚·‚éB
-		/// @param value ‘}“ü‚·‚é’l
+		/// @brief valueã‚’ã‚³ãƒ”ãƒ¼ã—ã¦ã€é…åˆ—ã®æœ«å°¾ã«è¦ç´ ã‚’æŒ¿å…¥ã™ã‚‹ã€‚
+		/// @param value æŒ¿å…¥ã™ã‚‹å€¤
 		constexpr void push_back(const T& value)
 		{
 			emplace_back(value);
 		}
 
-		/// @brief value‚ğˆÚ“®‚µ‚ÄA”z—ñ‚Ì––”ö‚É—v‘f‚ğ‘}“ü‚·‚éB
-		/// @param value ‘}“ü‚·‚é’l
+		/// @brief valueã‚’ç§»å‹•ã—ã¦ã€é…åˆ—ã®æœ«å°¾ã«è¦ç´ ã‚’æŒ¿å…¥ã™ã‚‹ã€‚
+		/// @param value æŒ¿å…¥ã™ã‚‹å€¤
 		constexpr void push_back(T&& value)
 		{
 			emplace_back(std::move(value));
 		}
 
-		/// @brief ”z—ñ‚Ì––”ö‚É—v‘f‚ğ‘}“ü‚·‚éB
-		/// @param value ‘}“ü‚·‚é’l
+		/// @brief é…åˆ—ã®æœ«å°¾ã«è¦ç´ ã‚’æŒ¿å…¥ã™ã‚‹ã€‚
+		/// @param value æŒ¿å…¥ã™ã‚‹å€¤
 		template<typename... params>
 		constexpr decltype(auto) emplace_back(params&&... p)
 		{
@@ -129,9 +130,9 @@ namespace dxforge::utl
 		}
 
 
-		/// @brief ”z—ñ‚ÌƒTƒCƒY‚ğ•ÏX‚·‚éB
-		/// @param new_size V‚µ‚¢ƒTƒCƒY
-		/// ”z—ñ‚ÌƒTƒCƒY‚ğ•ÏX‚µAV‚µ‚¢—v‘f‚ğƒfƒtƒHƒ‹ƒg’l‚Å‰Šú‰»‚·‚é
+		/// @brief é…åˆ—ã®ã‚µã‚¤ã‚ºã‚’å¤‰æ›´ã™ã‚‹ã€‚
+		/// @param new_size æ–°ã—ã„ã‚µã‚¤ã‚º
+		/// é…åˆ—ã®ã‚µã‚¤ã‚ºã‚’å¤‰æ›´ã—ã€æ–°ã—ã„è¦ç´ ã‚’ãƒ‡ãƒ•ã‚©ãƒ«ãƒˆå€¤ã§åˆæœŸåŒ–ã™ã‚‹
 		constexpr void resize(u64 new_size)
 		{
 			static_assert(std::is_default_constructible<T>::value, "Type must be default-constructible");
@@ -153,19 +154,21 @@ namespace dxforge::utl
 				_size = new_size;
 			}
 
-			// new_size == _size ‚Ìê‡‚Í‰½‚à‚µ‚È‚¢B
+			// new_size == _size ã®å ´åˆã¯ä½•ã‚‚ã—ãªã„ã€‚
 			assert(new_size == _size);
 		}
 
-		/// @brief ”z—ñ‚ÌƒTƒCƒY‚ğ•ÏX‚·‚éB
-		/// @param new_size V‚µ‚¢ƒTƒCƒY
-		/// ”z—ñ‚ÌƒTƒCƒY‚ğ•ÏX‚µAV‚µ‚¢—v‘f‚ğƒRƒs[‚µ‚½’l‚Å‰Šú‰»‚·‚é
+		/// @brief é…åˆ—ã®ã‚µã‚¤ã‚ºã‚’å¤‰æ›´ã™ã‚‹ã€‚
+		/// @param new_size æ–°ã—ã„ã‚µã‚¤ã‚º
+		/// é…åˆ—ã®ã‚µã‚¤ã‚ºã‚’å¤‰æ›´ã—ã€æ–°ã—ã„è¦ç´ ã‚’ã‚³ãƒ”ãƒ¼ã—ãŸå€¤ã§åˆæœŸåŒ–ã™ã‚‹
 		constexpr void resize(u64 new_size, const T& value)
 		{
+			// std::is_copy_constructible<T>::value == true ã§ã‚ã‚‹ã“ã¨ã‚’ç¢ºèªã™ã‚‹ã€‚
 			static_assert(std::is_copy_constructible<T>::value, "Type must be copy-constructible");
 
 			if (new_size > _size)
 			{
+				// æ–°ã—ã„ã‚µã‚¤ã‚ºãŒç¾åœ¨ã®ã‚µã‚¤ã‚ºã‚ˆã‚Šå¤§ãã„å ´åˆã€ãƒ¡ãƒ¢ãƒªã‚’ç¢ºä¿ã—ã€è¦ç´ ã‚’è¿½åŠ ã™ã‚‹ã€‚
 				reserve(new_size);
 				while (_size < new_size)
 				{
@@ -174,6 +177,7 @@ namespace dxforge::utl
 			}
 			else if (new_size < _size)
 			{
+				// æ–°ã—ã„ã‚µã‚¤ã‚ºãŒç¾åœ¨ã®ã‚µã‚¤ã‚ºã‚ˆã‚Šå°ã•ã„å ´åˆã€è¦ç´ ã‚’å‰Šé™¤ã™ã‚‹ã€‚
 				if constexpr (destruct)
 				{
 					destruct_range(new_size, _size);
@@ -181,36 +185,37 @@ namespace dxforge::utl
 				_size = new_size;
 			}
 
-			// new_size == _size ‚Ìê‡‚Í‰½‚à‚µ‚È‚¢B
+			// new_size == _size ã®å ´åˆã¯ä½•ã‚‚ã—ãªã„ã€‚
 			assert(new_size == _size);
 		}
 
-		/// @brief w’è‚³‚ê‚½”‚Ì—v‘f‚ğŠi”[‚·‚éƒƒ‚ƒŠ‚ğŠm•Û‚·‚éB
+		/// @brief æŒ‡å®šã•ã‚ŒãŸæ•°ã®è¦ç´ ã‚’æ ¼ç´ã™ã‚‹ãƒ¡ãƒ¢ãƒªã‚’ç¢ºä¿ã™ã‚‹ã€‚
 		constexpr void reserve(u64 new_capacity)
 		{
 			if (new_capacity > _capacity)
 			{
-				// NOTE: realoc()‚ÍAV‚µ‚¢ƒƒ‚ƒŠ—Ìˆæ‚ªŠ„‚è“–‚Ä‚ç‚ê‚é‚ÆAƒoƒbƒtƒ@“à‚Ìƒf[ƒ^‚ğ©“®“I‚ÉƒRƒs[‚·‚éB
+				// NOTE: realloc()ã¯ã€æ–°ã—ã„ãƒ¡ãƒ¢ãƒªé ˜åŸŸãŒå‰²ã‚Šå½“ã¦ã‚‰ã‚Œã‚‹ã¨ã€ãƒãƒƒãƒ•ã‚¡å†…ã®ãƒ‡ãƒ¼ã‚¿ã‚’è‡ªå‹•çš„ã«ã‚³ãƒ”ãƒ¼ã™ã‚‹ã€‚
 				void* new_buffer{ realloc(_data, new_capacity * sizeof(T)) };
 				assert(new_buffer);
 				if (new_buffer)
 				{
+					// æ–°ã—ã„ãƒ¡ãƒ¢ãƒªé ˜åŸŸãŒå‰²ã‚Šå½“ã¦ã‚‰ã‚ŒãŸå ´åˆã€ãƒã‚¤ãƒ³ã‚¿ã‚’æ›´æ–°ã™ã‚‹ã€‚
 					_data = static_cast<T*>(new_buffer);
 					_capacity = new_capacity;
 				}
 			}
 		}
 
-		/// @brief w’è‚³‚ê‚½ƒCƒ“ƒfƒbƒNƒX‚Ì—v‘f‚ğíœ‚µ‚Ü‚·B
-		/// @param index íœ‚·‚é—v‘f‚ÌƒCƒ“ƒfƒbƒNƒX
+		/// @brief æŒ‡å®šã•ã‚ŒãŸã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã®è¦ç´ ã‚’å‰Šé™¤ã—ã¾ã™ã€‚
+		/// @param index å‰Šé™¤ã™ã‚‹è¦ç´ ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
 		constexpr T* const erase(u64 index)
 		{
 			assert(_data && index < _size);
 			return erase(std::addressof(_data[index]));
 		}
 
-		/// @brief w’è‚µ‚½ˆÊ’u‚Ì—v‘f‚ğíœ‚µ‚Ü‚·B
-		/// @param item íœ‚·‚é—v‘f‚ÌˆÊ’u
+		/// @brief æŒ‡å®šã—ãŸä½ç½®ã®è¦ç´ ã‚’å‰Šé™¤ã—ã¾ã™ã€‚
+		/// @param item å‰Šé™¤ã™ã‚‹è¦ç´ ã®ä½ç½®
 		constexpr T* const erase(T* const item)
 		{
 			assert(_data && item >= std::addressof(_data[0]) && item < std::addressof(_data[_size]));
@@ -223,18 +228,18 @@ namespace dxforge::utl
 			return item;
 		}
 
-		/// @brief w’è‚³‚ê‚½ƒCƒ“ƒfƒbƒNƒX‚Ì—v‘f‚ğíœ‚µ‚Ü‚·B
-		/// @param index íœ‚·‚é—v‘f‚ÌƒCƒ“ƒfƒbƒNƒX
-		/// erase()‚Æ“¯‚¶‚¾‚ªAÅŒã‚Ì—v‘f‚ğƒRƒs[‚·‚é‚¾‚¯‚È‚Ì‚Å‚‘¬B
+		/// @brief æŒ‡å®šã•ã‚ŒãŸã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã®è¦ç´ ã‚’å‰Šé™¤ã—ã¾ã™ã€‚
+		/// @param index å‰Šé™¤ã™ã‚‹è¦ç´ ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		/// erase()ã¨åŒã˜ã ãŒã€æœ€å¾Œã®è¦ç´ ã‚’ã‚³ãƒ”ãƒ¼ã™ã‚‹ã ã‘ãªã®ã§é«˜é€Ÿã€‚
 		constexpr T* const erase_unordered(u64 index)
 		{
 			assert(_data && index < _size);
 			return erase_unordered(std::addressof(_data[index]));
 		}
 
-		/// @brief ”z—ñ‚Ìw’è‚µ‚½ˆÊ’u‚Ì—v‘f‚ğíœ‚µ‚Ü‚·B
-		/// @param item íœ‚·‚é—v‘f‚ÌˆÊ’u
-		/// erase()‚Æ“¯‚¶‚¾‚ªAÅŒã‚Ì—v‘f‚ğƒRƒs[‚·‚é‚¾‚¯‚È‚Ì‚Å‚‘¬B
+		/// @brief é…åˆ—ã®æŒ‡å®šã—ãŸä½ç½®ã®è¦ç´ ã‚’å‰Šé™¤ã—ã¾ã™ã€‚
+		/// @param item å‰Šé™¤ã™ã‚‹è¦ç´ ã®ä½ç½®
+		/// erase()ã¨åŒã˜ã ãŒã€æœ€å¾Œã®è¦ç´ ã‚’ã‚³ãƒ”ãƒ¼ã™ã‚‹ã ã‘ãªã®ã§é«˜é€Ÿã€‚
 		constexpr T* const erase_unordered(T* const item)
 		{
 			assert(_data && item >= std::addressof(_data[0]) && item < std::addressof(_data[_size]));
@@ -247,8 +252,8 @@ namespace dxforge::utl
 			return item;
 		}
 
-		/// @brief ”z—ñ‚ğƒNƒŠƒA‚·‚éB
-		/// ”z—ñ‚ğƒNƒŠƒA‚µAƒeƒ“ƒvƒŒ[ƒgˆø”‚Åw’è‚³‚ê‚½ƒf[ƒ^‚ğ”jŠü‚µ‚Ü‚·B
+		/// @brief é…åˆ—ã‚’ã‚¯ãƒªã‚¢ã™ã‚‹ã€‚
+		/// é…åˆ—ã‚’ã‚¯ãƒªã‚¢ã—ã€ãƒ†ãƒ³ãƒ—ãƒ¬ãƒ¼ãƒˆå¼•æ•°ã§æŒ‡å®šã•ã‚ŒãŸãƒ‡ãƒ¼ã‚¿ã‚’ç ´æ£„ã—ã¾ã™ã€‚
 		constexpr void clear()
 		{
 			if constexpr (destruct)
@@ -258,7 +263,7 @@ namespace dxforge::utl
 			_size = 0;
 		}
 
-		/// @brief 2‚Â‚Ì”z—ñ‚ğ“ü‚ê‘Ö‚¦‚éB
+		/// @brief 2ã¤ã®é…åˆ—ã‚’å…¥ã‚Œæ›¿ãˆã‚‹ã€‚
 		constexpr void swap(vector& o)
 		{
 			if (this != std::addressof(o))
@@ -269,107 +274,111 @@ namespace dxforge::utl
 			}
 		}
 
-		/// @brief ƒf[ƒ^‚ÌŠJnˆÊ’u‚Ö‚Ìƒ|ƒCƒ“ƒ^B
-		/// @return ƒf[ƒ^‚ÌŠJnˆÊ’u‚Ö‚Ìƒ|ƒCƒ“ƒ^B ƒf[ƒ^‚ª‚È‚¢ê‡‚Ínullptr‚©‚à‚µ‚ê‚È‚¢B
+		/// @brief ãƒ‡ãƒ¼ã‚¿ã®é–‹å§‹ä½ç½®ã¸ã®ãƒã‚¤ãƒ³ã‚¿ã€‚
+		/// @return ãƒ‡ãƒ¼ã‚¿ã®é–‹å§‹ä½ç½®ã¸ã®ãƒã‚¤ãƒ³ã‚¿ã€‚ ãƒ‡ãƒ¼ã‚¿ãŒãªã„å ´åˆã¯nullptrã‹ã‚‚ã—ã‚Œãªã„ã€‚
 		[[nodiscard]] constexpr T* data() { return _data; }
 
-		/// @brief ƒf[ƒ^‚ÌŠJnˆÊ’u‚Ö‚Ìƒ|ƒCƒ“ƒ^B
-		/// @return ƒf[ƒ^‚ÌŠJnˆÊ’u‚Ö‚Ìƒ|ƒCƒ“ƒ^B ƒf[ƒ^‚ª‚È‚¢ê‡‚Ínullptr‚©‚à‚µ‚ê‚È‚¢B
+		/// @brief ãƒ‡ãƒ¼ã‚¿ã®é–‹å§‹ä½ç½®ã¸ã®ãƒã‚¤ãƒ³ã‚¿ã€‚
+		/// @return ãƒ‡ãƒ¼ã‚¿ã®é–‹å§‹ä½ç½®ã¸ã®ãƒã‚¤ãƒ³ã‚¿ã€‚ ãƒ‡ãƒ¼ã‚¿ãŒãªã„å ´åˆã¯nullptrã‹ã‚‚ã—ã‚Œãªã„ã€‚
 		[[nodiscard]] constexpr T* const data() const { return _data; }
 
-		/// @brief ”z—ñ‚ª‹ó‚©‚Ç‚¤‚©‚ğ•Ô‚·B
-		/// @return ”z—ñ‚ª‹ó‚Ìê‡‚É^‚ğ•Ô‚·B
+		/// @brief é…åˆ—ãŒç©ºã‹ã©ã†ã‹ã‚’è¿”ã™ã€‚
+		/// @return é…åˆ—ãŒç©ºã®å ´åˆã«çœŸã‚’è¿”ã™ã€‚
 		[[nodiscard]] constexpr bool empty() const { return _size == 0; }
 
-		/// @brief ”z—ñ‚Ì—v‘f”‚ğ•Ô‚·B
-		/// @return ”z—ñ“à‚Ì—v‘f”
+		/// @brief é…åˆ—ã®è¦ç´ æ•°ã‚’è¿”ã™ã€‚
+		/// @return é…åˆ—å†…ã®è¦ç´ æ•°
 		[[nodiscard]] constexpr u64 size() const { return _size; }
 
-		/// @brief ”z—ñ‚Ì—e—Ê‚ğ•Ô‚·B
-		/// @return ”z—ñ‚Ì—e—Ê
+		/// @brief é…åˆ—ã®å®¹é‡ã‚’è¿”ã™ã€‚
+		/// @return é…åˆ—ã®å®¹é‡
 		[[nodiscard]] constexpr u64 capacity() const { return _capacity; }
 
-		/// @brief ƒCƒ“ƒfƒbƒNƒX‰‰ZqB
-		/// @param index ”z—ñ‚ÌƒCƒ“ƒfƒbƒNƒX
-		/// w’è‚µ‚½ƒCƒ“ƒfƒbƒNƒX‚Ì—v‘f‚ğ•Ô‚·B
+		/// @brief ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ¼”ç®—å­ã€‚
+		/// @param index é…åˆ—ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		/// æŒ‡å®šã—ãŸã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã®è¦ç´ ã‚’è¿”ã™ã€‚
 		[[nodiscard]] constexpr T& operator[](u64 index)
 		{
 			assert(_data && index < _size);
 			return _data[index];
 		}
 
-		/// @brief ƒCƒ“ƒfƒbƒNƒX‰‰ZqB
-		/// @param index ”z—ñ‚ÌƒCƒ“ƒfƒbƒNƒX
-		/// w’è‚³‚ê‚½ƒCƒ“ƒfƒbƒNƒX‚Ì—v‘f‚Ö‚Ì’è”QÆ‚ğ•Ô‚µ‚Ü‚·B
+		/// @brief ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹æ¼”ç®—å­ã€‚
+		/// @param index é…åˆ—ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		/// æŒ‡å®šã•ã‚ŒãŸã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã®è¦ç´ ã¸ã®å®šæ•°å‚ç…§ã‚’è¿”ã—ã¾ã™ã€‚
 		[[nodiscard]] constexpr const T& operator[](u64 index) const
 		{
 			assert(_data && index < _size);
 			return _data[index];
 		}
 
-		/// @brief ”z—ñ‚Ìæ“ª—v‘f‚Ö‚ÌQÆ‚ğ•Ô‚·B
-		/// @return ”z—ñ‚Ìæ“ª—v‘f‚Ö‚ÌQÆ
+		/// @brief é…åˆ—ã®å…ˆé ­è¦ç´ ã¸ã®å‚ç…§ã‚’è¿”ã™ã€‚
+		/// @return é…åˆ—ã®å…ˆé ­è¦ç´ ã¸ã®å‚ç…§
 		[[nodiscard]] constexpr T& front()
 		{
 			assert(_data && _size);
 			return _data[0];
 		}
 
-		/// @brief ”z—ñ‚Ìæ“ª—v‘f‚Ö‚Ì’è”QÆ‚ğ•Ô‚·B
-		/// @return ”z—ñ‚Ìæ“ª—v‘f‚Ö‚Ì’è”QÆ
+		/// @brief é…åˆ—ã®å…ˆé ­è¦ç´ ã¸ã®å®šæ•°å‚ç…§ã‚’è¿”ã™ã€‚
+		/// @return é…åˆ—ã®å…ˆé ­è¦ç´ ã¸ã®å®šæ•°å‚ç…§
 		[[nodiscard]] constexpr const T& front() const
 		{
 			assert(_data && _size);
 			return _data[0];
 		}
 
-		/// @brief ”z—ñ‚Ì––”ö—v‘f‚Ö‚ÌQÆ‚ğ•Ô‚·B
-		/// @return ”z—ñ‚Ì––”ö—v‘f‚Ö‚ÌQÆ
+		/// @brief é…åˆ—ã®æœ«å°¾è¦ç´ ã¸ã®å‚ç…§ã‚’è¿”ã™ã€‚
+		/// @return é…åˆ—ã®æœ«å°¾è¦ç´ ã¸ã®å‚ç…§
 		[[nodiscard]] constexpr T& back()
 		{
 			assert(_data && _size);
 			return _data[_size - 1];
 		}
 
-		/// @brief ”z—ñ‚Ì––”ö—v‘f‚Ö‚Ì’è”QÆ‚ğ•Ô‚·B
-		/// @return ”z—ñ‚Ì––”ö—v‘f‚Ö‚Ì’è”QÆ
+		/// @brief é…åˆ—ã®æœ«å°¾è¦ç´ ã¸ã®å®šæ•°å‚ç…§ã‚’è¿”ã™ã€‚
+		/// @return é…åˆ—ã®æœ«å°¾è¦ç´ ã¸ã®å®šæ•°å‚ç…§
 		[[nodiscard]] constexpr const T& back() const
 		{
 			assert(_data && _size);
 			return _data[_size - 1];
 		}
 
-		/// @brief Å‰‚Ì€–Ú‚Ö‚Ìƒ|ƒCƒ“ƒ^‚ğ•Ô‚·B
-		///ƒxƒNƒgƒ‹‚ª‹ó‚Ìê‡‚Í null ‚ğ•Ô‚µ‚Ü‚·B
+		/// @brief æœ€åˆã®é …ç›®ã¸ã®ãƒã‚¤ãƒ³ã‚¿ã‚’è¿”ã™ã€‚
+		///ãƒ™ã‚¯ãƒˆãƒ«ãŒç©ºã®å ´åˆã¯ null ã‚’è¿”ã—ã¾ã™ã€‚
 		[[nodiscard]] constexpr T* begin()
 		{
 			return std::addressof(_data[0]);
 		}
 
-		/// @brief Å‰‚Ì€–Ú‚Ö‚Ì’è”ƒ|ƒCƒ“ƒ^‚ğ•Ô‚·B
-		///ƒxƒNƒgƒ‹‚ª‹ó‚Ìê‡‚Í null ‚ğ•Ô‚µ‚Ü‚·B
+		/// @brief æœ€åˆã®é …ç›®ã¸ã®å®šæ•°ãƒã‚¤ãƒ³ã‚¿ã‚’è¿”ã™ã€‚
+		///ãƒ™ã‚¯ãƒˆãƒ«ãŒç©ºã®å ´åˆã¯ null ã‚’è¿”ã—ã¾ã™ã€‚
 		[[nodiscard]] constexpr const T* begin() const
 		{
 			return std::addressof(_data[0]);
 		}
 
-		/// @brief ÅŒã‚Ì€–Ú‚ÌŸ‚Ì€–Ú‚Ö‚Ìƒ|ƒCƒ“ƒ^‚ğ•Ô‚·B
-		///ƒxƒNƒgƒ‹‚ª‹ó‚Ìê‡‚Í null ‚ğ•Ô‚µ‚Ü‚·B
+		/// @brief æœ€å¾Œã®é …ç›®ã®æ¬¡ã®é …ç›®ã¸ã®ãƒã‚¤ãƒ³ã‚¿ã‚’è¿”ã™ã€‚
+		///ãƒ™ã‚¯ãƒˆãƒ«ãŒç©ºã®å ´åˆã¯ null ã‚’è¿”ã—ã¾ã™ã€‚
 		[[nodiscard]] constexpr T* end()
 		{
 			assert(!(_data == nullptr && _size > 0));
 			return std::addressof(_data[_size]);
 		}
 
-		/// @brief ÅŒã‚Ì€–Ú‚ÌŸ‚Ì€–Ú‚Ö‚Ì’è”ƒ|ƒCƒ“ƒ^‚ğ•Ô‚·B
-		///ƒxƒNƒgƒ‹‚ª‹ó‚Ìê‡‚Í null ‚ğ•Ô‚µ‚Ü‚·B
+		/// @brief æœ€å¾Œã®é …ç›®ã®æ¬¡ã®é …ç›®ã¸ã®å®šæ•°ãƒã‚¤ãƒ³ã‚¿ã‚’è¿”ã™ã€‚
+		///ãƒ™ã‚¯ãƒˆãƒ«ãŒç©ºã®å ´åˆã¯ null ã‚’è¿”ã—ã¾ã™ã€‚
 		[[nodiscard]] constexpr const T* end() const
 		{
 			assert(!(_data == nullptr && _size > 0));
 			return std::addressof(_data[_size]);
 		}
 
-	private:	// ====== ƒƒ“ƒoŠÖ” ======
+	private:	// ====== ãƒ¡ãƒ³ãƒé–¢æ•° ======
+
+		/// @brief é…åˆ—ã®ãƒ‡ãƒ¼ã‚¿ã‚’ç§»å‹•ã™ã‚‹ã€‚
+		/// @param o ç§»å‹•å…ƒã®é…åˆ—
+		/// é…åˆ—ã®ãƒ‡ãƒ¼ã‚¿ã‚’ç§»å‹•ã™ã‚‹ã€‚ ç§»å‹•å¾Œã®å…ƒã®é…åˆ—ã¯ç©ºã«ãªã‚‹ã€‚
 		constexpr void move(vector& o)
 		{
 			_capacity = o._capacity;
@@ -378,6 +387,7 @@ namespace dxforge::utl
 			o.reset();
 		}
 
+		/// @brief é…åˆ—ã®ãƒ‡ãƒ¼ã‚¿ã‚’ãƒªã‚»ãƒƒãƒˆã™ã‚‹ã€‚
 		constexpr void reset()
 		{
 			_capacity = 0;
@@ -385,6 +395,10 @@ namespace dxforge::utl
 			_data = nullptr;
 		}
 
+		/// @brief é…åˆ—ã®ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ã‚’å‘¼ã³å‡ºã™ã€‚
+		/// @param first ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ã‚’å‘¼ã³å‡ºã™æœ€åˆã®è¦ç´ ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		/// @param last ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ã‚’å‘¼ã³å‡ºã™æœ€å¾Œã®è¦ç´ ã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		/// é…åˆ—ã®ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ã‚’å‘¼ã³å‡ºã™ã€‚ ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ã¯ã€è¦ç´ ãŒç ´æ£„ã•ã‚Œã‚‹ã¨ãã«å‘¼ã³å‡ºã•ã‚Œã¾ã™ã€‚
 		constexpr void destruct_range(u64 first, u64 last)
 		{
 			assert(destruct);
@@ -398,6 +412,8 @@ namespace dxforge::utl
 			}
 		}
 
+		/// @brief é…åˆ—ã®ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ã‚’å‘¼ã³å‡ºã™ã€‚
+		/// é…åˆ—ã®ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ã‚’å‘¼ã³å‡ºã™ã€‚ ãƒ‡ã‚¹ãƒˆãƒ©ã‚¯ã‚¿ã¯ã€è¦ç´ ãŒç ´æ£„ã•ã‚Œã‚‹ã¨ãã«å‘¼ã³å‡ºã•ã‚Œã¾ã™ã€‚
 		constexpr void destroy()
 		{
 			assert([&] {return _capacity ? _data != nullptr : _data == nullptr; }());
@@ -407,9 +423,9 @@ namespace dxforge::utl
 			_data = nullptr;
 		}
 
-	private:	// ====== ƒƒ“ƒo•Ï” ======
-		u64 _capacity{ 0 };		// ”z—ñ‚Ì—e—Ê
-		u64 _size{ 0 };			// ”z—ñ‚ÌƒTƒCƒY
-		T* _data{ nullptr };	// ”z—ñ‚Ìƒf[ƒ^
+	private:	// ====== ãƒ¡ãƒ³ãƒå¤‰æ•° ======
+		u64 _capacity{ 0 };		///< é…åˆ—ã®å®¹é‡
+		u64 _size{ 0 };			///< é…åˆ—ã®ã‚µã‚¤ã‚º
+		T* _data{ nullptr };	///< é…åˆ—ã®ãƒ‡ãƒ¼ã‚¿
 	};
 }

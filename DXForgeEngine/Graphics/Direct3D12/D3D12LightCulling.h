@@ -1,14 +1,14 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12LightCulling.h]
-// ì¬“ú : 2025/01/19
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
+// ä½œæˆæ—¥ : 2025/01/19
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦ :
 //
-// XV—š—ğ
-// 2025/01/19 V‹Kì¬
+// æ›´æ–°å±¥æ­´
+// 2025/01/19 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12CommonHeaders.h"
 
 namespace dxforge::graphics::d3d12
@@ -18,7 +18,7 @@ namespace dxforge::graphics::d3d12
 
 namespace dxforge::graphics::d3d12::delight
 {
-	constexpr u32 light_culling_tile_size{ 16 };	// ƒ‰ƒCƒgƒJƒŠƒ“ƒO‚Ìƒ^ƒCƒ‹ƒTƒCƒY
+	constexpr u32 light_culling_tile_size{ 16 };	// ãƒ©ã‚¤ãƒˆã‚«ãƒªãƒ³ã‚°ã®ã‚¿ã‚¤ãƒ«ã‚µã‚¤ã‚º
 
 	bool initialize();
 	void shutdown();
@@ -28,7 +28,7 @@ namespace dxforge::graphics::d3d12::delight
 
 	void cull_lights(id3d12_graphics_command_list* const cmd_list, const d3d12_frame_info& d3d12_info, d3dx::d3d12_resource_barrier& barriers);
 
-	// TODO: ƒ‰ƒCƒg‚ÌƒJƒŠƒ“ƒO‚ğ‹Šo‰»‚·‚é‚½‚ß‚Ìˆê“I‚È‚à‚ÌB Œã‚Åæ‚èœ‚­B
+	// TODO: ãƒ©ã‚¤ãƒˆã®ã‚«ãƒªãƒ³ã‚°ã‚’è¦–è¦šåŒ–ã™ã‚‹ãŸã‚ã®ä¸€æ™‚çš„ãªã‚‚ã®ã€‚ å¾Œã§å–ã‚Šé™¤ãã€‚
 	D3D12_GPU_VIRTUAL_ADDRESS frustums(id::id_type id, u32 frame_index);
 	D3D12_GPU_VIRTUAL_ADDRESS light_grid_opaque(id::id_type light_culling_id, u32 frame_index);
 	D3D12_GPU_VIRTUAL_ADDRESS light_index_list_opaque(id::id_type light_culling_id, u32 frame_index);

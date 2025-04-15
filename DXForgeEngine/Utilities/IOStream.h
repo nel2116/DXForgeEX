@@ -1,146 +1,162 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// [IOStream.h]
-// ì¬“ú : 2025/01/12
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v :
-//
-// XV—š—ğ
-// 2025/01/12 V‹Kì¬
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+/// @file IOStream.h
+/// @brief ãƒã‚¤ãƒŠãƒªãƒ‡ãƒ¼ã‚¿ã®èª­ã¿æ›¸ãã‚’è¡Œã†ãƒ¦ãƒ¼ãƒ†ã‚£ãƒªãƒ†ã‚£ã‚¯ãƒ©ã‚¹
+/// @author ç”°ä¸­ãƒŸãƒãƒ«
+/// @date 2025/01/12
+/// @details
+/// - blob_stream_reader: ãƒã‚¤ãƒŠãƒªãƒ‡ãƒ¼ã‚¿ã‚’èª­ã¿è¾¼ã‚€ã‚¯ãƒ©ã‚¹
+/// - blob_stream_writer: ãƒã‚¤ãƒŠãƒªãƒ‡ãƒ¼ã‚¿ã‚’æ›¸ãè¾¼ã‚€ã‚¯ãƒ©ã‚¹
+/// @version 1.0
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "CommonHeaders.h"
 
 namespace dxforge::utl
 {
-	// NOTE: (d—vj‚±‚Ìƒ†[ƒeƒBƒŠƒeƒBEƒNƒ‰ƒX‚ÍAƒ[ƒJƒ‹‚Èg—pi‚Â‚Ü‚è1‚Â‚ÌŠÖ”“à‚Å‚Ìg—pj‚Ì‚İ‚ğˆÓ}‚µ‚Ä‚¢‚Ü‚·B
-	//		ƒCƒ“ƒXƒ^ƒ“ƒX‚ğƒƒ“ƒo•Ï”‚Æ‚µ‚Ä•Û‚µ‚È‚¢‚Å‚­‚¾‚³‚¢B
-	class blob_stream_reader
-	{
-	public:	// ƒpƒuƒŠƒbƒNŠÖ”
-		DISABLE_COPY_AND_MOVE(blob_stream_reader);
-		explicit blob_stream_reader(const u8* buffer)
-			:_buffer{ buffer }, _position{ buffer }
-		{
-			assert(buffer);
-		}
+    /// @class blob_stream_reader
+    /// @brief ãƒã‚¤ãƒŠãƒªãƒ‡ãƒ¼ã‚¿ã‚’èª­ã¿è¾¼ã‚€ãŸã‚ã®ãƒ¦ãƒ¼ãƒ†ã‚£ãƒªãƒ†ã‚£ã‚¯ãƒ©ã‚¹
+    /// @note ã“ã®ã‚¯ãƒ©ã‚¹ã¯ãƒ­ãƒ¼ã‚«ãƒ«ãªä½¿ç”¨ï¼ˆ1ã¤ã®é–¢æ•°å†…ã§ã®ä½¿ç”¨ï¼‰ã®ã¿ã‚’æ„å›³ã—ã¦ã„ã¾ã™ã€‚
+    ///       ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ã‚’ãƒ¡ãƒ³ãƒå¤‰æ•°ã¨ã—ã¦ä¿æŒã—ãªã„ã§ãã ã•ã„ã€‚
+    class blob_stream_reader
+    {
+    public:
+        /// @brief ã‚³ãƒ”ãƒ¼ãŠã‚ˆã³ãƒ ãƒ¼ãƒ–ã‚’ç¦æ­¢
+        DISABLE_COPY_AND_MOVE(blob_stream_reader);
 
-		// ‚±‚Ìƒeƒ“ƒvƒŒ[ƒgŠÖ”‚ÍAƒvƒŠƒ~ƒeƒBƒuŒ^iintAfloatAbool‚È‚Çj‚ğ“Ç‚İ‚Ş‚½‚ß‚Ì‚à‚Ì‚Å‚·B
-		/// @brief ƒvƒŠƒ~ƒeƒBƒuŒ^‚ğ“Ç‚İ‚Ş
-		/// @tparam T ƒvƒŠƒ~ƒeƒBƒuŒ^
-		/// @return T “Ç‚İ‚ñ‚¾’l
-		template<typename T>
-		[[nodiscard]] constexpr T read()
-		{
-			// C++ ‚ÉprimitveŒ^‚Æ‚¢‚¤‚à‚Ì‚ª‚ ‚é‚©‚Ç‚¤‚©‚Í‚í‚©‚è‚Ü‚¹‚ñB‚±‚ê‚Í®”Œ^AFLOATADOUBLEABOOL ‚É‘Î‚·‚é„‚ÌŒÄ‚Ñ–¼‚Å‚·B
-			static_assert(std::is_arithmetic_v<T>, "Template argument should be a primitve type.");
-			T value{ *((T*)_position) };
-			_position += sizeof(T);
-			return value;
-		}
+        /// @brief ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+        /// @param buffer èª­ã¿è¾¼ã¿å¯¾è±¡ã®ãƒãƒƒãƒ•ã‚¡
+        explicit blob_stream_reader(const u8* buffer)
+            :_buffer{ buffer }, _position{ buffer }
+        {
+            assert(buffer);
+        }
 
-		// 'length'ƒoƒCƒg‚ğ'buffer'‚É“Ç‚İ‚ŞB ŒÄ‚Ño‚µ‘¤‚ÍAbuffer ‚É\•ª‚Èƒƒ‚ƒŠ‚ğŠm•Û‚·‚éÓ”C‚ª‚ ‚éB
-		/// @brief ƒoƒCƒg‚ğ“Ç‚İ‚Ş
-		/// @param buffer ƒoƒbƒtƒ@
-		/// @param length “Ç‚İ‚ŞƒoƒCƒg”
-		/// @return void
-		void read(u8* buffer, size_t length)
-		{
-			memcpy(buffer, _position, length);
-			_position += length;
-		}
+        /// @brief ãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–å‹ã‚’èª­ã¿è¾¼ã‚€
+        /// @tparam T ãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–å‹
+        /// @return èª­ã¿è¾¼ã‚“ã å€¤
+        template<typename T>
+        [[nodiscard]] constexpr T read()
+        {
+			// C++ã§ãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–å‹ã¨å‘¼ã¶ã®ã‹ã¯ã‚ã‹ã‚Šã¾ã›ã‚“ãŒã€ã“ã“ã§ã¯æ•´æ•°å‹ã‚„æµ®å‹•å°æ•°ç‚¹å‹ã‚’æŒ‡ã™ã‚‚ã®ã¨ã—ã¾ã™(int, float, doubleãªã©)ã€‚
+            static_assert(std::is_arithmetic_v<T>, "Template argument should be a primitive type.");
+            T value{ *((T*)_position) };
+            _position += sizeof(T);
+            return value;
+        }
 
-		// 'offset'ƒoƒCƒg‚ğƒXƒLƒbƒv‚·‚éB
-		/// @brief ƒoƒCƒg‚ğƒXƒLƒbƒv‚·‚é
-		/// @param offset ƒXƒLƒbƒv‚·‚éƒoƒCƒg”
-		constexpr void skip(size_t offset)
-		{
-			_position += offset;
-		}
+        /// @brief ãƒã‚¤ãƒˆã‚’èª­ã¿è¾¼ã‚€
+        /// @param buffer èª­ã¿è¾¼ã‚“ã ãƒ‡ãƒ¼ã‚¿ã‚’æ ¼ç´ã™ã‚‹ãƒãƒƒãƒ•ã‚¡
+        /// @param length èª­ã¿è¾¼ã‚€ãƒã‚¤ãƒˆæ•°
+        void read(u8* buffer, size_t length)
+        {
+            memcpy(buffer, _position, length);
+            _position += length;
+        }
 
-		// ====== ƒAƒNƒZƒT ======
-		// ƒoƒbƒtƒ@‚Ìæ“ª‚ğæ“¾
-		[[nodiscard]] constexpr const u8* const buffer_start() const { return _buffer; }
-		// ƒoƒbƒtƒ@‚ÌI’[‚ğæ“¾
-		[[nodiscard]] constexpr const u8* const position() const { return _position; }
-		// Œ»İ‚ÌˆÊ’u‚ğæ“¾
-		[[nodiscard]] constexpr size_t offset() const { return _position - _buffer; }
+        /// @brief ãƒã‚¤ãƒˆã‚’ã‚¹ã‚­ãƒƒãƒ—ã™ã‚‹
+        /// @param offset ã‚¹ã‚­ãƒƒãƒ—ã™ã‚‹ãƒã‚¤ãƒˆæ•°
+        constexpr void skip(size_t offset)
+        {
+            _position += offset;
+        }
 
-	private:
-		const u8* const _buffer;	///< ƒoƒbƒtƒ@
-		const u8* _position;		///< ƒoƒbƒtƒ@‚ÌˆÊ’u
-	};
+        /// @brief ãƒãƒƒãƒ•ã‚¡ã®å…ˆé ­ã‚’å–å¾—
+        /// @return ãƒãƒƒãƒ•ã‚¡ã®å…ˆé ­ã‚¢ãƒ‰ãƒ¬ã‚¹
+        [[nodiscard]] constexpr const u8* const buffer_start() const { return _buffer; }
 
-	// NOTE: (d—vj‚±‚Ìƒ†[ƒeƒBƒŠƒeƒBEƒNƒ‰ƒX‚ÍAƒ[ƒJƒ‹‚Èg—pi‚Â‚Ü‚è1‚Â‚ÌŠÖ”“à‚Å‚Ìg—pj‚Ì‚İ‚ğˆÓ}‚µ‚Ä‚¢‚Ü‚·B
-	//		ƒCƒ“ƒXƒ^ƒ“ƒX‚ğƒƒ“ƒo•Ï”‚Æ‚µ‚Ä•Û‚µ‚È‚¢‚Å‚­‚¾‚³‚¢B
-	class blob_stream_writer
-	{
-	public:	// ƒpƒuƒŠƒbƒNŠÖ”
-		DISABLE_COPY_AND_MOVE(blob_stream_writer);
-		explicit blob_stream_writer(u8* buffer, size_t buffer_size)
-			:_buffer{ buffer }, _position{ buffer }, _buffer_size{ buffer_size }
-		{
-			assert(buffer && buffer_size);
-		}
+        /// @brief ç¾åœ¨ã®ä½ç½®ã‚’å–å¾—
+        /// @return ç¾åœ¨ã®ä½ç½®ã®ã‚¢ãƒ‰ãƒ¬ã‚¹
+        [[nodiscard]] constexpr const u8* const position() const { return _position; }
 
-		// ‚±‚Ìƒeƒ“ƒvƒŒ[ƒgŠÖ”‚ÍAƒvƒŠƒ~ƒeƒBƒuŒ^iintAfloatAbool‚È‚Çj‚ğ‹Lq‚·‚é‚½‚ß‚Ì‚à‚Ì‚Å‚ ‚éB
-		/// @brief ƒvƒŠƒ~ƒeƒBƒuŒ^‚ğ‘‚«‚Ş
-		/// @tparam T ƒvƒŠƒ~ƒeƒBƒuŒ^
-		/// @param value ‘‚«‚Ş’l
-		template<typename T>
-		void write(T value)
-		{
-			// C++ ‚ÉprimitveŒ^‚Æ‚¢‚¤‚à‚Ì‚ª‚ ‚é‚©‚Ç‚¤‚©‚Í‚í‚©‚è‚Ü‚¹‚ñB‚±‚ê‚Í®”Œ^AFLOATADOUBLEABOOL ‚É‘Î‚·‚é„‚ÌŒÄ‚Ñ–¼‚Å‚·B
-			static_assert(std::is_arithmetic_v<T>, "Template argument should be a primitve type.");
-			assert(&_position[sizeof(T)] <= &_buffer[_buffer_size]);
-			*((T*)_position) = value;
-			_position += sizeof(T);
-		}
+        /// @brief ç¾åœ¨ã®ã‚ªãƒ•ã‚»ãƒƒãƒˆã‚’å–å¾—
+        /// @return ãƒãƒƒãƒ•ã‚¡å…ˆé ­ã‹ã‚‰ã®ã‚ªãƒ•ã‚»ãƒƒãƒˆ
+        [[nodiscard]] constexpr size_t offset() const { return _position - _buffer; }
 
-		// 'length' •¶š‚ğ 'buffer' ‚É‘‚«‚ŞB
-		/// @brief •¶š‚ğ‘‚«‚Ş
-		/// @param buffer ƒoƒbƒtƒ@
-		/// @param length ‘‚«‚Ş•¶š”
-		void write(const char* buffer, size_t length)
-		{
-			assert(&_position[length] <= &_buffer[_buffer_size]);
-			memcpy(_position, buffer, length);
-			_position += length;
-		}
+    private:
+        const u8* const _buffer;	///< ãƒãƒƒãƒ•ã‚¡
+        const u8* _position;		///< ãƒãƒƒãƒ•ã‚¡ã®ç¾åœ¨ä½ç½®
+    };
 
-		// 'length' ƒoƒCƒg‚ğ 'buffer' ‚É‘‚«‚ŞB
-		/// @brief ƒoƒCƒg‚ğ‘‚«‚Ş
-		/// @param buffer ƒoƒbƒtƒ@
-		/// @param length ‘‚«‚ŞƒoƒCƒg”
-		void write(const u8* buffer, size_t length)
-		{
-			assert(&_position[length] <= &_buffer[_buffer_size]);
-			memcpy(_position, buffer, length);
-			_position += length;
-		}
+    /// @class blob_stream_writer
+    /// @brief ãƒã‚¤ãƒŠãƒªãƒ‡ãƒ¼ã‚¿ã‚’æ›¸ãè¾¼ã‚€ãŸã‚ã®ãƒ¦ãƒ¼ãƒ†ã‚£ãƒªãƒ†ã‚£ã‚¯ãƒ©ã‚¹
+    /// @note ã“ã®ã‚¯ãƒ©ã‚¹ã¯ãƒ­ãƒ¼ã‚«ãƒ«ãªä½¿ç”¨ï¼ˆ1ã¤ã®é–¢æ•°å†…ã§ã®ä½¿ç”¨ï¼‰ã®ã¿ã‚’æ„å›³ã—ã¦ã„ã¾ã™ã€‚
+    ///       ã‚¤ãƒ³ã‚¹ã‚¿ãƒ³ã‚¹ã‚’ãƒ¡ãƒ³ãƒå¤‰æ•°ã¨ã—ã¦ä¿æŒã—ãªã„ã§ãã ã•ã„ã€‚
+    class blob_stream_writer
+    {
+    public:
+        /// @brief ã‚³ãƒ”ãƒ¼ãŠã‚ˆã³ãƒ ãƒ¼ãƒ–ã‚’ç¦æ­¢
+        DISABLE_COPY_AND_MOVE(blob_stream_writer);
 
-		// 'offset' ƒoƒCƒg‚ğƒXƒLƒbƒv‚·‚éB
-		/// @brief ƒoƒCƒg‚ğƒXƒLƒbƒv‚·‚é
-		/// @param offset ƒXƒLƒbƒv‚·‚éƒoƒCƒg”
-		void skip(size_t offset)
-		{
-			assert(&_position[offset] <= &_buffer[_buffer_size]);
-			_position += offset;
-		}
+        /// @brief ã‚³ãƒ³ã‚¹ãƒˆãƒ©ã‚¯ã‚¿
+        /// @param buffer æ›¸ãè¾¼ã¿å¯¾è±¡ã®ãƒãƒƒãƒ•ã‚¡
+        /// @param buffer_size ãƒãƒƒãƒ•ã‚¡ã®ã‚µã‚¤ã‚º
+        explicit blob_stream_writer(u8* buffer, size_t buffer_size)
+            :_buffer{ buffer }, _position{ buffer }, _buffer_size{ buffer_size }
+        {
+            assert(buffer && buffer_size);
+        }
 
-		// ====== ƒAƒNƒZƒT ======
-		// ƒoƒbƒtƒ@‚Ìæ“ª‚ğæ“¾
-		[[nodiscard]] constexpr const u8* const buffer_start() const { return _buffer; }
-		// ƒoƒbƒtƒ@‚ÌI’[‚ğæ“¾
-		[[nodiscard]] constexpr const u8* const buffer_end() const { return &_buffer[_buffer_size]; }
-		// Œ»İ‚ÌˆÊ’u‚ğæ“¾
-		[[nodiscard]] constexpr const u8* const position() const { return _position; }
-		// Œ»İ‚ÌƒIƒtƒZƒbƒg‚ğæ“¾
-		[[nodiscard]] constexpr size_t offset() const { return _position - _buffer; }
+        /// @brief ãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–å‹ã‚’æ›¸ãè¾¼ã‚€
+        /// @tparam T ãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–å‹
+        /// @param value æ›¸ãè¾¼ã‚€å€¤
+        template<typename T>
+        void write(T value)
+        {
+			// C++ã§ãƒ—ãƒªãƒŸãƒ†ã‚£ãƒ–å‹ã¨å‘¼ã¶ã®ã‹ã¯ã‚ã‹ã‚Šã¾ã›ã‚“ãŒã€ã“ã“ã§ã¯æ•´æ•°å‹ã‚„æµ®å‹•å°æ•°ç‚¹å‹ã‚’æŒ‡ã™ã‚‚ã®ã¨ã—ã¾ã™(int, float, doubleãªã©)ã€‚
+            static_assert(std::is_arithmetic_v<T>, "Template argument should be a primitve type.");
+            assert(&_position[sizeof(T)] <= &_buffer[_buffer_size]);
+            *((T*)_position) = value;
+            _position += sizeof(T);
+        }
 
-	private:	// ƒƒ“ƒo•Ï”
-		u8* const _buffer;		///< ƒoƒbƒtƒ@
-		u8* _position;			///< ƒoƒbƒtƒ@‚ÌˆÊ’u
-		size_t _buffer_size;	///< ƒoƒbƒtƒ@‚ÌƒTƒCƒY
-	};
+        /// @brief æ–‡å­—åˆ—ã‚’æ›¸ãè¾¼ã‚€
+        /// @param buffer æ›¸ãè¾¼ã‚€æ–‡å­—åˆ—
+        /// @param length æ›¸ãè¾¼ã‚€æ–‡å­—æ•°
+        void write(const char* buffer, size_t length)
+        {
+            assert(&_position[length] <= &_buffer[_buffer_size]);
+            memcpy(_position, buffer, length);
+            _position += length;
+        }
+
+        /// @brief ãƒã‚¤ãƒˆã‚’æ›¸ãè¾¼ã‚€
+        /// @param buffer æ›¸ãè¾¼ã‚€ãƒ‡ãƒ¼ã‚¿
+        /// @param length æ›¸ãè¾¼ã‚€ãƒã‚¤ãƒˆæ•°
+        void write(const u8* buffer, size_t length)
+        {
+            assert(&_position[length] <= &_buffer[_buffer_size]);
+            memcpy(_position, buffer, length);
+            _position += length;
+        }
+
+        /// @brief ãƒã‚¤ãƒˆã‚’ã‚¹ã‚­ãƒƒãƒ—ã™ã‚‹
+        /// @param offset ã‚¹ã‚­ãƒƒãƒ—ã™ã‚‹ãƒã‚¤ãƒˆæ•°
+        void skip(size_t offset)
+        {
+            assert(&_position[offset] <= &_buffer[_buffer_size]);
+            _position += offset;
+        }
+
+        /// @brief ãƒãƒƒãƒ•ã‚¡ã®å…ˆé ­ã‚’å–å¾—
+        /// @return ãƒãƒƒãƒ•ã‚¡ã®å…ˆé ­ã‚¢ãƒ‰ãƒ¬ã‚¹
+        [[nodiscard]] constexpr const u8* const buffer_start() const { return _buffer; }
+
+        /// @brief ãƒãƒƒãƒ•ã‚¡ã®çµ‚ç«¯ã‚’å–å¾—
+        /// @return ãƒãƒƒãƒ•ã‚¡ã®çµ‚ç«¯ã‚¢ãƒ‰ãƒ¬ã‚¹
+        [[nodiscard]] constexpr const u8* const buffer_end() const { return &_buffer[_buffer_size]; }
+
+        /// @brief ç¾åœ¨ã®ä½ç½®ã‚’å–å¾—
+        /// @return ç¾åœ¨ã®ä½ç½®ã®ã‚¢ãƒ‰ãƒ¬ã‚¹
+        [[nodiscard]] constexpr const u8* const position() const { return _position; }
+
+        /// @brief ç¾åœ¨ã®ã‚ªãƒ•ã‚»ãƒƒãƒˆã‚’å–å¾—
+        /// @return ãƒãƒƒãƒ•ã‚¡å…ˆé ­ã‹ã‚‰ã®ã‚ªãƒ•ã‚»ãƒƒãƒˆ
+        [[nodiscard]] constexpr size_t offset() const { return _position - _buffer; }
+
+    private:
+        u8* const _buffer;		///< ãƒãƒƒãƒ•ã‚¡
+        u8* _position;			///< ãƒãƒƒãƒ•ã‚¡ã®ç¾åœ¨ä½ç½®
+        size_t _buffer_size;	///< ãƒãƒƒãƒ•ã‚¡ã®ã‚µã‚¤ã‚º
+    };
 }

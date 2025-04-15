@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+﻿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12Upload.cpp]
-// �쐬�� : 2025/01/12
-// �쐬�� : �c���~�m��
-// �T�v :
-// �A�b�v���[�h�q�[�v�̃T�u���W���[��
-// �X�V����
-// 2025/01/12 �V�K�쐬
+// 作成日 : 2025/01/12
+// 作成者 : 田中ミノル
+// 概要 :
+// アップロードヒープのサブモジュール
+// 更新履歴
+// 2025/01/12 新規作成
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== �C���N���[�h�� ======
+// ====== インクルード部 ======
 #include "D3D12Upload.h"
 #include "D3D12Core.h"
 
@@ -17,11 +17,11 @@ namespace dxforge::graphics::d3d12::upload
 	{
 		struct upload_frame
 		{
-			ID3D12CommandAllocator* cmd_allocator{ nullptr };	// �R�}���h�A���P�[�^
-			id3d12_graphics_command_list* cmd_list{ nullptr };	// �R�}���h���X�g
-			ID3D12Resource* upload_buffer{ nullptr };			// �A�b�v���[�h�o�b�t�@
-			void* cpu_address{ nullptr };						// CPU�A�h���X
-			u64 fence_value{ 0 };								// �t�F���X�l
+			ID3D12CommandAllocator* cmd_allocator{ nullptr };	// コマンドアロケータ
+			id3d12_graphics_command_list* cmd_list{ nullptr };	// コマンドリスト
+			ID3D12Resource* upload_buffer{ nullptr };			// アップロードバッファ
+			void* cpu_address{ nullptr };						// CPUアドレス
+			u64 fence_value{ 0 };								// フェンス値
 
 			void wait_and_reset();
 
@@ -35,14 +35,14 @@ namespace dxforge::graphics::d3d12::upload
 			constexpr bool is_ready() const { return upload_buffer == nullptr; }
 		};
 
-		constexpr u32 upload_frame_count{ 4 };					// �t���[����
-		upload_frame upload_frames[upload_frame_count]{};		// �t���[��
-		ID3D12CommandQueue* upload_cmd_queue{ nullptr };		// �R�}���h�L���[
-		ID3D12Fence1* upload_fence{ nullptr };					// �t�F���X
-		u64 upload_fence_value{ 0 };							// �t�F���X�l
-		HANDLE fence_event{};									// �t�F���X�C�x���g
-		std::mutex frame_mutex{};								// �~���[�e�b�N�X
-		std::mutex queue_mutex{};								// �~���[�e�b�N�X
+		constexpr u32 upload_frame_count{ 4 };					// フレーム数
+		upload_frame upload_frames[upload_frame_count]{};		// フレーム
+		ID3D12CommandQueue* upload_cmd_queue{ nullptr };		// コマンドキュー
+		ID3D12Fence1* upload_fence{ nullptr };					// フェンス
+		u64 upload_fence_value{ 0 };							// フェンス値
+		HANDLE fence_event{};									// フェンスイベント
+		std::mutex frame_mutex{};								// ミューテックス
+		std::mutex queue_mutex{};								// ミューテックス
 
 		void upload_frame::wait_and_reset()
 		{
@@ -57,7 +57,7 @@ namespace dxforge::graphics::d3d12::upload
 			cpu_address = nullptr;
 		}
 
-		// NOTE: �t���[���́A���̊֐����Ă΂��O�Ƀ��b�N����Ă��Ȃ���΂Ȃ�Ȃ��B
+		// NOTE: フレームは、この関数が呼ばれる前にロックされていなければならない。
 		u32 get_available_upload_frame()
 		{
 			u32 index{ u32_invalid_id };
@@ -73,8 +73,8 @@ namespace dxforge::graphics::d3d12::upload
 				}
 			}
 
-			// �ǂ̃t���[�����A�b�v���[�h���I����Ă��Ȃ������B
-			// �������͂����ŗB��̃X���b�h�Ȃ̂ŁA�������ł����t���[����������܂ŁA�t���[���𔽕����邱�Ƃ��ł��܂��B
+			// どのフレームもアップロードが終わっていなかった。
+			// 私たちはここで唯一のスレッドなので、準備ができたフレームを見つけるまで、フレームを反復することができます。
 			if (index == u32_invalid_id)
 			{
 				index = 0;
@@ -94,7 +94,7 @@ namespace dxforge::graphics::d3d12::upload
 			return false;
 		}
 
-	}	// �������O���
+	}	// 匿名名前空間
 
 
 	// ====== d3d12_upload_context ======
@@ -102,11 +102,11 @@ namespace dxforge::graphics::d3d12::upload
 	{
 		assert(upload_cmd_queue);
 		{
-			// �K�v�ȏ�ɂ��̋@�\�����b�N�������Ȃ��B �����ŁA���̃��b�N���X�R�[�v�Ɏ��߂�B
+			// 必要以上にこの機能をロックしたくない。 そこで、このロックをスコープに収める。
 			std::lock_guard lock{ frame_mutex };
 			_frame_index = get_available_upload_frame();
 			assert(_frame_index != u32_invalid_id);
-			// ���b�N����������O�ɁAis_ready��false��Ԃ��悤�ɂ��邱�ƂŁA���̃X���b�h�����̃t���[�����s�b�N�ł��Ȃ��悤�ɂ���B
+			// ロックを解除する前に、is_readyがfalseを返すようにすることで、他のスレッドがこのフレームをピックできないようにする。
 			upload_frames[_frame_index].upload_buffer = (ID3D12Resource*)1;
 		}
 
@@ -144,13 +144,13 @@ namespace dxforge::graphics::d3d12::upload
 		frame.fence_value = upload_fence_value;
 		DXCall(cmd_queue->Signal(upload_fence, frame.fence_value));
 
-		// �R�s�[�L���[�̏I����҂B ���̌�A�A�b�v���[�h�o�b�t�@���������B
+		// コピーキューの終了を待つ。 その後、アップロードバッファを解放する。
 		frame.wait_and_reset();
-		// ���̃A�b�v���[�h�R���e�L�X�g�̃C���X�^���X�͊����؂�ƂȂ����B ��x�Ǝg�p���Ȃ��悤�ɂ��Ă��������B
+		// このアップロードコンテキストのインスタンスは期限切れとなった。 二度と使用しないようにしてください。
 		DEBUG_OP(new (this) d3d12_upload_context{});
 	}
 
-	// ====== �O���[�o���֐� ======
+	// ====== グローバル関数 ======
 
 	bool initialize()
 	{

@@ -1,14 +1,14 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [D3D12Core.h]
-// ì¬“ú : 2024/12/27
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-// @Direct3D12‚ÌƒRƒA
-// XV—š—ğ
-// 2024/12/27 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/12/27
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+// ã€€Direct3D12ã®ã‚³ã‚¢
+// æ›´æ–°å±¥æ­´
+// 2024/12/27 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "D3D12CommonHeaders.h"
 
 namespace dxforge::graphics::d3d12
@@ -17,14 +17,14 @@ namespace dxforge::graphics::d3d12
 
 	struct d3d12_frame_info
 	{
-		const frame_info* info{ nullptr };					///< ƒtƒŒ[ƒ€î•ñ
-		camera::d3d12_camera* camera{ nullptr };			///< ƒJƒƒ‰
-		D3D12_GPU_VIRTUAL_ADDRESS global_shader_data{ 0 };	///< ƒVƒF[ƒ_ƒf[ƒ^
-		u32 surface_width{ 0 };								///< ƒT[ƒtƒFƒX‚Ì•
-		u32 surface_height{ 0 };							///< ƒT[ƒtƒFƒX‚Ì‚‚³
-		id::id_type light_culling_id{ id::invalid_id };		///< ƒ‰ƒCƒgƒJƒŠƒ“ƒOID
-		u32 frame_index{ 0 };								///< ƒtƒŒ[ƒ€ƒCƒ“ƒfƒbƒNƒX
-		f32 delta_time{ 16.7f };							///< ƒfƒ‹ƒ^ƒ^ƒCƒ€
+		const frame_info* info{ nullptr };					///< ãƒ•ãƒ¬ãƒ¼ãƒ æƒ…å ±
+		camera::d3d12_camera* camera{ nullptr };			///< ã‚«ãƒ¡ãƒ©
+		D3D12_GPU_VIRTUAL_ADDRESS global_shader_data{ 0 };	///< ã‚·ã‚§ãƒ¼ãƒ€ãƒ‡ãƒ¼ã‚¿
+		u32 surface_width{ 0 };								///< ã‚µãƒ¼ãƒ•ã‚§ã‚¹ã®å¹…
+		u32 surface_height{ 0 };							///< ã‚µãƒ¼ãƒ•ã‚§ã‚¹ã®é«˜ã•
+		id::id_type light_culling_id{ id::invalid_id };		///< ãƒ©ã‚¤ãƒˆã‚«ãƒªãƒ³ã‚°ID
+		u32 frame_index{ 0 };								///< ãƒ•ãƒ¬ãƒ¼ãƒ ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+		f32 delta_time{ 16.7f };							///< ãƒ‡ãƒ«ã‚¿ã‚¿ã‚¤ãƒ 
 	};
 }	// namespace dxforge::graphics::d3d12
 
@@ -33,9 +33,9 @@ namespace dxforge::graphics::d3d12::core
 	bool initialize(void);
 	void shutdown(void);
 
-	/// @brief ˆÀ‘S‚ÉƒŠƒŠ[ƒX‚·‚é
-	/// @tparam T ƒŠƒŠ[ƒX‚·‚éƒIƒuƒWƒFƒNƒg‚ÌŒ^
-	/// @param ptr ƒŠƒŠ[ƒX‚·‚éƒIƒuƒWƒFƒNƒg
+	/// @brief å®‰å…¨ã«ãƒªãƒªãƒ¼ã‚¹ã™ã‚‹
+	/// @tparam T ãƒªãƒªãƒ¼ã‚¹ã™ã‚‹ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®å‹
+	/// @param ptr ãƒªãƒªãƒ¼ã‚¹ã™ã‚‹ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆ
 	template<typename T>
 	constexpr void release(T*& ptr)
 	{
@@ -48,8 +48,8 @@ namespace dxforge::graphics::d3d12::core
 
 	namespace detail
 	{
-		/// @brief ’x‰„ƒŠƒŠ[ƒX
-		/// @param ptr ƒŠƒŠ[ƒX‚·‚éƒIƒuƒWƒFƒNƒg
+		/// @brief é…å»¶ãƒªãƒªãƒ¼ã‚¹
+		/// @param ptr ãƒªãƒªãƒ¼ã‚¹ã™ã‚‹ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆ
 		void deferred_release(IUnknown* ptr);
 	}	// namespace detail
 
@@ -64,20 +64,20 @@ namespace dxforge::graphics::d3d12::core
 		}
 	}
 
-	// ------ ƒAƒNƒZƒT ------
-	[[nodiscard]] id3d12_device* const device();					// ƒfƒoƒCƒX
-	[[nodiscard]] descriptor_heap& rtv_heap();						// RTVƒq[ƒv
-	[[nodiscard]] descriptor_heap& dsv_heap();						// DSVƒq[ƒv
-	[[nodiscard]] descriptor_heap& srv_heap();						// SRVƒq[ƒv
-	[[nodiscard]] descriptor_heap& uav_heap();						// UAVƒq[ƒv
-	[[nodiscard]] constant_buffer& cbuffer();						// ’è”ƒoƒbƒtƒ@
-	[[nodiscard]] u32 current_frame_index();						// Œ»İ‚ÌƒtƒŒ[ƒ€ƒCƒ“ƒfƒbƒNƒX
-	void set_deferred_releases_flag();								// ’x‰„ƒŠƒŠ[ƒXƒtƒ‰ƒO‚ğİ’è
+	// ------ ã‚¢ã‚¯ã‚»ã‚µ ------
+	[[nodiscard]] id3d12_device* const device();					// ãƒ‡ãƒã‚¤ã‚¹
+	[[nodiscard]] descriptor_heap& rtv_heap();						// RTVãƒ’ãƒ¼ãƒ—
+	[[nodiscard]] descriptor_heap& dsv_heap();						// DSVãƒ’ãƒ¼ãƒ—
+	[[nodiscard]] descriptor_heap& srv_heap();						// SRVãƒ’ãƒ¼ãƒ—
+	[[nodiscard]] descriptor_heap& uav_heap();						// UAVãƒ’ãƒ¼ãƒ—
+	[[nodiscard]] constant_buffer& cbuffer();						// å®šæ•°ãƒãƒƒãƒ•ã‚¡
+	[[nodiscard]] u32 current_frame_index();						// ç¾åœ¨ã®ãƒ•ãƒ¬ãƒ¼ãƒ ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+	void set_deferred_releases_flag();								// é…å»¶ãƒªãƒªãƒ¼ã‚¹ãƒ•ãƒ©ã‚°ã‚’è¨­å®š
 
-	[[nodiscard]] surface create_surface(platform::window window);	// ƒT[ƒtƒFƒX‚ğì¬
-	void remove_surface(surface_id id);								// ƒT[ƒtƒFƒX‚ğíœ
-	void resize_surface(surface_id id, u32 width, u32 height);		// ƒT[ƒtƒFƒX‚ÌƒŠƒTƒCƒY
-	[[nodiscard]] u32 surface_width(surface_id id);					// ƒT[ƒtƒFƒX‚Ì•
-	[[nodiscard]] u32 surface_height(surface_id id);				// ƒT[ƒtƒFƒX‚Ì‚‚³
-	void render_surface(surface_id id, frame_info info);			// ƒT[ƒtƒFƒX‚ÌƒŒƒ“ƒ_ƒŠƒ“ƒO
+	[[nodiscard]] surface create_surface(platform::window window);	// ã‚µãƒ¼ãƒ•ã‚§ã‚¹ã‚’ä½œæˆ
+	void remove_surface(surface_id id);								// ã‚µãƒ¼ãƒ•ã‚§ã‚¹ã‚’å‰Šé™¤
+	void resize_surface(surface_id id, u32 width, u32 height);		// ã‚µãƒ¼ãƒ•ã‚§ã‚¹ã®ãƒªã‚µã‚¤ã‚º
+	[[nodiscard]] u32 surface_width(surface_id id);					// ã‚µãƒ¼ãƒ•ã‚§ã‚¹ã®å¹…
+	[[nodiscard]] u32 surface_height(surface_id id);				// ã‚µãƒ¼ãƒ•ã‚§ã‚¹ã®é«˜ã•
+	void render_surface(surface_id id, frame_info info);			// ã‚µãƒ¼ãƒ•ã‚§ã‚¹ã®ãƒ¬ãƒ³ãƒ€ãƒªãƒ³ã‚°
 }	// namespace dxforge::graphics

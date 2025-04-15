@@ -1,13 +1,13 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Entity.cpp]
-// ì¬“ú : 2024/08/12
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-// 	ƒGƒ“ƒeƒBƒeƒB‚ğÀ‘•‚µ‚½ƒtƒ@ƒCƒ‹
-// XV—š—ğ
-// 2024/08/12 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/08/12
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+// 	ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚’å®Ÿè£…ã—ãŸãƒ•ã‚¡ã‚¤ãƒ«
+// æ›´æ–°å±¥æ­´
+// 2024/08/12 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "Entity.h"
 #include "Transform.h"
 #include "Script.h"
@@ -17,68 +17,68 @@ namespace dxforge::game_entity
 {
 	namespace
 	{
-		utl::vector<transform::component> transforms;	///< TransformƒRƒ“ƒ|[ƒlƒ“ƒg
-		utl::vector<script::component> scripts;			///< ScriptƒRƒ“ƒ|[ƒlƒ“ƒg
-		utl::vector<geometry::component> geometries;	///< GeometryƒRƒ“ƒ|[ƒlƒ“ƒg
+		utl::vector<transform::component> transforms;	///< Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆ
+		utl::vector<script::component> scripts;			///< Scriptã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆ
+		utl::vector<geometry::component> geometries;	///< Geometryã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆ
 
-		utl::vector<id::generation_type> generations;	///< ¢‘ã
-		utl::deque<entity_id> free_ids;					///< ‰ğ•ú‚³‚ê‚½ID
+		utl::vector<id::generation_type> generations;	///< ä¸–ä»£
+		utl::deque<entity_id> free_ids;					///< è§£æ”¾ã•ã‚ŒãŸID
 	}
 
 	entity create(entity_info info)
 	{
-		assert(info.transform);									// ‚·‚×‚Ä‚ÌƒQ[ƒ€ƒGƒ“ƒeƒBƒeƒB‚ÍAƒgƒ‰ƒ“ƒXƒtƒH[ƒ€ƒRƒ“ƒ|[ƒlƒ“ƒg‚ğ‚½‚È‚¯‚ê‚Î‚È‚ç‚È‚¢B
-		if (!info.transform) return {};							// transform î•ñ‚ª nullptr ‚Ìê‡‚Í–³Œø‚ÈƒGƒ“ƒeƒBƒeƒB‚ğ•Ô‚·
+		assert(info.transform);									// ã™ã¹ã¦ã®ã‚²ãƒ¼ãƒ ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã¯ã€ãƒˆãƒ©ãƒ³ã‚¹ãƒ•ã‚©ãƒ¼ãƒ ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’æŒãŸãªã‘ã‚Œã°ãªã‚‰ãªã„ã€‚
+		if (!info.transform) return {};							// transform æƒ…å ±ãŒ nullptr ã®å ´åˆã¯ç„¡åŠ¹ãªã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚’è¿”ã™
 
-		entity_id id{};											// ƒGƒ“ƒeƒBƒeƒBID‚ğŠi”[‚·‚é•Ï”
+		entity_id id{};											// ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£IDã‚’æ ¼ç´ã™ã‚‹å¤‰æ•°
 
-		// íœ‚³‚ê‚½ƒGƒ“ƒeƒBƒeƒBID‚ª‚ ‚é‚©‚Ç‚¤‚©‚ğ”»’è
+		// å‰Šé™¤ã•ã‚ŒãŸã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£IDãŒã‚ã‚‹ã‹ã©ã†ã‹ã‚’åˆ¤å®š
 		if (free_ids.size() > id::min_deleted_elements)
-		{	// íœ‚³‚ê‚½ƒGƒ“ƒeƒBƒeƒBID‚ª‚ ‚éê‡
-			id = free_ids.front();								// íœ‚³‚ê‚½ƒGƒ“ƒeƒBƒeƒBID‚ğÄ—˜—p
-			assert(!is_alive(id));								// Ä—˜—p‚µ‚½ID‚ªg‚í‚ê‚Ä‚¢‚È‚¢‚±‚Æ‚ğŠm”F
-			free_ids.pop_front();								// Ä—˜—p‚µ‚½ID‚ğíœ
-			id = entity_id{ id::new_generation(id) };			// ¢‘ã”Ô†‚ğXV
-			++generations[id::index(id)];						// ¢‘ã”Ô†‚ğXV
+		{	// å‰Šé™¤ã•ã‚ŒãŸã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£IDãŒã‚ã‚‹å ´åˆ
+			id = free_ids.front();								// å‰Šé™¤ã•ã‚ŒãŸã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£IDã‚’å†åˆ©ç”¨
+			assert(!is_alive(id));								// å†åˆ©ç”¨ã—ãŸIDãŒä½¿ã‚ã‚Œã¦ã„ãªã„ã“ã¨ã‚’ç¢ºèª
+			free_ids.pop_front();								// å†åˆ©ç”¨ã—ãŸIDã‚’å‰Šé™¤
+			id = entity_id{ id::new_generation(id) };			// ä¸–ä»£ç•ªå·ã‚’æ›´æ–°
+			++generations[id::index(id)];						// ä¸–ä»£ç•ªå·ã‚’æ›´æ–°
 		}
 		else
-		{	// íœ‚³‚ê‚½ƒGƒ“ƒeƒBƒeƒBID‚ª‚È‚¢ê‡
-			id = entity_id{ (id::id_type)generations.size() };	// V‚µ‚¢ƒGƒ“ƒeƒBƒeƒBID‚ğì¬
-			generations.push_back(0);							// ¢‘ã”Ô†‚ğ‰Šú‰»
+		{	// å‰Šé™¤ã•ã‚ŒãŸã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£IDãŒãªã„å ´åˆ
+			id = entity_id{ (id::id_type)generations.size() };	// æ–°ã—ã„ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£IDã‚’ä½œæˆ
+			generations.push_back(0);							// ä¸–ä»£ç•ªå·ã‚’åˆæœŸåŒ–
 
 			// Resize components
-			// NOTE : resize()‚ğŒÄ‚Ño‚³‚È‚¢‚Ì‚ÅAƒƒ‚ƒŠŠ„‚è“–‚Ä‚Ì‰ñ”‚ª­‚È‚¢B
-			transforms.emplace_back();							// TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚ğ’Ç‰Á
-			scripts.emplace_back();								// ScriptƒRƒ“ƒ|[ƒlƒ“ƒg‚ğ’Ç‰Á
-			geometries.emplace_back();							// GeometryƒRƒ“ƒ|[ƒlƒ“ƒg‚ğ’Ç‰Á
+			// NOTE : resize()ã‚’å‘¼ã³å‡ºã•ãªã„ã®ã§ã€ãƒ¡ãƒ¢ãƒªå‰²ã‚Šå½“ã¦ã®å›æ•°ãŒå°‘ãªã„ã€‚
+			transforms.emplace_back();							// Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’è¿½åŠ 
+			scripts.emplace_back();								// Scriptã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’è¿½åŠ 
+			geometries.emplace_back();							// Geometryã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’è¿½åŠ 
 		}
 
-		const entity new_entity{ id };							// V‚µ‚¢ƒGƒ“ƒeƒBƒeƒB‚ğì¬
-		const id::id_type index{ id::index(id) };				// ƒCƒ“ƒfƒbƒNƒX‚ğæ“¾
+		const entity new_entity{ id };							// æ–°ã—ã„ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚’ä½œæˆ
+		const id::id_type index{ id::index(id) };				// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã‚’å–å¾—
 
-		// TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚Ìì¬
+		// Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ä½œæˆ
 		assert(!transforms[index].is_valid());
 		transforms[index] = transform::create(*info.transform, new_entity);
 		assert(transforms[index].get_id() == id);
-		if (!transforms[index].is_valid()) return {}; // TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚ª–³Œø‚Èê‡‚Í–³Œø‚ÈƒGƒ“ƒeƒBƒeƒB‚ğ•Ô‚·
+		if (!transforms[index].is_valid()) return {}; // Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆãŒç„¡åŠ¹ãªå ´åˆã¯ç„¡åŠ¹ãªã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚’è¿”ã™
 
-		// ScriptƒRƒ“ƒ|[ƒlƒ“ƒg‚Ìì¬
+		// Scriptã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ä½œæˆ
 		if (info.script && info.script->script_creator)
 		{
-			assert(!scripts[index].is_valid());					// —LŒø‚ÈScriptƒRƒ“ƒ|[ƒlƒ“ƒg‚Å‚ ‚é‚±‚Æ‚ğŠm”F
-			scripts[index] = script::create(*info.script, new_entity);	// ScriptƒRƒ“ƒ|[ƒlƒ“ƒg‚ğì¬
+			assert(!scripts[index].is_valid());					// æœ‰åŠ¹ãªScriptã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã§ã‚ã‚‹ã“ã¨ã‚’ç¢ºèª
+			scripts[index] = script::create(*info.script, new_entity);	// Scriptã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’ä½œæˆ
 			assert(scripts[index].is_valid());
 		}
 
-		// GeometryƒRƒ“ƒ|[ƒlƒ“ƒg‚Ìì¬
+		// Geometryã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã®ä½œæˆ
 		if (info.geometry)
 		{
-			assert(!geometries[index].is_valid());				// —LŒø‚ÈGeometryƒRƒ“ƒ|[ƒlƒ“ƒg‚Å‚ ‚é‚±‚Æ‚ğŠm”F
-			geometries[index] = geometry::create(*info.geometry, new_entity);	// GeometryƒRƒ“ƒ|[ƒlƒ“ƒg‚ğì¬
+			assert(!geometries[index].is_valid());				// æœ‰åŠ¹ãªGeometryã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã§ã‚ã‚‹ã“ã¨ã‚’ç¢ºèª
+			geometries[index] = geometry::create(*info.geometry, new_entity);	// Geometryã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’ä½œæˆ
 			assert(geometries[index].is_valid());
 		}
 
-		return new_entity;										// V‚µ‚¢ƒGƒ“ƒeƒBƒeƒB‚ğ•Ô‚·
+		return new_entity;										// æ–°ã—ã„ã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã‚’è¿”ã™
 	}
 
 	void remove(entity_id id)
@@ -89,17 +89,17 @@ namespace dxforge::game_entity
 		if (geometries[index].is_valid())
 		{
 			geometry::remove(geometries[index]);
-			geometries[index] = {};	// GeometryƒRƒ“ƒ|[ƒlƒ“ƒg‚ğíœ
+			geometries[index] = {};	// Geometryã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’å‰Šé™¤
 		}
 
 		if (scripts[index].is_valid())
 		{
 			script::remove(scripts[index]);
-			scripts[index] = {};	// ScriptƒRƒ“ƒ|[ƒlƒ“ƒg‚ğíœ
+			scripts[index] = {};	// Scriptã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’å‰Šé™¤
 		}
 
 		transform::remove(transforms[index]);
-		transforms[index] = {};	// TransformƒRƒ“ƒ|[ƒlƒ“ƒg‚ğíœ
+		transforms[index] = {};	// Transformã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’å‰Šé™¤
 		if (generations[index] < id::max_generation)
 		{
 			free_ids.push_back(id);
@@ -108,30 +108,30 @@ namespace dxforge::game_entity
 
 	bool is_alive(entity_id id)
 	{
-		assert(id::is_valid(id));							// —LŒø‚ÈƒGƒ“ƒeƒBƒeƒB‚Å‚ ‚é‚±‚Æ‚ğŠm”F
+		assert(id::is_valid(id));							// æœ‰åŠ¹ãªã‚¨ãƒ³ãƒ†ã‚£ãƒ†ã‚£ã§ã‚ã‚‹ã“ã¨ã‚’ç¢ºèª
 		const id::id_type index{ id::index(id) };
-		assert(index < generations.size());					// ƒCƒ“ƒfƒbƒNƒX‚ª”ÍˆÍ“à‚Å‚ ‚é‚±‚Æ‚ğŠm”F
+		assert(index < generations.size());					// ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãŒç¯„å›²å†…ã§ã‚ã‚‹ã“ã¨ã‚’ç¢ºèª
 		return generations[index] == id::generation(id) && transforms[index].is_valid();
 	}
 
-	/// @brief ƒgƒ‰ƒ“ƒXƒtƒH[ƒ€ƒRƒ“ƒ|[ƒlƒ“ƒg‚ğæ“¾
-	/// @return ƒgƒ‰ƒ“ƒXƒtƒH[ƒ€ƒRƒ“ƒ|[ƒlƒ“ƒg
+	/// @brief ãƒˆãƒ©ãƒ³ã‚¹ãƒ•ã‚©ãƒ¼ãƒ ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’å–å¾—
+	/// @return ãƒˆãƒ©ãƒ³ã‚¹ãƒ•ã‚©ãƒ¼ãƒ ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆ
 	transform::component entity::transform() const
 	{
 		assert(is_alive(_id));
 		return transforms[id::index(_id)];
 	}
 
-	/// @brief ƒXƒNƒŠƒvƒgƒRƒ“ƒ|[ƒlƒ“ƒg‚ğæ“¾
-	/// @return ƒXƒNƒŠƒvƒgƒRƒ“ƒ|[ƒlƒ“ƒg
+	/// @brief ã‚¹ã‚¯ãƒªãƒ—ãƒˆã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’å–å¾—
+	/// @return ã‚¹ã‚¯ãƒªãƒ—ãƒˆã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆ
 	script::component entity::script() const
 	{
 		assert(is_alive(_id));
 		return scripts[id::index(_id)];
 	}
 
-	/// @brief ƒWƒIƒƒgƒŠƒRƒ“ƒ|[ƒlƒ“ƒg‚ğæ“¾
-	/// @return ƒWƒIƒƒgƒŠƒRƒ“ƒ|[ƒlƒ“ƒg
+	/// @brief ã‚¸ã‚ªãƒ¡ãƒˆãƒªã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆã‚’å–å¾—
+	/// @return ã‚¸ã‚ªãƒ¡ãƒˆãƒªã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆ
 	geometry::component entity::geometry() const
 	{
 		assert(is_alive(_id));

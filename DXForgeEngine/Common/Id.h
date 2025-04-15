@@ -1,19 +1,19 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Id.h]
-// ì¬“ú : 2024/08/12
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-// @ID‚ğ’è‹`‚µ‚½ƒtƒ@ƒCƒ‹
-// XV—š—ğ
-// 2024/08/12 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/08/12
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+// ã€€IDã‚’å®šç¾©ã—ãŸãƒ•ã‚¡ã‚¤ãƒ«
+// æ›´æ–°å±¥æ­´
+// 2024/08/12 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "CommonHeaders.h"
 
 namespace dxforge::id
 {
-	using id_type = u32;	///< ID‚ÌŒ^
+	using id_type = u32;	///< IDã®å‹
 
 	namespace detail
 	{
@@ -23,26 +23,26 @@ namespace dxforge::id
 		constexpr id_type generation_mask{ (id_type{1} << generation_bits) - 1 };	///< 255
 	} // detail namespace
 
-	constexpr id_type invalid_id{ id_type(-1) };	///< –³Œø‚ÈID
-	constexpr u32 min_deleted_elements{ 1024 };		///< Å¬íœ—v‘f”
+	constexpr id_type invalid_id{ id_type(-1) };	///< ç„¡åŠ¹ãªID
+	constexpr u32 min_deleted_elements{ 1024 };		///< æœ€å°å‰Šé™¤è¦ç´ æ•°
 
-	using generation_type = std::conditional_t<detail::generation_bits <= 16, std::conditional_t<detail::generation_bits <= 8, u8, u16>, u32>;	///< ¢‘ã‚ÌŒ^
-	static_assert(sizeof(generation_type) * 8 >= detail::generation_bits);	///< ¢‘ã‚Ìƒrƒbƒg”‚ª‘«‚è‚È‚¢ê‡‚ÍƒRƒ“ƒpƒCƒ‹ƒGƒ‰[
-	static_assert((sizeof(id_type) - sizeof(generation_type)) > 0);			///< 0‚æ‚è‘å‚«‚­‚È‚¯‚ê‚Î‚È‚ç‚È‚¢
+	using generation_type = std::conditional_t<detail::generation_bits <= 16, std::conditional_t<detail::generation_bits <= 8, u8, u16>, u32>;	///< ä¸–ä»£ã®å‹
+	static_assert(sizeof(generation_type) * 8 >= detail::generation_bits);	///< ä¸–ä»£ã®ãƒ“ãƒƒãƒˆæ•°ãŒè¶³ã‚Šãªã„å ´åˆã¯ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«ã‚¨ãƒ©ãƒ¼
+	static_assert((sizeof(id_type) - sizeof(generation_type)) > 0);			///< 0ã‚ˆã‚Šå¤§ãããªã‘ã‚Œã°ãªã‚‰ãªã„
 
-	constexpr generation_type max_generation{ (generation_type)(detail::generation_mask - 1) }; // —áF8ƒrƒbƒg¢‘ã‚Í254B
+	constexpr generation_type max_generation{ (generation_type)(detail::generation_mask - 1) }; // ä¾‹ï¼š8ãƒ“ãƒƒãƒˆä¸–ä»£ã¯254ã€‚
 
-	/// @brief ID‚ª—LŒø‚©‚Ç‚¤‚©
+	/// @brief IDãŒæœ‰åŠ¹ã‹ã©ã†ã‹
 	/// @param id ID
-	/// @return —LŒø‚È‚çtrue
+	/// @return æœ‰åŠ¹ãªã‚‰true
 	constexpr bool is_valid(id_type id)
 	{
 		return id != invalid_id;
 	}
 
-	/// @brief ID‚ÌƒCƒ“ƒfƒbƒNƒX‚ğæ“¾
+	/// @brief IDã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã‚’å–å¾—
 	/// @param id ID
-	/// @return ƒCƒ“ƒfƒbƒNƒX
+	/// @return ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
 	constexpr id_type index(id_type id)
 	{
 		id_type index{ id & detail::index_mask };
@@ -50,17 +50,17 @@ namespace dxforge::id
 		return index;
 	}
 
-	/// @brief ID‚Ì¢‘ã‚ğæ“¾
+	/// @brief IDã®ä¸–ä»£ã‚’å–å¾—
 	/// @param id ID
-	/// @return ¢‘ã
+	/// @return ä¸–ä»£
 	constexpr id_type generation(id_type id)
 	{
 		return (id >> detail::index_bits) & detail::generation_mask;
 	}
 
-	/// @brief ID‚Ì¢‘ã‚ğXV
+	/// @brief IDã®ä¸–ä»£ã‚’æ›´æ–°
 	/// @param id ID
-	/// @retur V‚µ‚¢ID
+	/// @retur æ–°ã—ã„ID
 	constexpr id_type new_generation(id_type id)
 	{
 		const id_type generation{ id::generation(id) + 1 };
