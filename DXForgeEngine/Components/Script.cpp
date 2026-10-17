@@ -6,6 +6,7 @@
 // 　スクリプトを実装したファイル
 // 更新履歴
 // 2024/12/2 新規作成
+// 2026/10/18 remove()の世代チェックが密なインデックスでgenerationsを参照していたのを修正 (#21)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Script.h"
@@ -177,7 +178,8 @@ namespace dxforge::script
 		id_mapping[id::index(last_id)] = index;
 		id_mapping[id::index(id)] = id::invalid_id;
 
-		if (generations[index] < id::max_generation)
+		// NOTE: generationsは疎なIDのインデックス(id::index(id))で引く。indexはentity_scripts上の密なインデックスなので使えない。
+		if (generations[id::index(id)] < id::max_generation)
 		{
 			free_ids.push_back(id);
 		}

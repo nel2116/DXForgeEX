@@ -6,6 +6,7 @@
 // ゲームエンティティのGeometryコンポーネントを管理する
 // 更新履歴
 // 2025/02/10 新規作成
+// 2026/10/18 remove()の世代チェックが密なインデックスでgenerationsを参照していたのを修正 (#21)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Geometry.h"
@@ -82,7 +83,8 @@ namespace dxforge::geometry
 		id_mapping[id::index(last_id)] = index;
 		id_mapping[id::index(id)] = id::invalid_id;
 
-		if (generations[index] < id::max_generation)
+		// NOTE: generationsは疎なIDのインデックス(id::index(id))で引く。indexはrender_item_ids上の密なインデックスなので使えない。
+		if (generations[id::index(id)] < id::max_generation)
 		{
 			free_ids.push_back(id);
 		}
