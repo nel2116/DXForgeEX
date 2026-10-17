@@ -102,7 +102,7 @@ namespace DXForgeEditor.Content
             }
         }
 
-        private string _name;
+        private string _name = string.Empty;
         public string Name
         {
             get => _name;
@@ -118,14 +118,14 @@ namespace DXForgeEditor.Content
 
         public ElementsType ElementsType { get; set; }
         public PrimitiveTopology PrimitiveTopology { get; set; }
-        public byte[] Positions { get; set; }
-        public byte[] Elements { get; set; }
-        public byte[] Indices { get; set; }
+        public byte[] Positions { get; set; } = Array.Empty<byte>();
+        public byte[] Elements { get; set; } = Array.Empty<byte>();
+        public byte[] Indices { get; set; } = Array.Empty<byte>();
     }
 
     class MeshLOD : ViewModelBase
     {
-        private string _name;
+        private string _name = string.Empty;
         public string Name
         {
             get => _name;
@@ -158,7 +158,7 @@ namespace DXForgeEditor.Content
 
     class LODGroup : ViewModelBase
     {
-        private string _name;
+        private string _name = string.Empty;
         public string Name
         {
             get => _name;
@@ -316,7 +316,7 @@ namespace DXForgeEditor.Content
 
         public GeometryImportSettings ImportSettings { get; } = new();
 
-        public LODGroup GetLODGroup(int lodGroup = 0)
+        public LODGroup? GetLODGroup(int lodGroup = 0)
         {
             Debug.Assert(lodGroup >= 0 && lodGroup < _lodGroups.Count);
             return (lodGroup < _lodGroups.Count) ? _lodGroups[lodGroup] : null;
@@ -440,7 +440,7 @@ namespace DXForgeEditor.Content
         private bool ImportFbx(string file)
         {
             Logger.Log(MessageType.Info, $"FBXファイルのインポート: {file}");
-            var tempPath = Application.Current.Dispatcher.Invoke(() => Project.Current.TempFolder);
+            var tempPath = Application.Current.Dispatcher.Invoke(() => Project.Current!.TempFolder); // インポートはプロジェクトを開いている間しか行われない
             if (string.IsNullOrEmpty(tempPath)) return false;
 
             lock (_lock)
@@ -472,7 +472,9 @@ namespace DXForgeEditor.Content
                 {
                     Debug.Assert(!string.IsNullOrEmpty(FullPath));
                     var files = Directory.GetFiles(embeddedMediaDir);
-                    new ConfigureImportSettings(files, Path.GetDirectoryName(FullPath)).Import();
+                    var destinationFolder = Path.GetDirectoryName(FullPath);
+                    Debug.Assert(destinationFolder != null);
+                    new ConfigureImportSettings(files, destinationFolder).Import();
                 }
             }
 
@@ -486,7 +488,7 @@ namespace DXForgeEditor.Content
 
             try
             {
-                byte[] data = null;
+                byte[] data;
                 using (var reader = new BinaryReader(File.Open(file, FileMode.Open, FileAccess.Read)))
                 {
                     ReadAssetFileHeader(reader);
@@ -548,7 +550,7 @@ namespace DXForgeEditor.Content
                     // NOTE: 新しいアセットファイルごとに異なるidを作成する必要がありますが、
                     //       同じ名前のジオメトリ・アセットファイルがすでに存在する場合は、代わりにそのguidを使用します。
                     Guid = TryGetAssetInfo(meshFileName) is AssetInfo info && info.Type == Type ? info.Guid : Guid.NewGuid();
-                    byte[] data = null;
+                    byte[] data;
                     using (var writer = new BinaryWriter(new MemoryStream()))
                     {
                         writer.Write(lodGroup.Name);
@@ -561,7 +563,7 @@ namespace DXForgeEditor.Content
                         }
 
                         Hash = ContentHelper.ComputeHash(hashes.ToArray());
-                        data = (writer.BaseStream as MemoryStream).ToArray();
+                        data = ((MemoryStream)writer.BaseStream).ToArray();
                         Icon = GenerateIcon(lodGroup.LODs[0]);
                     }
 
@@ -614,8 +616,10 @@ namespace DXForgeEditor.Content
         public override byte[] PackForEngine()
         {
             using var writer = new BinaryWriter(new MemoryStream());
-            writer.Write(GetLODGroup().LODs.Count);
-            foreach (var lod in GetLODGroup().LODs)
+            var lodGroup = GetLODGroup();
+            Debug.Assert(lodGroup != null);
+            writer.Write(lodGroup.LODs.Count);
+            foreach (var lod in lodGroup.LODs)
             {
                 writer.Write(lod.LodThreshold);
                 writer.Write(lod.Meshes.Count);
@@ -643,7 +647,7 @@ namespace DXForgeEditor.Content
                 writer.BaseStream.Position = endOfSubmeshes;
             }
             writer.Flush();
-            var data = (writer.BaseStream as MemoryStream)?.ToArray();
+            var data = ((MemoryStream)writer.BaseStream).ToArray();
             Debug.Assert(data?.Length > 0);
             // For Testing. Remove later!
             using (var fs = new FileStream(@"..\..\x64\model.model", FileMode.Create))
@@ -678,8 +682,8 @@ namespace DXForgeEditor.Content
 
             var meshDataSize = writer.BaseStream.Position - meshDataBegin;
             Debug.Assert(meshDataSize > 0);
-            var buffer = (writer.BaseStream as MemoryStream).ToArray();
-            hash = ContentHelper.ComputeHash(buffer, (int)meshDataBegin, (int)meshDataSize);
+            var buffer = ((MemoryStream)writer.BaseStream).ToArray();
+            hash = ContentHelper.ComputeHash(buffer, (int)meshDataBegin, (int)meshDataSize)!; // bufferは空でない(meshDataSize > 0)ためnullにならない
         }
 
         private MeshLOD BinaryToLOD(BinaryReader reader)
@@ -715,7 +719,7 @@ namespace DXForgeEditor.Content
         private static byte[] GenerateIcon(MeshLOD lod)
         {
             var width = ContentInfo.IconWidth * 4;
-            byte[] icon = null;
+            byte[]? icon = null;
             // NOTE: ViewModelでWPFコントロール（ビュー）を使用するのは良い習慣ではありません。
             // しかし、スクリーンショットに使えるグラフィック・レンダラーがない限り、このケースは例外とする必要がある。
             Application.Current.Dispatcher.Invoke(() =>
@@ -725,6 +729,7 @@ namespace DXForgeEditor.Content
                 icon = BitmapHelper.CreateThumbnail(bmp, ContentInfo.IconWidth, ContentInfo.IconWidth);
             });
 
+            Debug.Assert(icon != null);
             return icon;
         }
 

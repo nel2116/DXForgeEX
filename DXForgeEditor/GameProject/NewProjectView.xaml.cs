@@ -27,8 +27,10 @@ namespace DXForgeEditor.GameProject
 
         private void OnCreate_Button_Click(object sender, RoutedEventArgs e)
         {
-            var vm = DataContext as NewProject;
-            var projectPath = vm.CreateProject(templateListBox.SelectedItem as ProjectTemplate);
+            // An empty template list has no project template to create.
+            if (templateListBox.SelectedItem is not ProjectTemplate template) return;
+            var vm = (NewProject)DataContext;
+            var projectPath = vm.CreateProject(template);
             bool dialogResult = false;
             var win = Window.GetWindow(this);
             if (!string.IsNullOrEmpty(projectPath))

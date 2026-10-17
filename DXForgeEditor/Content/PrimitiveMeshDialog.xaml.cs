@@ -84,7 +84,7 @@ namespace DXForgeEditor.Content
             var geometry = new Geometry();
             geometry.ImportSettings.SmoothingAngle = smoothingAngle;
             ContentToolsAPI.CreatePrimitiveMesh(geometry, info);
-            (DataContext as GeometryEditor).SetAsset(geometry);
+            ((GeometryEditor)DataContext).SetAsset(geometry);
             OnTexture_CheckBox_Click(textureCheckBox, null);
         }
 
@@ -140,15 +140,15 @@ namespace DXForgeEditor.Content
             Loaded += (s, e) => UpdatePrimitive();
         }
 
-        private void OnTexture_CheckBox_Click(object sender, RoutedEventArgs e)
+        private void OnTexture_CheckBox_Click(object sender, RoutedEventArgs? e)
         {
             Brush brush = Brushes.White;
-            if ((sender as CheckBox).IsChecked == true)
+            if (((CheckBox)sender).IsChecked == true)
             {
                 brush = _textures[(int)primTypeComboBox.SelectedItem];
             }
 
-            var vm = DataContext as GeometryEditor;
+            var vm = (GeometryEditor)DataContext;
             foreach (var mesh in vm.MeshRenderer.Meshes)
             {
                 mesh.Diffuse = brush;
@@ -161,7 +161,7 @@ namespace DXForgeEditor.Content
             if (dlg.ShowDialog() == true)
             {
                 Debug.Assert(!string.IsNullOrEmpty(dlg.SaveFilePath));
-                var asset = (DataContext as IAssetEditor).Asset;
+                var asset = ((IAssetEditor)DataContext).Asset;
                 Debug.Assert(asset != null);
                 asset.Save(dlg.SaveFilePath);
 

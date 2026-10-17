@@ -17,12 +17,12 @@ namespace DXForgeEditor.Utilities
 
     public class UndoRedoAction : IUndoRedo
     {
-        private Action _undoAction;
-        private Action _redoAction;
+        private Action? _undoAction;
+        private Action? _redoAction;
         public string Name { get; }
 
-        public void Undo() => _undoAction();
-        public void Redo() => _redoAction();
+        public void Undo() => (_undoAction ?? throw new InvalidOperationException("No undo action was supplied."))();
+        public void Redo() => (_redoAction ?? throw new InvalidOperationException("No redo action was supplied."))();
 
         public UndoRedoAction(string name)
         {
@@ -37,10 +37,10 @@ namespace DXForgeEditor.Utilities
             _redoAction = redo;
         }
 
-        public UndoRedoAction(string property, object instance, object undoValue, object redoValue, string name)
+        public UndoRedoAction(string property, object instance, object? undoValue, object? redoValue, string name)
             : this(
-                  () => instance.GetType().GetProperty(property).SetValue(instance, undoValue),
-                  () => instance.GetType().GetProperty(property).SetValue(instance, redoValue),
+                  () => (instance.GetType().GetProperty(property) ?? throw new ArgumentException("The property does not exist.", nameof(property))).SetValue(instance, undoValue),
+                  () => (instance.GetType().GetProperty(property) ?? throw new ArgumentException("The property does not exist.", nameof(property))).SetValue(instance, redoValue),
                   name)
         {
         }

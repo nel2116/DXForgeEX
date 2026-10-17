@@ -16,8 +16,8 @@ namespace DXForgeEditor.Content
     sealed class ContentInfo : ViewModelBase
     {
         public static int IconWidth => 90;
-        public byte[] Icon { get; }
-        public byte[] IconSmall { get; }
+        public byte[]? Icon { get; }
+        public byte[]? IconSmall { get; }
         public string FullPath { get; private set; }
         public string FileName => Path.GetFileNameWithoutExtension(FullPath);
         public bool IsDirectory { get; }
@@ -87,6 +87,8 @@ namespace DXForgeEditor.Content
                 }
             }
 
+            // pathは "<ディレクトリ>\<名前>" の形で組み立てられるため、ディレクトリ名は常に存在する
+            Debug.Assert(dirName != null);
             if (dirName.IndexOfAny(Path.GetInvalidPathChars()) != -1)
             {
                 errorMsg = "パスに無効な文字が使用されています";
@@ -100,7 +102,7 @@ namespace DXForgeEditor.Content
             return string.IsNullOrEmpty(errorMsg);
         }
 
-        public ContentInfo(string fullpayh, byte[] icon = null, byte[] smallIcon = null, DateTime? lastModified = null)
+        public ContentInfo(string fullpayh, byte[]? icon = null, byte[]? smallIcon = null, DateTime? lastModified = null)
         {
             Debug.Assert(File.Exists(fullpayh) || Directory.Exists(fullpayh));
             var info = new FileInfo(fullpayh);
@@ -124,7 +126,7 @@ namespace DXForgeEditor.Content
         private readonly ObservableCollection<ContentInfo> _folderContent = new();
         public ReadOnlyObservableCollection<ContentInfo> FolderContent { get; }
 
-        private string _selectedFolder;
+        private string _selectedFolder = string.Empty;
         public string SelectedFolder
         {
             get => _selectedFolder;

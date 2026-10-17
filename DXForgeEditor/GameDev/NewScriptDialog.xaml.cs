@@ -53,7 +53,8 @@ namespace {1}
 
         private static string GetNamespaceFromProjectName()
         {
-            var projectName = Project.Current.Name.Trim();
+            var project = Project.Current ?? throw new InvalidOperationException("A project must be open to create a script.");
+            var projectName = project.Name.Trim();
             if (string.IsNullOrEmpty(projectName)) return string.Empty;
             projectName = Regex.Replace(projectName, @"[^A-Za-z0-9_]", "");
 
@@ -62,6 +63,7 @@ namespace {1}
 
         private bool Validate()
         {
+            var project = Project.Current ?? throw new InvalidOperationException("A project must be open to create a script.");
             bool isValid = false;
             var name = scriptName.Text.Trim();
             var path = scriptPath.Text.Trim();
@@ -84,12 +86,12 @@ namespace {1}
             {
                 errorMsg = "スクリプトのパスに無効な文字が使用されています";
             }
-            else if (!Path.GetFullPath(Path.Combine(Project.Current.Path, path)).Contains(Path.Combine(Project.Current.Path, @"GameCode\")))
+            else if (!Path.GetFullPath(Path.Combine(project.Path, path)).Contains(Path.Combine(project.Path, @"GameCode\")))
             {
                 errorMsg = "スクリプトはGameCode（のサブフォルダ）に追加する必要があります";
             }
-            else if (File.Exists(Path.GetFullPath(Path.Combine(Path.Combine(Project.Current.Path, path), $"{name}.cpp"))) ||
-                File.Exists(Path.GetFullPath(Path.Combine(Path.Combine(Project.Current.Path, path), $"{name}.h"))))
+            else if (File.Exists(Path.GetFullPath(Path.Combine(Path.Combine(project.Path, path), $"{name}.cpp"))) ||
+                File.Exists(Path.GetFullPath(Path.Combine(Path.Combine(project.Path, path), $"{name}.h"))))
             {
                 errorMsg = $"スクリプト {name} はすでにこのフォルダに存在します。";
             }
@@ -112,9 +114,10 @@ namespace {1}
 
         private void OnScriptName_TextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
+            var project = Project.Current ?? throw new InvalidOperationException("A project must be open to create a script.");
             if (!Validate()) return;
             var name = scriptName.Text.Trim();
-            messageTextBlock.Text = $"{name}.h と {name}.cpp が {Project.Current.Name} に追加されます";
+            messageTextBlock.Text = $"{name}.h と {name}.cpp が {project.Name} に追加されます";
         }
 
         private void OnScriptPath_TextBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -124,6 +127,7 @@ namespace {1}
 
         private async void OnCreate_Button_Click(object sender, RoutedEventArgs e)
         {
+            var project = Project.Current ?? throw new InvalidOperationException("A project must be open to create a script.");
             if (!Validate()) return;
             IsEnabled = false;
             busyAnimation.Opacity = 0;
@@ -134,9 +138,9 @@ namespace {1}
             try
             {
                 var name = scriptName.Text.Trim();
-                var path = Path.GetFullPath(Path.Combine(Project.Current.Path, scriptPath.Text.Trim()));
-                var solution = Project.Current.Solution;
-                var projectName = Project.Current.Name;
+                var path = Path.GetFullPath(Path.Combine(project.Path, scriptPath.Text.Trim()));
+                var solution = project.Solution;
+                var projectName = project.Name;
                 await Task.Run(() => CreateScript(name, path, solution, projectName));
             }
             catch (Exception ex)

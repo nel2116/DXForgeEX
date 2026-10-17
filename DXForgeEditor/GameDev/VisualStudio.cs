@@ -22,7 +22,7 @@ namespace DXForgeEditor.GameDev
         private static readonly string _progID = "VisualStudio.DTE.17.0";
         private static readonly object _lock = new();
         private static readonly string[] _buildConfigurationNames = new string[] { "Debug", "DebugEditor", "Release", "ReleaseEditor" };
-        private static EnvDTE80.DTE2 _vsInstance = null;
+        private static EnvDTE80.DTE2? _vsInstance = null;
 
         public static bool BuildSucceeded { get; private set; } = true;
         public static bool BuildDone { get; private set; } = true;
@@ -56,9 +56,9 @@ namespace DXForgeEditor.GameDev
 
         private static void OpenVisualStudio_Internal(string solutionPath)
         {
-            IRunningObjectTable rot = null;
-            IEnumMoniker monikerTable = null;
-            IBindCtx bindCtx = null;
+            IRunningObjectTable? rot = null;
+            IEnumMoniker? monikerTable = null;
+            IBindCtx? bindCtx = null;
             try
             {
                 if (_vsInstance == null)
@@ -82,7 +82,7 @@ namespace DXForgeEditor.GameDev
                         {
                             hResult = rot.GetObject(currentMoniker[0], out object obj);
                             if (hResult < 0 || obj == null) throw new COMException($"Running object table's GetObject() returned HRESULT: {hResult:X8}");
-                            EnvDTE80.DTE2 dte = obj as EnvDTE80.DTE2;
+                            EnvDTE80.DTE2 dte = (EnvDTE80.DTE2)obj;
 
                             var solutionName = string.Empty;
                             CallOnSTAThread(() =>
@@ -100,7 +100,8 @@ namespace DXForgeEditor.GameDev
 
                     if (_vsInstance == null)
                     {
-                        Type visualStudioType = Type.GetTypeFromProgID(_progID, true);
+                        Type visualStudioType = Type.GetTypeFromProgID(_progID, true)
+                            ?? throw new COMException("Visual Studio is not registered.");
                         _vsInstance = Activator.CreateInstance(visualStudioType) as EnvDTE80.DTE2;
                     }
                 }
@@ -235,16 +236,24 @@ namespace DXForgeEditor.GameDev
             }
 
             OpenVisualStudio_Internal(project.Solution);
+            // RunGame()はasync voidのコマンドから呼ばれ例外が捕捉されないため、throwせずにビルド失敗として扱う
+            var instance = _vsInstance;
+            if (instance == null)
+            {
+                BuildSucceeded = false;
+                Logger.Log(MessageType.Error, "Visual Studioを起動できなかったため、ビルドできませんでした。");
+                return;
+            }
             BuildDone = BuildSucceeded = false;
 
             CallOnSTAThread(() =>
             {
-                _vsInstance.MainWindow.Visible = showWindow;
-                if (!_vsInstance.Solution.IsOpen)
-                    _vsInstance.Solution.Open(project.Solution);
+                instance.MainWindow.Visible = showWindow;
+                if (!instance.Solution.IsOpen)
+                    instance.Solution.Open(project.Solution);
 
-                _vsInstance.Events.BuildEvents.OnBuildProjConfigBegin += OnBuildSolutionBegin;
-                _vsInstance.Events.BuildEvents.OnBuildProjConfigDone += OnBuildSolutionDone;
+                instance.Events.BuildEvents.OnBuildProjConfigBegin += OnBuildSolutionBegin;
+                instance.Events.BuildEvents.OnBuildProjConfigDone += OnBuildSolutionDone;
             });
 
             var configName = GetConfigurationName(buildConfig);
@@ -260,8 +269,8 @@ namespace DXForgeEditor.GameDev
 
             CallOnSTAThread(() =>
             {
-                _vsInstance.Solution.SolutionBuild.SolutionConfigurations.Item(configName).Activate();
-                _vsInstance.ExecuteCommand("Build.BuildSolution");
+                instance.Solution.SolutionBuild.SolutionConfigurations.Item(configName).Activate();
+                instance.ExecuteCommand("Build.BuildSolution");
                 _resetEvent.Wait();
                 _resetEvent.Reset();
             });
@@ -313,7 +322,7 @@ namespace DXForgeEditor.GameDev
         private const int SERVERCALL_RETRYLATER = 2;
 
         [DllImport("Ole32.dll")]
-        private static extern int CoRegisterMessageFilter(IMessageFilter newFilter, out IMessageFilter oldFilter);
+        private static extern int CoRegisterMessageFilter(IMessageFilter? newFilter, out IMessageFilter? oldFilter);
 
         public static void Register()
         {

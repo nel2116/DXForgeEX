@@ -23,7 +23,7 @@ namespace DXForgeEditor.Utilities
 
         public int SurfaceId { get; private set; } = ID.INVALID_ID;
 
-        private void Resize(object sender, DelayEventTimerArgs e)
+        private void Resize(object? sender, DelayEventTimerArgs e)
         {
             e.RepeaEvent = GetAsyncKeyState(VK_LBUTTON) < 0;
             if (!e.RepeaEvent)

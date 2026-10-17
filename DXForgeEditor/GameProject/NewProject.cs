@@ -18,17 +18,17 @@ namespace DXForgeEditor.GameProject
     public class ProjectTemplate
     {
         [DataMember]
-        public string ProjectType { get; set; }
+        public string ProjectType { get; set; } = string.Empty;
         [DataMember]
-        public string ProjectFile { get; set; }
+        public string ProjectFile { get; set; } = string.Empty;
         [DataMember]
-        public List<string> Folders { get; set; }
-        public byte[] Icon { get; set; }
-        public byte[] Screenshot { get; set; }
-        public string IconFilePath { get; set; }
-        public string ScreenshotFilePath { get; set; }
-        public string ProjectFilePath { get; set; }
-        public string TemplatePath { get; set; }
+        public List<string> Folders { get; set; } = new();
+        public byte[] Icon { get; set; } = Array.Empty<byte>();
+        public byte[] Screenshot { get; set; } = Array.Empty<byte>();
+        public string IconFilePath { get; set; } = string.Empty;
+        public string ScreenshotFilePath { get; set; } = string.Empty;
+        public string ProjectFilePath { get; set; } = string.Empty;
+        public string TemplatePath { get; set; } = string.Empty;
     }
 
     class NewProject : ViewModelBase
@@ -82,7 +82,7 @@ namespace DXForgeEditor.GameProject
             }
         }
 
-        private string _errorMsg;
+        private string _errorMsg = string.Empty;
         public string ErrorMsg
         {
             get => _errorMsg;
@@ -136,7 +136,7 @@ namespace DXForgeEditor.GameProject
             return IsValid;
         }
 
-        public string CreateProject(ProjectTemplate template)
+        public string? CreateProject(ProjectTemplate template)
         {
             // プロジェクトパスが有効かどうか
             if (!ValidateProjectPath()) return null;
@@ -149,7 +149,7 @@ namespace DXForgeEditor.GameProject
                 if (!Directory.Exists(path)) Directory.CreateDirectory(path);
                 foreach (var folder in template.Folders)
                 {
-                    Directory.CreateDirectory(Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path), folder)));
+                    Directory.CreateDirectory(Path.GetFullPath(Path.Combine(Path.GetDirectoryName(path) ?? throw new InvalidOperationException("The project path has no parent directory."), folder)));
                 }
                 var dirinfo = new DirectoryInfo(path + @".DXForge\");
                 dirinfo.Attributes |= FileAttributes.Hidden;
@@ -205,7 +205,7 @@ namespace DXForgeEditor.GameProject
                 foreach (var file in templatesFiles)
                 {
                     var template = Serializer.FromFile<ProjectTemplate>(file);
-                    template.TemplatePath = Path.GetDirectoryName(file);
+                    template.TemplatePath = Path.GetDirectoryName(file) ?? throw new InvalidOperationException("The template path has no parent directory.");
                     template.IconFilePath = Path.GetFullPath(Path.Combine(template.TemplatePath, "Icon.png"));
                     template.Icon = File.ReadAllBytes(template.IconFilePath);
                     template.ScreenshotFilePath = Path.GetFullPath(Path.Combine(template.TemplatePath, "Screenshot.png"));

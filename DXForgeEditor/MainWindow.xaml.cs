@@ -19,7 +19,7 @@ namespace DXForgeEditor
 {
     public partial class MainWindow : Window
     {
-        public static string DXForgePath { get; private set; }
+        public static string DXForgePath { get; private set; } = string.Empty;
 
         public MainWindow()
         {

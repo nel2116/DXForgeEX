@@ -15,7 +15,7 @@ namespace DXForgeEditor.Content
     {
         public FileInfo FileInfo { get; }
 
-        private string _destinationFolder;
+        private string _destinationFolder = string.Empty;
         public string DestinationFolder
         {
             get => _destinationFolder;
@@ -277,7 +277,7 @@ namespace DXForgeEditor.Content
 
     class ConfigureImportSettings : ViewModelBase
     {
-        public string LastDestinationFolder { get; private set; }
+        public string LastDestinationFolder { get; private set; } = string.Empty;
 
         public GeometryImportSettingsConfigurator GeometryImportSettingsConfigurator { get; } = new();
         public TextureImportSettingsConfigurator TextureImportSettingsConfigurator { get; } = new();
@@ -300,7 +300,7 @@ namespace DXForgeEditor.Content
             Debug.Assert(files != null);
             Debug.Assert(!string.IsNullOrEmpty(destinationFolder) && Directory.Exists(destinationFolder));
             if (!destinationFolder.EndsWith(Path.DirectorySeparatorChar)) destinationFolder += Path.DirectorySeparatorChar;
-            Debug.Assert(Application.Current.Dispatcher.Invoke(() => destinationFolder.Contains(Project.Current.ContentPath)));
+            Debug.Assert(Application.Current.Dispatcher.Invoke(() => destinationFolder.Contains(Project.Current!.ContentPath)));
             LastDestinationFolder = destinationFolder;
 
             var meshFiles = files.Where(file => ContentHelper.MeshFileExtensions.Contains(Path.GetExtension(file).ToLower()));
@@ -321,7 +321,7 @@ namespace DXForgeEditor.Content
         {
             Debug.Assert(!string.IsNullOrEmpty(destinationFolder) && Directory.Exists(destinationFolder));
             if (!destinationFolder.EndsWith(Path.DirectorySeparatorChar)) destinationFolder += Path.DirectorySeparatorChar;
-            Debug.Assert(Application.Current.Dispatcher.Invoke(() => destinationFolder.Contains(Project.Current.ContentPath)));
+            Debug.Assert(Application.Current.Dispatcher.Invoke(() => destinationFolder.Contains(Project.Current!.ContentPath)));
             LastDestinationFolder = destinationFolder;
         }
     }

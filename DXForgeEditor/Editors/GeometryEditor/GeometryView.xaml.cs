@@ -94,7 +94,7 @@ namespace DXForgeEditor.Editors
             }
             else if (!_capturedLeft && _capturedRight)
             {
-                var vm = DataContext as MeshRenderer;
+                var vm = (MeshRenderer)DataContext;
                 var cp = vm.CameraPosition;
                 var yOffset = d.Y * 0.001 * Math.Sqrt(cp.X * cp.X + cp.Z * cp.Z);
                 vm.CameraTarget = new Point3D(vm.CameraTarget.X, vm.CameraTarget.Y + yOffset, vm.CameraTarget.Z);
@@ -129,7 +129,7 @@ namespace DXForgeEditor.Editors
         private void MoveCamera(double dx, double dy, int dz)
         {
             // カメラの位置を取得
-            var vm = DataContext as MeshRenderer;
+            var vm = (MeshRenderer)DataContext;
             var v = new Vector3D(vm.CameraPosition.X, vm.CameraPosition.Y, vm.CameraPosition.Z);
 
             // 球面座標系でカメラの位置を変更

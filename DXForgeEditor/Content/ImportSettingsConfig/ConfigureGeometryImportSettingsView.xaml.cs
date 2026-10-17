@@ -19,19 +19,19 @@ namespace DXForgeEditor.Content
     {
         private void OnRemove_Button_Click(object sender, RoutedEventArgs e)
         {
-            var vm = DataContext as ConfigureImportSettings;
-            vm.GeometryImportSettingsConfigurator.RemoveFile((sender as FrameworkElement).DataContext as GeometryProxy);
+            var vm = (ConfigureImportSettings)DataContext;
+            vm.GeometryImportSettingsConfigurator.RemoveFile((GeometryProxy)((FrameworkElement)sender).DataContext);
         }
 
 
         private void OnImport_Button_Click(object sender, RoutedEventArgs e)
         {
-            ((sender as FrameworkElement).DataContext as GeometryImportSettingsConfigurator).Import();
+            ((GeometryImportSettingsConfigurator)((FrameworkElement)sender).DataContext).Import();
         }
 
         private void OnApplyToSelection_Button_Click(object sender, RoutedEventArgs e)
         {
-            var settings = ((sender as FrameworkElement).DataContext as GeometryProxy).ImportSettings;
+            var settings = ((GeometryProxy)((FrameworkElement)sender).DataContext).ImportSettings;
             var selection = geometryListBox.SelectedItems;
             foreach (GeometryProxy proxy in selection)
             {
@@ -41,8 +41,8 @@ namespace DXForgeEditor.Content
 
         private void OnApplyToAll_Button_Click(object sender, RoutedEventArgs e)
         {
-            var settings = ((sender as FrameworkElement).DataContext as GeometryProxy).ImportSettings;
-            var vm = DataContext as ConfigureImportSettings;
+            var settings = ((GeometryProxy)((FrameworkElement)sender).DataContext).ImportSettings;
+            var vm = (ConfigureImportSettings)DataContext;
             foreach (var proxy in vm.GeometryImportSettingsConfigurator.GeometryProxies)
             {
                 proxy.CopySettings(settings);
@@ -51,7 +51,7 @@ namespace DXForgeEditor.Content
 
         private void OnListBox_Drop(object sender, DragEventArgs e)
         {
-            ConfigureImportSettingsWindow.AddDroppedFiles(DataContext as ConfigureImportSettings, sender as ListBox, e);
+            ConfigureImportSettingsWindow.AddDroppedFiles((ConfigureImportSettings)DataContext, (ListBox)sender, e);
         }
 
         private void OnClearImportingItems_Button_Click(object sender, RoutedEventArgs e)

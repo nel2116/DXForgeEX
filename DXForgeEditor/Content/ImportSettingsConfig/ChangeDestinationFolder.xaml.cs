@@ -20,9 +20,9 @@ namespace DXForgeEditor.Content
 {
     class ContentSubfolderConverter : IValueConverter
     {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        public object? Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            var contentFolder = Project.Current.ContentPath;
+            var contentFolder = Project.Current!.ContentPath; // インポート設定はプロジェクトを開いている間しか表示されない
             if (value is string folder && !string.IsNullOrEmpty(folder) && folder.Contains(contentFolder))
             {
                 return $@"{Path.DirectorySeparatorChar}{folder.Replace(contentFolder, "")}";
@@ -43,11 +43,12 @@ namespace DXForgeEditor.Content
 
         private void OnChangeDestinationFolder_Button_Click(object sender, RoutedEventArgs e)
         {
-            var proxy = (sender as Button).DataContext as AssetProxy;
+            var proxy = (AssetProxy)((Button)sender).DataContext;
             var destinationFolder = proxy.DestinationFolder;
             if (Path.EndsInDirectorySeparator(destinationFolder))
             {
                 destinationFolder = Path.GetDirectoryName(destinationFolder);
+                Debug.Assert(destinationFolder != null);
             }
 
             var dlg = new SelectFolderDialog(destinationFolder);

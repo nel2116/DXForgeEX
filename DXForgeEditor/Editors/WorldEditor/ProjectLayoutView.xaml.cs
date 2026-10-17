@@ -29,14 +29,14 @@ namespace DXForgeEditor.Editors
 
         private void OnAddGameEntity_Button_Click(object sender, RoutedEventArgs e)
         {
-            var btn = sender as Button;
-            var vm = btn.DataContext as Scene;
+            var btn = (Button)sender;
+            var vm = (Scene)btn.DataContext;
             vm.AddGameEntityCommand.Execute(new GameEntity(vm) { Name = "Empty Entity" });
         }
 
         private void OnGameEntities_ListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            var listBox = sender as ListBox;
+            var listBox = (ListBox)sender;
             var newSelection = listBox.SelectedItems.Cast<GameEntity>().ToList();
             var previousSelection = newSelection.Except(e.AddedItems.Cast<GameEntity>()).Concat(e.RemovedItems.Cast<GameEntity>()).ToList();
 
@@ -44,17 +44,17 @@ namespace DXForgeEditor.Editors
                 () =>   // undo Action
                 {
                     listBox.UnselectAll();
-                    previousSelection.ForEach(x => (listBox.ItemContainerGenerator.ContainerFromItem(x) as ListBoxItem).IsSelected = true);
+                    previousSelection.ForEach(x => ((ListBoxItem)listBox.ItemContainerGenerator.ContainerFromItem(x)).IsSelected = true);
                 },
                 () =>   // redo Action
                 {
                     listBox.UnselectAll();
-                    newSelection.ForEach(x => (listBox.ItemContainerGenerator.ContainerFromItem(x) as ListBoxItem).IsSelected = true);
+                    newSelection.ForEach(x => ((ListBoxItem)listBox.ItemContainerGenerator.ContainerFromItem(x)).IsSelected = true);
                 },
                 "Selection Changed"
             ));
 
-            MSGameEntity msEntity = null;
+            MSGameEntity? msEntity = null;
             if (newSelection.Any())
             {
 

@@ -75,7 +75,7 @@ namespace DXForgeEditor.Editors
             }
         }
 
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
         public Point3DCollection Positions { get; } = new Point3DCollection();
         public Vector3DCollection Normals { get; } = new Vector3DCollection();
         public PointCollection UVs { get; } = new PointCollection();
@@ -191,7 +191,7 @@ namespace DXForgeEditor.Editors
             }
         }
 
-        public MeshRenderer(MeshLOD lod, MeshRenderer old)
+        public MeshRenderer(MeshLOD lod, MeshRenderer? old)
         {
             Debug.Assert(lod?.Meshes.Any() == true);
             // カメラの位置とターゲットを適切に設定するには、レンダリングするオブジェクトの大きさを把握する必要がある。
@@ -329,7 +329,8 @@ namespace DXForgeEditor.Editors
 
         Asset IAssetEditor.Asset => Geometry;
 
-        private Content.Geometry _geometry;
+        // SetAsset() で設定されるまでは null。ビューはアセットのロード後にのみこれらを参照する
+        private Content.Geometry _geometry = null!;
         public Content.Geometry Geometry
         {
             get => _geometry;
@@ -343,7 +344,7 @@ namespace DXForgeEditor.Editors
             }
         }
 
-        private MeshRenderer _meshRenderer;
+        private MeshRenderer _meshRenderer = null!;
         public MeshRenderer MeshRenderer
         {
             get => _meshRenderer;
@@ -353,7 +354,9 @@ namespace DXForgeEditor.Editors
                 {
                     _meshRenderer = value;
                     OnPropertyChanged(nameof(MeshRenderer));
-                    var lods = Geometry.GetLODGroup().LODs;
+var lodGroup = Geometry.GetLODGroup();
+                    Debug.Assert(lodGroup != null);
+                    var lods = lodGroup.LODs;
                     MaxLODIndex = (lods.Count > 0) ? lods.Count - 1 : 0;
                     OnPropertyChanged(nameof(MaxLODIndex));
                     if (lods.Count > 1)
@@ -391,7 +394,9 @@ namespace DXForgeEditor.Editors
             get => _lodIndex;
             set
             {
-                var lods = Geometry.GetLODGroup().LODs;
+                var lodGroup = Geometry.GetLODGroup();
+                Debug.Assert(lodGroup != null);
+                var lods = lodGroup.LODs;
                 value = Math.Clamp(value, 0, lods.Count);
                 if (_lodIndex != value)
                 {
@@ -425,14 +430,16 @@ namespace DXForgeEditor.Editors
             {
                 AssetGuid = asset.Guid;
                 Geometry = geometry;
-                var numLods = geometry.GetLODGroup().LODs.Count;
+                var lodGroup = geometry.GetLODGroup();
+                Debug.Assert(lodGroup != null);
+                var numLods = lodGroup.LODs.Count;
                 if (LODIndex >= numLods)
                 {
                     LODIndex = numLods - 1;
                 }
                 else
                 {
-                    MeshRenderer = new MeshRenderer(Geometry.GetLODGroup().LODs[0], MeshRenderer);
+                    MeshRenderer = new MeshRenderer(lodGroup.LODs[0], MeshRenderer);
                 }
             }
         }

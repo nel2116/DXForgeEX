@@ -92,7 +92,7 @@ namespace DXForgeEditor.Editors
 
         private void OnContentBrowser_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
-            if ((sender as FrameworkElement).DataContext is ContentBrowser contentBrowser && string.IsNullOrEmpty(contentBrowser.SelectedFolder?.Trim()))
+            if (((FrameworkElement)sender).DataContext is ContentBrowser contentBrowser && string.IsNullOrEmpty(contentBrowser.SelectedFolder?.Trim()))
             {
                 contentBrowser.SelectedFolder = contentBrowser.ContentFolder;
             }

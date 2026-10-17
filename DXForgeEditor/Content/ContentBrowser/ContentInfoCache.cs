@@ -72,6 +72,8 @@ namespace DXForgeEditor.Content
 
                     writer.Write(key);
                     writer.Write(info.DateModified.ToBinary());
+                    // キャッシュにはファイル (アイコン付き) のみが登録される
+                    Debug.Assert(info.Icon != null);
                     writer.Write(info.Icon.Length);
                     writer.Write(info.Icon);
                 }

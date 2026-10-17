@@ -48,12 +48,12 @@ namespace DXForgeEditor.Content
 
             return string.Format("{0:n" + decimalPlaces + "} {1}", adjustedSize, _sizeSuffixes[mag]);
         }
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             return (value is long size) ? SizeSuffix(size, 0) : null;
         }
 
-        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             throw new NotImplementedException();
         }
@@ -134,9 +134,9 @@ namespace DXForgeEditor.Content
         public static readonly DependencyProperty AllowImportProperty =
             DependencyProperty.Register(nameof(AllowImport), typeof(bool), typeof(ContentBrowserView), new PropertyMetadata(false));
 
-        internal ContentInfo SelectedItem
+        internal ContentInfo? SelectedItem
         {
-            get => (ContentInfo)GetValue(SelectedItemProperty);
+            get => (ContentInfo?)GetValue(SelectedItemProperty);
             set => SetValue(SelectedItemProperty, value);
         }
 
@@ -179,7 +179,7 @@ namespace DXForgeEditor.Content
             }
         }
 
-        private void OnProjectChanged(object sender, DependencyPropertyChangedEventArgs e)
+        private void OnProjectChanged(object? sender, DependencyPropertyChangedEventArgs e)
         {
             (DataContext as ContentBrowser)?.Dispose();
             DataContext = null;
@@ -192,9 +192,9 @@ namespace DXForgeEditor.Content
             }
         }
 
-        private void OnSelectedFolderChanged(object sender, PropertyChangedEventArgs e)
+        private void OnSelectedFolderChanged(object? sender, PropertyChangedEventArgs e)
         {
-            var vm = sender as ContentBrowser;
+            var vm = (ContentBrowser)sender!;
             if (e.PropertyName == nameof(vm.SelectedFolder) && !string.IsNullOrEmpty(vm.SelectedFolder))
             {
                 GeneratePathStackButtons();
@@ -203,8 +203,9 @@ namespace DXForgeEditor.Content
 
         private void GeneratePathStackButtons()
         {
-            var vm = DataContext as ContentBrowser;
-            var path = Directory.GetParent(Path.TrimEndingDirectorySeparator(vm.SelectedFolder)).FullName;
+            var vm = (ContentBrowser)DataContext;
+            // SelectedFolderはコンテンツフォルダ以下のパスなので、親ディレクトリは常に存在する
+            var path = Directory.GetParent(Path.TrimEndingDirectorySeparator(vm.SelectedFolder))!.FullName;
             var contentPath = Path.TrimEndingDirectorySeparator(vm.ContentFolder);
 
             pathStack.Children.RemoveRange(1, pathStack.Children.Count - 1);
@@ -247,14 +248,14 @@ namespace DXForgeEditor.Content
 
         private void OnPathStack_Button_Click(object sender, RoutedEventArgs e)
         {
-            var vm = DataContext as ContentBrowser;
-            vm.SelectedFolder = (sender as Button).DataContext as string;
+            var vm = (ContentBrowser)DataContext;
+            vm.SelectedFolder = (string)((Button)sender).DataContext;
         }
 
         private void OnGridViewColumnHeader_Click(object sender, RoutedEventArgs e)
         {
-            var column = sender as GridViewColumnHeader;
-            var sortBy = column.Tag.ToString();
+            var column = (GridViewColumnHeader)sender;
+            var sortBy = column.Tag.ToString()!;
 
             folderListView.Items.SortDescriptions.Clear();
             var newDir = ListSortDirection.Ascending;
@@ -271,30 +272,31 @@ namespace DXForgeEditor.Content
 
         private void OnContent_Item_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            var info = (sender as FrameworkElement).DataContext as ContentInfo;
+            var info = ((FrameworkElement)sender).DataContext as ContentInfo;
             ExecuteSelection(info);
         }
 
         private void OnContent_Item_KeyDown(object sender, KeyEventArgs e)
         {
-            var info = (sender as FrameworkElement).DataContext as ContentInfo;
+            var info = ((FrameworkElement)sender).DataContext as ContentInfo;
             if (e.Key == Key.Enter)
             {
                 ExecuteSelection(info);
             }
             else if (e.Key == Key.F2)
             {
-                TryEdit(folderListView, info.FullPath);
+                // ファイル/フォルダ以外の要素 (DataContextがContentInfoでない) でのF2は無視する
+                if (info != null) TryEdit(folderListView, info.FullPath);
             }
         }
 
-        private void ExecuteSelection(ContentInfo info)
+        private void ExecuteSelection(ContentInfo? info)
         {
             if (info == null) return;
 
             if (info.IsDirectory)
             {
-                var vm = DataContext as ContentBrowser;
+                var vm = (ContentBrowser)DataContext;
                 vm.SelectedFolder = info.FullPath;
             }
             else if (FileAccess.HasFlag(FileAccess.Read))
@@ -307,9 +309,9 @@ namespace DXForgeEditor.Content
             }
         }
 
-        private static IAssetEditor OpenAssetEditor(AssetInfo info)
+        private static IAssetEditor? OpenAssetEditor(AssetInfo info)
         {
-            IAssetEditor editor = null;
+            IAssetEditor? editor = null;
             try
             {
                 switch (info.Type)
@@ -334,7 +336,7 @@ namespace DXForgeEditor.Content
             return editor;
         }
 
-        private static IAssetEditor OpenEditorPanel<T>(AssetInfo info, Guid guid, string title)
+        private static IAssetEditor? OpenEditorPanel<T>(AssetInfo info, Guid guid, string title)
             where T : FrameworkElement, new()
         {
             // まず、すでに開いていて同じアセットを表示しているウィンドウを探します。
@@ -351,7 +353,8 @@ namespace DXForgeEditor.Content
 
             // まだアセットエディタで開いていない場合は、新しいウィンドウを作成してアセットを読み込みます。
             var newEditor = CreateEditorWindow<T>(title);
-            (newEditor.DataContext as IAssetEditor).SetAsset(info);
+            // CreateEditorWindowでDataContextがIAssetEditorであることを確認済み
+            ((IAssetEditor)newEditor.DataContext).SetAsset(info);
             return newEditor.DataContext as IAssetEditor;
         }
 
@@ -376,7 +379,7 @@ namespace DXForgeEditor.Content
 
         private void OnDropBorder_Drop(object sender, DragEventArgs e)
         {
-            var vm = DataContext as ContentBrowser;
+            var vm = (ContentBrowser)DataContext;
             if (Directory.Exists(vm.SelectedFolder) && e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 var files = (string[])e.Data.GetData(DataFormats.FileDrop);
@@ -399,9 +402,9 @@ namespace DXForgeEditor.Content
             OnDropBorder_DragLeave(sender, e);
         }
 
-        private static void OpenImportSettingsConfigurator(string[] files, string selectedFolder, bool forceOpen = false)
+        private static void OpenImportSettingsConfigurator(string[]? files, string selectedFolder, bool forceOpen = false)
         {
-            ConfigureImportSettings settingsConfigurator = null;
+            ConfigureImportSettings? settingsConfigurator = null;
             // まず、このDataContextのあるウィンドウを探し、インポート用に設定するファイルを追加する。
             foreach (Window win in Application.Current.Windows)
             {
@@ -456,6 +459,8 @@ namespace DXForgeEditor.Content
                 if (item.FullPath == path)
                 {
                     var listBoxItem = list.ItemContainerGenerator.ContainerFromItem(item) as ListBoxItem;
+                    // コンテナがまだ生成されていない場合は失敗扱いにし、呼び出し側の再試行に任せる
+                    if (listBoxItem == null) return false;
                     listBoxItem.IsSelected = true;
                     list.SelectedItem = item;
                     list.SelectedIndex = list.Items.IndexOf(item);
@@ -469,7 +474,7 @@ namespace DXForgeEditor.Content
 
         private async void OnCreateNewFolder(object sender, RoutedEventArgs e)
         {
-            var vm = DataContext as ContentBrowser;
+            var vm = (ContentBrowser)DataContext;
             var path = vm.SelectedFolder;
             if (!Path.EndsInDirectorySeparator(path)) path += Path.DirectorySeparatorChar;
             var folder = "NewFolder";
@@ -521,7 +526,7 @@ namespace DXForgeEditor.Content
 
         private void OnDropBorder_DragLeave(object sender, DragEventArgs e)
         {
-            if (sender == dropBorder && e?.Effects != DragDropEffects.None)
+            if (sender == dropBorder && e.Effects != DragDropEffects.None)
             {
                 var point = e.GetPosition(dropBorder);
                 var result = VisualTreeHelper.HitTest(dropBorder, point);
@@ -538,7 +543,7 @@ namespace DXForgeEditor.Content
 
         private void OnOpenImportSettingsConfigurator_Button_Click(object sender, RoutedEventArgs e)
         {
-            var vm = DataContext as ContentBrowser;
+            var vm = (ContentBrowser)DataContext;
             OpenImportSettingsConfigurator(null, vm.SelectedFolder, true);
         }
     }

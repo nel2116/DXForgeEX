@@ -18,7 +18,7 @@ namespace DXForgeEditor
     /// </summary>
     public partial class EnginePathDialog : Window
     {
-        public string DXForgePath { get; private set; }
+        public string DXForgePath { get; private set; } = string.Empty;
         public EnginePathDialog()
         {
             InitializeComponent();
