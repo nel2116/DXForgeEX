@@ -1,4 +1,4 @@
-# CLAUDE.md
+﻿# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -19,7 +19,7 @@ Current implementation reaches roughly the PBR direct-lighting stage (GGX/Smith/
 - **ContentTools** (`DynamicLibrary`) — offline asset pipeline: FBX import (`FbxImporter.*`, Autodesk FBX SDK), texture import (`TextureImpoter.cpp`, DirectXTex), procedural primitive meshes (`PrimitiveMesh.*`), tangent generation (MikkTSpace), normal-map detection. Consumed by the editor, not linked into the runtime engine.
 - **DXForgeEditor** (C#/.NET WPF, `ConfigurationType` mapped to the Editor configs) — project browser/creation, scene & game-entity editing (undo/redo commands), content browser, texture/geometry editors, Visual Studio automation for generating and building per-game-project C++ solutions (`ProjectTemplates/*`, `GameDev/VisualStudio.cs`).
 
-Build via Visual Studio 2022 (`PlatformToolset v143`, open `DXForge.sln`) or via the CLI: root `build.ps1` wraps MSBuild (native) and `dotnet build` (editor) and can run `EngineUnitTests` afterwards — see `README.md` for the parameter list and examples. **Always build native projects through `DXForge.sln`** (directly invoking a `.vcxproj` makes `$(SolutionDir)` fall back to the project's own directory, breaking the `AdditionalIncludeDirectories` paths — `build.ps1` already does this correctly via `/t:<ProjectName>`). `GetDXC.ps1` fetches the DirectX Shader Compiler package used for shader compilation (`packages/DirectXShaderCompiler`); it downloads the *latest* DXC release whenever `packages/DirectXShaderCompiler` is empty, so CI caches that directory to avoid GitHub API rate limits. `EngineUnitTests` covers only pure-logic modules; rendering/GPU code (`Graphics/Direct3D12/*`) still has to be verified by running `EngineTest` or the editor and visually inspecting the render output.
+Build via Visual Studio 2022 (`PlatformToolset v143`, open `DXForge.sln`) or via the CLI: root `build.ps1` wraps MSBuild (native) and `dotnet build` (editor) and can run `EngineUnitTests` afterwards — see `README.md` for the parameter list. It summarizes build output by default (see Keeping sessions cheap below). **Always build native projects through `DXForge.sln`** (directly invoking a `.vcxproj` makes `$(SolutionDir)` fall back to the project's own directory, breaking the `AdditionalIncludeDirectories` paths — `build.ps1` already does this correctly via `/t:<ProjectName>`). `GetDXC.ps1` fetches the DirectX Shader Compiler package used for shader compilation (`packages/DirectXShaderCompiler`); it downloads the *latest* DXC release whenever `packages/DirectXShaderCompiler` is empty, so CI caches that directory to avoid GitHub API rate limits. `EngineUnitTests` covers only pure-logic modules; rendering/GPU code (`Graphics/Direct3D12/*`) still has to be verified by running `EngineTest` or the editor and visually inspecting the render output.
 
 **New C++ source files must be saved with a UTF-8 BOM.** Every existing file in this repo starts with a Japanese header comment (see below); without a BOM, MSVC misdetects the file as the local codepage (Shift-JIS) instead of UTF-8 and corrupts the token stream, producing unrelated-looking cascading compile errors. If a new file produces confusing errors at/after its first Japanese comment, check for a missing BOM first.
 
@@ -30,6 +30,39 @@ Build via Visual Studio 2022 (`PlatformToolset v143`, open `DXForge.sln`) or via
 - **`.editorconfig`**: encodes the measured conventions — `.c/.cpp/.h/.hpp` are UTF-8 BOM + tabs (113/113 files), `.cs`/`.xaml` are UTF-8 BOM + 4 spaces (71/71 files). HLSL deliberately has **no** `charset` rule: 8 of the shader files that contain Japanese comments are still Shift-JIS (only the C++ files were converted in commit `6b1d57b`), so declaring a charset risks an editor mojibake-ing them on save. Unifying shader encodings is an open task.
 - **Japanese text must never appear in a narrow string literal.** CI runners are not Japanese-locale: their system code page is 1252, and MSVC converts narrow literals to the execution charset, so Japanese characters there produce one `C4566` per character and fail the `/WX` build (this is real: it is locale-dependent string data, not CI noise). Comments are fine — only literals matter. Use the wide API instead (`OutputDebugStringW(L"...")`, as `D3D12Core.cpp` now does); wide literals are UTF-16 and code-page independent. A full scan found exactly one such literal in 113 C++ files, so this is rare — but note the symptom is Debug-only when the code sits inside `#if _DEBUG`.
 - **Do not silence a warning that points at a real defect.** The two `C4100` warnings that existed before the gate turned out to mark a genuine bug: `transform::set_orientation` is an empty function body, yet it is reachable from the public API (`entity.set_orientation()` → `entity_script::set_orientation` → the orientation flag branch in `transform::update`), so the value is silently dropped. It is now documented with a `TODO` explaining why it is unimplemented and marked `[[maybe_unused]]`; the design question (how to derive a rotation from a direction vector) is still open.
+
+## Keeping sessions cheap
+
+Build-tool output is the dominant token cost in this repo. Measured on a full compile: the native
+MSBuild log is ~7,400 characters at default verbosity, and `dotnet build` of the editor is
+**~132,000 characters** (588 nullable warnings, see issue #9). `build.ps1` therefore summarizes by
+default — errors verbatim, warnings folded into per-code counts — which brings the editor build down
+to ~150 characters.
+
+- **Never pass `-DetailedLog` unless actually diagnosing a build failure**, and never re-run a build
+  just to see its full log when the summary already named the error.
+- **Scope the build**: `-Target native -Project EngineUnitTests` for the test loop. Building the
+  whole solution, or `-Target all`, costs much more and is rarely needed.
+- **Reading CI logs**: `gh run view <id> --json conclusion,jobs` first. `--log-failed` dumps the raw
+  log (the C4566 failure was 43 near-identical lines); only reach for it when the job summary is not
+  enough, and pipe it through `tail`/`grep`.
+- Don't re-read a file right after writing it, and prefer `sed -n '<range>p'` over reading whole
+  files when a specific function is what matters.
+- **Write edit scripts to a file, don't inline them.** A quoted heredoc passed to `python -`/`pwsh -Command`
+  loses backslashes on the way in: Windows paths break (`swhere` becomes a vertical tab), `
+` becomes a
+  real newline so patterns stop matching, and regex character classes like `[^"\]` fail to compile. Write the
+  script (or the replacement text) into the scratchpad directory with a quoted heredoc and run it by path, or
+  match on a backslash-free substring. Each mangled attempt is a wasted round trip.
+- `python3` on this machine is the Windows Store stub and silently does nothing — use `python`.
+- Verify with the fast path: `EngineUnitTests` is seconds; a full `Debug`+`Release` sweep is minutes
+  and only needed before pushing.
+
+# Compact instructions
+
+When compacting, keep: the pitfalls in this file, which issues are open and their decisions, exact
+build/test commands used, and any measured numbers. Drop: full build logs, file contents already
+written to disk, and superseded intermediate attempts.
 
 ## Engine architecture
 

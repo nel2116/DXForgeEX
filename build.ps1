@@ -31,6 +31,10 @@
     ネイティブ側のビルドで警告をエラーとして扱う(Directory.Build.props 経由で /WX を付与)。
     ローカル開発を妨げないよう既定はオフで、CIから指定する想定。
 
+.PARAMETER DetailedLog
+    ビルドツールの出力を全文表示する。既定ではエラーと警告件数の要約だけを表示する
+    (出力が非常に大きく、特にエディタ側は約132,000文字に達するため)。
+
 .PARAMETER Json
     最後に1行のJSON要約を標準出力に出す。EngineUnitTests.exeにも--jsonを渡す。
 
@@ -56,12 +60,54 @@ param(
 
 	[switch]$WarningsAsErrors,
 
+	[switch]$DetailedLog,
+
 	[switch]$Json
 )
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = $PSScriptRoot
 $Platform = "x64"
+
+# ビルドツールの出力をそのまま流すと非常に大きくなるため(実測: ネイティブ約7,400文字、
+# エディタ約132,000文字)、既定では要約だけを表示する。エラーは原因特定に必要なので全文
+# 表示し、警告はコード別の件数に畳む。完全なログが必要なときは -DetailedLog を指定する。
+function Invoke-BuildStep
+{
+	param(
+		[Parameter(Mandatory)][scriptblock]$Command,
+		[switch]$ShowFullLog
+	)
+
+	if ($ShowFullLog)
+	{
+		& $Command
+		return $LASTEXITCODE
+	}
+
+	$output = (& $Command 2>&1 | Out-String)
+	$exit = $LASTEXITCODE
+
+	$errorLines = [regex]::Matches($output, '(?m)^.*\berror [A-Z]+[0-9]+.*$') |
+		ForEach-Object { $_.Value.Trim() } | Select-Object -Unique
+	foreach ($line in $errorLines) { Write-Host "  $line" }
+
+	$warningCodes = [regex]::Matches($output, '\bwarning ([A-Z]+[0-9]+)') | ForEach-Object { $_.Groups[1].Value }
+	if ($warningCodes.Count -gt 0)
+	{
+		$grouped = $warningCodes | Group-Object | Sort-Object Count -Descending
+		$top = ($grouped | Select-Object -First 5 | ForEach-Object { "$($_.Name) x$($_.Count)" }) -join ", "
+		$rest = if ($grouped.Count -gt 5) { " ほか$($grouped.Count - 5)種" } else { "" }
+		Write-Host "  警告 $($warningCodes.Count)件: $top$rest"
+	}
+	else
+	{
+		Write-Host "  警告 0件"
+	}
+
+	Write-Host "  (完全なログは -DetailedLog で表示できます)"
+	return $exit
+}
 
 function Resolve-MSBuildPath
 {
@@ -120,12 +166,12 @@ if ($Target -eq "native" -or $Target -eq "all")
 		"/p:Configuration=$Configuration",
 		"/p:Platform=$Platform"
 	)
+	if (-not $DetailedLog) { $msbuildArgs += "/v:minimal" }
 	if ($Project) { $msbuildArgs += "/t:$Project" }
 	if ($WarningsAsErrors) { $msbuildArgs += "/p:DXForgeWarningsAsErrors=true" }
 
 	Write-Host "== Native build [$Configuration|$Platform]$(if ($Project) { " target=$Project" }) =="
-	& $msbuild @msbuildArgs
-	$nativeExit = $LASTEXITCODE
+	$nativeExit = Invoke-BuildStep -Command { & $msbuild @msbuildArgs } -ShowFullLog:$DetailedLog
 	$summary.native = [ordered]@{ exitCode = $nativeExit; project = $Project; warningsAsErrors = [bool]$WarningsAsErrors }
 	if ($nativeExit -ne 0) { $exitCode = $nativeExit }
 }
@@ -136,8 +182,7 @@ if ($Target -eq "editor" -or $Target -eq "all")
 	$csproj = "$RepoRoot\DXForgeEditor\DXForgeEditor.csproj"
 
 	Write-Host "== Editor build [$editorConfiguration|$Platform] =="
-	& dotnet build $csproj -c $editorConfiguration --nologo
-	$editorExit = $LASTEXITCODE
+	$editorExit = Invoke-BuildStep -Command { & dotnet build $csproj -c $editorConfiguration --nologo -v:minimal } -ShowFullLog:$DetailedLog
 	$summary.editor = [ordered]@{ exitCode = $editorExit; configuration = $editorConfiguration }
 	if ($editorExit -ne 0 -and $exitCode -eq 0) { $exitCode = $editorExit }
 }
