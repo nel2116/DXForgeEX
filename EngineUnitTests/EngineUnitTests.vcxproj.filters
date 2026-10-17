@@ -5,6 +5,7 @@
     <ClCompile Include="Tests_Id.cpp" />
     <ClCompile Include="Tests_FreeList.cpp" />
     <ClCompile Include="Tests_Vector.cpp" />
+    <ClCompile Include="Tests_Entity.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MicroTest.h" />
