@@ -38,7 +38,7 @@ namespace DXForgeEditor.Content
             using BinaryWriter writer = new(new MemoryStream());
             fromSettings.ToBinary(writer);
             writer.Flush();
-            var bytes = (writer.BaseStream as MemoryStream).ToArray();
+            var bytes = ((MemoryStream)writer.BaseStream).ToArray();
 
             using BinaryReader reader = new(new MemoryStream(bytes));
             toSettings.FromBinary(reader);
@@ -48,22 +48,22 @@ namespace DXForgeEditor.Content
     sealed class AssetInfo
     {
         public AssetType Type { get; set; }
-        public byte[] Icon { get; set; }
-        public string FullPath { get; set; }
+        public byte[] Icon { get; set; } = Array.Empty<byte>();
+        public string FullPath { get; set; } = string.Empty;
         public string FullName => Path.GetFileNameWithoutExtension(FullPath);
         public DateTime RegisterTime { get; set; }
         public DateTime ImportDate { get; set; }
         public Guid Guid { get; set; }
-        public byte[] Hash { get; set; }
+        public byte[]? Hash { get; set; }
     }
 
     abstract class Asset : ViewModelBase
     {
         public static string AssetFileExtension => ".asset";
         public AssetType Type { get; }
-        public byte[] Icon { get; protected set; }
+        public byte[]? Icon { get; protected set; }
 
-        private string _fullPath;
+        private string _fullPath = string.Empty;
         public string FullPath
         {
             get => _fullPath;
@@ -81,7 +81,7 @@ namespace DXForgeEditor.Content
         public string FileName => Path.GetFileNameWithoutExtension(FullPath);
         public Guid Guid { get; protected set; } = Guid.NewGuid();
         public DateTime ImportDate { get; protected set; }
-        public byte[] Hash { get; protected set; }
+        public byte[]? Hash { get; protected set; }
 
         public abstract bool Import(string file);
         public abstract bool Load(string file);
@@ -108,10 +108,10 @@ namespace DXForgeEditor.Content
             return info;
         }
 
-        public static AssetInfo TryGetAssetInfo(string file) =>
+        public static AssetInfo? TryGetAssetInfo(string file) =>
             File.Exists(file) && Path.GetExtension(file) == AssetFileExtension ? AssetRegistry.GetAssetInfo(file) ?? GetAssetInfo(file) : null;
 
-        public static AssetInfo GetAssetInfo(string file)
+        public static AssetInfo? GetAssetInfo(string file)
         {
             Debug.Assert(File.Exists(file) && Path.GetExtension(file) == AssetFileExtension);
             try
@@ -148,6 +148,8 @@ namespace DXForgeEditor.Content
                 writer.Write(0);
             }
 
+            // アイコンは派生クラスがインポート/読み込み時に必ず設定する
+            Debug.Assert(Icon != null);
             writer.Write(Icon.Length);
             writer.Write(Icon);
         }

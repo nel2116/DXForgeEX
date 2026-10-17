@@ -15,7 +15,7 @@ namespace DXForgeEditor.Content
 {
     public partial class SaveDialog : Window
     {
-        public string SaveFilePath { get; private set; }
+        public string SaveFilePath { get; private set; } = string.Empty;
 
         public SaveDialog()
         {
@@ -23,7 +23,7 @@ namespace DXForgeEditor.Content
 
             contentBrowserView.Loaded += (_, _) =>
             {
-                var contentBrowser = contentBrowserView.DataContext as ContentBrowser;
+                var contentBrowser = (ContentBrowser)contentBrowserView.DataContext;
                 contentBrowser.SelectedFolder = contentBrowser.ContentFolder;
             };
 
@@ -32,7 +32,7 @@ namespace DXForgeEditor.Content
 
         private bool ValidateFileName(out string saveFilePath)
         {
-            var contentBrowser = contentBrowserView.DataContext as ContentBrowser;
+            var contentBrowser = (ContentBrowser)contentBrowserView.DataContext;
             var path = contentBrowser.SelectedFolder;
             if (!Path.EndsInDirectorySeparator(path)) path += @"\";
             var fileName = fileNameTextBox.Text.Trim();
@@ -72,7 +72,7 @@ namespace DXForgeEditor.Content
             return isValid;
         }
 
-        private void OnSave_Button_Click(object sender, RoutedEventArgs e)
+        private void OnSave_Button_Click(object sender, RoutedEventArgs? e)
         {
             if (ValidateFileName(out var saveFilePath))
             {
@@ -84,14 +84,16 @@ namespace DXForgeEditor.Content
 
         private void OnContentBrowser_Mouse_DoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if ((e.OriginalSource as FrameworkElement).DataContext == contentBrowserView.SelectedItem &&
-                contentBrowserView.SelectedItem.FileName == fileNameTextBox.Text)
+            // FrameworkElement以外 (Run等) や未選択状態のダブルクリックでは例外にせず、保存しない
+            if (e.OriginalSource is FrameworkElement element &&
+                element.DataContext == contentBrowserView.SelectedItem &&
+                contentBrowserView.SelectedItem?.FileName == fileNameTextBox.Text)
             {
                 OnSave_Button_Click(sender, null);
             }
         }
 
-        private void OnSaveDialogClosing(object sender, CancelEventArgs e)
+        private void OnSaveDialogClosing(object? sender, CancelEventArgs e)
         {
             contentBrowserView.Dispose();
         }
