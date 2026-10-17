@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <!--
+    FBX SDK の参照先(ContentTools.vcxproj から読み込まれる)。
+
+    既定ではインストーラの標準パス(2020.3.7)を参照する。別の場所・バージョンにインストールした
+    場合は、次のいずれかで SDK のルート(include と lib を含むフォルダ)を指定する:
+      - 環境変数     : FbxSdkDir=D:\SDK\FBX\2020.3.7
+      - MSBuild引数  : msbuild DXForge.sln /p:FbxSdkDir=D:\SDK\FBX\2020.3.7
+    (MSBuild では環境変数が同名のプロパティとして参照できるため、どちらも同じ名前で効く)
+
+    SDK が見つからない場合は、コンパイル前に分かりやすいエラーで停止する。
+  -->
+  <PropertyGroup>
+    <FbxSdkDir Condition="'$(FbxSdkDir)' == ''">C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\</FbxSdkDir>
+    <!-- /p: で渡されたグローバルプロパティは再代入できないため、末尾の \ の補完は別名で行う -->
+    <FbxSdkRoot>$([MSBuild]::EnsureTrailingSlash('$(FbxSdkDir)'))</FbxSdkRoot>
+    <FbxSdkIncludeDir>$(FbxSdkRoot)include</FbxSdkIncludeDir>
+    <FbxSdkLibDir Condition="'$(UseDebugLibraries)' == 'true'">$(FbxSdkRoot)lib\x64\debug</FbxSdkLibDir>
+    <FbxSdkLibDir Condition="'$(UseDebugLibraries)' != 'true'">$(FbxSdkRoot)lib\x64\release</FbxSdkLibDir>
+    <!-- /MD(マルチスレッドDLL)版のランタイムに合わせたライブラリ -->
+    <FbxSdkLibraries>libfbxsdk-md.lib;libxml2-md.lib;zlib-md.lib</FbxSdkLibraries>
+  </PropertyGroup>
+
+  <!-- Visual Studio のデザイン時ビルド(IntelliSense)では止めない -->
+  <Target Name="DXForgeCheckFbxSdk" BeforeTargets="PrepareForBuild" Condition="'$(DesignTimeBuild)' != 'true'">
+    <!-- build.ps1 の要約は「error <コード>」の行だけを拾うため、コードを付けておく -->
+    <Error Code="DXFORGE001" Condition="!Exists('$(FbxSdkIncludeDir)\fbxsdk.h')"
+           Text="FBX SDK が見つかりません: '$(FbxSdkIncludeDir)\fbxsdk.h' が存在しません。FBX SDK 2020.3.7 以降をインストールするか、環境変数または /p:FbxSdkDir=&lt;SDKのルート&gt; でインストール先を指定してください(ContentTools\FbxSdk.props を参照)。" />
+    <Error Code="DXFORGE002" Condition="!Exists('$(FbxSdkLibDir)\libfbxsdk-md.lib')"
+           Text="FBX SDK のライブラリが見つかりません: '$(FbxSdkLibDir)\libfbxsdk-md.lib' が存在しません。FbxSdkDir='$(FbxSdkDir)' が SDK のルートを指しているか確認してください。" />
+  </Target>
+
+</Project>

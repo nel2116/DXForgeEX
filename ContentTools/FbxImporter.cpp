@@ -6,25 +6,16 @@
 // FBXファイルを読み込むクラス
 // 更新履歴
 // 2025/01/11 新規作成
+// 2026/10/18 FBX SDKのライブラリ指定を絶対パスの#pragma commentからFbxSdk.propsに移動
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "FbxImporter.h"
 #include "Geometry.h"
 
 // ====== リンク部 ======
-// コンパイルエラーやリンカーエラーが発生した場合は、次のことを確認してください。
-// 1) FBX SDK 2020.3.7以降がインストールされていること。
-// 2) fbxsdk.hへのインクルードパスが「追加インクルードディレクトリ」（コンパイラの設定）に追加されていること。
-// 3) 次のセクションのライブラリ・パスは、正しい場所を指していること。
-#if _DEBUG
-#pragma comment(lib,"C:\\Program Files\\Autodesk\\FBX\\FBX SDK\\2020.3.7\\lib\\x64\\debug\\libfbxsdk-md.lib")
-#pragma comment(lib,"C:\\Program Files\\Autodesk\\FBX\\FBX SDK\\2020.3.7\\lib\\x64\\debug\\libxml2-md.lib")
-#pragma comment(lib,"C:\\Program Files\\Autodesk\\FBX\\FBX SDK\\2020.3.7\\lib\\x64\\debug\\zlib-md.lib")
-#else
-#pragma comment(lib,"C:\\Program Files\\Autodesk\\FBX\\FBX SDK\\2020.3.7\\lib\\x64\\release\\libfbxsdk-md.lib")
-#pragma comment(lib,"C:\\Program Files\\Autodesk\\FBX\\FBX SDK\\2020.3.7\\lib\\x64\\release\\libxml2-md.lib")
-#pragma comment(lib,"C:\\Program Files\\Autodesk\\FBX\\FBX SDK\\2020.3.7\\lib\\x64\\release\\zlib-md.lib")
-#endif
+// FBX SDKのインクルードパスとライブラリ(libfbxsdk-md/libxml2-md/zlib-md)は ContentTools\FbxSdk.props で設定している。
+// SDKが見つからない場合はビルド開始時にエラーになる。既定以外の場所にインストールした場合は、
+// 環境変数または /p:FbxSdkDir=<SDKのルート> でインストール先を指定すること(FBX SDK 2020.3.7以降)。
 // LNK4099 PDB not found警告は、FBX SDK PDBをインストール（別途ダウンロード）するか、リンカーオプションでこの警告を無効にする（リンカーコマンドライン：/ignore:4099）ことで解決できます。
 
 // ====== 名前空間 ======
