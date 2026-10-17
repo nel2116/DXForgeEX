@@ -19,6 +19,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DXForgeEngineDLL", "DXForge
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ContentTools", "ContentTools\ContentTools.vcxproj", "{184FC280-4B34-4698-990D-AC18609E845D}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EngineUnitTests", "EngineUnitTests\EngineUnitTests.vcxproj", "{BA19223A-32FC-4C4F-87C2-72ABFD94EEED}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A7DBD67B-496C-463E-97D0-D522150BB52F} = {A7DBD67B-496C-463E-97D0-D522150BB52F}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -59,6 +64,12 @@ Global
 		{184FC280-4B34-4698-990D-AC18609E845D}.Release|x64.ActiveCfg = ReleaseEditor|x64
 		{184FC280-4B34-4698-990D-AC18609E845D}.ReleaseEditor|x64.ActiveCfg = ReleaseEditor|x64
 		{184FC280-4B34-4698-990D-AC18609E845D}.ReleaseEditor|x64.Build.0 = ReleaseEditor|x64
+		{BA19223A-32FC-4C4F-87C2-72ABFD94EEED}.Debug|x64.ActiveCfg = Debug|x64
+		{BA19223A-32FC-4C4F-87C2-72ABFD94EEED}.Debug|x64.Build.0 = Debug|x64
+		{BA19223A-32FC-4C4F-87C2-72ABFD94EEED}.DebugEditor|x64.ActiveCfg = Debug|x64
+		{BA19223A-32FC-4C4F-87C2-72ABFD94EEED}.Release|x64.ActiveCfg = Release|x64
+		{BA19223A-32FC-4C4F-87C2-72ABFD94EEED}.Release|x64.Build.0 = Release|x64
+		{BA19223A-32FC-4C4F-87C2-72ABFD94EEED}.ReleaseEditor|x64.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

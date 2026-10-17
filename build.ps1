@@ -1,0 +1,154 @@
+<#
+.SYNOPSIS
+    DXForgeEX をCLIからビルド・テスト実行するためのスクリプト。
+
+.DESCRIPTION
+    ネイティブ側(DXForgeEngine/EngineTest/ContentTools/EngineUnitTests)はvswhereで見つけた
+    MSBuild.exeでDXForge.slnをビルドし、エディタ側(DXForgeEditor)はdotnet buildでビルドする。
+    -RunTestsを指定すると、ビルド後にヘッドレスのEngineUnitTests.exeを実行し、その終了コードを
+    このスクリプト全体の終了コードに反映する。-Jsonを指定すると、最後に1行のJSON要約を標準出力
+    に出す(将来、AIエージェントやCIがこのスクリプトを呼び出す前提)。
+
+    NOTE: ネイティブ側は必ず DXForge.sln 経由でビルドすること。.vcxprojを直接MSBuildに渡すと、
+    $(SolutionDir)がプロジェクト自身のディレクトリにフォールバックしてしまい、インクルードパスが
+    壊れてビルドに失敗する(MSBuildの既知の挙動)。
+
+.PARAMETER Configuration
+    Debug / DebugEditor / Release / ReleaseEditor のいずれか。既定値: DebugEditor。
+
+.PARAMETER Target
+    native / editor / all のいずれか。既定値: all。
+
+.PARAMETER Project
+    -Target native のときのみ有効。DXForge.sln内の特定プロジェクトのみビルドする
+    (例: EngineUnitTests, DXForgeEngine, EngineTest, ContentTools)。省略時はソリューション全体。
+
+.PARAMETER RunTests
+    ネイティブビルド成功後にEngineUnitTests.exeを実行し、失敗したテストケースがあれば
+    このスクリプトも非ゼロの終了コードを返す。
+
+.PARAMETER Json
+    最後に1行のJSON要約を標準出力に出す。EngineUnitTests.exeにも--jsonを渡す。
+
+.EXAMPLE
+    ./build.ps1 -Target native -Project EngineUnitTests -RunTests
+    EngineUnitTestsだけをビルドして実行する(最速のフィードバックループ)。
+
+.EXAMPLE
+    ./build.ps1 -Configuration Debug -RunTests -Json
+    ネイティブ+エディタ両方をDebugでビルドし、テストを実行してJSON要約を出す。
+#>
+[CmdletBinding()]
+param(
+	[ValidateSet("Debug", "DebugEditor", "Release", "ReleaseEditor")]
+	[string]$Configuration = "DebugEditor",
+
+	[ValidateSet("native", "editor", "all")]
+	[string]$Target = "all",
+
+	[string]$Project,
+
+	[switch]$RunTests,
+
+	[switch]$Json
+)
+
+$ErrorActionPreference = "Stop"
+$RepoRoot = $PSScriptRoot
+$Platform = "x64"
+
+function Resolve-MSBuildPath
+{
+	$vswhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
+	if (-not (Test-Path $vswhere))
+	{
+		throw "vswhere.exeが見つかりません。Visual Studio 2022以降をインストールしてください。"
+	}
+	$msbuild = & $vswhere -latest -prerelease -products * -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
+	if (-not $msbuild)
+	{
+		throw "MSBuild.exeが見つかりません。"
+	}
+	return $msbuild
+}
+
+# EngineTest/EngineUnitTestsはDebugEditor/ReleaseEditorソリューション構成ではビルド対象外
+# (Debug/Releaseにしかマッピングされていない)。実際の出力先を知るにはこの対応関係が必要。
+function Get-NativeOutputConfiguration([string]$Config)
+{
+	if ($Config -like "*Editor") { return $Config.Substring(0, $Config.Length - "Editor".Length) }
+	return $Config
+}
+
+function Get-EditorConfiguration([string]$Config)
+{
+	if ($Config -like "*Editor") { return $Config }
+	return "${Config}Editor"
+}
+
+$summary = [ordered]@{
+	configuration = $Configuration
+	target        = $Target
+	native        = $null
+	editor        = $null
+	tests         = $null
+	exitCode      = 0
+}
+$exitCode = 0
+
+if ($Target -eq "native" -or $Target -eq "all")
+{
+	$msbuild = Resolve-MSBuildPath
+	$msbuildArgs = @(
+		"$RepoRoot\DXForge.sln",
+		"/nologo",
+		"/m",
+		"/p:Configuration=$Configuration",
+		"/p:Platform=$Platform"
+	)
+	if ($Project) { $msbuildArgs += "/t:$Project" }
+
+	Write-Host "== Native build [$Configuration|$Platform]$(if ($Project) { " target=$Project" }) =="
+	& $msbuild @msbuildArgs
+	$nativeExit = $LASTEXITCODE
+	$summary.native = [ordered]@{ exitCode = $nativeExit; project = $Project }
+	if ($nativeExit -ne 0) { $exitCode = $nativeExit }
+}
+
+if ($Target -eq "editor" -or $Target -eq "all")
+{
+	$editorConfiguration = Get-EditorConfiguration $Configuration
+	$csproj = "$RepoRoot\DXForgeEditor\DXForgeEditor.csproj"
+
+	Write-Host "== Editor build [$editorConfiguration|$Platform] =="
+	& dotnet build $csproj -c $editorConfiguration --nologo
+	$editorExit = $LASTEXITCODE
+	$summary.editor = [ordered]@{ exitCode = $editorExit; configuration = $editorConfiguration }
+	if ($editorExit -ne 0 -and $exitCode -eq 0) { $exitCode = $editorExit }
+}
+
+if ($RunTests)
+{
+	$nativeOutputConfiguration = Get-NativeOutputConfiguration $Configuration
+	$testExe = "$RepoRoot\$Platform\$nativeOutputConfiguration\EngineUnitTests.exe"
+	if (-not (Test-Path $testExe))
+	{
+		throw "$testExe が見つかりません。先に -Target native (または all) でビルドしてください。"
+	}
+
+	Write-Host "== Running tests: $testExe =="
+	$testArgs = @()
+	if ($Json) { $testArgs += "--json" }
+	& $testExe @testArgs
+	$testsExit = $LASTEXITCODE
+	$summary.tests = [ordered]@{ exitCode = $testsExit; path = $testExe }
+	if ($testsExit -ne 0 -and $exitCode -eq 0) { $exitCode = $testsExit }
+}
+
+if ($Json)
+{
+	$summary.exitCode = $exitCode
+	($summary | ConvertTo-Json -Depth 4 -Compress)
+}
+
+exit $exitCode
