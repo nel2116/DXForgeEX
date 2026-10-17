@@ -320,7 +320,7 @@ namespace DXForgeEditor.Content
         public int Height { get; set; }
         public int RowPitch { get; set; }
         public int SlicePitch { get; set; }
-        public byte[] RawContent { get; set; }
+        public byte[] RawContent { get; set; } = Array.Empty<byte>();
     }
 
     class Texture : Asset
@@ -335,7 +335,7 @@ namespace DXForgeEditor.Content
         // array ( mip ( サブリソース (スライス) ) )
         // https://learn.microsoft.com/en-us/windows/win32/direct3d12/subresources を参照
         // 配列内のスライスの順番
-        private List<List<List<Slice>>> _slices;
+        private List<List<List<Slice>>> _slices = new();
         public List<List<List<Slice>>> Slices
         {
             get => _slices;

@@ -19,19 +19,19 @@ namespace DXForgeEditor.Content
     {
         private void OnRemove_Button_Click(object sender, RoutedEventArgs e)
         {
-            var vm = DataContext as ConfigureImportSettings;
-            vm.TextureImportSettingsConfigurator.RemoveFile((sender as FrameworkElement).DataContext as TextureProxy);
+            var vm = (ConfigureImportSettings)DataContext;
+            vm.TextureImportSettingsConfigurator.RemoveFile((TextureProxy)((FrameworkElement)sender).DataContext);
         }
 
 
         private void OnImport_Button_Click(object sender, RoutedEventArgs e)
         {
-            ((sender as FrameworkElement).DataContext as TextureImportSettingsConfigurator).Import();
+            ((TextureImportSettingsConfigurator)((FrameworkElement)sender).DataContext).Import();
         }
 
         private void OnApplyToSelection_Button_Click(object sender, RoutedEventArgs e)
         {
-            var settings = ((sender as FrameworkElement).DataContext as TextureProxy).ImportSettings;
+            var settings = ((TextureProxy)((FrameworkElement)sender).DataContext).ImportSettings;
             var selection = textureListBox.SelectedItems;
             foreach (TextureProxy proxy in selection)
             {
@@ -41,8 +41,8 @@ namespace DXForgeEditor.Content
 
         private void OnApplyToAll_Button_Click(object sender, RoutedEventArgs e)
         {
-            var settings = ((sender as FrameworkElement).DataContext as TextureProxy).ImportSettings;
-            var vm = DataContext as ConfigureImportSettings;
+            var settings = ((TextureProxy)((FrameworkElement)sender).DataContext).ImportSettings;
+            var vm = (ConfigureImportSettings)DataContext;
             foreach (var proxy in vm.TextureImportSettingsConfigurator.TextureProxies)
             {
                 proxy.CopySettings(settings);
@@ -51,7 +51,7 @@ namespace DXForgeEditor.Content
 
         private void OnListBox_Drop(object sender, DragEventArgs e)
         {
-            ConfigureImportSettingsWindow.AddDroppedFiles(DataContext as ConfigureImportSettings, sender as ListBox, e);
+            ConfigureImportSettingsWindow.AddDroppedFiles((ConfigureImportSettings)DataContext, (ListBox)sender, e);
         }
 
         private void OnClearImportingItems_Button_Click(object sender, RoutedEventArgs e)
@@ -61,8 +61,8 @@ namespace DXForgeEditor.Content
 
         private void OnAddImageSource_Button_Click(object sender, RoutedEventArgs e)
         {
-            var vm = (DataContext as ConfigureImportSettings).TextureImportSettingsConfigurator;
-            var target = (sender as FrameworkElement).DataContext as TextureProxy;
+            var vm = ((ConfigureImportSettings)DataContext).TextureImportSettingsConfigurator;
+            var target = (TextureProxy)((FrameworkElement)sender).DataContext;
             // NOTE: アイテムをループしている間にソース・コレクションを変更するのを避けるために、
             //       選択されたアイテムをコピーする必要があります。
             var items = textureListBox.SelectedItems;
@@ -77,8 +77,8 @@ namespace DXForgeEditor.Content
 
         private void OnRemoveImageSource_Button_Click(object sender, RoutedEventArgs e)
         {
-            var vm = (DataContext as ConfigureImportSettings).TextureImportSettingsConfigurator;
-            var target = (sender as FrameworkElement).DataContext as TextureProxy;
+            var vm = ((ConfigureImportSettings)DataContext).TextureImportSettingsConfigurator;
+            var target = (TextureProxy)((FrameworkElement)sender).DataContext;
             // NOTE: アイテムをループしている間にソース・コレクションを変更するのを避けるために、
             //       選択されたアイテムをコピーする必要があります。
             var items = imageSourcesListBox.SelectedItems;
@@ -93,7 +93,7 @@ namespace DXForgeEditor.Content
 
         private void MoveSelection(object sender, Action<TextureProxy, List<TextureProxy>> action)
         {
-            var target = (sender as FrameworkElement).DataContext as TextureProxy;
+            var target = (TextureProxy)((FrameworkElement)sender).DataContext;
             var items = imageSourcesListBox.SelectedItems;
             var selection = new List<TextureProxy>();
 

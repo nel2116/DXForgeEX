@@ -15,7 +15,7 @@ namespace DXForgeEditor.Content
     {
         public FileInfo FileInfo { get; }
 
-        private string _destinationFolder;
+        private string _destinationFolder = string.Empty;
         public string DestinationFolder
         {
             get => _destinationFolder;
@@ -277,7 +277,7 @@ namespace DXForgeEditor.Content
 
     class ConfigureImportSettings : ViewModelBase
     {
-        public string LastDestinationFolder { get; private set; }
+        public string LastDestinationFolder { get; private set; } = string.Empty;
 
         public GeometryImportSettingsConfigurator GeometryImportSettingsConfigurator { get; } = new();
         public TextureImportSettingsConfigurator TextureImportSettingsConfigurator { get; } = new();
