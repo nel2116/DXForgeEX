@@ -18,7 +18,7 @@ namespace DXForgeEditor.Content
 {
     public partial class SelectFolderDialog : Window
     {
-        public string SelectedFolder { get; private set; }
+        public string SelectedFolder { get; private set; } = string.Empty;
         public SelectFolderDialog(string startFolder)
         {
             InitializeComponent();
@@ -30,7 +30,7 @@ namespace DXForgeEditor.Content
 
                 if (startPath.Contains(Project.Current.ContentPath))
                 {
-                    (contentBrowserView.DataContext as ContentBrowser).SelectedFolder = startFolder;
+                    ((ContentBrowser)contentBrowserView.DataContext).SelectedFolder = startFolder;
                 }
             };
 
@@ -39,13 +39,13 @@ namespace DXForgeEditor.Content
 
         private void OnSelectFolder_Button_Click(object sender, RoutedEventArgs e)
         {
-            var contentBrowser = contentBrowserView.DataContext as ContentBrowser;
+            var contentBrowser = (ContentBrowser)contentBrowserView.DataContext;
             SelectedFolder = contentBrowser.SelectedFolder;
             DialogResult = true;
             Close();
         }
 
-        private void OnDialogClosing(object sender, CancelEventArgs e)
+        private void OnDialogClosing(object? sender, CancelEventArgs e)
         {
             contentBrowserView.Dispose();
         }

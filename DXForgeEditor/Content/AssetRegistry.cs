@@ -61,7 +61,7 @@ namespace DXForgeEditor.Content
             }
         }
 
-        private static void OnContentModified(object sender, ContentModifiedEventArgs e)
+        private static void OnContentModified(object? sender, ContentModifiedEventArgs e)
         {
             if (ContentHelper.IsDirectory(e.FullPath))
             {
@@ -88,7 +88,7 @@ namespace DXForgeEditor.Content
             ContentWatcher.ContentModified += OnContentModified;
         }
 
-        public static AssetInfo GetAssetInfo(string file) => _assetDictionary.ContainsKey(file) ? _assetDictionary[file] : null;
-        public static AssetInfo GetAssetInfo(Guid guid) => _assets.FirstOrDefault(x => x.Guid == guid);
+        public static AssetInfo? GetAssetInfo(string file) => _assetDictionary.ContainsKey(file) ? _assetDictionary[file] : null;
+        public static AssetInfo? GetAssetInfo(Guid guid) => _assets.FirstOrDefault(x => x.Guid == guid);
     }
 }

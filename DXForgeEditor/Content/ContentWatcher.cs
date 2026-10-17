@@ -33,7 +33,7 @@ namespace DXForgeEditor.Content
 
         // ファイル・ウォッチャーは、このカウンタが0のときのみ有効になる。
         private static int _fileWatcherEnableCounter = 0;
-        public static event EventHandler<ContentModifiedEventArgs> ContentModified;
+        public static event EventHandler<ContentModifiedEventArgs>? ContentModified;
 
         public static void EnableFileWatcher(bool isEnabled)
         {
