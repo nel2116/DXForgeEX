@@ -28,7 +28,8 @@
     このスクリプトも非ゼロの終了コードを返す。
 
 .PARAMETER WarningsAsErrors
-    ネイティブ側のビルドで警告をエラーとして扱う(Directory.Build.props 経由で /WX を付与)。
+    警告をエラーとして扱う。ネイティブ側は Directory.Build.props 経由で /WX を付与し、
+    エディタ側は -p:TreatWarningsAsErrors=true を付けてフルビルドする(警告0件を維持するため)。
     ローカル開発を妨げないよう既定はオフで、CIから指定する想定。
 
 .PARAMETER DetailedLog
@@ -181,9 +182,14 @@ if ($Target -eq "editor" -or $Target -eq "all")
 	$editorConfiguration = Get-EditorConfiguration $Configuration
 	$csproj = "$RepoRoot\DXForgeEditor\DXForgeEditor.csproj"
 
+	# インクリメンタルビルドでは最新のファイルが再コンパイルされず警告も再出力されないため、
+	# 警告をエラー化するときはフルビルドにして取りこぼしを防ぐ。
+	$editorArgs = @()
+	if ($WarningsAsErrors) { $editorArgs += @("-p:TreatWarningsAsErrors=true", "--no-incremental") }
+
 	Write-Host "== Editor build [$editorConfiguration|$Platform] =="
-	$editorExit = Invoke-BuildStep -Command { & dotnet build $csproj -c $editorConfiguration --nologo -v:minimal } -ShowFullLog:$DetailedLog
-	$summary.editor = [ordered]@{ exitCode = $editorExit; configuration = $editorConfiguration }
+	$editorExit = Invoke-BuildStep -Command { & dotnet build $csproj -c $editorConfiguration --nologo -v:minimal @editorArgs } -ShowFullLog:$DetailedLog
+	$summary.editor = [ordered]@{ exitCode = $editorExit; configuration = $editorConfiguration; warningsAsErrors = [bool]$WarningsAsErrors }
 	if ($editorExit -ne 0 -and $exitCode -eq 0) { $exitCode = $editorExit }
 }
 

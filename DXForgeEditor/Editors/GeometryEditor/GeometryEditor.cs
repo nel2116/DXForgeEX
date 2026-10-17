@@ -354,7 +354,9 @@ namespace DXForgeEditor.Editors
                 {
                     _meshRenderer = value;
                     OnPropertyChanged(nameof(MeshRenderer));
-                    var lods = Geometry.GetLODGroup().LODs;
+var lodGroup = Geometry.GetLODGroup();
+                    Debug.Assert(lodGroup != null);
+                    var lods = lodGroup.LODs;
                     MaxLODIndex = (lods.Count > 0) ? lods.Count - 1 : 0;
                     OnPropertyChanged(nameof(MaxLODIndex));
                     if (lods.Count > 1)
@@ -392,7 +394,9 @@ namespace DXForgeEditor.Editors
             get => _lodIndex;
             set
             {
-                var lods = Geometry.GetLODGroup().LODs;
+                var lodGroup = Geometry.GetLODGroup();
+                Debug.Assert(lodGroup != null);
+                var lods = lodGroup.LODs;
                 value = Math.Clamp(value, 0, lods.Count);
                 if (_lodIndex != value)
                 {
@@ -426,14 +430,16 @@ namespace DXForgeEditor.Editors
             {
                 AssetGuid = asset.Guid;
                 Geometry = geometry;
-                var numLods = geometry.GetLODGroup().LODs.Count;
+                var lodGroup = geometry.GetLODGroup();
+                Debug.Assert(lodGroup != null);
+                var numLods = lodGroup.LODs.Count;
                 if (LODIndex >= numLods)
                 {
                     LODIndex = numLods - 1;
                 }
                 else
                 {
-                    MeshRenderer = new MeshRenderer(Geometry.GetLODGroup().LODs[0], MeshRenderer);
+                    MeshRenderer = new MeshRenderer(lodGroup.LODs[0], MeshRenderer);
                 }
             }
         }

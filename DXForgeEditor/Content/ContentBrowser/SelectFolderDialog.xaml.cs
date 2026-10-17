@@ -28,7 +28,7 @@ namespace DXForgeEditor.Content
                 // TODO: すべてのパスが常にディレクトリ区切り文字で終わるようにする！
                 var startPath = startFolder + Path.DirectorySeparatorChar;
 
-                if (startPath.Contains(Project.Current.ContentPath))
+                if (startPath.Contains(Project.Current!.ContentPath)) // このダイアログはプロジェクトを開いている間しか表示されない
                 {
                     ((ContentBrowser)contentBrowserView.DataContext).SelectedFolder = startFolder;
                 }

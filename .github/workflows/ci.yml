@@ -55,4 +55,4 @@ jobs:
 
       - name: Build editor
         shell: pwsh
-        run: ./build.ps1 -Target editor -Configuration DebugEditor
+        run: ./build.ps1 -Target editor -Configuration DebugEditor -WarningsAsErrors

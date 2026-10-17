@@ -22,7 +22,7 @@ namespace DXForgeEditor.Content
     {
         public object? Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            var contentFolder = Project.Current.ContentPath;
+            var contentFolder = Project.Current!.ContentPath; // インポート設定はプロジェクトを開いている間しか表示されない
             if (value is string folder && !string.IsNullOrEmpty(folder) && folder.Contains(contentFolder))
             {
                 return $@"{Path.DirectorySeparatorChar}{folder.Replace(contentFolder, "")}";

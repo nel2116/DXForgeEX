@@ -236,7 +236,14 @@ namespace DXForgeEditor.GameDev
             }
 
             OpenVisualStudio_Internal(project.Solution);
-            var instance = _vsInstance ?? throw new COMException("Visual Studio could not be opened for the build.");
+            // RunGame()はasync voidのコマンドから呼ばれ例外が捕捉されないため、throwせずにビルド失敗として扱う
+            var instance = _vsInstance;
+            if (instance == null)
+            {
+                BuildSucceeded = false;
+                Logger.Log(MessageType.Error, "Visual Studioを起動できなかったため、ビルドできませんでした。");
+                return;
+            }
             BuildDone = BuildSucceeded = false;
 
             CallOnSTAThread(() =>

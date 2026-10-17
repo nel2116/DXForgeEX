@@ -440,7 +440,7 @@ namespace DXForgeEditor.Content
         private bool ImportFbx(string file)
         {
             Logger.Log(MessageType.Info, $"FBXファイルのインポート: {file}");
-            var tempPath = Application.Current.Dispatcher.Invoke(() => Project.Current.TempFolder);
+            var tempPath = Application.Current.Dispatcher.Invoke(() => Project.Current!.TempFolder); // インポートはプロジェクトを開いている間しか行われない
             if (string.IsNullOrEmpty(tempPath)) return false;
 
             lock (_lock)
@@ -683,7 +683,7 @@ namespace DXForgeEditor.Content
             var meshDataSize = writer.BaseStream.Position - meshDataBegin;
             Debug.Assert(meshDataSize > 0);
             var buffer = ((MemoryStream)writer.BaseStream).ToArray();
-            hash = ContentHelper.ComputeHash(buffer, (int)meshDataBegin, (int)meshDataSize);
+            hash = ContentHelper.ComputeHash(buffer, (int)meshDataBegin, (int)meshDataSize)!; // bufferは空でない(meshDataSize > 0)ためnullにならない
         }
 
         private MeshLOD BinaryToLOD(BinaryReader reader)

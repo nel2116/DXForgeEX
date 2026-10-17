@@ -282,8 +282,9 @@ namespace DXForgeEditor.GameProject
             }
 
             Debug.Assert(_scenes != null);
-            ActiveScene = _scenes.FirstOrDefault(x => x.IsActive)
-                ?? throw new SerializationException("The project must contain an active scene.");
+            // アクティブなシーンは必ず存在する前提(直後のDebug.Assertで検証)。ロード中にthrowすると
+            // 呼び出し元(OpenProjectView)で捕捉されずエディタが落ちるため、従来どおりthrowしない
+            ActiveScene = _scenes.FirstOrDefault(x => x.IsActive)!;
             Debug.Assert(ActiveScene != null);
 
             await BuildGameCodeDLL(false);

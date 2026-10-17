@@ -503,6 +503,7 @@ namespace DXForgeEditor.Content
                 ImportSettings.Sources.Add(file);
 
                 (var slices, var icon) = ContentToolsAPI.Import(this);
+                if (slices == null) throw new InvalidDataException("ContentToolsからテクスチャデータを取得できませんでした。");
                 Debug.Assert(slices.Any() && slices.First().Any() && slices.First().First().Any());
 
                 if (slices.Any() && slices.First().Any() && slices.First().First().Any())
@@ -526,7 +527,8 @@ namespace DXForgeEditor.Content
                     icon = firstMip;
                 }
 
-                Icon = BitmapHelper.CreateThumbnail(BitmapHelper.ImageFromSlice(icon, IsNormalMap), ContentInfo.IconWidth, ContentInfo.IconWidth);
+                var iconImage = BitmapHelper.ImageFromSlice(icon, IsNormalMap) ?? throw new InvalidDataException("アイコン画像を生成できませんでした。");
+                Icon = BitmapHelper.CreateThumbnail(iconImage, ContentInfo.IconWidth, ContentInfo.IconWidth);
 
                 return true;
             }
