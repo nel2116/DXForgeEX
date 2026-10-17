@@ -75,7 +75,7 @@ namespace DXForgeEditor.Editors
             }
         }
 
-        public string Name { get; set; }
+        public string Name { get; set; } = string.Empty;
         public Point3DCollection Positions { get; } = new Point3DCollection();
         public Vector3DCollection Normals { get; } = new Vector3DCollection();
         public PointCollection UVs { get; } = new PointCollection();
@@ -191,7 +191,7 @@ namespace DXForgeEditor.Editors
             }
         }
 
-        public MeshRenderer(MeshLOD lod, MeshRenderer old)
+        public MeshRenderer(MeshLOD lod, MeshRenderer? old)
         {
             Debug.Assert(lod?.Meshes.Any() == true);
             // カメラの位置とターゲットを適切に設定するには、レンダリングするオブジェクトの大きさを把握する必要がある。
@@ -329,7 +329,8 @@ namespace DXForgeEditor.Editors
 
         Asset IAssetEditor.Asset => Geometry;
 
-        private Content.Geometry _geometry;
+        // SetAsset() で設定されるまでは null。ビューはアセットのロード後にのみこれらを参照する
+        private Content.Geometry _geometry = null!;
         public Content.Geometry Geometry
         {
             get => _geometry;
@@ -343,7 +344,7 @@ namespace DXForgeEditor.Editors
             }
         }
 
-        private MeshRenderer _meshRenderer;
+        private MeshRenderer _meshRenderer = null!;
         public MeshRenderer MeshRenderer
         {
             get => _meshRenderer;

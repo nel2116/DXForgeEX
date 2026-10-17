@@ -73,7 +73,7 @@ namespace DXForgeEditor.Components
             }
         }
 
-        private string _name;
+        private string _name = string.Empty;
         [DataMember]
         public string Name
         {
@@ -92,11 +92,12 @@ namespace DXForgeEditor.Components
 
         [DataMember(Name = "Components")]
         private readonly ObservableCollection<Component> _components = new();
-        public ReadOnlyObservableCollection<Component> Components { get; private set; }
+        // OnDeserialized() で設定される (コンストラクタからも呼び出される)
+        public ReadOnlyObservableCollection<Component> Components { get; private set; } = null!;
 
-        public Component GetComponent(Type type) => Components.FirstOrDefault(c => c.GetType() == type);
+        public Component? GetComponent(Type type) => Components.FirstOrDefault(c => c.GetType() == type);
 
-        public T GetComponent<T>() where T : Component => GetComponent(typeof(T)) as T;
+        public T? GetComponent<T>() where T : Component => GetComponent(typeof(T)) as T;
 
         public bool AddComponent(Component component)
         {
@@ -161,8 +162,8 @@ namespace DXForgeEditor.Components
             }
         }
 
-        private string _name;
-        public string Name
+        private string? _name;
+        public string? Name
         {
             get => _name;
             set
@@ -178,9 +179,9 @@ namespace DXForgeEditor.Components
         private readonly ObservableCollection<IMSComponent> _components = new();
         public ReadOnlyObservableCollection<IMSComponent> Components { get; private set; }
 
-        public T GetMSComponent<T>() where T : IMSComponent
+        public T? GetMSComponent<T>() where T : IMSComponent
         {
-            return (T)Components.FirstOrDefault(x => x.GetType() == typeof(T));
+            return (T?)Components.FirstOrDefault(x => x.GetType() == typeof(T));
         }
 
         public List<GameEntity> SelectedEntities { get; }
@@ -217,12 +218,12 @@ namespace DXForgeEditor.Components
             var value = getProperty(objects.First());
             return objects.Skip(1).Any(x => value != getProperty(x)) ? null : value;
         }
-        protected virtual bool UpdateGameEntities(string propertyName)
+        protected virtual bool UpdateGameEntities(string? propertyName)
         {
             switch (propertyName)
             {
-                case nameof(IsEnabled): SelectedEntities.ForEach(x => x.IsEnabled = IsEnabled.Value); return true;
-                case nameof(Name): SelectedEntities.ForEach(x => x.Name = Name); return true;
+                case nameof(IsEnabled): Debug.Assert(IsEnabled.HasValue); SelectedEntities.ForEach(x => x.IsEnabled = IsEnabled.Value); return true;
+                case nameof(Name): Debug.Assert(Name != null); SelectedEntities.ForEach(x => x.Name = Name); return true;
             }
             return false;
         }

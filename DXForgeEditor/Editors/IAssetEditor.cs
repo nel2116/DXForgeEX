@@ -15,7 +15,7 @@ namespace DXForgeEditor.Editors
     {
         AssetEditorState State { get; }
         Guid AssetGuid { get; }
-        Asset Asset { get; }
+        Asset? Asset { get; }
 
         void SetAsset(AssetInfo info);
     }

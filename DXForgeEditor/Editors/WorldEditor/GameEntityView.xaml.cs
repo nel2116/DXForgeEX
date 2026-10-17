@@ -28,9 +28,10 @@ namespace DXForgeEditor.Editors
 
     public partial class GameEntityView : UserControl
     {
-        private Action _undoAction;
-        private string _propertyName;
-        public static GameEntityView Instance { get; private set; }
+        private Action? _undoAction;
+        private string? _propertyName;
+        // コンストラクタで設定される (WorldEditorView の生成時に作られ、参照はその後に限られる)
+        public static GameEntityView Instance { get; private set; } = null!;
         public GameEntityView()
         {
             InitializeComponent();
@@ -40,30 +41,30 @@ namespace DXForgeEditor.Editors
             {
                 if (DataContext != null)
                 {
-                    (DataContext as MSEntity).PropertyChanged += (s, e) => _propertyName = e.PropertyName;
+                    ((MSEntity)DataContext).PropertyChanged += (s, e) => _propertyName = e.PropertyName;
                 }
             };
         }
 
         private Action GetRenameAction()
         {
-            var vm = DataContext as MSEntity;
+            var vm = (MSEntity)DataContext;
             var selection = vm.SelectedEntities.Select(entity => (entity, entity.Name)).ToList();
             return new Action(() =>
             {
                 selection.ForEach(item => item.entity.Name = item.Name);
-                (DataContext as MSEntity).Refresh();
+                ((MSEntity)DataContext).Refresh();
             });
         }
 
         private Action GetIsEnabledAction()
         {
-            var vm = DataContext as MSEntity;
+            var vm = (MSEntity)DataContext;
             var selection = vm.SelectedEntities.Select(entity => (entity, entity.IsEnabled)).ToList();
             return new Action(() =>
             {
                 selection.ForEach(item => item.entity.IsEnabled = item.IsEnabled);
-                (DataContext as MSEntity).Refresh();
+                ((MSEntity)DataContext).Refresh();
             });
         }
 
@@ -87,8 +88,8 @@ namespace DXForgeEditor.Editors
         private void OnIsEnabled_CheckBox_Click(object sender, RoutedEventArgs e)
         {
             var undoAction = GetIsEnabledAction();
-            var vm = DataContext as MSEntity;
-            vm.IsEnabled = (sender as CheckBox).IsChecked == true;
+            var vm = (MSEntity)DataContext;
+            vm.IsEnabled = ((CheckBox)sender).IsChecked == true;
             var redoAction = GetIsEnabledAction();
             Project.UndoRedo.Add(new UndoRedoAction(undoAction, redoAction,
                 vm.IsEnabled == true ? "ゲーム・エンティティを有効にする" : "ゲーム・エンティティを無効にする"));
@@ -96,8 +97,8 @@ namespace DXForgeEditor.Editors
 
         private void OnAddComponent_Button_PreviewMouse_LBD(object sender, MouseButtonEventArgs e)
         {
-            var menu = FindResource("addComponentMenu") as ContextMenu;
-            var btn = sender as ToggleButton;
+            var menu = (ContextMenu)FindResource("addComponentMenu");
+            var btn = (ToggleButton)sender;
             btn.IsChecked = true;
             menu.Placement = PlacementMode.Bottom;
             menu.PlacementTarget = btn;
@@ -109,7 +110,7 @@ namespace DXForgeEditor.Editors
         {
             var creationFunction = ComponentFactory.GetCreationFunction(componentType);
             var chandedEntities = new List<(GameEntity entity, Component component)>();
-            var vm = DataContext as MSEntity;
+            var vm = (MSEntity)DataContext;
             foreach (var entity in vm.SelectedEntities)
             {
                 var component = creationFunction(entity, data);
@@ -127,12 +128,12 @@ namespace DXForgeEditor.Editors
                 () =>
                 {
                     chandedEntities.ForEach(x => x.entity.RemoveComponent(x.component));
-                    (DataContext as MSEntity).Refresh();
+                    ((MSEntity)DataContext).Refresh();
                 },
                 () =>
                 {
                     chandedEntities.ForEach(x => x.entity.AddComponent(x.component));
-                    (DataContext as MSEntity).Refresh();
+                    ((MSEntity)DataContext).Refresh();
                 },
                 $"{componentType}コンポーネントを追加"));
             }
@@ -140,7 +141,8 @@ namespace DXForgeEditor.Editors
 
         private void OnAddScriptComponent(object sender, RoutedEventArgs e)
         {
-            AddComponent(ComponentType.Script, (sender as MenuItem).Header.ToString());
+            // Header はスクリプト名 (string) にバインドされているため ToString() は null にならない
+            AddComponent(ComponentType.Script, ((MenuItem)sender).Header.ToString()!);
         }
     }
 }

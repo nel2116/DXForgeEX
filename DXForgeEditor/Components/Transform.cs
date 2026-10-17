@@ -201,7 +201,7 @@ namespace DXForgeEditor.Components
             }
         }
 
-        protected override bool UpdateComponents(string propertyName)
+        protected override bool UpdateComponents(string? propertyName)
         {
             switch (propertyName)
             {
