@@ -45,7 +45,7 @@ namespace DXForgeEditor
 
     static class VisualExtensions
     {
-        public static T FindVisualParent<T>(this DependencyObject depObject) where T : DependencyObject
+        public static T? FindVisualParent<T>(this DependencyObject depObject) where T : DependencyObject
         {
             if (depObject is not Visual) return null;
 
@@ -61,7 +61,7 @@ namespace DXForgeEditor
             return null;
         }
 
-        public static T FindVisualChild<T>(this DependencyObject depObj) where T : DependencyObject
+        public static T? FindVisualChild<T>(this DependencyObject depObj) where T : DependencyObject
         {
             if (depObj is not Visual) return null;
 
@@ -132,7 +132,7 @@ namespace DXForgeEditor
             return path.Append(file).ToString();
         }
 
-        public static byte[] ComputeHash(byte[] data, int offset = 0, int count = 0)
+        public static byte[]? ComputeHash(byte[]? data, int offset = 0, int count = 0)
         {
             if (data?.Length > 0)
             {
@@ -142,9 +142,9 @@ namespace DXForgeEditor
             return null;
         }
 
-        internal static async Task<List<Asset>> ImportFilesAsync(IEnumerable<AssetProxy> proxies)
+        internal static async Task<List<Asset?>> ImportFilesAsync(IEnumerable<AssetProxy> proxies)
         {
-            List<Asset> assets = new();
+            List<Asset?> assets = new();
             try
             {
                 ImportingItemCollection.Init();
@@ -170,14 +170,14 @@ namespace DXForgeEditor
             return assets;
         }
 
-        private static Asset Import(string file, IAssetImportSettings importSettings, string destination)
+        private static Asset? Import(string file, IAssetImportSettings importSettings, string destination)
         {
             Debug.Assert(!string.IsNullOrEmpty(file));
             if (IsDirectory(file)) return null;
             var name = Path.GetFileNameWithoutExtension(file).ToLower();
             var ext = Path.GetExtension(file).ToLower();
 
-            Asset asset = ext switch
+            Asset? asset = ext switch
             {
                 { } when MeshFileExtensions.Contains(ext) => new Content.Geometry(importSettings),
                 { } when ImageFileExtensions.Contains(ext) => new Texture(importSettings),
@@ -195,7 +195,7 @@ namespace DXForgeEditor
 
         private static void Import(Asset asset, string name, string file, string destination)
         {
-            destination = destination?.Trim();
+            destination = destination.Trim();
 
             Debug.Assert(asset != null);
             Debug.Assert(!string.IsNullOrEmpty(destination) && Directory.Exists(destination));
@@ -231,7 +231,7 @@ namespace DXForgeEditor
         public static byte[] Compress(byte[] data)
         {
             Debug.Assert(data?.Length > 0);
-            byte[] compressedData = null;
+            byte[] compressedData;
             using (var output = new MemoryStream())
             {
                 using (var compressor = new DeflateStream(output, CompressionLevel.Optimal, true))
@@ -248,7 +248,7 @@ namespace DXForgeEditor
         public static byte[] Decompress(byte[] data)
         {
             Debug.Assert(data?.Length > 0);
-            byte[] decompressedData = null;
+            byte[] decompressedData;
             using (var output = new MemoryStream())
             {
                 using (var compressor = new DeflateStream(new MemoryStream(data), CompressionMode.Decompress))
@@ -283,13 +283,13 @@ namespace DXForgeEditor
             return memStream.ToArray();
         }
 
-        internal static BitmapSource ImageFromSlice(Slice slice, bool isNormalMap = false)
+        internal static BitmapSource? ImageFromSlice(Slice slice, bool isNormalMap = false)
         {
             var data = slice.RawContent;
             var bytesPerPixel = data.Length / (slice.Width * slice.Height);
             var stride = slice.Width * bytesPerPixel; // これはslice.RowPitchと同じでなければならない。
             var format = PixelFormats.Default;
-            byte[] bgrData = null;
+            byte[]? bgrData = null;
 
             if (bytesPerPixel == 16) format = PixelFormats.Rgba128Float;
             else if (bytesPerPixel == 4) format = PixelFormats.Bgra32;
@@ -346,7 +346,7 @@ namespace DXForgeEditor
                 Buffer.BlockCopy(data, 0, bgrData, 0, data.Length);
             }
 
-            BitmapSource image = null;
+            BitmapSource? image = null;
             if (bgrData != null)
             {
                 image = BitmapSource.Create(slice.Width, slice.Height, 96.0, 96.0, format, null, bgrData, stride);

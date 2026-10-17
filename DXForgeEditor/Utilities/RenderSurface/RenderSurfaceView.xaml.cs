@@ -30,7 +30,7 @@ namespace DXForgeEditor.Utilities
             WM_SIZE = 0x0005,
         }
 
-        private RenderSurfaceHost _host = null;
+        private RenderSurfaceHost? _host = null;
 
         public RenderSurfaceView()
         {
@@ -71,7 +71,8 @@ namespace DXForgeEditor.Utilities
             {
                 if (disposing)
                 {
-                    _host.Dispose();
+                    // The view can be disposed before its Loaded event creates the host.
+                    _host?.Dispose();
                 }
                 _disposedValue = true;
             }

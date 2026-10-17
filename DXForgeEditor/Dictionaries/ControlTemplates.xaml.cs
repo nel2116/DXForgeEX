@@ -13,7 +13,7 @@ namespace DXForgeEditor.Dictionaries
     {
         private void OnTextBox_KeyDown(object sender, KeyEventArgs e)
         {
-            var textBox = sender as TextBox;
+            var textBox = (TextBox)sender;
             var exp = textBox.GetBindingExpression(TextBox.TextProperty);
             if (exp == null) return;
 
@@ -39,16 +39,16 @@ namespace DXForgeEditor.Dictionaries
 
         private void OnTextBox_GotFocus(object sender, RoutedEventArgs e)
         {
-            var textBox = sender as TextBox;
+            var textBox = (TextBox)sender;
             var exp = textBox.GetBindingExpression(TextBox.TextProperty);
             exp?.UpdateTarget();
 
-            (sender as TextBox).SelectAll();
+            ((TextBox)sender).SelectAll();
         }
 
         private void OnTextBoxRename_KeyDown(object sender, KeyEventArgs e)
         {
-            var textBox = sender as TextBox;
+            var textBox = (TextBox)sender;
             var exp = textBox.GetBindingExpression(TextBox.TextProperty);
             if (exp == null) return;
 
@@ -84,7 +84,7 @@ namespace DXForgeEditor.Dictionaries
         private void OnTextBoxRename_LostFocus(object sender, RoutedEventArgs e)
         {
 
-            var textBox = sender as TextBox;
+            var textBox = (TextBox)sender;
             if (!textBox.IsVisible) return;
             var exp = textBox.GetBindingExpression(TextBox.TextProperty);
             if (exp != null)

@@ -77,7 +77,8 @@ namespace DXForgeEditor.DllWrappers
 
                 // transform component
                 {
-                    var c = entity.GetComponent<Transform>();
+                    // Transform is required on every entity and cannot be removed.
+                    var c = entity.GetComponent<Transform>()!;
                     desc.Transform.Position = c.Position;
                     desc.Transform.Rotation = c.Rotation;
                     desc.Transform.Scale = c.Scale;
@@ -90,7 +91,7 @@ namespace DXForgeEditor.DllWrappers
                     var c = entity.GetComponent<Script>();
                     if (c != null && Project.Current != null)
                     {
-                        if (Project.Current.AvailableScripts.Contains(c.Name))
+                        if (Project.Current.AvailableScripts?.Contains(c.Name) == true)
                         {
                             desc.Script.ScriptCreater = GetScriptCreater(c.Name);
                         }

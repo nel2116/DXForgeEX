@@ -15,7 +15,7 @@ namespace DXForgeEditor.GameProject
     [DataContract]
     class Scene : ViewModelBase
     {
-        private string _name;
+        private string _name = string.Empty;
         [DataMember]
         public string Name
         {
@@ -49,10 +49,12 @@ namespace DXForgeEditor.GameProject
         }
         [DataMember(Name = "GameEntities")]
         private readonly ObservableCollection<GameEntity> _gameEntities = new();
-        public ReadOnlyObservableCollection<GameEntity> GameEntities { get; private set; }
+        // Initialized synchronously by OnDeserialized during construction/loading.
+        public ReadOnlyObservableCollection<GameEntity> GameEntities { get; private set; } = null!;
 
-        public ICommand AddGameEntityCommand { get; private set; }
-        public ICommand RemoveGameEntityCommand { get; private set; }
+        // Both commands are initialized synchronously by OnDeserialized.
+        public ICommand AddGameEntityCommand { get; private set; } = null!;
+        public ICommand RemoveGameEntityCommand { get; private set; } = null!;
 
         private void AddGameEntity(GameEntity entity, int index = -1)
         {
@@ -84,6 +86,7 @@ namespace DXForgeEditor.GameProject
                 OnPropertyChanged(nameof(_gameEntities));
             }
 
+            Debug.Assert(_gameEntities != null);
             foreach (var entity in _gameEntities)
             {
                 entity.IsActive = IsActive;

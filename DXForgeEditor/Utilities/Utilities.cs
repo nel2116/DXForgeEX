@@ -76,9 +76,9 @@ namespace DXForgeEditor.Utilities
         private DateTime _lastEventTime = DateTime.Now;
         private readonly List<object> _data = new();
 
-        public event EventHandler<DelayEventTimerArgs> Triggered;
+        public event EventHandler<DelayEventTimerArgs>? Triggered;
 
-        public void Trigger(object data = null)
+        public void Trigger(object? data = null)
         {
             if (data != null) _data.Add(data);
             _lastEventTime = DateTime.Now;

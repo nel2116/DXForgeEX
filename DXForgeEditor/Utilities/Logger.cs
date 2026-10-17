@@ -74,7 +74,7 @@ namespace DXForgeEditor.Utilities
         {
             FilterdMessages.Filter += (s, e) =>
             {
-                var type = (int)(e.Item as LogMessage).MessageType;
+                var type = (int)((LogMessage)e.Item).MessageType;
                 e.Accepted = (type & _messageFilter) != 0;
             };
         }

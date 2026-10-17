@@ -41,7 +41,7 @@ namespace DXForgeEditor.ContentToolsAPIStructs
     [StructLayout(LayoutKind.Sequential)]
     class TextureImportSettings
     {
-        public string Sources;
+        public string Sources = string.Empty;
         public int SourceCount;
         public int Dimension;
         public int MipLevels;
@@ -180,7 +180,7 @@ namespace DXForgeEditor.DllWrappers
             return SlicesFromBinary(subresourceData, data.Info.ArraySize, data.Info.MipLevels, ((TextureFlags)data.Info.Flags).HasFlag(TextureFlags.IsVolumeMap));
         }
 
-        private static Slice GetIcon(TextureData data)
+        private static Slice? GetIcon(TextureData data)
         {
             // サブリソースは圧縮されない。 最初の画像をアイコンに使用するだけです。
             if (data.ImportSettings.Compress == 0) return null;
@@ -333,7 +333,7 @@ namespace DXForgeEditor.DllWrappers
         [DllImport(_toolsDLL)]
         private static extern void Import([In, Out] TextureData data);
 
-        public static (List<List<List<Slice>>> slices, Slice icon) Import(Texture texture)
+        public static (List<List<List<Slice>>>? slices, Slice? icon) Import(Texture texture)
         {
             Debug.Assert(texture.ImportSettings.Sources.Any());
             using var textureData = new TextureData();
@@ -395,12 +395,12 @@ namespace DXForgeEditor.DllWrappers
         }
 
         [DllImport(_toolsDLL)]
-        private static extern void ImportFbx(string file, [In, Out] SceneData data, ProgressCallback callback);
+        private static extern void ImportFbx(string file, [In, Out] SceneData data, ProgressCallback? callback);
 
         public static void ImportFbx(string file, Geometry geometry)
         {
             var item = ImportingItemCollection.GetItem(geometry);
-            ProgressCallback callback = item != null ? item.SetProgress : null;
+            ProgressCallback? callback = item != null ? item.SetProgress : null;
             GeometryFromSceneData(geometry, (sceneData) => ImportFbx(file, sceneData, callback), $"FBXファイルのインポートに失敗しました： {file}");
         }
         #endregion Geometry
