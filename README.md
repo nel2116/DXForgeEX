@@ -113,7 +113,8 @@ DXFORGE_TEST_CASE(my_new_test)
 
 CIの対象範囲は意図的に絞っています:
 
-- `ContentTools`はFBX SDKを絶対パスで参照しているためランナーではビルドできません(ソリューション構成`Debug`/`Release`ではビルド対象外なので問題になりません)。
+- `ContentTools`はFBX SDKが必要なためランナーではビルドできません(ソリューション構成`Debug`/`Release`ではビルド対象外なので問題になりません)。
+  ローカルでは既定でFBX SDK 2020.3.7の標準インストール先を参照します。別の場所にある場合は、環境変数または`/p:FbxSdkDir=<SDKのルート>`で指定してください(`ContentTools/FbxSdk.props`)。SDKが見つからない場合はビルド開始時に分かりやすいエラーで停止します。
 - `EngineTest`はビルドのみ(実行にはウィンドウとGPUが必要)。
 - `EngineUnitTests`はGPU・ウィンドウ不要なので、CIで実際に実行されます。
 

@@ -153,22 +153,6 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.42.34433\atlmfc\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(LibraryPath)</LibraryPath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugEditor|x64'">
-    <IncludePath>C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.42.34433\atlmfc\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(LibraryPath)</LibraryPath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.42.34433\atlmfc\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(LibraryPath)</LibraryPath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseEditor|x64'">
-    <IncludePath>C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.42.34433\atlmfc\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(LibraryPath)</LibraryPath>
-  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
