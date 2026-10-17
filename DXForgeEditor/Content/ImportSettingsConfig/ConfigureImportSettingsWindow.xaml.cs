@@ -23,7 +23,7 @@ namespace DXForgeEditor.Content
 
             Loaded += (_, _) =>
             {
-                var vm = DataContext as ConfigureImportSettings;
+                var vm = (ConfigureImportSettings)DataContext;
 
                 tabControl.SelectedIndex = vm.GeometryImportSettingsConfigurator.GeometryProxies.Any() ? 0 :
                 vm.TextureImportSettingsConfigurator.TextureProxies.Any() ? 1 :
@@ -34,7 +34,7 @@ namespace DXForgeEditor.Content
 
         private void OnTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            ImportingItemCollection.SetItemFilter((AssetType)(tabControl.SelectedItem as TabItem)?.Tag);
+            ImportingItemCollection.SetItemFilter((AssetType)((TabItem)tabControl.SelectedItem).Tag);
         }
 
         internal static void AddDroppedFiles(ConfigureImportSettings dataContext, ListBox listBox, DragEventArgs e)
@@ -43,7 +43,7 @@ namespace DXForgeEditor.Content
             if (files?.Length > 0)
             {
                 var destinationFolder = listBox.HasItems ?
-                    (listBox.Items[^1] as AssetProxy).DestinationFolder : dataContext.LastDestinationFolder;
+                    ((AssetProxy)listBox.Items[^1]).DestinationFolder : dataContext.LastDestinationFolder;
 
                 dataContext.AddFiles(files, destinationFolder);
             }

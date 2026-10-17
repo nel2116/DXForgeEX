@@ -21,7 +21,7 @@ namespace DXForgeEditor.Content
         private DispatcherTimer _timer;
         private Stopwatch _stopwatch;
 
-        private string _importDuration;
+        private string _importDuration = string.Empty;
         public string ImportDuration
         {
             get => _importDuration;
@@ -100,8 +100,9 @@ namespace DXForgeEditor.Content
             NormalizedValue = maxValue > 0 ? Math.Clamp(progress / maxValue, 0, 1) : 0.0;
         }
 
-        private void UpdateTimer(object sender, EventArgs e)
+        private void UpdateTimer(object? sender, EventArgs e)
         {
+            Debug.Assert(_timer != null && _stopwatch != null);
             if (Status == ImportStatus.Importing)
             {
                 if (!_stopwatch.IsRunning) _stopwatch.Start();
@@ -130,6 +131,7 @@ namespace DXForgeEditor.Content
                 _timer.Tick += UpdateTimer;
                 _timer.Start();
             });
+            Debug.Assert(_timer != null && _stopwatch != null);
         }
     }
 
@@ -173,7 +175,7 @@ namespace DXForgeEditor.Content
             }
         }
 
-        public static ImportingItem GetItem(Asset asset)
+        public static ImportingItem? GetItem(Asset asset)
         {
             lock (_lockObject) { return _importingItems.FirstOrDefault(x => x.Asset == asset); }
         }
@@ -190,7 +192,7 @@ namespace DXForgeEditor.Content
             FilteredItems = new() { Source = ImportingItems };
             FilteredItems.Filter += (s, e) =>
             {
-                var type = (e.Item as ImportingItem).Asset.Type;
+                var type = ((ImportingItem)e.Item).Asset.Type;
                 e.Accepted = type == _itemFilter;
             };
         }
