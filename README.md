@@ -60,6 +60,7 @@ PowerShell 7+ (`pwsh`) から実行します。
 | `-Target` | `native` / `editor` / `all` | `all` |
 | `-Project` | `DXForge.sln`内のプロジェクト名(`-Target native`時のみ有効) | 省略時はソリューション全体 |
 | `-RunTests` | スイッチ。ビルド後に`EngineUnitTests.exe`を実行 | - |
+| `-WarningsAsErrors` | スイッチ。ネイティブ側の警告をエラーとして扱う(CI用) | - |
 | `-Json` | スイッチ。1行のJSON要約を標準出力に出す | - |
 
 **注意:** ネイティブ側は必ず`DXForge.sln`経由でビルドしてください。`.vcxproj`を直接MSBuildに渡すと、`$(SolutionDir)`がプロジェクト自身のディレクトリにフォールバックしてしまい、インクルードパスが崩れてビルドに失敗します(MSBuildの既知の挙動)。`build.ps1`は常に`/t:<プロジェクト名>`で`DXForge.sln`を経由するため、この問題を踏みません。
@@ -100,11 +101,45 @@ DXFORGE_TEST_CASE(my_new_test)
 
 **新規ファイルは必ずUTF-8 BOM付きで保存してください。** このリポジトリの既存ファイルは全て日本語のヘッダーコメントで始まっており、BOMが無いとMSVCがShift-JISと誤認してコンパイルエラー(一見無関係な箇所でのエラー)になります。
 
+## 品質ゲート
+
+### CI (GitHub Actions)
+
+`.github/workflows/ci.yml` が、`main`/`develop`へのpushとすべてのPRで以下を実行します。
+
+- **ネイティブビルド + 自動テスト** — `Debug`と`Release`の両構成(`Release`では`NDEBUG`で`assert`が無効化され挙動が変わるため、両方を検証)。警告をエラーとして扱います。
+- **エディタビルド** — `dotnet build`で`DXForgeEditor`をビルド。
+
+CIの対象範囲は意図的に絞っています:
+
+- `ContentTools`はFBX SDKを絶対パスで参照しているためランナーではビルドできません(ソリューション構成`Debug`/`Release`ではビルド対象外なので問題になりません)。
+- `EngineTest`はビルドのみ(実行にはウィンドウとGPUが必要)。
+- `EngineUnitTests`はGPU・ウィンドウ不要なので、CIで実際に実行されます。
+
+### 警告のエラー化
+
+ローカル開発では警告はエラーになりません。CIだけが厳格に扱います。
+
+```powershell
+./build.ps1 -Target native -WarningsAsErrors   # ローカルでCIと同じ厳しさで確認したいとき
+```
+
+**注意:** MSBuildの`/p:TreatWarningAsError=true`はグローバルプロパティであり、**C++プロジェクトには効きません**(`/WX-`のままになります)。そのためルートの`Directory.Build.props`で`ItemDefinitionGroup`として設定し、`/p:DXForgeWarningsAsErrors=true`で切り替える方式にしています。`build.ps1 -WarningsAsErrors`がこれを渡します。
+
+現在、ネイティブ側は`Debug`/`Release`ともに警告0件です。この状態を維持してください。
+
+**日本語をナロー文字列リテラルに書かないでください。** CIランナーのシステムコードページは1252(日本語環境ではない)で、MSVCはナロー文字列を実行文字セットへ変換するため、日本語は1文字ごとに`C4566`が出てビルドが失敗します。これはCI特有のノイズではなく、ビルドするマシンのロケールによって文字列データが変わってしまう実際の移植性問題です。コメントは問題ありません(リテラルのみが対象)。日本語が必要な場合はワイド文字版API(`OutputDebugStringW(L"...")`)を使ってください。なお`#if _DEBUG`の中にある場合、Debug構成だけが失敗するため原因が分かりにくくなります。
+
+### コーディング規約の自動化
+
+`.editorconfig`に、実測に基づいた文字コードとインデントの規約を定義しています。とくに**C/C++のUTF-8 BOM必須**(`charset = utf-8-bom`)は、BOM無しだとMSVCがShift-JISと誤認してコンパイルエラーになる問題を、エディタ側で自動的に防ぐためのものです。
+
 ## 既知の制約
 
 - `EngineTest`は対話的なビジュアルテストで、ウィンドウとGPUが必須のため、CLI/CIでは実行できません。
 - グラフィックスバックエンドはDirect3D12のみ実装済みです。Vulkan/OpenGLは未実装のスタブです。
-- Lint設定やCI連携は未整備です。
+- **シェーダファイルの文字コードが統一されていません。** 日本語コメントを含む`.hlsl`/`.hlsli`の8ファイルがShift-JISのまま残っており(C++側だけが過去にUTF-8へ変換された)、残りはASCIIです。DXCは現状これを許容していますが、統一するのが望ましい状態です。`.editorconfig`でもこのためHLSLの`charset`は指定していません(指定すると保存時に文字化けする恐れがあるため)。
+- `.clang-format`は未導入です(既存コード全体が再フォーマットされ巨大な差分になるため見送り)。
 
 ## 今後の方向性
 

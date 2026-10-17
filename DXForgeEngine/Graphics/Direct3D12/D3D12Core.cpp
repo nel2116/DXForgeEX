@@ -7,6 +7,7 @@
 // 更新履歴
 // 2024/12/27 新規作成
 // 2025/01/07 Gパスの追加
+// 2026/10/18 日本語のデバッグ出力をワイド文字版APIに変更(C4566対応)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Core.h"
@@ -389,7 +390,7 @@ namespace dxforge::graphics::d3d12::core
 			}
 			else
 			{
-				OutputDebugStringA("Warning: D3D12 デバッグインターフェイスは使用できません。 このデバイスにGraphics Toolsオプション機能がインストールされているか確認してください。\n");
+				OutputDebugStringW(L"Warning: D3D12 デバッグインターフェイスは使用できません。 このデバイスにGraphics Toolsオプション機能がインストールされているか確認してください。\n");
 			}
 			dxgi_factory_flag |= DXGI_CREATE_FACTORY_DEBUG;
 		}

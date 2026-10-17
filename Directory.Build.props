@@ -1,0 +1,24 @@
+<Project>
+
+  <!--
+    リポジトリ直下の全プロジェクトに適用される共通設定。
+
+    警告のエラー化:
+      MSBuildの /p:TreatWarningAsError=true はグローバルプロパティであり、C++プロジェクトの
+      ClCompile項目メタデータには流れ込まないため効果がない(/WX- のままになる)。
+      そのため、ここで ItemDefinitionGroup として明示的に設定する。
+      ローカル開発を妨げないよう既定ではオフで、CIから次のように有効化する:
+        msbuild DXForge.sln /p:DXForgeWarningsAsErrors=true
+        (build.ps1 の -WarningsAsErrors スイッチがこれを渡す)
+  -->
+  <PropertyGroup>
+    <DXForgeWarningsAsErrors Condition="'$(DXForgeWarningsAsErrors)' == ''">false</DXForgeWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup Condition="'$(DXForgeWarningsAsErrors)' == 'true'">
+    <ClCompile>
+      <TreatWarningAsError>true</TreatWarningAsError>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+</Project>

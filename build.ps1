@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     DXForgeEX をCLIからビルド・テスト実行するためのスクリプト。
 
@@ -27,6 +27,10 @@
     ネイティブビルド成功後にEngineUnitTests.exeを実行し、失敗したテストケースがあれば
     このスクリプトも非ゼロの終了コードを返す。
 
+.PARAMETER WarningsAsErrors
+    ネイティブ側のビルドで警告をエラーとして扱う(Directory.Build.props 経由で /WX を付与)。
+    ローカル開発を妨げないよう既定はオフで、CIから指定する想定。
+
 .PARAMETER Json
     最後に1行のJSON要約を標準出力に出す。EngineUnitTests.exeにも--jsonを渡す。
 
@@ -50,6 +54,8 @@ param(
 
 	[switch]$RunTests,
 
+	[switch]$WarningsAsErrors,
+
 	[switch]$Json
 )
 
@@ -59,17 +65,25 @@ $Platform = "x64"
 
 function Resolve-MSBuildPath
 {
-	$vswhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
-	if (-not (Test-Path $vswhere))
+	# NOTE: ハードコードされたドライブパスに頼らず、環境変数とPATHの両方を見る
+	#       (CIランナーなど Program Files の場所や構成が異なる環境でも動くようにするため)。
+	$vswhereCandidates = @(
+		(Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'),
+		(Join-Path $env:ProgramFiles 'Microsoft Visual Studio\Installer\vswhere.exe'),
+		(Get-Command vswhere.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+	) | Where-Object { $_ -and (Test-Path $_) }
+
+	foreach ($vswhere in $vswhereCandidates)
 	{
-		throw "vswhere.exeが見つかりません。Visual Studio 2022以降をインストールしてください。"
+		$msbuild = & $vswhere -latest -prerelease -products * -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+		if ($msbuild) { return $msbuild }
 	}
-	$msbuild = & $vswhere -latest -prerelease -products * -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
-	if (-not $msbuild)
-	{
-		throw "MSBuild.exeが見つかりません。"
-	}
-	return $msbuild
+
+	# vswhere経由で見つからない場合は、PATH上のMSBuildを使う(setup-msbuildアクション等)
+	$fromPath = Get-Command msbuild.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
+	if ($fromPath) { return $fromPath }
+
+	throw 'MSBuild.exeが見つかりません。Visual Studio 2022以降(「C++によるデスクトップ開発」ワークロード)をインストールしてください。'
 }
 
 # EngineTest/EngineUnitTestsはDebugEditor/ReleaseEditorソリューション構成ではビルド対象外
@@ -107,11 +121,12 @@ if ($Target -eq "native" -or $Target -eq "all")
 		"/p:Platform=$Platform"
 	)
 	if ($Project) { $msbuildArgs += "/t:$Project" }
+	if ($WarningsAsErrors) { $msbuildArgs += "/p:DXForgeWarningsAsErrors=true" }
 
 	Write-Host "== Native build [$Configuration|$Platform]$(if ($Project) { " target=$Project" }) =="
 	& $msbuild @msbuildArgs
 	$nativeExit = $LASTEXITCODE
-	$summary.native = [ordered]@{ exitCode = $nativeExit; project = $Project }
+	$summary.native = [ordered]@{ exitCode = $nativeExit; project = $Project; warningsAsErrors = [bool]$WarningsAsErrors }
 	if ($nativeExit -ne 0) { $exitCode = $nativeExit }
 }
 
