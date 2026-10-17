@@ -93,10 +93,12 @@ function Invoke-BuildStep
 		ForEach-Object { $_.Value.Trim() } | Select-Object -Unique
 	foreach ($line in $errorLines) { Write-Host "  $line" }
 
-	$warningCodes = [regex]::Matches($output, '\bwarning ([A-Z]+[0-9]+)') | ForEach-Object { $_.Groups[1].Value }
+	# @()で包む: パイプラインの結果が1要素だと配列ではなく要素そのものが代入され、
+	# GroupInfoのCount(そのグループの件数)を種類の数と取り違えるため(#15)
+	$warningCodes = @([regex]::Matches($output, '\bwarning ([A-Z]+[0-9]+)') | ForEach-Object { $_.Groups[1].Value })
 	if ($warningCodes.Count -gt 0)
 	{
-		$grouped = $warningCodes | Group-Object | Sort-Object Count -Descending
+		$grouped = @($warningCodes | Group-Object | Sort-Object Count -Descending)
 		$top = ($grouped | Select-Object -First 5 | ForEach-Object { "$($_.Name) x$($_.Count)" }) -join ", "
 		$rest = if ($grouped.Count -gt 5) { " ほか$($grouped.Count - 5)種" } else { "" }
 		Write-Host "  警告 $($warningCodes.Count)件: $top$rest"
