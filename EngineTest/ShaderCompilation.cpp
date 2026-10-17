@@ -7,6 +7,7 @@
 // 更新履歴
 // 2025/01/07 新規作成
 // 2025/01/13 ユーザー定義のシェーダーをコンパイルする処理を追加
+// 2026/10/18 引数の個数をUINT32へ明示的にキャスト(C4244の警告対応)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -115,7 +116,7 @@ namespace
 
 			HRESULT hr{ S_OK };
 			ComPtr<IDxcResult> results{ nullptr };
-			DXCall(hr = _compiler->Compile(&buffer, args.data(), args.size(), _include_handler.Get(), IID_PPV_ARGS(&results)));
+			DXCall(hr = _compiler->Compile(&buffer, args.data(), (u32)args.size(), _include_handler.Get(), IID_PPV_ARGS(&results)));
 			if (FAILED(hr)) return {};
 			ComPtr<IDxcBlobUtf8> errors{ nullptr };
 			DXCall(hr = results->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errors), nullptr));

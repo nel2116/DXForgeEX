@@ -1,0 +1,48 @@
+# このリポジトリの既存ファイルを実測した結果に基づく設定。
+# 実測値: .cpp/.h = UTF-8 BOM + タブ / .cs/.xaml = UTF-8 BOM + 4スペース
+#         .hlsl/.hlsli = 4スペース(エンコーディングは Shift-JIS と ASCII が混在。後述)
+root = true
+
+[*]
+end_of_line = crlf
+insert_final_newline = true
+
+# C/C++: UTF-8 BOM が必須。
+# BOM が無いと MSVC がローカルコードページ(Shift-JIS)と誤認し、日本語コメント以降の
+# トークン列が壊れて、一見無関係な箇所でコンパイルエラーが連鎖する。
+[*.{c,cpp,h,hpp}]
+charset = utf-8-bom
+indent_style = tab
+indent_size = 4
+
+[*.{cs,xaml}]
+charset = utf-8-bom
+indent_style = space
+indent_size = 4
+
+# HLSL: DXC が読むためコンパイラ側の BOM 要件は無い。
+# ただし現状、日本語コメントを含むファイルが Shift-JIS のまま残っており UTF-8 と混在している
+# (C++ 側だけが過去に UTF-8 へ変換された)。統一は別途対応するため、ここでは charset を
+# 指定していない。指定するとエディタが保存時に文字化けを生む恐れがある。
+[*.{hlsl,hlsli}]
+indent_style = space
+indent_size = 4
+
+[*.ps1]
+charset = utf-8-bom
+indent_style = tab
+indent_size = 4
+
+[*.{yml,yaml}]
+charset = utf-8
+indent_style = space
+indent_size = 2
+
+[*.md]
+charset = utf-8
+indent_style = space
+indent_size = 2
+
+[*.{sln,vcxproj,vcxproj.filters,csproj,props,targets}]
+indent_style = space
+indent_size = 2

@@ -9,6 +9,7 @@
 // 2025/01/07 コメントの修正
 // 2525/01/12 Orientationの計算を追加
 // 2025/01/14 コメントの追加
+// 2026/10/18 set_orientation()が未実装である旨をTODOとして明記
 // /_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Transform.h"
@@ -80,7 +81,12 @@ namespace dxforge::transform
 		changes_from_previous_frame[index] |= (u8)component_flags::rotation;
 	}
 
-	void set_orientation(transform_id id, const math::v3& orientation_vector)
+	// TODO: 未実装。orientationはset_rotation()内でクォータニオンから導出される値
+	//       (calculate_orientation())であり、方向ベクタから回転を逆算するにはロール角の
+	//       扱いを決める必要があるため保留している。
+	//       現状、entity_script::set_orientation()経由で指定された値はここで黙って捨てられる。
+	//       実装するか、公開APIから取り下げるかを決めること。
+	void set_orientation([[maybe_unused]] transform_id id, [[maybe_unused]] const math::v3& orientation_vector)
 	{
 	}
 
