@@ -6,6 +6,7 @@
 // Components/Script.cppのスクリプト登録・生成・削除・更新ロジックのテスト
 // 更新履歴
 // 2026/10/18 新規作成
+// 2026/10/18 世代が上限に達したスクリプトIDを再利用しないことのテストを追加 (#21)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
@@ -224,4 +225,80 @@ DXFORGE_TEST_CASE(script_components_stay_valid_across_id_reuse)
 	}
 	CHECK(counters.created == before.created + count * 2);
 	CHECK(counters.destroyed == before.destroyed + count * 2);
+}
+
+DXFORGE_TEST_CASE(script_id_at_max_generation_is_not_reused)
+{
+	// NOTE: script::remove()は、ID再利用の可否をgenerations[id::index(id)]で判定しなければならない(#21)。
+	// 以前は密なインデックス(=削除時点の生存スクリプト数)で引いていたため、
+	// そのインデックスのスロットが低い世代のまま残っていると、上限に達したIDまで再利用されていた。
+	// ここでは「生存スクリプト数 == 世代0のまま保持しているスロットのインデックス」という状態を作り、
+	// その上で1スロットずつ生成・削除を繰り返して世代を上限まで進める。
+	const auto creator{ &script::detail::create_script<script_test_counter> };
+
+	struct held_script
+	{
+		game_entity::entity_id entity_id;
+		id::id_type script_index;
+	};
+	utl::vector<held_script> held{};
+	const auto hold_one = [&]() -> script::script_id
+	{
+		const game_entity::entity entity{ create_entity(creator) };
+		const script::script_id script_id{ entity.script().get_id() };
+		held.emplace_back(held_script{ entity.get_id(), id::index(script_id) });
+		return script_id;
+	};
+
+	// 1. 解放済みIDのキューを使い切り、新規スロット(世代0)が割り当てられるまで保持し続ける。
+	//    再利用されたIDは必ず世代1以上なので、世代0なら新規スロットである。
+	//    このときキューの長さはちょうどid::min_deleted_elementsになっている。
+	id::id_type pinned_index{ id::invalid_id };
+	for (u32 i{ 0 }; i < 1'000'000; ++i)
+	{
+		const script::script_id script_id{ hold_one() };
+		if (id::generation(script_id) == 0)
+		{
+			pinned_index = id::index(script_id);
+			break;
+		}
+	}
+	REQUIRE(id::is_valid(pinned_index));
+	REQUIRE(pinned_index >= held.size());
+
+	// 2. 新規スロットの割り当てを続け、保持数をpinned_index + 1にしてから最後の1つを削除する。
+	//    これで生存スクリプト数 == pinned_index、解放済みIDのキューはid::min_deleted_elements + 1になる。
+	while (held.size() < pinned_index + 1)
+	{
+		hold_one();
+	}
+	REQUIRE(held.back().script_index != pinned_index);
+	game_entity::remove(held.back().entity_id);
+	held.resize(held.size() - 1);
+	REQUIRE(held.size() == pinned_index);
+
+	// 3. 1つ生成して削除する操作を繰り返し、キュー内のスロットの世代を上限まで進める。
+	//    修正前は削除時にgenerations[pinned_index](=0)を見るため上限のIDもキューに戻り、
+	//    キューを一周した後で世代がid::max_generationを超えたIDが生成されていた。
+	constexpr u32 queue_length{ id::min_deleted_elements + 1 };
+	constexpr u32 max_cycles{ (id::max_generation + 4) * queue_length };
+	bool reached_max_generation{ false };
+	bool exceeded_max_generation{ false };
+	u32 cycles_after_max{ 0 };
+	for (u32 i{ 0 }; i < max_cycles && cycles_after_max < queue_length * 2; ++i)
+	{
+		const game_entity::entity entity{ create_entity(creator) };
+		const id::id_type generation{ id::generation(entity.script().get_id()) };
+		if (generation > id::max_generation) exceeded_max_generation = true;
+		if (generation == id::max_generation) reached_max_generation = true;
+		if (reached_max_generation) ++cycles_after_max;
+		game_entity::remove(entity.get_id());
+	}
+	CHECK(reached_max_generation);
+	CHECK(!exceeded_max_generation);
+
+	for (const held_script& h : held)
+	{
+		game_entity::remove(h.entity_id);
+	}
 }
