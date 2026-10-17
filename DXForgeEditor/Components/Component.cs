@@ -36,7 +36,7 @@ namespace DXForgeEditor.Components
         private bool _enableUpdates = true;
         public List<T> SelectedComponents { get; }
 
-        protected abstract bool UpdateComponents(string propertyName);
+        protected abstract bool UpdateComponents(string? propertyName);
         protected abstract bool UpdateMSComponent();
 
         public void Refresh()
@@ -49,7 +49,8 @@ namespace DXForgeEditor.Components
         public MSComponent(MSEntity msEntity)
         {
             Debug.Assert(msEntity?.SelectedEntities?.Any() == true);
-            SelectedComponents = msEntity.SelectedEntities.Select(entity => entity.GetComponent<T>()).ToList();
+            // MSEntity.MakeComponentList() は全選択エンティティが持つコンポーネントに対してのみ生成するため null にならない
+            SelectedComponents = msEntity.SelectedEntities.Select(entity => entity.GetComponent<T>()!).ToList();
             PropertyChanged += (s, e) => { if (_enableUpdates) UpdateComponents(e.PropertyName); };
         }
     }

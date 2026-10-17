@@ -21,7 +21,7 @@ namespace DXForgeEditor.Editors
     /// </summary>
     public partial class TransformView : UserControl
     {
-        private Action _undoAction = null;
+        private Action? _undoAction = null;
         private bool _propertyChanged = false;
 
         public TransformView()
@@ -33,10 +33,10 @@ namespace DXForgeEditor.Editors
         private void OnTransformViewLoaded(object sender, RoutedEventArgs e)
         {
             Loaded -= OnTransformViewLoaded;
-            (DataContext as MSTransform).PropertyChanged += (s, e) => _propertyChanged = true;
+            ((MSTransform)DataContext).PropertyChanged += (s, e) => _propertyChanged = true;
         }
 
-        private Action GetAction(Func<Transform, (Transform transform, Vector3)> selector,
+        private Action? GetAction(Func<Transform, (Transform transform, Vector3)> selector,
             Action<(Transform transform, Vector3)> forEachAction)
         {
             if (!(DataContext is MSTransform vm))
@@ -50,21 +50,23 @@ namespace DXForgeEditor.Editors
             return new Action(() =>
             {
                 selection.ForEach(x => forEachAction(x));
-                (GameEntityView.Instance.DataContext as MSEntity)?.GetMSComponent<MSTransform>().Refresh();
+                // Transform は削除できないため、すべてのエンティティが MSTransform を持つ
+                (GameEntityView.Instance.DataContext as MSEntity)?.GetMSComponent<MSTransform>()!.Refresh();
             });
         }
 
-        private Action GetPositionAction() => GetAction((x) => (x, x.Position), (x) => x.transform.Position = x.Item2);
+        private Action? GetPositionAction() => GetAction((x) => (x, x.Position), (x) => x.transform.Position = x.Item2);
 
-        private Action GetRotationAction() => GetAction((x) => (x, x.Rotation), (x) => x.transform.Rotation = x.Item2);
+        private Action? GetRotationAction() => GetAction((x) => (x, x.Rotation), (x) => x.transform.Rotation = x.Item2);
 
-        private Action GetScaleAction() => GetAction((x) => (x, x.Scale), (x) => x.transform.Scale = x.Item2);
+        private Action? GetScaleAction() => GetAction((x) => (x, x.Scale), (x) => x.transform.Scale = x.Item2);
 
-        private void RecordActions(Action redoAction, string name)
+        private void RecordActions(Action? redoAction, string name)
         {
             if (_propertyChanged)
             {
                 Debug.Assert(_undoAction != null);
+                Debug.Assert(redoAction != null);
                 _propertyChanged = false;
                 Project.UndoRedo.Add(new UndoRedoAction(_undoAction, redoAction, name));
             }
@@ -76,7 +78,7 @@ namespace DXForgeEditor.Editors
             _undoAction = GetPositionAction();
         }
 
-        private void OnPosition_VectorBox_PreviewMouse_LBU(object sender, MouseButtonEventArgs e)
+        private void OnPosition_VectorBox_PreviewMouse_LBU(object sender, MouseButtonEventArgs? e)
         {
             RecordActions(GetPositionAction(), "Position Changed");
         }
@@ -86,7 +88,7 @@ namespace DXForgeEditor.Editors
             _undoAction = GetRotationAction();
         }
 
-        private void OnRotation_VectorBox_PreviewMouse_LBU(object sender, MouseButtonEventArgs e)
+        private void OnRotation_VectorBox_PreviewMouse_LBU(object sender, MouseButtonEventArgs? e)
         {
             RecordActions(GetRotationAction(), "Rotation Changed");
         }
@@ -97,7 +99,7 @@ namespace DXForgeEditor.Editors
             _undoAction = GetScaleAction();
         }
 
-        private void OnScale_VectorBox_PreviewMouse_LBU(object sender, MouseButtonEventArgs e)
+        private void OnScale_VectorBox_PreviewMouse_LBU(object sender, MouseButtonEventArgs? e)
         {
             RecordActions(GetScaleAction(), "Scale Changed");
         }

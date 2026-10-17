@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -11,7 +12,7 @@ namespace DXForgeEditor.Components
     [DataContract]
     class Script : Component
     {
-        private string _name;
+        private string _name = string.Empty;
         [DataMember]
         public string Name
         {
@@ -43,8 +44,8 @@ namespace DXForgeEditor.Components
 
     sealed class MSScript : MSComponent<Script>
     {
-        private string _name;
-        public string Name
+        private string? _name;
+        public string? Name
         {
             get => _name;
             set
@@ -57,10 +58,11 @@ namespace DXForgeEditor.Components
             }
         }
 
-        protected override bool UpdateComponents(string propertyName)
+        protected override bool UpdateComponents(string? propertyName)
         {
             if (propertyName == nameof(Name))
             {
+                Debug.Assert(_name != null);
                 SelectedComponents.ForEach(c => c.Name = _name);
                 return true;
             }

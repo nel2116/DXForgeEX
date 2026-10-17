@@ -17,7 +17,7 @@ namespace DXForgeEditor.Editors
     class TextureEditor : ViewModelBase, IAssetEditor
     {
         private readonly List<List<List<BitmapSource>>> _sliceBitmaps = new();
-        private List<List<List<Slice>>> _slices;
+        private List<List<List<Slice>>>? _slices;
 
         public ICommand SetAllChannelsCommand { get; init; }
         public ICommand SetChannelCommand { get; init; }
@@ -125,10 +125,10 @@ namespace DXForgeEditor.Editors
 
         public float Stride => (float?)SelectedSliceBitmap?.Format.BitsPerPixel / 8 ?? 1.0f;
 
-        Asset IAssetEditor.Asset => Texture;
+        Asset? IAssetEditor.Asset => Texture;
 
-        private Texture _texture = new();
-        public Texture Texture
+        private Texture? _texture = new();
+        public Texture? Texture
         {
             get => _texture;
             private set
@@ -152,7 +152,7 @@ namespace DXForgeEditor.Editors
         public int MaxMipIndex => _sliceBitmaps.Any() && _sliceBitmaps.First().Any() ? _sliceBitmaps.First().Count - 1 : 0;
         public int MaxArrayIndex => _sliceBitmaps.Any() ? _sliceBitmaps.Count - 1 : 0;
         public int MaxDepthIndex => _sliceBitmaps.Any() && _sliceBitmaps.First().Any() && _sliceBitmaps.First().First().Any() ?
-            _sliceBitmaps.ElementAtOrDefault(ArrayIndex).ElementAtOrDefault(MipIndex).Count - 1 : 0;
+            _sliceBitmaps[ArrayIndex][MipIndex].Count - 1 : 0;
 
         private int _arrayIndex;
         public int ArrayIndex
@@ -207,8 +207,8 @@ namespace DXForgeEditor.Editors
             }
         }
 
-        public BitmapSource SelectedSliceBitmap => _sliceBitmaps.ElementAtOrDefault(ArrayIndex)?.ElementAtOrDefault(MipIndex)?.ElementAtOrDefault(DepthIndex);
-        public Slice SelectedSlice => Texture?.Slices?.ElementAtOrDefault(ArrayIndex)?.ElementAtOrDefault(MipIndex)?.ElementAtOrDefault(DepthIndex);
+        public BitmapSource? SelectedSliceBitmap => _sliceBitmaps.ElementAtOrDefault(ArrayIndex)?.ElementAtOrDefault(MipIndex)?.ElementAtOrDefault(DepthIndex);
+        public Slice? SelectedSlice => Texture?.Slices?.ElementAtOrDefault(ArrayIndex)?.ElementAtOrDefault(MipIndex)?.ElementAtOrDefault(DepthIndex);
         public long DataSize => Texture?.Slices?.Sum(x => x.Sum(y => y.Sum(z => z.RawContent.LongLength))) ?? 0;
 
         private void SetSelectedBitmap()
@@ -316,6 +316,7 @@ namespace DXForgeEditor.Editors
         private void GenerateSliceBitMaps(bool isNormalMap)
         {
             _sliceBitmaps.Clear();
+            Debug.Assert(_slices != null);
             foreach (var arraySlice in _slices)
             {
                 List<List<BitmapSource>> mipmapsBitmaps = new();

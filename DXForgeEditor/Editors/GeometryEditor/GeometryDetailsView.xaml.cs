@@ -27,26 +27,26 @@ namespace DXForgeEditor.Editors
 
         private void OnHighlight_CheckBox_Click(object sender, RoutedEventArgs e)
         {
-            var vm = DataContext as GeometryEditor;
+            var vm = (GeometryEditor)DataContext;
             foreach (var m in vm.MeshRenderer.Meshes)
             {
                 m.IsHighlighted = false;
             }
 
-            var checkBox = sender as CheckBox;
-            (checkBox.DataContext as MeshRendererVertexData).IsHighlighted = checkBox.IsChecked == true;
+            var checkBox = (CheckBox)sender;
+            ((MeshRendererVertexData)checkBox.DataContext).IsHighlighted = checkBox.IsChecked == true;
         }
 
         private void OnIsolate_CheckBox_Click(object sender, RoutedEventArgs e)
         {
-            var vm = DataContext as GeometryEditor;
+            var vm = (GeometryEditor)DataContext;
             foreach (var m in vm.MeshRenderer.Meshes)
             {
                 m.IsIsolated = false;
             }
 
-            var checkBox = sender as CheckBox;
-            var mesh = checkBox.DataContext as MeshRendererVertexData;
+            var checkBox = (CheckBox)sender;
+            var mesh = (MeshRendererVertexData)checkBox.DataContext;
             mesh.IsIsolated = checkBox.IsChecked == true;
 
             if (Tag is GeometryView geometryView)
