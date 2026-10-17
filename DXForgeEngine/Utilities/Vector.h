@@ -7,6 +7,7 @@
 // 更新履歴
 // 2024/12/31 新規作成
 // 2025/04/15 コメント追加
+// 2026/10/18 erase()の重複領域のコピーをmemmoveに修正
 // // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -223,7 +224,8 @@ namespace dxforge::utl
 			--_size;
 			if (item < std::addressof(_data[_size]))
 			{
-				memcpy(item, item + 1, (std::addressof(_data[_size]) - item) * sizeof(T));
+				// NOTE: コピー元とコピー先が重なるため、memcpyではなくmemmoveを使う必要がある。
+				memmove(item, item + 1, (std::addressof(_data[_size]) - item) * sizeof(T));
 			}
 			return item;
 		}
