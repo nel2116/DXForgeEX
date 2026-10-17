@@ -56,8 +56,8 @@ namespace DXForgeEditor.GameProject
 
         public BuildConfiguration DLLBuildConfig => BuildConfig == 0 ? BuildConfiguration.DebugEditor : BuildConfiguration.ReleaseEditor;
 
-        private string[] _availableScripts;
-        public string[] AvailableScripts
+        private string[]? _availableScripts;
+        public string[]? AvailableScripts
         {
             get => _availableScripts;
             private set
@@ -72,9 +72,11 @@ namespace DXForgeEditor.GameProject
 
         [DataMember(Name = nameof(Scenes))]
         private readonly ObservableCollection<Scene> _scenes = new();
-        public ReadOnlyObservableCollection<Scene> Scenes { get; private set; }
+        // Initialized by OnDeserialized before its first await.
+        public ReadOnlyObservableCollection<Scene> Scenes { get; private set; } = null!;
 
-        private Scene _activeScene;
+        // Initialized by OnDeserialized before its first await.
+        private Scene _activeScene = null!;
 
         public Scene ActiveScene
         {
@@ -89,23 +91,23 @@ namespace DXForgeEditor.GameProject
             }
         }
 
-        public static Project Current => Application.Current.MainWindow?.DataContext as Project;
+        public static Project? Current => Application.Current.MainWindow?.DataContext as Project;
 
         public static UndoRedo UndoRedo { get; } = new UndoRedo();
 
-        public ICommand UndoCommand { get; private set; }
+        public ICommand? UndoCommand { get; private set; }
 
-        public ICommand RedoCommand { get; private set; }
+        public ICommand? RedoCommand { get; private set; }
 
-        public ICommand AddSceneCommand { get; private set; }
+        public ICommand? AddSceneCommand { get; private set; }
 
-        public ICommand RemoveSceneCommand { get; private set; }
-        public ICommand SaveCommand { get; private set; }
+        public ICommand? RemoveSceneCommand { get; private set; }
+        public ICommand? SaveCommand { get; private set; }
 
-        public ICommand DebugStartCommand { get; private set; }
-        public ICommand DebugStartWithoutDebuggingCommand { get; private set; }
-        public ICommand DebugStopCommand { get; private set; }
-        public ICommand BuildCommand { get; private set; }
+        public ICommand? DebugStartCommand { get; private set; }
+        public ICommand? DebugStartWithoutDebuggingCommand { get; private set; }
+        public ICommand? DebugStopCommand { get; private set; }
+        public ICommand? BuildCommand { get; private set; }
 
         private void SetCommands()
         {
@@ -279,7 +281,9 @@ namespace DXForgeEditor.GameProject
                 OnPropertyChanged(nameof(Scenes));
             }
 
-            ActiveScene = _scenes.FirstOrDefault(x => x.IsActive);
+            Debug.Assert(_scenes != null);
+            ActiveScene = _scenes.FirstOrDefault(x => x.IsActive)
+                ?? throw new SerializationException("The project must contain an active scene.");
             Debug.Assert(ActiveScene != null);
 
             await BuildGameCodeDLL(false);

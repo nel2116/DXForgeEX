@@ -33,7 +33,7 @@ namespace DXForgeEditor.Utilities
             {
                 using var fs = new FileStream(path, FileMode.Open);
                 var serializer = new DataContractSerializer(typeof(T));
-                T instance = (T)serializer.ReadObject(fs);
+                T instance = (T)(serializer.ReadObject(fs) ?? throw new SerializationException("The serialized root must not be null."));
                 return instance;
             }
             catch (Exception ex)

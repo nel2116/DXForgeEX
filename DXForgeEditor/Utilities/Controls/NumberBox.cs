@@ -50,7 +50,7 @@ namespace DXForgeEditor.Utilities.Controls
 
         private static void OnValueChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            (d as NumberBox).RaiseEvent(new RoutedEventArgs(ValueChangedEvent));
+            ((NumberBox)d).RaiseEvent(new RoutedEventArgs(ValueChangedEvent));
         }
 
         public override void OnApplyTemplate()
