@@ -76,8 +76,9 @@ namespace DXForgeEditor.Utilities
                 var cmd = _undoList.Last();
                 _undoList.RemoveAt(_undoList.Count - 1);
                 _enableAdd = false;
-                cmd.Undo();
-                _enableAdd = true;
+                // cmd.Undo()が例外を投げても_enableAddを戻す。戻さないと以後の操作がすべて履歴に記録されなくなる
+                try { cmd.Undo(); }
+                finally { _enableAdd = true; }
                 _redoList.Insert(0, cmd);
             }
         }
@@ -89,8 +90,8 @@ namespace DXForgeEditor.Utilities
                 var cmd = _redoList.First();
                 _redoList.RemoveAt(0);
                 _enableAdd = false;
-                cmd.Redo();
-                _enableAdd = true;
+                try { cmd.Redo(); }
+                finally { _enableAdd = true; }
                 _undoList.Add(cmd);
             }
         }
