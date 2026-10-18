@@ -8,6 +8,7 @@
 // 2026/10/18 新規作成
 // 2026/10/18 世代が上限に達したスクリプトIDを再利用しないことのテストを追加 (#21)
 // 2026/10/18 begin_play()がupdate()より前に1回だけ呼ばれることのテストを追加 (#47)
+// 2026/10/18 削除したスクリプトがbegin_play()の待ちリストに残らないことのテストを追加 (#47)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
@@ -78,6 +79,25 @@ namespace
 		void update(f32 dt) override
 		{
 			set_position(math::v3{ dt, 2.f, 3.f });
+		}
+	};
+
+	// begin_play()の中で、指定されたエンティティを削除するスクリプト
+	game_entity::entity_id entity_to_remove_in_begin_play{ id::invalid_id };
+
+	class script_test_remover : public script::entity_script
+	{
+	public:
+		explicit script_test_remover(game_entity::entity entity)
+			: script::entity_script{ entity } {}
+
+		void begin_play() override
+		{
+			if (id::is_valid(entity_to_remove_in_begin_play))
+			{
+				game_entity::remove(entity_to_remove_in_begin_play);
+				entity_to_remove_in_begin_play = game_entity::entity_id{ id::invalid_id };
+			}
 		}
 	};
 
@@ -360,4 +380,44 @@ DXFORGE_TEST_CASE(script_removed_before_first_update_does_not_begin_play)
 	script::update(1.f);
 	CHECK(counters.begun == before.begun);
 	CHECK(counters.updated == before.updated);
+}
+
+DXFORGE_TEST_CASE(script_removed_before_update_does_not_stay_in_begin_play_queue)
+{
+	// NOTE: エディタはscript::update()を呼ばずに、ゲームDLLを読み直すたびにスクリプトの削除と再生成を繰り返す。
+	//		 削除したスクリプトが待ちリストに残ると、update()が呼ばれない限り待ちリストが増え続ける。
+	const u32 pending_before{ script::detail::pending_begin_play_count() };
+
+	for (u32 i{ 0 }; i < 100; ++i)
+	{
+		const game_entity::entity entity{ create_entity(&script::detail::create_script<script_test_counter>) };
+		REQUIRE(entity.is_valid() && entity.script().is_valid());
+		CHECK(script::detail::pending_begin_play_count() == pending_before + 1);
+		game_entity::remove(entity.get_id());
+	}
+	CHECK(script::detail::pending_begin_play_count() == pending_before);
+}
+
+DXFORGE_TEST_CASE(script_removed_inside_begin_play_is_skipped)
+{
+	const script_counters before{ counters };
+
+	// removerのbegin_play()が、同じフレームでまだbegin_play()を呼ばれていないtargetを削除する
+	const game_entity::entity remover{ create_entity(&script::detail::create_script<script_test_remover>) };
+	const game_entity::entity target{ create_entity(&script::detail::create_script<script_test_counter>) };
+	const game_entity::entity survivor{ create_entity(&script::detail::create_script<script_test_counter>) };
+	REQUIRE(remover.is_valid() && target.is_valid() && survivor.is_valid());
+	entity_to_remove_in_begin_play = target.get_id();
+
+	script::update(1.f);
+	CHECK(!game_entity::is_alive(target.get_id()));
+	CHECK(counters.destroyed == before.destroyed + 1);
+	// targetは削除されたのでbegin_play()もupdate()も呼ばれず、survivorだけが呼ばれる
+	CHECK(counters.begun == before.begun + 1);
+	CHECK(counters.updated == before.updated + 1);
+	CHECK(counters.updated_before_begin_play == before.updated_before_begin_play);
+	CHECK(script::detail::pending_begin_play_count() == 0);
+
+	game_entity::remove(remover.get_id());
+	game_entity::remove(survivor.get_id());
 }
