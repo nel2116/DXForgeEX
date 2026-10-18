@@ -12,6 +12,8 @@
 	  レビューでもコマンドの実行がすべて "blocked by policy" で拒否され、差分を読めないまま終わる。
 	  そのため呼び出しごとに -c windows.sandbox="unelevated" を渡す(~/.codex/config.toml は変更しない)。
 	- codex review は --base とカスタム指示を同時に指定できないため、差分の範囲は指示の中で指定する。
+	- マージ済みのPRは、マージコミットの2つの親(マージ直前のbaseとPRのhead)を比べ、各指摘が今のbaseでも
+	  残っているかもCodexに確かめさせる(merge commitでマージされたPRのみ対応)。
 	- 所要時間の目安は1PRあたり1〜数分。ビルドやテストは行わない(読み取り専用)ため、CIの代わりにはならない。
 
 .PARAMETER Pr
@@ -58,7 +60,7 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 # gh は呼び出し元のディレクトリで対象リポジトリを決めるため、このリポジトリの中で実行する
 Push-Location $RepoRoot
 try {
-	$info = gh pr view $Pr --json number,title,url,baseRefName,headRefOid | ConvertFrom-Json
+	$info = gh pr view $Pr --json number,title,url,state,baseRefName,headRefOid,mergeCommit | ConvertFrom-Json
 	$repoUrl = gh repo view --json url --jq .url
 }
 finally {
@@ -73,11 +75,28 @@ $head = $info.headRefOid
 # 同じPRを並行してレビューしても衝突しないよう、refとworktreeの名前には実行ごとのIDを含める
 $runId = [guid]::NewGuid().ToString('N').Substring(0, 8)
 $ref = "refs/codex-review/$Pr-$runId"
-git -C $RepoRoot fetch --quiet --no-tags $repoUrl "+refs/heads/${base}:$ref/base" "+refs/pull/$Pr/head:$ref/head"
+# FETCH_HEADは共有されるため、並行して実行したときに書き込みが競合しないよう書き出さない
+git -C $RepoRoot fetch --quiet --no-tags --no-write-fetch-head $repoUrl "+refs/heads/${base}:$ref/base" "+refs/pull/$Pr/head:$ref/head"
 if ($LASTEXITCODE -ne 0) { throw "git fetch に失敗しました。" }
 $baseSha = git -C $RepoRoot rev-parse "$ref/base"
 # gh で情報を取得してから push されていても、実際に取得したheadをレビューする
 $head = git -C $RepoRoot rev-parse "$ref/head"
+
+# マージ済みのPRは、今のbaseにPR自身の変更が含まれていて差分が空になるため、
+# マージコミットの1番目の親(マージ直前のbase)と2番目の親(マージ時点のPRのhead)を比べる
+$merged = $info.state -eq "MERGED"
+$currentSha = $baseSha
+if ($merged) {
+	$mergeSha = $info.mergeCommit.oid
+	$parents = @(git -C $RepoRoot rev-list --parents -n 1 $mergeSha) -split " "
+	if ($parents.Count -ne 3) {
+		git -C $RepoRoot update-ref -d "$ref/base"
+		git -C $RepoRoot update-ref -d "$ref/head"
+		throw "マージコミット $mergeSha の親が2つではありません(squashやrebaseでマージされたPRには未対応です)。"
+	}
+	$baseSha = $parents[1]
+	$head = $parents[2]
+}
 
 $work = Join-Path ([System.IO.Path]::GetTempPath()) "DXForgeCodexReview-$Pr-$runId"
 $log = "$work.log"
@@ -88,9 +107,20 @@ if ($LASTEXITCODE -ne 0) {
 	throw "一時worktreeの作成に失敗しました。"
 }
 
+$baseNote = if ($merged) { "マージ直前の $base" } else { "PRの向き先 $base の先端" }
 $prompt = @"
-このリポジトリは、PR #$Pr「$($info.title)」のheadをチェックアウトしたものです。``git diff $baseSha...HEAD`` (``$baseSha`` はPRの向き先 $base の先端)の変更をレビューしてください。
+このリポジトリは、PR #$Pr「$($info.title)」のheadをチェックアウトしたものです。``git diff $baseSha...HEAD`` (``$baseSha`` は$baseNote)の変更をレビューしてください。
 - ファイルは変更せず、ビルドやテストも実行しないこと。
+- 文字コード(BOM)や改行コードだけの変更は指摘しなくてよい(BOMが欠けている場合は指摘すること)。
+"@
+if ($merged) {
+	$prompt += @"
+
+- このPRはすでに $base にマージされている。各指摘について、今の $base の先端(``$currentSha``)でもまだ起きるかを ``git show ${currentSha}:<パス>`` などで確かめ、「現在も残っている」か「その後修正済み」かを必ず書くこと。今の規約は ``git show ${currentSha}:CLAUDE.md`` で読める。
+"@
+}
+$prompt += "`n" + @"
+
 - 指摘は日本語で書き、それぞれに重大度(P0〜P3)、ファイル:行、その不具合が起きる具体的な手順や入力を書くこと。推測で書いた指摘はそうと分かるようにすること。
 - 変更された行だけでなく、呼び出し元や関連する箇所も読んで、変更が既存の挙動を壊していないかを確かめること。
 - リポジトリのCLAUDE.mdの規約も確認すること(特に: C++/C#のファイルはUTF-8 BOM、日本語ヘッダの更新履歴は追記のみ、狭い文字列リテラルに日本語を入れない、async void・OpenProjectViewから呼ばれる経路で例外を投げない、警告を握りつぶさない)。
@@ -135,10 +165,16 @@ Remove-Item -ErrorAction SilentlyContinue $log
 Write-Output $review
 
 if ($Post) {
+	$target = if ($merged) {
+		"マージ済み。$($head.Substring(0, 7))(マージ直前の ``$base`` の $($baseSha.Substring(0, 7)) との差分)、現在の ``$base`` は $($currentSha.Substring(0, 7))"
+	}
+	else {
+		"$($head.Substring(0, 7))(``$base`` の $($baseSha.Substring(0, 7)) との差分)"
+	}
 	$body = @"
 ## Codex レビュー
 
-対象: $($head.Substring(0, 7))(``$base`` の $($baseSha.Substring(0, 7)) との差分) / モデル: $model / 推論: $Effort
+対象: $target / モデル: $model / 推論: $Effort
 
 $review
 
