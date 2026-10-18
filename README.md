@@ -156,6 +156,20 @@ CIの対象範囲は意図的に絞っています:
 
 `.editorconfig`に、実測に基づいた文字コードとインデントの規約を定義しています。とくに**C/C++のUTF-8 BOM必須**(`charset = utf-8-bom`)は、BOM無しだとMSVCがShift-JISと誤認してコンパイルエラーになる問題を、エディタ側で自動的に防ぐためのものです。
 
+### Codexによるレビュー (`CodexReview.ps1`)
+
+PRの差分を[Codex CLI](https://github.com/openai/codex)(`codex review`)にレビューさせ、実装したエージェントとは別の視点から指摘を得ます。PRのheadを`%TEMP%`の下の使い捨てのworktreeに展開してレビューし、終わったら削除します。ビルドやテストは行わないので、CIの代わりにはなりません。1PRあたり1〜2分かかります。
+
+```powershell
+# 結果を表示するだけ
+./CodexReview.ps1 -Pr 52
+
+# 結果をPRにコメントとして投稿する
+./CodexReview.ps1 -Pr 52 -Post
+```
+
+Codex CLIがインストール済みで、ログインしている必要があります。Windowsでは、Codexのサンドボックスが無効だと、レビューのためのコマンドがすべて拒否されます。そのため、スクリプトは呼び出しごとに`-c windows.sandbox="unelevated"`を渡しています。
+
 ## 既知の制約
 
 - `EngineTest`は対話的なビジュアルテストで、ウィンドウとGPUが必須のため、CLI/CIでは実行できません。
