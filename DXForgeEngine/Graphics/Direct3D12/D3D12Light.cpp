@@ -6,6 +6,7 @@
 // Direct3D12のライトクラス
 // 更新履歴
 // 2025/01/18 新規作成
+// 2026/10/18 ライトの向きをエンティティのfront()から取得するよう変更 (#4)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Light.h"
@@ -170,7 +171,7 @@ namespace dxforge::graphics::d3d12::light
 					{
 						const game_entity::entity entity{ game_entity::entity_id{owner.entity_id} };
 						hlsl::DirectionalLightParameters& params{ _non_cullable_lights[owner.data_index] };
-						params.Direction = entity.orientation();
+						params.Direction = entity.front();
 					}
 				}
 
@@ -570,7 +571,7 @@ namespace dxforge::graphics::d3d12::light
 
 				if (_owners[_cullable_owners[index]].type == graphics::light::spot)
 				{
-					culling_info.Direction = params.Direction = entity.orientation();
+					culling_info.Direction = params.Direction = entity.front();
 					calculate_cone_bounding_sphere(params, _bounding_spheres[index]);
 				}
 

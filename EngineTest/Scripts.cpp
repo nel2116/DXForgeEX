@@ -6,6 +6,7 @@
 //
 // 更新履歴
 // 2025/01/18 新規作成
+// 2026/10/18 orientation()の廃止に伴いfront()を使うよう変更 (#4)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Components/Entity.h"
@@ -185,7 +186,7 @@ public:
 		const u64 binding{ std::hash<std::string>()("move") };
 		_input_system.add_handler(binding, this, &camera_script::on_move);
 
-		math::v3 dir{ orientation() };
+		math::v3 dir{ front() };
 		f32 theta{ DirectX::XMScalarACos(dir.y) };
 		f32 phi{ std::atan2(-dir.z, dir.x) };
 		math::v3 rot{ theta - math::half_pi, phi + math::half_pi, 0.0f };

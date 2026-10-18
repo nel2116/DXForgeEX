@@ -7,6 +7,7 @@
 // 更新履歴
 // 2024/08/12 新規作成
 // 2025/01/14 コメントの追加
+// 2026/10/18 set_orientation()を削除し、向きを回転から導出するローカルフレーム(right/up/front)で保持するよう変更 (#4)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -27,11 +28,10 @@ namespace dxforge::transform
 		enum flags : u32
 		{
 			rotation = 0x01,	///< 回転値が変更された
-			orientation = 0x02,	///< 向きが変更された
-			position = 0x04,	///< 位置が変更された
-			scale = 0x08,		///< 拡大率が変更された
+			position = 0x02,	///< 位置が変更された
+			scale = 0x04,		///< 拡大率が変更された
 
-			all = rotation | orientation | position | scale,	///< 全てのフラグ
+			all = rotation | position | scale,	///< 全てのフラグ
 		};
 	};
 
@@ -39,7 +39,6 @@ namespace dxforge::transform
 	struct component_cache
 	{
 		math::v4 rotation;		///< 回転値
-		math::v3 orientation;	///< 向き
 		math::v3 position;		///< 位置
 		math::v3 scale;			///< 拡大率
 		transform_id id;		///< TransformコンポーネントのID

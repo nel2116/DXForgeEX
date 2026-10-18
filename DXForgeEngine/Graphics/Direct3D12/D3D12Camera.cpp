@@ -7,6 +7,7 @@
 // 更新履歴
 // 2025/01/12 新規作成
 // 2025/01/14 コメントの追加
+// 2026/10/18 向きをエンティティのfront()から取得し、上方向もエンティティのup()に追従するよう変更 (#4)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -329,10 +330,12 @@ namespace dxforge::graphics::d3d12::camera
 	{
 		game_entity::entity entity{ game_entity::entity_id{_entity_id} };
 		using namespace DirectX;
-		math::v3 pos{ entity.transform().position() };
-		math::v3 dir{ entity.transform().orientation() };
+		math::v3 pos{ entity.position() };
+		math::v3 dir{ entity.front() };
+		math::v3 up{ entity.up() };
 		_position = XMLoadFloat3(&pos);
 		_direction = XMLoadFloat3(&dir);
+		_up = XMLoadFloat3(&up);
 		_view = XMMatrixLookToRH(_position, _direction, _up);
 
 		if (_is_dirty)
