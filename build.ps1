@@ -184,9 +184,11 @@ if ($Target -eq "editor" -or $Target -eq "all")
 	$editorConfiguration = Get-EditorConfiguration $Configuration
 	$csproj = "$RepoRoot\DXForgeEditor\DXForgeEditor.csproj"
 
+	# Platformを渡さないとAnyCPU扱いになり、出力先がリポジトリ直下の<Config>\になってしまう。
+	# VSのソリューションビルドと同じx64\<Config>\(エンジンのDLLと同じフォルダ)に出力させる。
+	$editorArgs = @("-p:Platform=$Platform")
 	# インクリメンタルビルドでは最新のファイルが再コンパイルされず警告も再出力されないため、
 	# 警告をエラー化するときはフルビルドにして取りこぼしを防ぐ。
-	$editorArgs = @()
 	if ($WarningsAsErrors) { $editorArgs += @("-p:TreatWarningsAsErrors=true", "--no-incremental") }
 
 	Write-Host "== Editor build [$editorConfiguration|$Platform] =="
