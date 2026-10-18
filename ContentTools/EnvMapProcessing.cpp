@@ -7,6 +7,7 @@
 // 更新履歴
 // 2026/10/18 新規作成
 // 2026/10/18 機能レベル11_0のデバイスでもUAVの解除が正しく行われるよう修正
+// 2026/10/18 CPU版のキューブマップ変換のサンプリング位置をGPU版と同じ画素の中心に修正(キューブ面と正距円筒画像の両方で半画素ずれていた)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "EnvMapProcessing.h"
@@ -27,6 +28,8 @@ namespace dxforge::tools
 		}
 
 		constexpr u32 prefiltered_specular_cubemap_size{ 256 };
+		// EnvMapProcessing.hlslのSAMPLE_OFFSETと同じ値にすること(画素の中心からサンプリングする)。
+		constexpr f32 sample_offset{ 0.5f };
 
 		// EnvMapProcessing.hlslのcbuffer Constantsと同じレイアウトにすること。
 		struct ShaderConstants
@@ -85,30 +88,32 @@ namespace dxforge::tools
 			const f32 inv_width{ 1.f / (f32)cube_face.width };
 			const f32 inv_height{ 1.f / (f32)cube_face.height };
 			const u32 row_pitch{ (u32)cube_face.rowPitch };
-			const u32 env_width{ (u32)env_map.width - 1 };
-			const u32 env_height{ (u32)env_map.height - 1 };
+			const u32 env_max_x{ (u32)env_map.width - 1 };
+			const u32 env_max_y{ (u32)env_map.height - 1 };
 			const u32 env_row_pitch{ (u32)env_map.rowPitch };
 			// env_mapとcube_faceはどちらもDXGI_FORMAT_R32G32B32A32_FLOATであることを前提とする。
 			constexpr u32 bytes_per_pixel{ sizeof(f32) * 4 };
 
 			for (u32 y{ 0 }; y < cube_face.height; ++y)
 			{
-				const f32 v{ (y * inv_height) * 2.f - 1.f };
+				const f32 v{ ((y + sample_offset) * inv_height) * 2.f - 1.f };
 
 				for (u32 x{ 0 }; x < cube_face.width; ++x)
 				{
-					const f32 u{ (x * inv_width) * 2.f - 1.f };
+					const f32 u{ ((x + sample_offset) * inv_width) * 2.f - 1.f };
 
 					const math::v3 sample_direction{ get_sample_direction_equirectangular(face_index, u, v) };
 					math::v2 uv{ direction_to_equirectangular(sample_direction) };
 					assert(uv.x >= 0.f && uv.x <= 1.f && uv.y >= 0.f && uv.y <= 1.f);
 
 					if (mirror) uv.x = 1.f - uv.x;
-					const f32 pos_x{ uv.x * env_width };
-					const f32 pos_y{ uv.y * env_height };
+					// GPU版(SampleLevel)と同じく、テクセルiがUVの[i / width, (i + 1) / width)を覆うとみなして最近傍のテクセルを選ぶ。
+					// uvが1のときは端のテクセルにクランプする(GPU版のサンプラーもCLAMP)。
+					const u32 pos_x{ std::min((u32)(uv.x * env_map.width), env_max_x) };
+					const u32 pos_y{ std::min((u32)(uv.y * env_map.height), env_max_y) };
 					u8* dst_pixel{ &cube_face.pixels[row_pitch * y + x * bytes_per_pixel] };
 
-					u8* const src_pixel{ &env_map.pixels[env_row_pitch * (u32)pos_y + (u32)pos_x * bytes_per_pixel] };
+					u8* const src_pixel{ &env_map.pixels[env_row_pitch * pos_y + pos_x * bytes_per_pixel] };
 					memcpy(dst_pixel, src_pixel, bytes_per_pixel);
 				}
 			}
