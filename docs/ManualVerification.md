@@ -200,21 +200,28 @@ Remove-Item -Recurse -Force $verifyRoot
 
 3. `%APPDATA%\DXForgeEditor\ProjectData.xml`から、検証用のプロジェクトのエントリだけを削除する。このファイルはProject Browserの「Open Project」の一覧で、作成/オープンしたプロジェクトが登録されます。フォルダを消しても一覧のエントリは残るので、ほかのエントリには触らず、該当の`<ProjectData>`要素だけを消します。エディタはプロジェクトを`ProjectPath`+`ProjectName`(フルパス)で区別するので、別の場所にある同じ名前のプロジェクトを消さないよう、**`ProjectName`と`ProjectPath`の両方が一致するもの**だけを消します。先にバックアップを取ってください。
 
+まず、バックアップを取り、消すエントリの`ProjectPath`を決めます。バックアップは、まだないときだけ作ります(再実行しても、最初のバックアップが上書きされないように)。
+
 ```powershell
 $f = "$env:APPDATA\DXForgeEditor\ProjectData.xml"
-Copy-Item $f "$f.bak"
+if (-not (Test-Path "$f.bak")) { Copy-Item $f "$f.bak" }
+# エディタは、Path欄の値 + プロジェクト名 + "\" をProjectPathとして登録する
+$projectPath = "$verifyRoot\$verifyName\"
+```
+
+次に、`ProjectName`と`ProjectPath`の両方が一致するエントリを消します。
+
+```powershell
 [xml]$x = Get-Content $f -Raw -Encoding UTF8
 $ns = New-Object Xml.XmlNamespaceManager $x.NameTable
 $ns.AddNamespace("d", "http://schemas.datacontract.org/2004/07/DXForgeEditor.GameProject")
-# エディタは、Path欄の値 + プロジェクト名 + "\" をProjectPathとして登録する
-$projectPath = "$verifyRoot\$verifyName\"
 $targets = @($x.SelectNodes("//d:ProjectData", $ns) | Where-Object { $_.ProjectName -eq $verifyName -and $_.ProjectPath -eq $projectPath })
 "削除するエントリ: $($targets.Count)件 ($projectPath)"
 foreach ($e in $targets) { [void]$e.ParentNode.RemoveChild($e) }
 $x.Save($f)
 ```
 
-削除するエントリが0件と表示された場合は、手順2でPath欄に`$verifyRoot\`以外の値を入力しています。`ProjectData.xml`を開き、該当するエントリの`ProjectPath`の値を`$projectPath`に入れてから、もう一度実行してください。
+削除するエントリが0件と表示された場合は、手順2でPath欄に`$verifyRoot\`以外の値を入力しています。`ProjectData.xml`を開き、該当するエントリの`ProjectPath`の値を`$projectPath`に入れて(例: `$projectPath = "D:\Work\Verify43\"`)から、**2つ目のコードブロックだけ**をもう一度実行してください(1つ目を実行すると`$projectPath`が元の値に戻ります)。
 
 4. `DXFORGE_ENGINE`を一時的に切り替えた場合は、元の値に戻す。
 
