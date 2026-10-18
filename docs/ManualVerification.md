@@ -4,6 +4,8 @@
 
 所要時間の目安は、ビルド済みなら10分程度です。
 
+この手順書のコマンドは、すべて**リポジトリのルートで開いたPowerShell**(PowerShell 7またはWindows PowerShell 5.1)に、そのままコピーして実行できるように書いています。手順2で定義する変数(`$verifyName`など)を手順7の後片付けでも使うので、最後まで同じPowerShellのウィンドウで続けてください。
+
 ## 1. 前提
 
 ### 必要な環境
@@ -43,17 +45,36 @@
 
 ```powershell
 [Environment]::GetEnvironmentVariable("DXFORGE_ENGINE", "User")
-# 一時的に切り替える場合(検証後に元の値へ戻すこと)
-[Environment]::SetEnvironmentVariable("DXFORGE_ENGINE", "C:\PATH\TO\DXFORGEEX\", "User")
+# 一時的にこのチェックアウトへ切り替える場合(元の値を$origEngineに控え、手順7で戻す)
+$origEngine = [Environment]::GetEnvironmentVariable("DXFORGE_ENGINE", "User")
+[Environment]::SetEnvironmentVariable("DXFORGE_ENGINE", "$PWD\", "User")
 ```
 
 Visual StudioはCOM経由で起動されるため、エディタのプロセスの環境変数ではなく、ユーザー環境変数の値が使われます。そのため、変更はエディタを起動する前に行ってください。
 
 ## 2. プロジェクトの作成/開く
 
-1. `x64\DebugEditor\DXForgeEditor.exe`を起動する。Project Browserが開く。
-2. 「Create Project」を選び、テンプレート`Empty Project`、Nameに任意の名前(例: `Verify43`)、Pathにリポジトリの外の使い捨ての場所(例: `%TEMP%\DXForgeVerify\`)を入力して「Create」。
+1. 検証用の名前と場所を変数に入れ、エディタを起動する。Project Browserが開く。
+
+```powershell
+# 検証用のプロジェクトの名前と、それを作るフォルダ(展開済みの絶対パス)。手順7でも使う
+$verifyName = "Verify43"
+$verifyRoot = Join-Path $env:TEMP "DXForgeVerify"
+# 手順2でPath欄に貼り付けるため、クリップボードに入れておく
+Set-Clipboard "$verifyRoot\"
+"$verifyRoot\"
+# エディタはテンプレートを作業フォルダからの相対パス(..\..\DXForgeEditor\ProjectTemplates)で読むため、
+# 作業フォルダをx64\DebugEditorにして起動する(このPowerShellの場所はリポジトリのルートのまま)
+Start-Process -FilePath "$PWD\x64\DebugEditor\DXForgeEditor.exe" -WorkingDirectory "$PWD\x64\DebugEditor"
+```
+
+2. 「Create Project」を選び、テンプレート`Empty Project`、Nameに`$verifyName`の値(`Verify43`)、Pathに`$verifyRoot\`の値を入力して「Create」。
+   - Path欄は、中身を全部選択(Ctrl+A)してから貼り付け(Ctrl+V)ます。上のコマンドで表示した値(例: `C:\Users\<ユーザー名>\AppData\Local\Temp\DXForgeVerify\`)を手で入力してもかまいません。
+   - **`%TEMP%`のような環境変数をPath欄に書かないでください。** エディタは環境変数を展開しないので、作業フォルダ(`x64\DebugEditor`)の下に`%TEMP%`という名前のフォルダが作られ、手順7の後片付けの対象からも外れます。
    - 既定のPathは`ドキュメント\DXForgeProjects\`です。後片付けを簡単にするため、専用のフォルダを使うことをおすすめします。
+   - 前回の検証のフォルダ(`$verifyRoot\$verifyName\`)が残っていると「選択したプロジェクトフォルダはすでに存在しています」と出て作成できません。手順7の後片付けを先に行ってください。
+
+**注意:** リポジトリのルートで`.\x64\DebugEditor\DXForgeEditor.exe`のように直接起動すると、作業フォルダがリポジトリのルートになり、テンプレートが見つかりません。必ず上の`Start-Process`(または`x64\DebugEditor`に移動してから起動)を使ってください。
 
 **期待される結果**
 
@@ -162,9 +183,22 @@ Build: Debug configuration 成功
 
 ## 7. 後片付け
 
-1. エディタを閉じる(ウィンドウの×)。プロジェクトのアンロード時に、エディタが起動したVisual Studioも閉じられます。`tasklist`で`DXForgeEditor.exe`と`devenv.exe`が残っていないことを確認します(自分で別に開いているVisual Studioは除く)。
-2. 検証用のプロジェクトのフォルダを削除する(例: `Remove-Item -Recurse -Force $env:TEMP\DXForgeVerify`)。
-3. `%APPDATA%\DXForgeEditor\ProjectData.xml`から、検証用のプロジェクトのエントリだけを削除する。このファイルはProject Browserの「Open Project」の一覧で、作成/オープンしたプロジェクトが登録されます。フォルダを消しても一覧のエントリは残るので、ほかのエントリには触らず、該当の`<ProjectData>`要素だけを消します。先にバックアップを取ってください。
+別のPowerShellのウィンドウで後片付けをする場合は、先に手順2の`$verifyName`と`$verifyRoot`の2行を実行して、変数を定義し直してください(`$origEngine`は失われているので、手順4では元の値を直接指定します)。
+
+1. エディタを閉じる(ウィンドウの×)。プロジェクトのアンロード時に、エディタが起動したVisual Studioも閉じられます。`DXForgeEditor.exe`と`devenv.exe`が残っていないことを確認します(自分で別に開いているVisual Studioは除く)。
+
+```powershell
+tasklist /FI "IMAGENAME eq DXForgeEditor.exe"
+tasklist /FI "IMAGENAME eq devenv.exe"
+```
+
+2. 検証用のプロジェクトのフォルダを削除する。
+
+```powershell
+Remove-Item -Recurse -Force $verifyRoot
+```
+
+3. `%APPDATA%\DXForgeEditor\ProjectData.xml`から、検証用のプロジェクトのエントリだけを削除する。このファイルはProject Browserの「Open Project」の一覧で、作成/オープンしたプロジェクトが登録されます。フォルダを消しても一覧のエントリは残るので、ほかのエントリには触らず、該当の`<ProjectData>`要素だけを消します。エディタはプロジェクトを`ProjectPath`+`ProjectName`(フルパス)で区別するので、別の場所にある同じ名前のプロジェクトを消さないよう、**`ProjectName`と`ProjectPath`の両方が一致するもの**だけを消します。先にバックアップを取ってください。
 
 ```powershell
 $f = "$env:APPDATA\DXForgeEditor\ProjectData.xml"
@@ -172,11 +206,23 @@ Copy-Item $f "$f.bak"
 [xml]$x = Get-Content $f -Raw -Encoding UTF8
 $ns = New-Object Xml.XmlNamespaceManager $x.NameTable
 $ns.AddNamespace("d", "http://schemas.datacontract.org/2004/07/DXForgeEditor.GameProject")
-foreach ($e in $x.SelectNodes("//d:ProjectData[d:ProjectName='Verify43']", $ns)) { [void]$e.ParentNode.RemoveChild($e) }
+# エディタは、Path欄の値 + プロジェクト名 + "\" をProjectPathとして登録する
+$projectPath = "$verifyRoot\$verifyName\"
+$targets = @($x.SelectNodes("//d:ProjectData", $ns) | Where-Object { $_.ProjectName -eq $verifyName -and $_.ProjectPath -eq $projectPath })
+"削除するエントリ: $($targets.Count)件 ($projectPath)"
+foreach ($e in $targets) { [void]$e.ParentNode.RemoveChild($e) }
 $x.Save($f)
 ```
 
+削除するエントリが0件と表示された場合は、手順2でPath欄に`$verifyRoot\`以外の値を入力しています。`ProjectData.xml`を開き、該当するエントリの`ProjectPath`の値を`$projectPath`に入れてから、もう一度実行してください。
+
 4. `DXFORGE_ENGINE`を一時的に切り替えた場合は、元の値に戻す。
+
+```powershell
+# $origEngineは手順1の「一時的に切り替える場合」で控えた値。切り替えていなければ何もしない
+if (Test-Path variable:origEngine) { [Environment]::SetEnvironmentVariable("DXFORGE_ENGINE", $origEngine, "User") }
+[Environment]::GetEnvironmentVariable("DXFORGE_ENGINE", "User")
+```
 
 エディタをもう一度起動して、Project Browserの一覧から検証用のプロジェクトが消え、ほかのプロジェクトが残っていることを確認できます。
 
