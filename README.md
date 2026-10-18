@@ -60,11 +60,21 @@ PowerShell 7+ (`pwsh`) から実行します。
 | `-Target` | `native` / `editor` / `all` | `all` |
 | `-Project` | `DXForge.sln`内のプロジェクト名(`-Target native`時のみ有効) | 省略時はソリューション全体 |
 | `-RunTests` | スイッチ。ビルド後に`EngineUnitTests.exe`を実行 | - |
+| `-NoRestore` | スイッチ。ネイティブビルド前の`packages/`の復元(`Restore.ps1`)を省く | - |
 | `-WarningsAsErrors` | スイッチ。ネイティブ側とエディタ側の警告をエラーとして扱う(CI用) | - |
 | `-Json` | スイッチ。1行のJSON要約を標準出力に出す | - |
 | `-DetailedLog` | スイッチ。ビルドツールの出力を全文表示する | - |
 
 **注意:** ネイティブ側は必ず`DXForge.sln`経由でビルドしてください。`.vcxproj`を直接MSBuildに渡すと、`$(SolutionDir)`がプロジェクト自身のディレクトリにフォールバックしてしまい、インクルードパスが崩れてビルドに失敗します(MSBuildの既知の挙動)。`build.ps1`は常に`/t:<プロジェクト名>`で`DXForge.sln`を経由するため、この問題を踏みません。
+
+### `packages/`の復元 (`Restore.ps1`)
+
+`packages/`は`.gitignore`で除外しているため、新しいclone/worktreeでは空です。`build.ps1`はネイティブ側をビルドする前に`Restore.ps1`を呼び、足りないものだけを取得します。手作業でのコピーは不要です。
+
+- **DirectXTex** (`ContentTools/packages.config`の`directxtex_desktop_win10`): `packages/<id>.<version>`が無ければ`MSBuild DXForge.sln -t:restore -p:RestorePackagesConfig=true`で復元します(`nuget.exe`は不要)。`ContentTools`は`*Editor`構成でしかビルドされないため、`Debug`/`Release`構成では復元しません。
+- **DXC** (`packages/DirectXShaderCompiler`): フォルダが空なら`GetDXC.ps1`で最新版を取得します(GitHub APIを使います)。
+
+既に揃っているときは、ファイルの有無を見るだけでネットワークにはアクセスせず、すぐに終わります(実測: 数十ms)。`Restore.ps1`は単体でも実行でき(`./Restore.ps1 -Configuration DebugEditor`)、`build.ps1 -NoRestore`で復元を省けます。DXCを最新版に更新したいときは、`packages/DirectXShaderCompiler`を削除してから実行してください。
 
 ## テスト
 

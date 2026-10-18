@@ -36,6 +36,10 @@
     ビルドツールの出力を全文表示する。既定ではエラーと警告件数の要約だけを表示する
     (出力が非常に大きく、特にエディタ側は約132,000文字に達するため)。
 
+.PARAMETER NoRestore
+    ネイティブビルドの前に Restore.ps1 で packages/ (DirectXTex・DXC)を復元する処理を省く。
+    既に揃っているときの復元はファイルの有無を見るだけで、ネットワークにはアクセスしない。
+
 .PARAMETER Json
     最後に1行のJSON要約を標準出力に出す。EngineUnitTests.exeにも--jsonを渡す。
 
@@ -62,6 +66,8 @@ param(
 	[switch]$WarningsAsErrors,
 
 	[switch]$DetailedLog,
+
+	[switch]$NoRestore,
 
 	[switch]$Json
 )
@@ -162,6 +168,11 @@ $exitCode = 0
 if ($Target -eq "native" -or $Target -eq "all")
 {
 	$msbuild = Resolve-MSBuildPath
+	if (-not $NoRestore)
+	{
+		Write-Host "== Restore packages [$Configuration] =="
+		& "$RepoRoot\Restore.ps1" -Configuration $Configuration -MSBuildPath $msbuild
+	}
 	$msbuildArgs = @(
 		"$RepoRoot\DXForge.sln",
 		"/nologo",
