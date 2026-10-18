@@ -44,7 +44,8 @@ namespace DXForgeEditor.Components
             }
         }
 
-        private Vector3 _scale;
+        // 新しく作るTransformのスケールは1 (0だと何も描画されない)
+        private Vector3 _scale = Vector3.One;
         [DataMember]
         public Vector3 Scale
         {
@@ -66,6 +67,14 @@ namespace DXForgeEditor.Components
             bw.Write(_position.X); bw.Write(_position.Y); bw.Write(_position.Z);
             bw.Write(_rotation.X); bw.Write(_rotation.Y); bw.Write(_rotation.Z);
             bw.Write(_scale.X); bw.Write(_scale.Y); bw.Write(_scale.Z);
+        }
+
+        // DataContractのデシリアライズではコンストラクタもフィールド初期化子も実行されないため、
+        // ここで既定値を入れておく。保存されているScaleがあれば、このあとその値で上書きされる。
+        [OnDeserializing]
+        private void OnDeserializing(StreamingContext context)
+        {
+            _scale = Vector3.One;
         }
 
         public Transform(GameEntity owner) : base(owner)
