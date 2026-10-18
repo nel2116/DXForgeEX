@@ -40,7 +40,8 @@
     (出力が非常に大きく、特にエディタ側は約132,000文字に達するため)。
 
 .PARAMETER NoRestore
-    ネイティブビルドの前に Restore.ps1 で packages/ (DirectXTex・DXC)を復元する処理を省く。
+    ネイティブビルドの前に Restore.ps1 で packages/ (DirectXTex・DXC)とエディタのNuGet依存を
+    復元する処理を省く。
     既に揃っているときの復元はファイルの有無を見るだけで、ネットワークにはアクセスしない。
 
 .PARAMETER Json
@@ -212,7 +213,7 @@ if ($Target -eq "native" -or $Target -eq "all")
 	if (-not $NoRestore)
 	{
 		Write-Host "== Restore packages [$Configuration] =="
-		& "$RepoRoot\Restore.ps1" -Configuration $Configuration -MSBuildPath $msbuild
+		& "$RepoRoot\Restore.ps1" -Configuration $Configuration -Project $Project -MSBuildPath $msbuild
 	}
 	$nativeExit = Invoke-NativeBuild $msbuild $Configuration $Project
 	$summary.native = [ordered]@{ exitCode = $nativeExit; project = $Project; warningsAsErrors = [bool]$WarningsAsErrors }

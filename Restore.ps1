@@ -8,16 +8,26 @@
     ネットワークにはアクセスせずに終わる。build.ps1 がネイティブのビルドの前に呼び出す
     (build.ps1 -NoRestore で止められる)。単体でも実行できる。
 
-    - DirectXTex: 各プロジェクトの packages.config に書かれたパッケージ(packages/<id>.<version>)が
-      無ければ、MSBuild DXForge.sln -t:restore -p:RestorePackagesConfig=true で復元する
-      (nuget.exe は不要)。packages.config を使うのは ContentTools だけで、ContentTools は
-      *Editor 構成にしかマッピングされていないため、Debug/Release 構成では何もしない
-      (MSBuildもその構成では復元対象が無いと判断する)。
+    - NuGet(DirectXTex・エディタ): 各プロジェクトの packages.config に書かれたパッケージ
+      (packages/<id>.<version>)か、DXForgeEditor/obj/project.assets.json が無ければ、
+      MSBuild DXForge.sln -t:restore -p:RestorePackagesConfig=true で復元する(nuget.exe は不要)。
+      この1回で packages.config(ContentTools の DirectXTex)と PackageReference(DXForgeEditor)の
+      両方が復元される。どちらも *Editor 構成にしかマッピングされていないため、Debug/Release
+      構成では何もしない。ネイティブのビルドは /restore なしで DXForge.sln を呼ぶため、*Editor
+      構成で project.assets.json が無いと(obj だけを消したときなど)、ソリューションに含まれる
+      DXForgeEditor が NETSDK1004 で失敗する(#61)。
     - DXC: packages/DirectXShaderCompiler が空なら GetDXC.ps1 で最新版を取得する
-      (GitHub APIを使うため、既にあるときは呼ばない)。
+      (GitHub APIを使うため、既にあるときは呼ばない)。DXCを使うのは EngineTest
+      (シェーダーのコンパイル)だけで、EngineTest は Debug/Release 構成にしかマッピングされて
+      いないため、*Editor 構成や EngineTest を含まない -Project のときは取得しない(#61)。
+      オフラインやGitHub APIのレート制限の下でも、EngineUnitTests などはビルドできる。
 
 .PARAMETER Configuration
     Debug / DebugEditor / Release / ReleaseEditor のいずれか。既定値: DebugEditor。
+
+.PARAMETER Project
+    build.ps1 の -Project と同じ。ビルドするプロジェクト(MSBuildの /t: に渡す名前。; 区切りで
+    複数可)。省略時はソリューション全体とみなす。DXCが必要かどうかの判断に使う。
 
 .PARAMETER MSBuildPath
     復元に使う MSBuild.exe。省略時は vswhere で探す(build.ps1 からは解決済みのパスを渡す)。
@@ -30,6 +40,8 @@
 param(
 	[ValidateSet("Debug", "DebugEditor", "Release", "ReleaseEditor")]
 	[string]$Configuration = "DebugEditor",
+
+	[string]$Project,
 
 	[string]$MSBuildPath
 )
@@ -58,12 +70,23 @@ function Get-MissingNuGetPackages
 	}
 }
 
+# DXCを使うプロジェクト(EngineTest)が、この構成と -Project でビルドされるかどうか
+function Test-DxcRequired
+{
+	if ($Configuration -like "*Editor") { return $false }
+	if (-not $Project) { return $true }
+	# /t: には「EngineTest:Rebuild」のようにターゲット名が付くこともあるため、その前だけを見る
+	$projects = $Project -split ';' | ForEach-Object { ($_ -split ':')[0].Trim() }
+	return $projects -contains "EngineTest"
+}
+
 $started = Get-Date
 $restored = $false
 
 if ($Configuration -like "*Editor")
 {
 	$missing = @(Get-MissingNuGetPackages)
+	if (-not (Test-Path (Join-Path $RepoRoot "DXForgeEditor\obj\project.assets.json"))) { $missing += "DXForgeEditor(project.assets.json)" }
 	if ($missing.Count -gt 0)
 	{
 		if (-not $MSBuildPath)
@@ -89,7 +112,7 @@ if ($Configuration -like "*Editor")
 }
 
 $dxcDir = Join-Path $PackagesDir "DirectXShaderCompiler"
-if (-not (Test-Path (Join-Path $dxcDir "*")))
+if ((Test-DxcRequired) -and -not (Test-Path (Join-Path $dxcDir "*")))
 {
 	Write-Host "  DXCを取得します: $dxcDir"
 	& (Join-Path $RepoRoot "GetDXC.ps1") $dxcDir | Out-Null
@@ -99,4 +122,4 @@ if (-not (Test-Path (Join-Path $dxcDir "*")))
 
 $elapsed = [int]((Get-Date) - $started).TotalMilliseconds
 if ($restored) { Write-Host "  復元しました($elapsed ms)" }
-else { Write-Host "  packages/ は揃っています。復元は不要です($elapsed ms)" }
+else { Write-Host "  必要なパッケージは揃っています。復元は不要です($elapsed ms)" }
