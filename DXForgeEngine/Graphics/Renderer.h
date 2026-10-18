@@ -10,6 +10,7 @@
 // 2025/01/12 カメラ関連の関数を追加
 // 2025/01/13 add_material()、remove_material()の追加
 // 2025/01/18 light関連の構造体、関数を追加
+// 2026/10/18 camera_init_infoから上方向を削除し、up_vectorを取得専用にした (#62)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -113,7 +114,7 @@ namespace dxforge::graphics
 	{
 		enum parameter : u32
 		{
-			up_vector,
+			up_vector,		// 取得専用 (上方向はエンティティの回転から決まる)
 			field_of_view,
 			aspect_ratio,
 			view_width,
@@ -136,7 +137,6 @@ namespace dxforge::graphics
 	{
 		id::id_type entity_id{ id::invalid_id };	// カメラがアタッチされるエンティティのID
 		camera::type type{};						// カメラの種類
-		math::v3 up;								// カメラの上方向
 		union
 		{
 			f32 field_of_view;						// 視野角
@@ -158,7 +158,6 @@ namespace dxforge::graphics
 			assert(id::is_valid(id));
 			entity_id = id;
 			type = camera::type::perspective;
-			up = { 0.0f, 1.0f, 0.0f };
 			field_of_view = 0.25f;
 			aspect_ratio = 16.0f / 9.0f;
 			near_z = 0.01f;
@@ -173,7 +172,6 @@ namespace dxforge::graphics
 			assert(id::is_valid(id));
 			entity_id = id;
 			type = camera::type::orthographic;
-			up = { 0.0f, 1.0f, 0.0f };
 			view_width = 1920;
 			view_height = 1080;
 			near_z = 0.01f;

@@ -86,6 +86,7 @@
     <ClCompile Include="Tests_Vector.cpp" />
     <ClCompile Include="Tests_Entity.cpp" />
     <ClCompile Include="Tests_Script.cpp" />
+    <ClCompile Include="Tests_Camera.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MicroTest.h" />

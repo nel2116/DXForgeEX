@@ -7,6 +7,7 @@
 // 更新履歴
 // 2025/01/12 新規作成
 // 2025/01/14 コメントの追加
+// 2026/10/18 上方向のsetterを削除し、上方向はエンティティのup()だけで決まるよう変更 (#62)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -24,9 +25,6 @@ namespace dxforge::graphics::d3d12::camera
 
 		/// @brief カメラを更新する
 		void update();
-		/// @brief 上方向ベクトルを設定する
-		/// @param up 新しい上方向ベクトル
-		void up(math::v3 up);
 		/// @brief 視野角を設定する (パースペクティブカメラ用)
 		/// @param fov 新しい視野角
 		constexpr void field_of_view(f32 fov);
@@ -72,7 +70,7 @@ namespace dxforge::graphics::d3d12::camera
 		DirectX::XMMATRIX _inverse_view_projection;	///< 逆ビュープロジェクション行列
 		DirectX::XMVECTOR _position{};				///< カメラの位置
 		DirectX::XMVECTOR _direction{};				///< カメラの向き
-		DirectX::XMVECTOR _up;						///< 上方向ベクトル
+		DirectX::XMVECTOR _up{};					///< 上方向ベクトル (update()でエンティティのup()から取得)
 		f32 _near_z;								///< 近クリッピング平面距離
 		f32 _far_z;									///< 遠クリッピング平面距離
 		union
