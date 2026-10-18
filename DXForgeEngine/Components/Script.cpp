@@ -11,6 +11,7 @@
 // 2026/10/18 begin_play()が呼ばれていなかったのを修正し、生成後最初のupdate()の前に1回だけ呼ぶよう変更 (#47)
 // 2026/10/18 削除したスクリプトをbegin_play()の待ちリストから外すよう修正(エディタで待ちリストが増え続けるため) (#47)
 // 2026/10/18 update()の中でスクリプトを生成・削除するとイテレータが無効になるのを修正(添字で回し、削除はupdate()の最後にまとめて行う) (#54)
+// 2026/10/18 update()中に削除したスクリプトもremove()の中で破棄し、実行中のスクリプト自身の削除だけを遅らせるよう変更(デストラクタからTransformを読めるようにするため) (#54)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Script.h"
@@ -28,7 +29,8 @@ namespace dxforge::script
 		utl::vector<id::generation_type> generations;				///< 世代情報
 		utl::deque<script_id> free_ids;								///< 解放されたID
 		utl::vector<script_id> pending_begin_play;					///< begin_play()をまだ呼んでいないスクリプトのID
-		utl::vector<detail::script_ptr> removed_scripts;			///< update()の実行中に削除され、破棄を待っているスクリプト
+		utl::vector<detail::script_ptr> removed_scripts;			///< 実行中に自分自身を削除し、update()の最後での破棄を待っているスクリプト
+		const entity_script* executing_script{ nullptr };			///< begin_play()/update()を実行中のスクリプト
 		bool is_updating{ false };									///< update()の実行中かどうか
 
 		utl::vector<transform::component_cache> transform_cache;	///< Transformコンポーネントのキャッシュ
@@ -192,9 +194,15 @@ namespace dxforge::script
 		if (is_updating)
 		{
 			// NOTE: update()の実行中にerase_unordered()で要素を入れ替えると、ループで飛ばされる・二重に呼ばれるスクリプトが出る。
-			//		 また、自分自身を削除したスクリプトは実行中に破棄されてしまう。そのため、ここではスロットを空にするだけにして、
-			//		 スクリプトはupdate()の最後に詰めてから破棄する。
-			removed_scripts.emplace_back(std::move(entity_scripts[index]));
+			//		 そのため、ここではスロットを空にするだけにして、update()の最後に詰める。
+			//		 スクリプトは、デストラクタからTransformなどを読めるよう、エンティティが削除される前(ここ)で破棄する。
+			//		 ただし、実行中のスクリプトが自分自身を削除した場合は、実行中に破棄できないのでupdate()の最後まで遅らせる。
+			//		 破棄する前にスロットから取り出すので、デストラクタの中で生成・削除が行われても壊れない。
+			detail::script_ptr removed{ std::move(entity_scripts[index]) };
+			if (removed.get() == executing_script)
+			{
+				removed_scripts.emplace_back(std::move(removed));
+			}
 		}
 		else
 		{
@@ -239,6 +247,7 @@ namespace dxforge::script
 				const id::id_type index{ id::index(id) };
 				if (id::is_valid(id_mapping[index]) && generations[index] == id::generation(id))
 				{
+					executing_script = entity_scripts[id_mapping[index]].get();
 					entity_scripts[id_mapping[index]]->begin_play();
 				}
 			}
@@ -252,10 +261,12 @@ namespace dxforge::script
 		{
 			if (entity_scripts[i])
 			{
+				executing_script = entity_scripts[i].get();
 				entity_scripts[i]->update(dt);
 			}
 		}
 
+		executing_script = nullptr;
 		is_updating = false;
 
 		// update()の実行中に削除されたスクリプトの空きスロットを、末尾の要素で埋めて詰める。

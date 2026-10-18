@@ -10,6 +10,7 @@
 // 2026/10/18 begin_play()がupdate()より前に1回だけ呼ばれることのテストを追加 (#47)
 // 2026/10/18 削除したスクリプトがbegin_play()の待ちリストに残らないことのテストを追加 (#47)
 // 2026/10/18 update()/begin_play()の中でスクリプト付きエンティティを生成・削除するテストを追加 (#54)
+// 2026/10/18 update()/begin_play()の中で削除されたスクリプトのデストラクタからTransformを読めることのテストを追加 (#54)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
@@ -132,6 +133,33 @@ namespace
 			const auto hook{ std::move(update_hook) };
 			update_hook = nullptr;
 			if (hook) hook(get_id());
+		}
+	};
+
+	// デストラクタで、自分のエンティティがまだ生きているか、位置を読めるかを記録するスクリプト
+	struct reader_result
+	{
+		u32 destroyed{ 0 };
+		u32 alive_in_destructor{ 0 };
+		math::v3 position_in_destructor{};
+	};
+	reader_result reader{};
+
+	class script_test_reader : public script::entity_script
+	{
+	public:
+		explicit script_test_reader(game_entity::entity entity)
+			: script::entity_script{ entity } {}
+
+		~script_test_reader() override
+		{
+			++reader.destroyed;
+			// NOTE: 生きていないエンティティのposition()はDebugではassertのダイアログで止まるため、先に確かめる。
+			if (game_entity::is_alive(get_id()))
+			{
+				++reader.alive_in_destructor;
+				reader.position_in_destructor = position();
+			}
 		}
 	};
 
@@ -614,4 +642,47 @@ DXFORGE_TEST_CASE(script_removing_itself_inside_begin_play_is_safe)
 
 	begin_play_hook = nullptr;
 	game_entity::remove(survivor.get_id());
+}
+
+DXFORGE_TEST_CASE(script_removed_by_another_script_can_read_transform_in_destructor)
+{
+	// NOTE: update()/begin_play()の中で別のスクリプトに削除されたスクリプトは、エンティティ(Transform)が
+	//		 無効になる前、つまりgame_entity::remove()の中で破棄されなければならない。
+	//		 破棄をupdate()の最後まで遅らせると、デストラクタからposition()などを読めなくなる(#54のレビュー指摘)。
+	const auto reader_creator{ &script::detail::create_script<script_test_reader> };
+	const reader_result before{ reader };
+
+	const game_entity::entity actor{ create_entity(&script::detail::create_script<script_test_hook>) };
+	const game_entity::entity removed_in_begin_play{ create_entity(reader_creator) };
+	REQUIRE(actor.is_valid() && removed_in_begin_play.is_valid());
+
+	// 1. actorのbegin_play()の中で削除する
+	begin_play_hook = [&](game_entity::entity_id)
+	{
+		game_entity::remove(removed_in_begin_play.get_id());
+	};
+	script::update(1.f);
+	CHECK(!game_entity::is_alive(removed_in_begin_play.get_id()));
+	CHECK(reader.destroyed == before.destroyed + 1);
+	CHECK(reader.alive_in_destructor == before.alive_in_destructor + 1);
+
+	// 2. actorのupdate()の中で削除する
+	const game_entity::entity removed_in_update{ create_entity(reader_creator) };
+	REQUIRE(removed_in_update.is_valid());
+	script::update(1.f);
+	update_hook = [&](game_entity::entity_id)
+	{
+		game_entity::remove(removed_in_update.get_id());
+	};
+	script::update(1.f);
+	CHECK(!game_entity::is_alive(removed_in_update.get_id()));
+	CHECK(reader.destroyed == before.destroyed + 2);
+	CHECK(reader.alive_in_destructor == before.alive_in_destructor + 2);
+	CHECK(reader.position_in_destructor.x == 0.f);
+	CHECK(reader.position_in_destructor.y == 0.f);
+	CHECK(reader.position_in_destructor.z == 0.f);
+
+	begin_play_hook = nullptr;
+	update_hook = nullptr;
+	game_entity::remove(actor.get_id());
 }
