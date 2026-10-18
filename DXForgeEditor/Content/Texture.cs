@@ -338,7 +338,12 @@ namespace DXForgeEditor.Content
             writer.Write(PrefilterCubeMap);
         }
 
-        public void FromBinary(BinaryReader reader)
+        public void FromBinary(BinaryReader reader) => FromBinary(reader, true);
+
+        /// <param name="hasCubeMapSettings">
+        /// falseなら、キューブマップの3項目がない古い形式(#38より前)として読み、3項目には既定値を入れる。
+        /// </param>
+        public void FromBinary(BinaryReader reader, bool hasCubeMapSettings)
         {
             Sources.Clear();
             reader.ReadString().Split(";").Where(x => !string.IsNullOrEmpty(x)).ToList().ForEach(Sources.Add);
@@ -348,9 +353,23 @@ namespace DXForgeEditor.Content
             PreferBC7 = reader.ReadBoolean();
             FormatIndex = reader.ReadInt32();
             Compress = reader.ReadBoolean();
-            CubeMapSize = reader.ReadInt32();
-            MirrorCubeMap = reader.ReadBoolean();
-            PrefilterCubeMap = reader.ReadBoolean();
+            if (hasCubeMapSettings)
+            {
+                CubeMapSize = reader.ReadInt32();
+                MirrorCubeMap = reader.ReadBoolean();
+                PrefilterCubeMap = reader.ReadBoolean();
+            }
+            else
+            {
+                SetDefaultCubeMapSettings();
+            }
+        }
+
+        private void SetDefaultCubeMapSettings()
+        {
+            CubeMapSize = 256;
+            MirrorCubeMap = true;
+            PrefilterCubeMap = true;
         }
 
         public TextureImportSettings()
@@ -360,9 +379,7 @@ namespace DXForgeEditor.Content
             PreferBC7 = true;
             FormatIndex = 0;
             Compress = true;
-            CubeMapSize = 256;
-            MirrorCubeMap = true;
-            PrefilterCubeMap = true;
+            SetDefaultCubeMapSettings();
         }
     }
 
@@ -381,6 +398,18 @@ namespace DXForgeEditor.Content
 
         public static int MaxArraySize => 2048;
         public static int Max3DSize => 2048;
+
+        // .assetの形式のバージョン(#63)。
+        // 0: #38より前。バージョン番号もキューブマップの設定もない。
+        // 1: #38以降。インポート設定の末尾にキューブマップの3項目が増えたが、バージョン番号はない。
+        // 2: アセットのヘッダの直後に FileFormatTag とバージョン番号を書く。
+        // 0と1にはタグがないので、ReadFileFormatVersion() でバイト配置から判別する。
+        private const int FileFormatVersion = 2;
+        private const int FirstVersionWithCubeMapSettings = 1;
+        // バイト列は "TEX\0"。0と1のファイルでは、この位置からインポート設定の Sources(BinaryWriterの
+        // 文字列: 7ビット符号化の長さ + UTF-8)が始まる。これをタグとして読むと、長さ84の文字列の
+        // 3バイト目がNULになるが、ファイルパスはNULを含まないので、0と1のファイルがタグと一致することはない。
+        private const int FileFormatTag = 0x00584554;
 
         public TextureImportSettings ImportSettings { get; } = new();
 
@@ -605,7 +634,8 @@ namespace DXForgeEditor.Content
                 using var reader = new BinaryReader(File.Open(file, FileMode.Open, FileAccess.Read));
 
                 ReadAssetFileHeader(reader);
-                ImportSettings.FromBinary(reader);
+                var version = ReadFileFormatVersion(reader);
+                ImportSettings.FromBinary(reader, version >= FirstVersionWithCubeMapSettings);
 
                 Width = reader.ReadInt32();
                 Height = reader.ReadInt32();
@@ -634,6 +664,51 @@ namespace DXForgeEditor.Content
             }
 
             return false;
+        }
+
+        private static int ReadFileFormatVersion(BinaryReader reader)
+        {
+            var stream = reader.BaseStream;
+            var start = stream.Position;
+
+            if (stream.Length - start >= sizeof(int) && reader.ReadInt32() == FileFormatTag)
+            {
+                var version = reader.ReadInt32();
+                if (version != FileFormatVersion)
+                {
+                    throw new InvalidDataException($"未対応のテクスチャアセットの形式です(バージョン{version})。");
+                }
+                return version;
+            }
+
+            // タグのない古い形式(0か1)。どちらもインポート設定のあとに
+            // Width, Height, ArraySize, Flags, MipLevels, Format, 圧縮データの長さ(各int32)と圧縮データが
+            // ファイルの終わりまで続く。1は0よりインポート設定が6バイト(int32 + bool×2)長いので、
+            // それぞれの形式で読んだときに、圧縮データがちょうどファイルの終わりで終わる方を選ぶ。
+            for (var version = FirstVersionWithCubeMapSettings; version >= 0; --version)
+            {
+                stream.Position = start;
+                var matches = EndsAtEndOfStream(reader, version);
+                stream.Position = start;
+                if (matches) return version;
+            }
+
+            throw new InvalidDataException("テクスチャアセットの形式を判別できませんでした。");
+        }
+
+        private static bool EndsAtEndOfStream(BinaryReader reader, int version)
+        {
+            try
+            {
+                new TextureImportSettings().FromBinary(reader, version >= FirstVersionWithCubeMapSettings);
+                reader.BaseStream.Position += 6 * sizeof(int);
+                var compressedLength = reader.ReadInt32();
+                return compressedLength > 0 && reader.BaseStream.Position + compressedLength == reader.BaseStream.Length;
+            }
+            catch (EndOfStreamException)
+            {
+                return false;
+            }
         }
 
         /// <summary>
@@ -706,6 +781,8 @@ namespace DXForgeEditor.Content
                 using var writer = new BinaryWriter(File.Open(file, FileMode.Create, FileAccess.Write));
 
                 WriteAssetFileHeader(writer);
+                writer.Write(FileFormatTag);
+                writer.Write(FileFormatVersion);
                 ImportSettings.ToBinary(writer);
 
                 writer.Write(Width);
