@@ -59,7 +59,7 @@ PowerShell 7+ (`pwsh`) から実行します。
 | `-Configuration` | `Debug` / `DebugEditor` / `Release` / `ReleaseEditor` | `DebugEditor` |
 | `-Target` | `native` / `editor` / `all` | `all` |
 | `-Project` | `DXForge.sln`内のプロジェクト名(`-Target native`時のみ有効) | 省略時はソリューション全体 |
-| `-RunTests` | スイッチ。ビルド後に`EngineUnitTests.exe`を実行 | - |
+| `-RunTests` | スイッチ。ビルド後に`EngineUnitTests.exe`を実行。`EngineUnitTests`は`Debug`/`Release`構成にしかないため、`*Editor`構成・`-Target editor`・別の`-Project`のときは対応する`Debug`/`Release`構成で`EngineUnitTests`を追加でビルドしてから実行する(古い実行ファイルを実行しないため)。ビルドに失敗したときはテストを実行しない | - |
 | `-NoRestore` | スイッチ。ネイティブビルド前の`packages/`の復元(`Restore.ps1`)を省く | - |
 | `-WarningsAsErrors` | スイッチ。ネイティブ側とエディタ側の警告をエラーとして扱う(CI用) | - |
 | `-Json` | スイッチ。1行のJSON要約を標準出力に出す | - |

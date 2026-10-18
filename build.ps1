@@ -25,7 +25,10 @@
 
 .PARAMETER RunTests
     ネイティブビルド成功後にEngineUnitTests.exeを実行し、失敗したテストケースがあれば
-    このスクリプトも非ゼロの終了コードを返す。
+    このスクリプトも非ゼロの終了コードを返す。EngineUnitTestsはDebug/Release構成にしか
+    マッピングされていないため、*Editor構成や -Target editor、別の -Project を指定したときは、
+    対応するDebug/Release構成でEngineUnitTestsを追加でビルドしてから実行する(以前のビルドで
+    残った古い実行ファイルを黙って実行しないため。#60)。ビルドに失敗したときはテストを実行しない。
 
 .PARAMETER WarningsAsErrors
     警告をエラーとして扱う。ネイティブ側は Directory.Build.props 経由で /WX を付与し、
@@ -167,6 +170,25 @@ function Get-NativeOutputConfiguration([string]$Config)
 	return $Config
 }
 
+# ネイティブ側のMSBuild呼び出し。ソリューションのビルドと、-RunTestsのためのEngineUnitTestsの
+# 追加ビルド(#60)で共有する。
+function Invoke-NativeBuild([string]$MSBuild, [string]$Config, [string]$TargetProject)
+{
+	$msbuildArgs = @(
+		"$RepoRoot\DXForge.sln",
+		"/nologo",
+		"/m",
+		"/p:Configuration=$Config",
+		"/p:Platform=$Platform"
+	)
+	if (-not $DetailedLog) { $msbuildArgs += "/v:minimal" }
+	if ($TargetProject) { $msbuildArgs += "/t:$TargetProject" }
+	if ($WarningsAsErrors) { $msbuildArgs += "/p:DXForgeWarningsAsErrors=true" }
+
+	Write-Host "== Native build [$Config|$Platform]$(if ($TargetProject) { " target=$TargetProject" }) =="
+	return Invoke-BuildStep -Command { & $MSBuild @msbuildArgs } -ShowFullLog:$DetailedLog
+}
+
 function Get-EditorConfiguration([string]$Config)
 {
 	if ($Config -like "*Editor") { return $Config }
@@ -178,6 +200,7 @@ $summary = [ordered]@{
 	target        = $Target
 	native        = $null
 	editor        = $null
+	testsBuild    = $null
 	tests         = $null
 	exitCode      = 0
 }
@@ -191,19 +214,7 @@ if ($Target -eq "native" -or $Target -eq "all")
 		Write-Host "== Restore packages [$Configuration] =="
 		& "$RepoRoot\Restore.ps1" -Configuration $Configuration -MSBuildPath $msbuild
 	}
-	$msbuildArgs = @(
-		"$RepoRoot\DXForge.sln",
-		"/nologo",
-		"/m",
-		"/p:Configuration=$Configuration",
-		"/p:Platform=$Platform"
-	)
-	if (-not $DetailedLog) { $msbuildArgs += "/v:minimal" }
-	if ($Project) { $msbuildArgs += "/t:$Project" }
-	if ($WarningsAsErrors) { $msbuildArgs += "/p:DXForgeWarningsAsErrors=true" }
-
-	Write-Host "== Native build [$Configuration|$Platform]$(if ($Project) { " target=$Project" }) =="
-	$nativeExit = Invoke-BuildStep -Command { & $msbuild @msbuildArgs } -ShowFullLog:$DetailedLog
+	$nativeExit = Invoke-NativeBuild $msbuild $Configuration $Project
 	$summary.native = [ordered]@{ exitCode = $nativeExit; project = $Project; warningsAsErrors = [bool]$WarningsAsErrors }
 	if ($nativeExit -ne 0) { $exitCode = $nativeExit }
 }
@@ -230,18 +241,41 @@ if ($RunTests)
 {
 	$nativeOutputConfiguration = Get-NativeOutputConfiguration $Configuration
 	$testExe = "$RepoRoot\$Platform\$nativeOutputConfiguration\EngineUnitTests.exe"
-	if (-not (Test-Path $testExe))
+
+	# 上のネイティブのビルドがEngineUnitTestsを今のソースからビルドしたかどうか。していなければ
+	# (*Editor構成・-Target editor・別の -Project)、出力先に残っている実行ファイルは古い可能性が
+	# あるため、Debug/Release構成でEngineUnitTestsだけを追加でビルドする(#60)。
+	$testsBuiltByNative = ($Target -ne "editor") -and ($Configuration -eq $nativeOutputConfiguration) -and
+		(-not $Project -or $Project -eq "EngineUnitTests")
+	if ($testsBuiltByNative)
 	{
-		throw "$testExe が見つかりません。先に -Target native (または all) でビルドしてください。"
+		$testsBuildExit = $nativeExit
+	}
+	else
+	{
+		if (-not $msbuild) { $msbuild = Resolve-MSBuildPath }
+		# EngineUnitTestsはpackages/の中身を使わないため、復元は不要
+		$testsBuildExit = Invoke-NativeBuild $msbuild $nativeOutputConfiguration "EngineUnitTests"
+		$summary.testsBuild = [ordered]@{ exitCode = $testsBuildExit; configuration = $nativeOutputConfiguration }
+		if ($testsBuildExit -ne 0 -and $exitCode -eq 0) { $exitCode = $testsBuildExit }
 	}
 
-	Write-Host "== Running tests: $testExe =="
-	$testArgs = @()
-	if ($Json) { $testArgs += "--json" }
-	& $testExe @testArgs
-	$testsExit = $LASTEXITCODE
-	$summary.tests = [ordered]@{ exitCode = $testsExit; path = $testExe }
-	if ($testsExit -ne 0 -and $exitCode -eq 0) { $exitCode = $testsExit }
+	if ($testsBuildExit -ne 0)
+	{
+		# ビルドに失敗しても以前の実行ファイルは残っているため、それを実行すると古い結果を返してしまう
+		Write-Host "== Tests skipped: EngineUnitTests のビルドに失敗したため実行しません =="
+		$summary.tests = [ordered]@{ exitCode = $null; path = $testExe; skipped = $true }
+	}
+	else
+	{
+		Write-Host "== Running tests: $testExe =="
+		$testArgs = @()
+		if ($Json) { $testArgs += "--json" }
+		& $testExe @testArgs
+		$testsExit = $LASTEXITCODE
+		$summary.tests = [ordered]@{ exitCode = $testsExit; path = $testExe }
+		if ($testsExit -ne 0 -and $exitCode -eq 0) { $exitCode = $testsExit }
+	}
 }
 
 if ($Json)
