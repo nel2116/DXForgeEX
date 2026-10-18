@@ -19,9 +19,12 @@
 
         <ContextMenu x:Key="addComponentMenu"
                      IsOpen="{Binding Path=IsCheked,RelativeSource={RelativeSource Mode=FindAncestor,AncestorType={x:Type ToggleButton}}}">
-            <MenuItem Header="Geometry"/>
-            <MenuItem Header="Physics">
-                <MenuItem Header="Rigidbody"/>
+            <!-- TODO: Geometry/Rigidbodyはエディタ側のコンポーネントが未実装のため無効化している(#20) -->
+            <MenuItem Header="Geometry" IsEnabled="False"
+                      ToolTip="未実装" ToolTipService.ShowOnDisabled="True"/>
+            <MenuItem Header="Physics" IsEnabled="False"
+                      ToolTip="未実装(物理エンジンが未実装)" ToolTipService.ShowOnDisabled="True">
+                <MenuItem Header="Rigidbody" IsEnabled="False"/>
             </MenuItem>
             <MenuItem Header="Script" ItemsSource="{Binding SelectedEntities[0].ParentScene.Project.AvailableScripts}">
                 <MenuItem.Style>
