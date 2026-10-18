@@ -7,6 +7,7 @@
 // 更新履歴
 // 2025/01/23 新規作成
 // 2026/10/18 正距円筒のHDR画像からキューブマップへの変換に対応 (Primal Day 072)
+// 2026/10/18 D3D11の機能レベル11_0のアダプタも使えるよう修正
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "ToolsCommon.h"
@@ -163,7 +164,8 @@ namespace dxforge::tools
 
 			utl::vector<ComPtr<IDXGIAdapter>> adapters{ get_adapters_by_performance() };
 			utl::vector<ComPtr<ID3D11Device>> devices(adapters.size(), nullptr);
-			constexpr D3D_FEATURE_LEVEL feature_levels[]{ D3D_FEATURE_LEVEL_11_1 };
+			// NOTE: Primalは11_1のみを要求しているが、11_0までしか対応しないアダプタでもGPUでの圧縮・変換を使えるよう11_0も許可する。
+			constexpr D3D_FEATURE_LEVEL feature_levels[]{ D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0 };
 
 			for (u32 i{ 0 }; i < adapters.size(); ++i)
 			{
@@ -178,7 +180,7 @@ namespace dxforge::tools
 
 			for (u32 i{ 0 }; i < devices.size(); ++i)
 			{
-				// NOTE: 要求された機能レベル(D3D_FEATURE_LEVEL_11_1)をサポートしていないアダプタでは、デバイスの作成に失敗することがあるためです。
+				// NOTE: 要求された機能レベル(D3D_FEATURE_LEVEL_11_0以上)をサポートしていないアダプタでは、デバイスの作成に失敗することがあるためです。
 				if (devices[i])
 				{
 					d3d11_devices.emplace_back();

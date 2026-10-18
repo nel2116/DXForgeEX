@@ -6,6 +6,7 @@
 // 環境マップ(正距円筒のHDR画像 -> キューブマップ)の変換処理
 // 更新履歴
 // 2026/10/18 新規作成
+// 2026/10/18 機能レベル11_0のデバイスでもUAVの解除が正しく行われるよう修正
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "EnvMapProcessing.h"
@@ -120,7 +121,12 @@ namespace dxforge::tools
 			u8 zero_mem_block[D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT * sizeof(void*)];
 			memset(&zero_mem_block, 0, sizeof(zero_mem_block));
 
-			ctx->CSSetUnorderedAccessViews(0, D3D11_1_UAV_SLOT_COUNT, (ID3D11UnorderedAccessView**)&zero_mem_block[0], nullptr);
+			// NOTE: UAVのスロット数は機能レベル11_1では64、11_0では8。上限を超えて指定すると呼び出しが無視される。
+			ComPtr<ID3D11Device> device{};
+			ctx->GetDevice(&device);
+			const u32 uav_slot_count{ device && device->GetFeatureLevel() >= D3D_FEATURE_LEVEL_11_1
+				? (u32)D3D11_1_UAV_SLOT_COUNT : (u32)D3D11_PS_CS_UAV_REGISTER_COUNT };
+			ctx->CSSetUnorderedAccessViews(0, uav_slot_count, (ID3D11UnorderedAccessView**)&zero_mem_block[0], nullptr);
 			ctx->CSSetShaderResources(0, D3D11_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT, (ID3D11ShaderResourceView**)&zero_mem_block[0]);
 			ctx->CSSetConstantBuffers(0, D3D11_COMMONSHADER_CONSTANT_BUFFER_API_SLOT_COUNT, (ID3D11Buffer**)&zero_mem_block[0]);
 		}
