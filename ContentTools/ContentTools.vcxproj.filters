@@ -6,6 +6,7 @@
     <ClInclude Include="Geometry.h" />
     <ClInclude Include="FbxImporter.h" />
     <ClInclude Include="MikkTSpace\mikktspace.h" />
+    <ClInclude Include="EnvMapProcessing.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="PrimitiveMesh.cpp" />
@@ -15,8 +16,11 @@
     <ClCompile Include="NormalMapIdentification.cpp" />
     <ClCompile Include="ContentTools.cpp" />
     <ClCompile Include="MikkTSpace\mikktspace.c" />
+    <ClCompile Include="EnvMapProcessing.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="CompileShaders.cmd" />
+    <None Include="EnvMapProcessing.hlsl" />
   </ItemGroup>
 </Project>

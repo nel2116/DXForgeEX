@@ -225,7 +225,7 @@ namespace DXForgeEditor.GameProject
             }
         }
 
-        private async Task StopGame() => await Task.Run(() => VisualStudio.Stop());
+        private async Task StopGame() => await Task.Run(VisualStudio.Stop);
 
         private async Task BuildGameCodeDLL(bool showWindow = true)
         {

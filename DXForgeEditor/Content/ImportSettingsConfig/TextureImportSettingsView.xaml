@@ -14,9 +14,12 @@
         <dxforge:EnumDescriptionConverter x:Key="enumDescriptionConverter"/>
         <local:TextureDimensionToBooleanConverter x:Key="textureDimensionToBooleanConverter"/>
 
-        <Style x:Key="{x:Type TextBlock}" TargetType="{x:Type TextBlock}">
-            <Setter Property="Foreground" Value="{StaticResource Editor.FontBrush}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
+        <Style x:Key="{x:Type TextBlock}" TargetType="{x:Type TextBlock}" BasedOn="{StaticResource LightTextBlockStyle}">
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="{StaticResource Editor.Disabled.FontBrush}"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <ObjectDataProvider x:Key="bcFormatEnumDataSource" MethodName="GetValues" ObjectType="{x:Type sys:Enum}">
@@ -48,6 +51,39 @@
                          Margin="0,1,20,2" Content="3D" GroupName="Dimension" d:IsEnabled="False" Foreground="{StaticResource Editor.FontBrush}"/>
             <RadioButton IsChecked="{Binding Dimension, Converter={StaticResource textureDimensionToBooleanConverter}, ConverterParameter=3}"
                          Margin="0,1,20,2" Content="Cubemap" GroupName="Dimension" Foreground="{StaticResource Editor.FontBrush}"/>
+            <StackPanel d:Visibility="Visible">
+                <StackPanel.Style>
+                    <Style TargetType="{x:Type StackPanel}">
+                        <Setter Property="IsEnabled" Value="False"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Dimension}" Value="{x:Static local:TextureDimension.TextureCube}">
+                                <Setter Property="IsEnabled" Value="True"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </StackPanel.Style>
+                <StackPanel Orientation="Horizontal">
+                    <StackPanel.Style>
+                        <Style TargetType="{x:Type StackPanel}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding PrefilterCubeMap}" Value="True">
+                                    <Setter Property="IsEnabled" Value="False"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <TextBlock Text="キューブマップのサイズ" Width="140"/>
+                    <TextBox Text="{Binding CubeMapSize}" Width="48" Padding="0" d:Text="1024"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="キューブマップを反転" Width="140"/>
+                    <CheckBox IsChecked="{Binding MirrorCubeMap}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="プリフィルタ" Width="140"/>
+                    <CheckBox IsChecked="{Binding PrefilterCubeMap}"/>
+                </StackPanel>
+            </StackPanel>
         </WrapPanel>
 
         <TextBlock Grid.Row="1" Grid.Column="0" Text="ミップレベル"/>

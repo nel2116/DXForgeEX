@@ -34,7 +34,7 @@ namespace DXForgeEditor.ContentToolsAPIStructs
         FormatMismatch,
         [Description("ソース画像ファイルが見つかりません。")]
         FileNotFound,
-        [Description("キューブマップの画像数は6の倍数でなければならない。")]
+        [Description("キューブマップの画像数は6の倍数であるか、ソース画像が同じサイズとフォーマットの正距円筒画像でなければならない。")]
         NeedSixImages,
     }
 
@@ -49,6 +49,9 @@ namespace DXForgeEditor.ContentToolsAPIStructs
         public int PreferBC7;
         public int OutputFormat;
         public int Compress;
+        public int CubeMapSize;
+        public int MirrorCubeMap;
+        public int PrefilterCubeMap;
 
         public void FromContentSettings(Texture texture)
         {
@@ -62,6 +65,9 @@ namespace DXForgeEditor.ContentToolsAPIStructs
             PreferBC7 = settings.PreferBC7 ? 1 : 0;
             OutputFormat = (int)settings.OutputFormat;
             Compress = settings.Compress ? 1 : 0;
+            CubeMapSize = settings.CubeMapSize;
+            MirrorCubeMap = settings.MirrorCubeMap ? 1 : 0;
+            PrefilterCubeMap = settings.PrefilterCubeMap ? 1 : 0;
         }
     }
 
@@ -169,7 +175,7 @@ namespace DXForgeEditor.DllWrappers
 
 
         #region Texture
-        private static List<List<List<Slice>>> GetSlices(TextureData data)
+        private static SliceArray3D GetSlices(TextureData data)
         {
             Debug.Assert(data.Info.MipLevels > 0);
             Debug.Assert(data.SubresourceData != IntPtr.Zero && data.SubresourceSize > 0);
@@ -193,7 +199,7 @@ namespace DXForgeEditor.DllWrappers
             return SlicesFromBinary(icon, 1, 1, false).First()?.First()?.First();
         }
 
-        private static void SetSubresourceData(List<List<List<Slice>>> slices, TextureData data)
+        private static void SetSubresourceData(SliceArray3D slices, TextureData data)
         {
             var subresourceData = SlicesToBinary(slices);
             data.SubresourceData = Marshal.AllocCoTaskMem(subresourceData.Length);
@@ -216,16 +222,16 @@ namespace DXForgeEditor.DllWrappers
         private static void GetTextureInfo(Texture texture, TextureData data)
         {
             var info = data.Info;
-
+            // NOTE: 一部のプロパティは設定時にフラグを確認するため、フラグを最初に設定する。
+            texture.Flags = (TextureFlags)info.Flags;
             texture.Width = info.Width;
             texture.Height = info.Height;
             texture.ArraySize = info.ArraySize;
             texture.MipLevels = info.MipLevels;
             texture.Format = (DXGI_FORMAT)info.Format;
-            texture.Flags = (TextureFlags)info.Flags;
         }
 
-        public static List<List<List<Slice>>> SlicesFromBinary(byte[] data, int arraySize, int mipLevels, bool is3D)
+        public static SliceArray3D SlicesFromBinary(byte[] data, int arraySize, int mipLevels, bool is3D)
         {
             Debug.Assert(data?.Length > 0 && arraySize > 0);
             Debug.Assert(mipLevels > 0 && mipLevels < Texture.MaxMipLevels);
@@ -244,7 +250,7 @@ namespace DXForgeEditor.DllWrappers
             }
 
             using var reader = new BinaryReader(new MemoryStream(data));
-            var slices = new List<List<List<Slice>>>();
+            var slices = new SliceArray3D();
             for (var i = 0; i < arraySize; ++i)
             {
                 var arraySlice = new List<List<Slice>>();
@@ -272,7 +278,7 @@ namespace DXForgeEditor.DllWrappers
             return slices;
         }
 
-        public static byte[] SlicesToBinary(List<List<List<Slice>>> slices)
+        public static byte[] SlicesToBinary(SliceArray3D slices)
         {
             Debug.Assert(slices?.Any() == true && slices.First()?.Any() == true);
             using var writer = new BinaryWriter(new MemoryStream());
@@ -301,7 +307,7 @@ namespace DXForgeEditor.DllWrappers
         [DllImport(_toolsDLL)]
         private static extern void Decompress([In, Out] TextureData data);
 
-        public static List<List<List<Slice>>> Decompress(Texture texture)
+        public static SliceArray3D Decompress(Texture texture)
         {
             Debug.Assert(texture.ImportSettings.Compress);
             using var textureData = new TextureData();
@@ -333,7 +339,7 @@ namespace DXForgeEditor.DllWrappers
         [DllImport(_toolsDLL)]
         private static extern void Import([In, Out] TextureData data);
 
-        public static (List<List<List<Slice>>>? slices, Slice? icon) Import(Texture texture)
+        public static (SliceArray3D? slices, Slice? icon) Import(Texture texture)
         {
             Debug.Assert(texture.ImportSettings.Sources.Any());
             using var textureData = new TextureData();
