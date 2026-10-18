@@ -71,8 +71,8 @@ PowerShell 7+ (`pwsh`) から実行します。
 
 `packages/`は`.gitignore`で除外しているため、新しいclone/worktreeでは空です。`build.ps1`はネイティブ側をビルドする前に`Restore.ps1`を呼び、足りないものだけを取得します。手作業でのコピーは不要です。
 
-- **DirectXTex** (`ContentTools/packages.config`の`directxtex_desktop_win10`): `packages/<id>.<version>`が無ければ`MSBuild DXForge.sln -t:restore -p:RestorePackagesConfig=true`で復元します(`nuget.exe`は不要)。`ContentTools`は`*Editor`構成でしかビルドされないため、`Debug`/`Release`構成では復元しません。
-- **DXC** (`packages/DirectXShaderCompiler`): フォルダが空なら`GetDXC.ps1`で最新版を取得します(GitHub APIを使います)。
+- **NuGet** (`ContentTools/packages.config`の`directxtex_desktop_win10`と、`DXForgeEditor`の`PackageReference`): `packages/<id>.<version>`か`DXForgeEditor/obj/project.assets.json`が無ければ`MSBuild DXForge.sln -t:restore -p:RestorePackagesConfig=true`で両方を復元します(`nuget.exe`は不要)。ネイティブのビルドは*Editor構成でソリューション内の`DXForgeEditor`もビルドするため、`obj`だけを消した状態でも`NETSDK1004`にならないようにしています。どちらも`*Editor`構成でしかビルドされないため、`Debug`/`Release`構成では復元しません。
+- **DXC** (`packages/DirectXShaderCompiler`): フォルダが空なら`GetDXC.ps1`で最新版を取得します(GitHub APIを使います)。DXCを使うのは`EngineTest`だけなので、`EngineTest`をビルドするとき(`Debug`/`Release`構成で、`-Project`を省略したときか`EngineTest`を指定したとき)だけ取得します。`-Project EngineUnitTests`や`*Editor`構成のビルドは、オフラインやGitHub APIのレート制限の下でもDXCなしで進みます。
 
 既に揃っているときは、ファイルの有無を見るだけでネットワークにはアクセスせず、すぐに終わります(実測: 数十ms)。`Restore.ps1`は単体でも実行でき(`./Restore.ps1 -Configuration DebugEditor`)、`build.ps1 -NoRestore`で復元を省けます。DXCを最新版に更新したいときは、`packages/DirectXShaderCompiler`を削除してから実行してください。
 
