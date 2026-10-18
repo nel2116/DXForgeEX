@@ -10,6 +10,7 @@
 // 2025/01/12 カメラ関連の処理の追加
 // 2025/01/13 add_material()、remove_material()の追加
 // 2025/01/18 light関連の処理の追加
+// 2026/10/18 カメラの上方向のsetterを削除 (#62)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Renderer.h"
@@ -247,11 +248,6 @@ namespace dxforge::graphics
 		gfx.camera.remove(id);
 	}
 
-	void camera::up(math::v3 up) const
-	{
-		assert(is_valid());
-		gfx.camera.set_parameter(_id, camera_parameter::up_vector, &up, sizeof(up));
-	}
 	void camera::field_of_view(f32 fov) const
 	{
 		assert(is_valid());

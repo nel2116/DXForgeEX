@@ -6,6 +6,7 @@
 // カメラのインターフェース
 // 更新履歴
 // 2025/01/12 新規作成
+// 2026/10/18 上方向のsetter up(math::v3)を削除 (#62)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -29,7 +30,6 @@ namespace dxforge::graphics
 		constexpr camera_id get_id() const { return _id; }
 		constexpr bool is_valid() const { return id::is_valid(_id); }
 
-		void up(math::v3 up) const;
 		void field_of_view(f32 fov) const;
 		void aspect_ratio(f32 aspect_ratio) const;
 		void view_width(f32 width) const;
@@ -41,7 +41,7 @@ namespace dxforge::graphics
 		math::m4x4 inverse_projection() const;
 		math::m4x4 view_projection() const;
 		math::m4x4 inverse_view_projection() const;
-		math::v3 up() const;
+		math::v3 up() const;	// カメラのエンティティのup()に追従する (向きはエンティティの回転で変える)
 		f32 near_z() const;
 		f32 far_z() const;
 		f32 field_of_view() const;

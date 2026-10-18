@@ -8,6 +8,7 @@
 // 2025/01/12 新規作成
 // 2025/01/14 コメントの追加
 // 2026/10/18 向きをエンティティのfront()から取得し、上方向もエンティティのup()に追従するよう変更 (#4)
+// 2026/10/18 update()で毎フレーム上書きされ効かなかった上方向のsetterを削除 (#62)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -22,17 +23,6 @@ namespace dxforge::graphics::d3d12::camera
 	{
 		// カメラの情報を格納するフリースト構造
 		utl::free_list<d3d12_camera> cameras;
-
-		/// @brief カメラの"上方向"ベクトルを設定する関数
-		/// @param camera 設定対象のカメラ
-		/// @param data "上方向"ベクトルのデータ
-		/// @param size データサイズ
-		void set_up_vector(d3d12_camera& camera, const void* const data, [[maybe_unused]] u32 size)
-		{
-			math::v3 up_vector{ *(math::v3*)data };
-			assert(sizeof(up_vector) == size);
-			camera.up(up_vector);
-		}
 
 		/// @brief カメラの視野角を設定する関数
 		/// @param camera 設定対象のカメラ
@@ -273,7 +263,7 @@ namespace dxforge::graphics::d3d12::camera
 		// カメラのパラメータ設定関数配列
 		constexpr set_function set_functions[]
 		{
-			set_up_vector,
+			dummy_set,	// 上方向はエンティティの回転から決まるため設定できない (#62)
 			set_field_of_view,
 			set_aspect_ratio,
 			set_view_width,
@@ -316,8 +306,7 @@ namespace dxforge::graphics::d3d12::camera
 
 	// ====== クラス実装部 ======
 	d3d12_camera::d3d12_camera(camera_init_info info)
-		: _up{ DirectX::XMLoadFloat3(&info.up) },
-		_near_z{ info.near_z }, _far_z{ info.far_z },
+		: _near_z{ info.near_z }, _far_z{ info.far_z },
 		_field_of_view{ info.field_of_view }, _aspect_ratio{ info.aspect_ratio },
 		_projection_type{ info.type }, _entity_id{ info.entity_id }, _is_dirty{ true }
 	{
@@ -349,13 +338,6 @@ namespace dxforge::graphics::d3d12::camera
 
 		_view_projection = XMMatrixMultiply(_view, _projection);
 		_inverse_view_projection = XMMatrixInverse(nullptr, _view_projection);
-	}
-
-	/// @brief カメラの"上方向"ベクトルを設定する関数
-	/// @param up カメラの"上方向"ベクトル
-	void d3d12_camera::up(math::v3 up)
-	{
-		_up = DirectX::XMLoadFloat3(&up);
 	}
 
 	/// @brief カメラの視野角を設定する関数
