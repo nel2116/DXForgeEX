@@ -725,14 +725,11 @@ namespace DXForgeEditor.Content
         /// </summary>
         private void LoadIBLPair(Guid iblPairGuid, string file)
         {
-            // アセットがまだ登録されていない場合に備えて、Save() と同じ規則のファイル名も探す。
-            var conventionalFile = ImportSettings.Sources.Any() ?
-                file.Replace(AssetFileExtension, $"{DiffuseIBLFileSuffix}{AssetFileExtension}") :
-                file.Replace($"{DiffuseIBLFileSuffix}{AssetFileExtension}", AssetFileExtension);
             var pairFile = AssetRegistry.GetAssetInfo(iblPairGuid)?.FullPath;
-            if (string.IsNullOrEmpty(pairFile) && TryGetAssetInfo(conventionalFile)?.Guid == iblPairGuid)
+            if (string.IsNullOrEmpty(pairFile))
             {
-                pairFile = conventionalFile;
+                // アセットがまだ登録されていない場合に備えて、Save() と同じ規則のファイル名(番号付きを含む)も探す。
+                pairFile = GetConventionalIBLPairFiles(file).FirstOrDefault(x => TryGetAssetInfo(x)?.Guid == iblPairGuid);
             }
 
             if (string.IsNullOrEmpty(pairFile) || !File.Exists(pairFile))
@@ -749,6 +746,33 @@ namespace DXForgeEditor.Content
             else
             {
                 Logger.Log(MessageType.Warning, $"対になるIBLのテクスチャを読み込めませんでした: {pairFile}");
+            }
+        }
+
+        /// <summary>
+        /// Save() の規則でペアに付く名前の候補。元のキューブマップからは &lt;名前&gt;_diffuse_ibl[番号].asset、
+        /// 拡散光のIBLからは名前の末尾の _diffuse_ibl[番号] を除いた名前。
+        /// </summary>
+        private IEnumerable<string> GetConventionalIBLPairFiles(string file)
+        {
+            var directory = Path.GetDirectoryName(file) ?? string.Empty;
+            var name = Path.GetFileNameWithoutExtension(file);
+            if (ImportSettings.Sources.Any())
+            {
+                var pairName = $"{name}{DiffuseIBLFileSuffix}";
+                yield return Path.Combine(directory, $"{pairName}{AssetFileExtension}");
+                for (var i = 1; File.Exists(Path.Combine(directory, $"{pairName}{i}{AssetFileExtension}")); ++i)
+                {
+                    yield return Path.Combine(directory, $"{pairName}{i}{AssetFileExtension}");
+                }
+            }
+            else
+            {
+                var index = name.LastIndexOf(DiffuseIBLFileSuffix, StringComparison.Ordinal);
+                if (index >= 0 && name[(index + DiffuseIBLFileSuffix.Length)..].All(char.IsAsciiDigit))
+                {
+                    yield return Path.Combine(directory, $"{name[..index]}{AssetFileExtension}");
+                }
             }
         }
 
@@ -865,21 +889,17 @@ namespace DXForgeEditor.Content
                 var savedFiles = new List<string>();
 
                 // 対になる拡散光のIBLのテクスチャも保存する(互いのGUIDを書くので、このテクスチャのGUIDを決めた後で保存する)。
+                // ペアを保存できなければ、存在しない・古いペアを参照しないよう、このテクスチャも保存しない。
+                string? pairFile = null;
                 if (IBLPair != null && !IBLPair._isSaving && !IsDiffuseIBL)
                 {
-                    var pairFile = string.IsNullOrEmpty(IBLPair.FullPath) ?
-                        file.Replace(AssetFileExtension, $"{DiffuseIBLFileSuffix}{AssetFileExtension}") : IBLPair.FullPath;
-                    savedFiles.AddRange(IBLPair.Save(pairFile));
-                }
-
-                if (!string.IsNullOrEmpty(_obsoleteIBLPairFile))
-                {
-                    if (File.Exists(_obsoleteIBLPairFile))
+                    pairFile = string.IsNullOrEmpty(IBLPair.FullPath) ? GetNewIBLPairFile(file) : IBLPair.FullPath;
+                    var savedPairFiles = IBLPair.Save(pairFile).ToList();
+                    if (!savedPairFiles.Any())
                     {
-                        File.Delete(_obsoleteIBLPairFile);
-                        Logger.Log(MessageType.Info, $"不要になった拡散光のIBLのテクスチャを削除: {_obsoleteIBLPairFile}");
+                        throw new IOException($"対になる拡散光のIBLのテクスチャを保存できませんでした: {pairFile}");
                     }
-                    _obsoleteIBLPairFile = null;
+                    savedFiles.AddRange(savedPairFiles);
                 }
 
                 var compressed = CompressContent();
@@ -906,6 +926,17 @@ namespace DXForgeEditor.Content
                 FullPath = file;
                 Logger.Log(MessageType.Info, $"テクスチャを保存: {file}");
 
+                // 事前フィルタをやめたときの古いペアのファイルを消す。ペアを付け直して同じファイルへ保存した場合は消さない。
+                if (!string.IsNullOrEmpty(_obsoleteIBLPairFile))
+                {
+                    if (!IsSameFile(_obsoleteIBLPairFile, pairFile) && File.Exists(_obsoleteIBLPairFile))
+                    {
+                        File.Delete(_obsoleteIBLPairFile);
+                        Logger.Log(MessageType.Info, $"不要になった拡散光のIBLのテクスチャを削除: {_obsoleteIBLPairFile}");
+                    }
+                    _obsoleteIBLPairFile = null;
+                }
+
                 savedFiles.Insert(0, file);
                 return savedFiles;
 
@@ -922,6 +953,56 @@ namespace DXForgeEditor.Content
 
             return new List<string>();
         }
+
+        /// <summary>
+        /// まだ保存していない拡散光のIBLのテクスチャの保存先を決める。規則のファイル名(&lt;名前&gt;_diffuse_ibl.asset)に
+        /// このテクスチャのペアではない別のアセットがあるときは、上書きしないよう番号を付けた名前にする。
+        /// </summary>
+        private string GetNewIBLPairFile(string file)
+        {
+            var directory = Path.GetDirectoryName(file) ?? string.Empty;
+            var name = $"{Path.GetFileNameWithoutExtension(file)}{DiffuseIBLFileSuffix}";
+            var pairFile = Path.Combine(directory, $"{name}{AssetFileExtension}");
+            for (var i = 1; File.Exists(pairFile) && !IsOwnIBLPairFile(pairFile); ++i)
+            {
+                pairFile = Path.Combine(directory, $"{name}{i}{AssetFileExtension}");
+            }
+
+            if (!IsSameFile(pairFile, Path.Combine(directory, $"{name}{AssetFileExtension}")))
+            {
+                Logger.Log(MessageType.Warning, $"同じ名前の別のアセットがあるため、拡散光のIBLのテクスチャを別の名前で保存します: {pairFile}");
+            }
+            return pairFile;
+        }
+
+        /// <summary>
+        /// ファイルが、このテクスチャを IBLPair として参照するテクスチャアセット(前に保存したペア)かどうか。
+        /// </summary>
+        private bool IsOwnIBLPairFile(string file)
+        {
+            if (Guid == Guid.Empty || TryGetAssetInfo(file)?.Type != Type) return false;
+
+            try
+            {
+                using var reader = new BinaryReader(File.Open(file, FileMode.Open, FileAccess.Read));
+
+                new Texture().ReadAssetFileHeader(reader);
+                var version = ReadFileFormatVersion(reader);
+                if (version < FirstVersionWithIBLPair) return false;
+
+                new TextureImportSettings().FromBinary(reader, version >= FirstVersionWithCubeMapSettings);
+                reader.BaseStream.Position += 6 * sizeof(int);
+                return new Guid(reader.ReadString()) == Guid;
+            }
+            catch (Exception ex) { Debug.WriteLine(ex.Message); }
+
+            return false;
+        }
+
+        private static bool IsSameFile(string file, string? other) =>
+            !string.IsNullOrEmpty(other) &&
+            string.Equals(Path.GetFullPath(file), Path.GetFullPath(other), StringComparison.OrdinalIgnoreCase);
+
         private byte[] CompressContent()
         {
             Debug.Assert(Slices.First().Any() && Slices.First().Count == MipLevels);
