@@ -23,6 +23,9 @@ namespace DXForgeEditor.GameDev
         private static readonly object _lock = new();
         private static readonly string[] _buildConfigurationNames = new string[] { "Debug", "DebugEditor", "Release", "ReleaseEditor" };
         private static EnvDTE80.DTE2? _vsInstance = null;
+        // DTEのイベントはRCWへの参照が無くなるとGCで登録が外れるため、フィールドに保持する
+        private static EnvDTE.BuildEvents? _buildEvents = null;
+        private static EnvDTE80.DTE2? _buildEventsOwner = null;
 
         public static bool BuildSucceeded { get; private set; } = true;
         public static bool BuildDone { get; private set; } = true;
@@ -128,6 +131,7 @@ namespace DXForgeEditor.GameDev
         {
             CallOnSTAThread(() =>
             {
+                UnregisterBuildEvents();
                 if (_vsInstance?.Solution.IsOpen == true)
                 {
                     _vsInstance.ExecuteCommand("File.SaveAll");
@@ -209,6 +213,35 @@ namespace DXForgeEditor.GameDev
             _resetEvent.Set();
         }
 
+        // ビルドのたびに+=すると同じハンドラが重複して登録されるため、VSのインスタンスごとに1回だけ登録する
+        private static void RegisterBuildEvents(EnvDTE80.DTE2 instance)
+        {
+            if (_buildEvents != null && ReferenceEquals(_buildEventsOwner, instance)) return;
+            UnregisterBuildEvents();
+
+            var buildEvents = instance.Events.BuildEvents;
+            buildEvents.OnBuildProjConfigBegin += OnBuildSolutionBegin;
+            buildEvents.OnBuildProjConfigDone += OnBuildSolutionDone;
+            _buildEvents = buildEvents;
+            _buildEventsOwner = instance;
+        }
+
+        private static void UnregisterBuildEvents()
+        {
+            var buildEvents = _buildEvents;
+            _buildEvents = null;
+            _buildEventsOwner = null;
+            if (buildEvents == null) return;
+
+            // VSが既に終了している場合などは解除に失敗するが、登録先ごと無くなっているので無視してよい
+            try
+            {
+                buildEvents.OnBuildProjConfigBegin -= OnBuildSolutionBegin;
+                buildEvents.OnBuildProjConfigDone -= OnBuildSolutionDone;
+            }
+            catch (Exception ex) { Debug.WriteLine(ex.Message); }
+        }
+
         private static bool IsDebugging_Internal()
         {
             bool result = false;
@@ -252,8 +285,7 @@ namespace DXForgeEditor.GameDev
                 if (!instance.Solution.IsOpen)
                     instance.Solution.Open(project.Solution);
 
-                instance.Events.BuildEvents.OnBuildProjConfigBegin += OnBuildSolutionBegin;
-                instance.Events.BuildEvents.OnBuildProjConfigDone += OnBuildSolutionDone;
+                RegisterBuildEvents(instance);
             });
 
             var configName = GetConfigurationName(buildConfig);
