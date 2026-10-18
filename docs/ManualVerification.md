@@ -198,13 +198,14 @@ tasklist /FI "IMAGENAME eq devenv.exe"
 Remove-Item -Recurse -Force $verifyRoot
 ```
 
-3. `%APPDATA%\DXForgeEditor\ProjectData.xml`から、検証用のプロジェクトのエントリだけを削除する。このファイルはProject Browserの「Open Project」の一覧で、作成/オープンしたプロジェクトが登録されます。フォルダを消しても一覧のエントリは残るので、ほかのエントリには触らず、該当の`<ProjectData>`要素だけを消します。エディタはプロジェクトを`ProjectPath`+`ProjectName`(フルパス)で区別するので、別の場所にある同じ名前のプロジェクトを消さないよう、**`ProjectName`と`ProjectPath`の両方が一致するもの**だけを消します。先にバックアップを取ってください。
+3. `%APPDATA%\DXForgeEditor\ProjectData.xml`から、検証用のプロジェクトのエントリだけを削除する。このファイルはProject Browserの「Open Project」の一覧で、作成/オープンしたプロジェクトが登録されます。フォルダを消しても一覧のエントリは残るので、ほかのエントリには触らず、該当の`<ProjectData>`要素だけを消します。エディタはプロジェクトを`ProjectPath`+`ProjectName`(フルパス)で区別するので、別の場所にある同じ名前のプロジェクトを消さないよう、**`ProjectName`と`ProjectPath`の両方が一致するもの**だけを消します。
 
-まず、バックアップを取り、消すエントリの`ProjectPath`を決めます。バックアップは、まだないときだけ作ります(再実行しても、最初のバックアップが上書きされないように)。
+まず、バックアップを取り、消すエントリの`ProjectPath`を決めます。バックアップは日時入りの名前で毎回新しく作るので、前回の検証のバックアップと取り違えたり、上書きしたりすることはありません。
 
 ```powershell
 $f = "$env:APPDATA\DXForgeEditor\ProjectData.xml"
-if (-not (Test-Path "$f.bak")) { Copy-Item $f "$f.bak" }
+$bak = "$f.$(Get-Date -Format yyyyMMdd-HHmmss).bak"
+Copy-Item $f $bak
 # エディタは、Path欄の値 + プロジェクト名 + "\" をProjectPathとして登録する
 $projectPath = "$verifyRoot\$verifyName\"
 ```
@@ -222,6 +223,18 @@ $x.Save($f)
 ```
 
 削除するエントリが0件と表示された場合は、手順2でPath欄に`$verifyRoot\`以外の値を入力しています。`ProjectData.xml`を開き、該当するエントリの`ProjectPath`の値を`$projectPath`に入れて(例: `$projectPath = "D:\Work\Verify43\"`)から、**2つ目のコードブロックだけ**をもう一度実行してください(1つ目を実行すると`$projectPath`が元の値に戻ります)。
+
+最後に、残っているエントリを表示し、検証用のエントリが消えて、ほかのエントリが残っていることを確かめます。
+
+```powershell
+$x.SelectNodes("//d:ProjectData", $ns) | ForEach-Object { "$($_.ProjectName)  $($_.ProjectPath)" }
+```
+
+問題がなければ、このとき作ったバックアップを消します(次回の検証で古いバックアップが残らないように)。意図しないエントリまで消えていた場合は、消さずに`Copy-Item $bak $f`で元に戻してください。
+
+```powershell
+Remove-Item $bak
+```
 
 4. `DXFORGE_ENGINE`を一時的に切り替えた場合は、元の値に戻す。
 
