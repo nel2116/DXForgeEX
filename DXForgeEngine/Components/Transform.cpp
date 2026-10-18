@@ -10,6 +10,7 @@
 // 2525/01/12 Orientationの計算を追加
 // 2025/01/14 コメントの追加
 // 2026/10/18 set_orientation()が未実装である旨をTODOとして明記
+// 2026/10/18 set_orientation()を削除し、向きを回転から導出するローカルフレーム(right/up/front)で保持するよう変更 (#4)
 // /_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Transform.h"
@@ -20,10 +21,36 @@ namespace dxforge::transform
 	// 匿名名前空間に各種ベクターを定義
 	namespace
 	{
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable:4201)
+#endif
+		// C4201: nonstandard extension used: nameless struct/union
+		/// @brief エンティティのローカル座標系(右・上・前方の各軸)を格納する構造体
+		struct local_frame
+		{
+			union {
+				struct {
+					math::v3 right;	///< 右方向 (ローカルX軸)
+					math::v3 up;	///< 上方向 (ローカルY軸)
+					math::v3 front;	///< 前方向 (ローカルZ軸)
+				};
+				math::m3x3 frame;	///< 3軸を行として並べた3x3行列
+			};
+
+			local_frame()
+				: right{ 1.f, 0.f, 0.f }, up{ 0.f, 1.f, 0.f }, front{ 0.f, 0.f, 1.f }
+			{}
+		};
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
+
 		utl::vector<math::m4x4> to_world;				///< ワールド行列を格納するベクター
 		utl::vector<math::m4x4> inv_world;				///< ワールド行列の逆行列を格納するベクター
 		utl::vector<math::v4> rotations;				///< 各エンティティの回転情報を格納するベクター
-		utl::vector<math::v3> orientations;				///< 各エンティティの向きを格納するベクター
+		utl::vector<local_frame> local_frames;			///< 各エンティティのローカルフレームを格納するベクター
 		utl::vector<math::v3> positions;				///< 各エンティティの位置を格納するベクター
 		utl::vector<math::v3> scales;					///< 各エンティティのスケール情報を格納するベクター
 		utl::vector<u8> has_transform;					///< 計算済みかどうかを示すフラグ (0: 未計算, 1: 計算済み)
@@ -57,17 +84,28 @@ namespace dxforge::transform
 			has_transform[index] = 1;// 計算済みに設定
 		}
 
-		/// @brief 回転ベクトルから向きを計算
+		/// @brief 回転クォータニオンからローカルフレームを計算
 		/// @param rotation 回転クォータニオン
-		/// @return 向きのベクトル
-		math::v3 calculate_orientation(math::v4 rotation)
+		/// @param result 計算結果を格納するローカルフレーム
+		void calculate_local_frame(const math::v4& rotation, local_frame& result)
 		{
 			using namespace DirectX;
+
+			local_frame frame{};
+
+			XMVECTOR right{ XMLoadFloat3(&frame.right) };
+			XMVECTOR up{ XMLoadFloat3(&frame.up) };
+			XMVECTOR front{ XMLoadFloat3(&frame.front) };
 			XMVECTOR rotation_quat{ XMLoadFloat4(&rotation) };
-			XMVECTOR front{ XMVectorSet(0.f, 0.f, 1.f, 0.f) };
-			math::v3 orientation;
-			XMStoreFloat3(&orientation, XMVector3Normalize(XMVector3Rotate(front, rotation_quat)));
-			return orientation;
+
+			// 右・上を回転させ、前方はその外積から求めて3軸の直交性を保つ
+			right = XMVector3Normalize(XMVector3Rotate(right, rotation_quat));
+			up = XMVector3Normalize(XMVector3Rotate(up, rotation_quat));
+			front = XMVector3Normalize(XMVector3Cross(right, up));
+
+			XMStoreFloat3(&result.right, right);
+			XMStoreFloat3(&result.up, up);
+			XMStoreFloat3(&result.front, front);
 		}
 
 	} // 匿名名前空間
@@ -76,18 +114,9 @@ namespace dxforge::transform
 	{
 		const u32 index{ id::index(id) };
 		rotations[index] = rotation_quaternion;
-		orientations[index] = calculate_orientation(rotation_quaternion);
+		calculate_local_frame(rotation_quaternion, local_frames[index]);
 		has_transform[index] = 0;
 		changes_from_previous_frame[index] |= (u8)component_flags::rotation;
-	}
-
-	// TODO: 未実装。orientationはset_rotation()内でクォータニオンから導出される値
-	//       (calculate_orientation())であり、方向ベクタから回転を逆算するにはロール角の
-	//       扱いを決める必要があるため保留している。
-	//       現状、entity_script::set_orientation()経由で指定された値はここで黙って捨てられる。
-	//       実装するか、公開APIから取り下げるかを決めること。
-	void set_orientation([[maybe_unused]] transform_id id, [[maybe_unused]] const math::v3& orientation_vector)
-	{
 	}
 
 	void set_position(transform_id id, const math::v3& position)
@@ -121,7 +150,7 @@ namespace dxforge::transform
 		{
 			math::v4 rotation{ info.rotation };
 			rotations[entity_index] = rotation;
-			orientations[entity_index] = calculate_orientation(rotation);
+			calculate_local_frame(rotation, local_frames[entity_index]);
 			positions[entity_index] = math::v3{ info.position };
 			scales[entity_index] = math::v3{ info.scale };
 			has_transform[entity_index] = 0;
@@ -133,7 +162,8 @@ namespace dxforge::transform
 			to_world.emplace_back();
 			inv_world.emplace_back();
 			rotations.emplace_back(info.rotation);
-			orientations.emplace_back(calculate_orientation(math::v4{ info.rotation }));
+			local_frames.emplace_back();
+			calculate_local_frame(rotations.back(), local_frames.back());
 			positions.emplace_back(info.position);
 			scales.emplace_back(info.scale);
 			has_transform.emplace_back((u8)0);
@@ -205,10 +235,6 @@ namespace dxforge::transform
 			{
 				set_rotation(c.id, c.rotation);
 			}
-			if (c.flags & component_flags::orientation)
-			{
-				set_orientation(c.id, c.orientation);
-			}
 			if (c.flags & component_flags::position)
 			{
 				set_position(c.id, c.position);
@@ -229,14 +255,6 @@ namespace dxforge::transform
 		return rotations[id::index(_id)];
 	}
 
-	/// @brief コンポーネントの向きを取得
-	/// @return 向きのベクトル
-	math::v3 component::orientation() const
-	{
-		assert(is_valid());
-		return orientations[id::index(_id)];
-	}
-
 	/// @brief コンポーネントの位置を取得
 	/// @return 位置ベクトル
 	math::v3 component::position() const
@@ -251,5 +269,37 @@ namespace dxforge::transform
 	{
 		assert(is_valid());
 		return scales[id::index(_id)];
+	}
+
+	/// @brief コンポーネントの右方向(ローカルX軸)を取得
+	/// @return 右方向の単位ベクトル
+	math::v3 component::right() const
+	{
+		assert(is_valid());
+		return local_frames[id::index(_id)].right;
+	}
+
+	/// @brief コンポーネントの上方向(ローカルY軸)を取得
+	/// @return 上方向の単位ベクトル
+	math::v3 component::up() const
+	{
+		assert(is_valid());
+		return local_frames[id::index(_id)].up;
+	}
+
+	/// @brief コンポーネントの前方向(ローカルZ軸)を取得
+	/// @return 前方向の単位ベクトル
+	math::v3 component::front() const
+	{
+		assert(is_valid());
+		return local_frames[id::index(_id)].front;
+	}
+
+	/// @brief コンポーネントのローカルフレームを取得
+	/// @return 右・上・前方向を行として並べた3x3行列
+	math::m3x3 component::local_frame() const
+	{
+		assert(is_valid());
+		return local_frames[id::index(_id)].frame;
 	}
 }

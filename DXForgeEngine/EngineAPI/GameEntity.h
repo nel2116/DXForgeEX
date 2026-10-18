@@ -8,6 +8,7 @@
 // 2024/08/12 新規作成
 // 2024/12/10 スクリプトコンポーネントの作成関数の追加
 // 2025/02/10 Geometryコンポーネントの作成関数の追加
+// 2026/10/18 set_orientation()を削除し、向きを回転から導出するローカルフレーム(right/up/front)で保持するよう変更 (#4)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -35,9 +36,12 @@ namespace dxforge::game_entity
 		[[nodiscard]] geometry::component geometry() const;
 
 		[[nodiscard]] math::v4 rotation() const { return transform().rotation(); }
-		[[nodiscard]] math::v3 orientation() const { return transform().orientation(); }
 		[[nodiscard]] math::v3 position() const { return transform().position(); }
 		[[nodiscard]] math::v3 scale() const { return transform().scale(); }
+		[[nodiscard]] math::v3 right() const { return transform().right(); }
+		[[nodiscard]] math::v3 up() const { return transform().up(); }
+		[[nodiscard]] math::v3 front() const { return transform().front(); }
+		[[nodiscard]] math::m3x3 local_frame() const { return transform().local_frame(); }
 
 	private:
 		entity_id _id;	// ゲームエンティティのID
@@ -58,12 +62,10 @@ namespace dxforge::script
 			: game_entity::entity{ entity.get_id() } {}
 
 		void set_rotation(math::v4 rotation_quaternion) const { set_rotation(this, rotation_quaternion); }
-		void set_orientation(math::v3 orientation_vector) const { set_orientation(this, orientation_vector); }
 		void set_position(math::v3 position) const { set_position(this, position); }
 		void set_scale(math::v3 scale) const { set_scale(this, scale); }
 
 		static void set_rotation(const game_entity::entity* const entity, math::v4 rotation_quaternion);
-		static void set_orientation(const game_entity::entity* const entity, math::v3 orientation_vector);
 		static void set_position(const game_entity::entity* const entity, math::v3 position);
 		static void set_scale(const game_entity::entity* const entity, math::v3 scale);
 	};

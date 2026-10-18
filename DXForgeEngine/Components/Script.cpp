@@ -7,6 +7,7 @@
 // 更新履歴
 // 2024/12/2 新規作成
 // 2026/10/18 remove()の世代チェックが密なインデックスでgenerationsを参照していたのを修正 (#21)
+// 2026/10/18 set_orientation()を削除し、向きを回転から導出するローカルフレーム(right/up/front)で保持するよう変更 (#4)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Script.h"
@@ -208,13 +209,6 @@ namespace dxforge::script
 		transform::component_cache& cache{ *get_cache_ptr(entity) };
 		cache.flags |= transform::component_flags::rotation;
 		cache.rotation = rotation_quaretnion;
-	}
-
-	void entity_script::set_orientation(const game_entity::entity* const entity, math::v3 orientation_vector)
-	{
-		transform::component_cache& cache{ *get_cache_ptr(entity) };
-		cache.flags |= transform::component_flags::orientation;
-		cache.orientation = orientation_vector;
 	}
 
 	void entity_script::set_position(const game_entity::entity* const entity, math::v3 position)

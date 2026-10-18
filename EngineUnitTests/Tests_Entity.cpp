@@ -6,6 +6,7 @@
 // Components/Entity.cppとComponents/Transform.cppの生成・削除・世代管理のテスト
 // 更新履歴
 // 2026/10/18 新規作成
+// 2026/10/18 orientation()の廃止に伴いローカルフレーム(right/up/front)の検証に変更 (#4)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
@@ -171,11 +172,30 @@ DXFORGE_TEST_CASE(entity_transform_is_created_with_entity_from_init_info)
 	CHECK(scale.y == 3.f);
 	CHECK(scale.z == 4.f);
 
-	// 向きは回転から導出される: 前方(0, 0, 1)をY軸まわりに90度回すと(1, 0, 0)
-	const math::v3 orientation{ entity.orientation() };
-	CHECK(nearly_equal(orientation.x, 1.f));
-	CHECK(nearly_equal(orientation.y, 0.f));
-	CHECK(nearly_equal(orientation.z, 0.f));
+	// ローカルフレームは回転から導出される。Y軸まわり+90度(右手系)の回転では
+	//	右(1, 0, 0) -> (0, 0, -1)、上(0, 1, 0) -> (0, 1, 0)のまま。
+	//	前方はcross(right, up) = cross((0, 0, -1), (0, 1, 0)) = (1, 0, 0)で、
+	//	(0, 0, 1)を同じ回転で回した結果とも一致する。
+	const math::v3 right{ entity.right() };
+	CHECK(nearly_equal(right.x, 0.f));
+	CHECK(nearly_equal(right.y, 0.f));
+	CHECK(nearly_equal(right.z, -1.f));
+
+	const math::v3 up{ entity.up() };
+	CHECK(nearly_equal(up.x, 0.f));
+	CHECK(nearly_equal(up.y, 1.f));
+	CHECK(nearly_equal(up.z, 0.f));
+
+	const math::v3 front{ entity.front() };
+	CHECK(nearly_equal(front.x, 1.f));
+	CHECK(nearly_equal(front.y, 0.f));
+	CHECK(nearly_equal(front.z, 0.f));
+
+	// local_frame()は右・上・前方を行として並べた行列
+	const math::m3x3 frame{ entity.local_frame() };
+	CHECK(nearly_equal(frame._11, right.x) && nearly_equal(frame._12, right.y) && nearly_equal(frame._13, right.z));
+	CHECK(nearly_equal(frame._21, up.x) && nearly_equal(frame._22, up.y) && nearly_equal(frame._23, up.z));
+	CHECK(nearly_equal(frame._31, front.x) && nearly_equal(frame._32, front.y) && nearly_equal(frame._33, front.z));
 
 	// NOTE: is_alive()はTransformコンポーネントの有効性も見ているため、
 	//		削除後にfalseになることがTransformが無効化されたことの観測になる
