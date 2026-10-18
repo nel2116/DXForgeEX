@@ -4,7 +4,8 @@
 #   python ContentTools/Tests/envmap_cpu_gpu_test.py                       # x64/ReleaseEditor/ContentTools.dll
 #   python ContentTools/Tests/envmap_cpu_gpu_test.py --config DebugEditor  # x64/DebugEditor/ContentTools.dll
 #   python ContentTools/Tests/envmap_cpu_gpu_test.py --dll <ContentTools.dllのパス>
-# 一致すれば終了コード0、一致しなければ1を返す。
+# 一致すれば終了コード0、一致しなければ(またはGPU版で変換されたことを確かめられなければ)1、
+# ハードウェアのD3D11デバイスを作れずGPU版を試せない環境では"SKIPPED"と表示して2を返す。
 #
 # 同じ格子模様のHDR画像を、GPU版とCPU版のそれぞれで変換し、画素ごとに比較する。
 # CPU版はD3D11を使えない環境でのフォールバックなので、CPU版の子プロセスでは
@@ -15,6 +16,10 @@
 # 両方が同じ位置(画素の中心)をサンプリングしていれば、最近傍のテクセルの色はバイリニアの
 # 重みの半分以上を占めるため、差は格子の2色の差の半分以下に収まる。
 # 半画素ずれていると、格子の境界でもう一方の色を拾い、差が2色の差のほぼ全体になる。
+#
+# GPU版の子プロセスでGPUが使えないと、ContentTools.dllは黙ってCPU版にフォールバックし、
+# CPU版同士の比較で合格してしまう。そこで、GPU版の出力に2色の中間の値(バイリニアで補間された画素)が
+# あることを確かめる。最近傍のCPU版は格子の2色以外の値を出さないので、これでGPUで変換されたと分かる。
 import argparse
 import ctypes
 import ctypes.wintypes as wt
@@ -205,30 +210,62 @@ def convert(dll_path, hdr_path, mode, mirror, work_dir):
 	return struct.unpack(f"<{len(raw) // 4}f", raw)
 
 
+def has_hardware_d3d11():
+	"""ハードウェア(WARPではない)のD3D11デバイスを、ContentTools.dllと同じ機能レベル(11_1, 11_0)で作れるか"""
+	try:
+		d3d11 = ctypes.WinDLL("d3d11")
+	except OSError:
+		return False
+	feature_levels = (ctypes.c_uint32 * 2)(0xb100, 0xb000)  # D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0
+	device = ctypes.c_void_p()
+	hr = d3d11.D3D11CreateDevice(None, 1, None, 0, feature_levels, 2, 7,  # D3D_DRIVER_TYPE_HARDWARE, D3D11_SDK_VERSION
+								 ctypes.byref(device), None, None)
+	if hr < 0 or not device:
+		return False
+	# IUnknown::Release (vtableの3番目)
+	release = ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(ctypes.cast(device, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p)))[0][2])
+	release(device)
+	return True
+
+
 def compare(cpu, gpu, mirror):
 	color_a = from_rgbe(to_rgbe(COLOR_A))
 	color_b = from_rgbe(to_rgbe(COLOR_B))
 	contrast = [abs(a - b) for a, b in zip(color_a, color_b)]
+
+	def is_checker_color(p):
+		return all(abs(v - a) < 1e-6 for v, a in zip(p, color_a)) or all(abs(v - b) < 1e-6 for v, b in zip(p, color_b))
+
 	pixel_count = len(cpu) // 4
 	max_ratio = 0.0
 	sum_ratio = 0.0
 	bad = 0
-	not_checker_color = 0
+	cpu_interpolated = 0
+	gpu_interpolated = 0
 	for i in range(pixel_count):
 		c = cpu[i * 4:i * 4 + 3]
 		g = gpu[i * 4:i * 4 + 3]
-		# CPU版は最近傍なので、出力は格子の2色のどちらかになるはず。
-		if not (all(abs(v - a) < 1e-6 for v, a in zip(c, color_a)) or all(abs(v - b) < 1e-6 for v, b in zip(c, color_b))):
-			not_checker_color += 1
+		if not is_checker_color(c):
+			cpu_interpolated += 1
+		if not is_checker_color(g):
+			gpu_interpolated += 1
 		ratio = max(abs(cv - gv) / k for cv, gv, k in zip(c, g, contrast))
 		max_ratio = max(max_ratio, ratio)
 		sum_ratio += ratio
 		if ratio > TOLERANCE:
 			bad += 1
 	print(f"mirror={mirror}: 2色の差に対する最大誤差 {max_ratio:.3f}, 平均誤差 {sum_ratio / pixel_count:.4f}, "
-		  f"許容値({TOLERANCE})を超えた画素 {bad}/{pixel_count}")
-	assert not_checker_color == 0, f"CPU版の出力に格子の色ではない画素が {not_checker_color} 個ある"
-	return bad == 0
+		  f"許容値({TOLERANCE})を超えた画素 {bad}/{pixel_count}, 補間された画素 GPU版 {gpu_interpolated} / CPU版 {cpu_interpolated}")
+	passed = bad == 0
+	# CPU版は最近傍なので、出力は格子の2色のどちらかになるはず。
+	if cpu_interpolated:
+		print(f"  CPU版の出力に格子の色ではない画素が {cpu_interpolated} 個ある(CPU版で変換されていない疑い)")
+		passed = False
+	# GPU版はバイリニアなので、格子の境界では2色の中間の値になるはず。
+	if not gpu_interpolated:
+		print("  GPU版の出力に補間された画素がない(GPUが使えずCPU版にフォールバックした疑い)")
+		passed = False
+	return passed
 
 
 def main():
@@ -248,6 +285,10 @@ def main():
 		return 0
 
 	print(f"ContentTools.dll: {dll_path}")
+	if not has_hardware_d3d11():
+		print("SKIPPED: ハードウェアのD3D11デバイスを作れないため、GPU版を試せません")
+		return 2
+
 	work_dir = tempfile.mkdtemp(prefix="envmap_cpu_gpu_test_")
 	try:
 		hdr_path = os.path.join(work_dir, "checker.hdr")
