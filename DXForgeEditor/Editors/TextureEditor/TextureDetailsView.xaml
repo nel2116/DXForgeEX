@@ -86,6 +86,10 @@
                             <DataTrigger Binding="{Binding State}" Value="{x:Static ed:AssetEditorState.Done}">
                                 <Setter Property="IsEnabled" Value="True"/>
                             </DataTrigger>
+                            <!-- 拡散光のIBLのテクスチャはソース画像を持たないので、再インポートできない。 -->
+                            <DataTrigger Binding="{Binding Texture.IsDiffuseIBL}" Value="True">
+                                <Setter Property="IsEnabled" Value="False"/>
+                            </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </StackPanel.Style>

@@ -403,9 +403,14 @@ namespace DXForgeEditor.Content
         // 0: #38より前。バージョン番号もキューブマップの設定もない。
         // 1: #38以降。インポート設定の末尾にキューブマップの3項目が増えたが、バージョン番号はない。
         // 2: アセットのヘッダの直後に FileFormatTag とバージョン番号を書く。
+        // 3: Format の直後に、対になるIBLのテクスチャ(IBLPair)のGUIDを文字列で書く(#35)。ないときは Guid.Empty。
         // 0と1にはタグがないので、ReadFileFormatVersion() でバイト配置から判別する。
-        private const int FileFormatVersion = 2;
+        private const int FileFormatVersion = 3;
         private const int FirstVersionWithCubeMapSettings = 1;
+        private const int FirstVersionWithFileFormatTag = 2;
+        private const int FirstVersionWithIBLPair = 3;
+        // 拡散光のIBLのテクスチャのファイル名に付ける接尾辞(Primal Day 073と同じ)。
+        private const string DiffuseIBLFileSuffix = "_diffuse_ibl";
         // バイト列は "TEX\0"。0と1のファイルでは、この位置からインポート設定の Sources(BinaryWriterの
         // 文字列: 7ビット符号化の長さ + UTF-8)が始まる。これをタグとして読むと、長さ84の文字列の
         // 3バイト目がNULになるが、ファイルパスはNULを含まないので、0と1のファイルがタグと一致することはない。
@@ -534,6 +539,32 @@ namespace DXForgeEditor.Content
 
         public string FormatName => ImportSettings.Compress && !IsSRGB ? ((BC_FORMAT)Format).GetDescription() : Format.GetDescription();
 
+        // 事前フィルタしたキューブマップの組(Primal Day 073)。元のキューブマップ(ソース画像あり)と、
+        // それから作った拡散光のIBLのキューブマップ(irradiance map, ソース画像なし)が、互いを IBLPair として持つ。
+        private Texture? _iblPair;
+        public Texture? IBLPair
+        {
+            get => _iblPair;
+            private set
+            {
+                if (_iblPair != value)
+                {
+                    _iblPair = value;
+                    OnPropertyChanged(nameof(IBLPair));
+                    OnPropertyChanged(nameof(IsPrefilteredIBL));
+                    OnPropertyChanged(nameof(IsDiffuseIBL));
+                }
+            }
+        }
+
+        public bool IsPrefilteredIBL => IBLPair != null;
+        // 拡散光のIBLのテクスチャはソース画像を持たない(再インポートできない)。
+        public bool IsDiffuseIBL => IsPrefilteredIBL && !ImportSettings.Sources.Any();
+
+        private bool _isSaving;
+        // 再インポートで事前フィルタしなくなったときに、保存時に削除する古い拡散光のIBLのファイル。
+        private string? _obsoleteIBLPairFile;
+
         private static bool HasValidDimensions(int width, int height, int arrayOrDepth, bool is3D, string file)
         {
             bool result = true;
@@ -574,6 +605,47 @@ namespace DXForgeEditor.Content
             return result;
         }
 
+        /// <summary>
+        /// インポートの結果を設定する。
+        /// </summary>
+        /// <param name="iblPair">対になるIBLのテクスチャ。事前フィルタしていなければ null。</param>
+        public bool SetData(SliceArray3D slices, Slice? icon, Texture? iblPair, string file)
+        {
+            Debug.Assert(slices.Any() && slices.First().Any() && slices.First().First().Any());
+
+            if (slices.Any() && slices.First().Any() && slices.First().First().Any())
+            {
+                Slices = slices;
+            }
+            else
+            {
+                return false;
+            }
+
+            var firstMip = Slices[0][0][0];
+            if (!HasValidDimensions(firstMip.Width, firstMip.Height, ArraySize, IsVolumeMap, file))
+            {
+                return false;
+            }
+
+            if (icon == null)
+            {
+                Debug.Assert(!ImportSettings.Compress);
+                icon = firstMip;
+            }
+
+            var iconImage = BitmapHelper.ImageFromSlice(icon, IsNormalMap) ?? throw new InvalidDataException("アイコン画像を生成できませんでした。");
+            Icon = BitmapHelper.CreateThumbnail(iconImage, ContentInfo.IconWidth, ContentInfo.IconWidth);
+
+            if (iblPair == null && IBLPair != null && !string.IsNullOrEmpty(IBLPair.FullPath))
+            {
+                _obsoleteIBLPairFile = IBLPair.FullPath;
+            }
+            IBLPair = iblPair;
+
+            return true;
+        }
+
         public override bool Import(string file)
         {
             Debug.Assert(File.Exists(file));
@@ -583,35 +655,10 @@ namespace DXForgeEditor.Content
                 Logger.Log(MessageType.Info, $"画像ファイルのインポート: {file}");
                 ImportSettings.Sources.Add(file);
 
-                (var slices, var icon) = ContentToolsAPI.Import(this);
+                (var slices, var icon, var diffuseIBL) = ContentToolsAPI.Import(this);
                 if (slices == null) throw new InvalidDataException("ContentToolsからテクスチャデータを取得できませんでした。");
-                Debug.Assert(slices.Any() && slices.First().Any() && slices.First().First().Any());
 
-                if (slices.Any() && slices.First().Any() && slices.First().First().Any())
-                {
-                    Slices = slices;
-                }
-                else
-                {
-                    return false;
-                }
-
-                var firstMip = Slices[0][0][0];
-                if (!HasValidDimensions(firstMip.Width, firstMip.Height, ArraySize, IsVolumeMap, file))
-                {
-                    return false;
-                }
-
-                if (icon == null)
-                {
-                    Debug.Assert(!ImportSettings.Compress);
-                    icon = firstMip;
-                }
-
-                var iconImage = BitmapHelper.ImageFromSlice(icon, IsNormalMap) ?? throw new InvalidDataException("アイコン画像を生成できませんでした。");
-                Icon = BitmapHelper.CreateThumbnail(iconImage, ContentInfo.IconWidth, ContentInfo.IconWidth);
-
-                return true;
+                return SetData(slices, icon, diffuseIBL, file);
             }
             catch (Exception ex)
             {
@@ -643,6 +690,8 @@ namespace DXForgeEditor.Content
                 Flags = (TextureFlags)reader.ReadInt32();
                 MipLevels = reader.ReadInt32();
                 Format = (DXGI_FORMAT)reader.ReadInt32();
+                // バージョン3より前の形式には IBLPair がない(事前フィルタしていないものとして読む)。
+                var iblPairGuid = version >= FirstVersionWithIBLPair ? new Guid(reader.ReadString()) : Guid.Empty;
                 var compressedLength = reader.ReadInt32();
                 Debug.Assert(compressedLength > 0);
                 var compressed = reader.ReadBytes(compressedLength);
@@ -650,6 +699,11 @@ namespace DXForgeEditor.Content
 
                 HasValidDimensions(Width, Height, ArraySize, IsVolumeMap, file);
                 FullPath = file;
+
+                if (iblPairGuid != Guid.Empty && IBLPair == null)
+                {
+                    LoadIBLPair(iblPairGuid, file);
+                }
 
                 // For Testing. Remove later.
                 PackForEngine();
@@ -666,6 +720,38 @@ namespace DXForgeEditor.Content
             return false;
         }
 
+        /// <summary>
+        /// 対になるIBLのテクスチャを読み込む。読み込めなくても、このテクスチャ自体の読み込みは失敗にしない。
+        /// </summary>
+        private void LoadIBLPair(Guid iblPairGuid, string file)
+        {
+            // アセットがまだ登録されていない場合に備えて、Save() と同じ規則のファイル名も探す。
+            var conventionalFile = ImportSettings.Sources.Any() ?
+                file.Replace(AssetFileExtension, $"{DiffuseIBLFileSuffix}{AssetFileExtension}") :
+                file.Replace($"{DiffuseIBLFileSuffix}{AssetFileExtension}", AssetFileExtension);
+            var pairFile = AssetRegistry.GetAssetInfo(iblPairGuid)?.FullPath;
+            if (string.IsNullOrEmpty(pairFile) && TryGetAssetInfo(conventionalFile)?.Guid == iblPairGuid)
+            {
+                pairFile = conventionalFile;
+            }
+
+            if (string.IsNullOrEmpty(pairFile) || !File.Exists(pairFile))
+            {
+                Logger.Log(MessageType.Warning, $"対になるIBLのテクスチャが見つかりません: {file}");
+                return;
+            }
+
+            var pair = new Texture() { IBLPair = this };
+            if (pair.Load(pairFile) && pair.Guid == iblPairGuid)
+            {
+                IBLPair = pair;
+            }
+            else
+            {
+                Logger.Log(MessageType.Warning, $"対になるIBLのテクスチャを読み込めませんでした: {pairFile}");
+            }
+        }
+
         private static int ReadFileFormatVersion(BinaryReader reader)
         {
             var stream = reader.BaseStream;
@@ -674,7 +760,7 @@ namespace DXForgeEditor.Content
             if (stream.Length - start >= sizeof(int) && reader.ReadInt32() == FileFormatTag)
             {
                 var version = reader.ReadInt32();
-                if (version != FileFormatVersion)
+                if (version < FirstVersionWithFileFormatTag || version > FileFormatVersion)
                 {
                     throw new InvalidDataException($"未対応のテクスチャアセットの形式です(バージョン{version})。");
                 }
@@ -767,11 +853,33 @@ namespace DXForgeEditor.Content
 
         public override IEnumerable<string> Save(string file)
         {
+            _isSaving = true;
+
             try
             {
                 if (TryGetAssetInfo(file) is AssetInfo info && info.Type == Type)
                 {
                     Guid = info.Guid;
+                }
+
+                var savedFiles = new List<string>();
+
+                // 対になる拡散光のIBLのテクスチャも保存する(互いのGUIDを書くので、このテクスチャのGUIDを決めた後で保存する)。
+                if (IBLPair != null && !IBLPair._isSaving && !IsDiffuseIBL)
+                {
+                    var pairFile = string.IsNullOrEmpty(IBLPair.FullPath) ?
+                        file.Replace(AssetFileExtension, $"{DiffuseIBLFileSuffix}{AssetFileExtension}") : IBLPair.FullPath;
+                    savedFiles.AddRange(IBLPair.Save(pairFile));
+                }
+
+                if (!string.IsNullOrEmpty(_obsoleteIBLPairFile))
+                {
+                    if (File.Exists(_obsoleteIBLPairFile))
+                    {
+                        File.Delete(_obsoleteIBLPairFile);
+                        Logger.Log(MessageType.Info, $"不要になった拡散光のIBLのテクスチャを削除: {_obsoleteIBLPairFile}");
+                    }
+                    _obsoleteIBLPairFile = null;
                 }
 
                 var compressed = CompressContent();
@@ -791,13 +899,14 @@ namespace DXForgeEditor.Content
                 writer.Write((int)Flags);
                 writer.Write(MipLevels);
                 writer.Write((int)Format);
+                writer.Write((IBLPair?.Guid ?? Guid.Empty).ToString());
                 writer.Write(compressed.Length);
                 writer.Write(compressed);
 
                 FullPath = file;
                 Logger.Log(MessageType.Info, $"テクスチャを保存: {file}");
 
-                var savedFiles = new List<string>() { file };
+                savedFiles.Insert(0, file);
                 return savedFiles;
 
             }
@@ -805,6 +914,10 @@ namespace DXForgeEditor.Content
             {
                 Debug.WriteLine(ex.Message);
                 Logger.Log(MessageType.Error, $"テクスチャの保存に失敗しました: {file}");
+            }
+            finally
+            {
+                _isSaving = false;
             }
 
             return new List<string>();

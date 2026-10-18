@@ -36,6 +36,7 @@ namespace DXForgeEditor.Editors
         public ICommand RegenerateBitmapsCommand { get; init; }
         public ICommand ReimportCommand { get; init; }
         public ICommand SaveCommand { get; init; }
+        public ICommand ShowIBLPairCommand { get; init; }
 
         private AssetEditorState _state;
         public AssetEditorState State
@@ -359,6 +360,23 @@ namespace DXForgeEditor.Editors
             finally { State = AssetEditorState.Done; }
         }
 
+        /// <summary>
+        /// 事前フィルタしたキューブマップと、それから作った拡散光のIBLのキューブマップの表示を切り替える(Primal Day 073)。
+        /// </summary>
+        private async Task OnShowIBLPairCommand(object obj)
+        {
+            if (Texture?.IBLPair is not Texture pair || State != AssetEditorState.Done) return;
+
+            State = AssetEditorState.Loading;
+            try
+            {
+                await SetMipmaps(pair);
+                Texture = pair;
+                AssetGuid = pair.Guid;
+            }
+            finally { State = AssetEditorState.Done; }
+        }
+
         private async Task SetMipmaps(Texture texture)
         {
             try
@@ -407,7 +425,8 @@ namespace DXForgeEditor.Editors
 
         private async Task OnReimportCommand(object obj)
         {
-            if (Texture == null) return;
+            // 拡散光のIBLのテクスチャはソース画像を持たないので、元のキューブマップを再インポートする。
+            if (Texture == null || Texture.IsDiffuseIBL) return;
 
             TextureImportSettings settingsBackup = new();
             IAssetImportSettings.CopyImportSettings(Texture.ImportSettings, settingsBackup);
@@ -440,7 +459,9 @@ namespace DXForgeEditor.Editors
 
             State = AssetEditorState.Saving;
             CanSaveChanges = false;
-            await Task.Run(Texture.SaveAsset);
+            // 拡散光のIBLを表示しているときも、元のキューブマップを保存する(拡散光のIBLも一緒に保存される)。
+            var texture = Texture.IsDiffuseIBL && Texture.IBLPair != null ? Texture.IBLPair : Texture;
+            await Task.Run(texture.SaveAsset);
             State = AssetEditorState.Done;
         }
 
@@ -451,6 +472,7 @@ namespace DXForgeEditor.Editors
             RegenerateBitmapsCommand = new RelayCommand<bool>(OnRegenerateBitmapsCommand);
             ReimportCommand = new RelayCommand<object>(async x => await OnReimportCommand(x));
             SaveCommand = new RelayCommand<object>(async x => await OnSaveCommand(x));
+            ShowIBLPairCommand = new RelayCommand<object>(async x => await OnShowIBLPairCommand(x));
         }
     }
 }

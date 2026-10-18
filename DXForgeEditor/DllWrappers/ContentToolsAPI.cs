@@ -9,6 +9,7 @@ using System.IO;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace DXForgeEditor.ContentToolsAPIStructs
 {
@@ -69,6 +70,8 @@ namespace DXForgeEditor.ContentToolsAPIStructs
             MirrorCubeMap = settings.MirrorCubeMap ? 1 : 0;
             PrefilterCubeMap = settings.PrefilterCubeMap ? 1 : 0;
         }
+
+        public TextureImportSettings Clone() => (TextureImportSettings)MemberwiseClone();
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -81,6 +84,8 @@ namespace DXForgeEditor.ContentToolsAPIStructs
         public int Format;
         public int ImportError;
         public int Flags;
+
+        public TextureInfo Clone() => (TextureInfo)MemberwiseClone();
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -93,10 +98,31 @@ namespace DXForgeEditor.ContentToolsAPIStructs
         public TextureInfo Info = new();
         public TextureImportSettings ImportSettings = new();
 
+        /// <summary>
+        /// サブリソース、テクスチャの情報、インポート設定をコピーする(アイコンはコピーしない)。
+        /// </summary>
+        public TextureData Clone()
+        {
+            var data = new TextureData();
+            if (SubresourceData != IntPtr.Zero && SubresourceSize > 0)
+            {
+                var bytes = new byte[SubresourceSize];
+                Marshal.Copy(SubresourceData, bytes, 0, SubresourceSize);
+                data.SubresourceData = Marshal.AllocCoTaskMem(SubresourceSize);
+                data.SubresourceSize = SubresourceSize;
+                Marshal.Copy(bytes, 0, data.SubresourceData, SubresourceSize);
+            }
+            data.Info = Info.Clone();
+            data.ImportSettings = ImportSettings.Clone();
+            return data;
+        }
+
         public void Dispose()
         {
             Marshal.FreeCoTaskMem(SubresourceData);
             Marshal.FreeCoTaskMem(Icon);
+            SubresourceData = IntPtr.Zero;
+            Icon = IntPtr.Zero;
             GC.SuppressFinalize(this);
         }
 
@@ -339,7 +365,26 @@ namespace DXForgeEditor.DllWrappers
         [DllImport(_toolsDLL)]
         private static extern void Import([In, Out] TextureData data);
 
-        public static (SliceArray3D? slices, Slice? icon) Import(Texture texture)
+        [DllImport(_toolsDLL)]
+        private static extern void PrefilterDiffuseIBL([In, Out] TextureData data);
+
+        [DllImport(_toolsDLL)]
+        private static extern void PrefilterSpecularIBL([In, Out] TextureData data);
+
+        private static void ThrowIfImportError(TextureData data, string step)
+        {
+            if (data.Info.ImportError != 0)
+            {
+                Logger.Log(MessageType.Error, $"テクスチャの{step}エラー: {EnumExtensions.GetDescription((TextureImportError)data.Info.ImportError)}");
+                throw new Exception($"Error while trying to {step}. Error code {data.Info.ImportError}");
+            }
+        }
+
+        /// <summary>
+        /// テクスチャをインポートする。インポート設定で事前フィルタするキューブマップの場合は、
+        /// 拡散光のIBLのキューブマップ(irradiance map)も作り、diffuseIBLとして返す(Primal Day 073)。
+        /// </summary>
+        public static (SliceArray3D? slices, Slice? icon, Texture? diffuseIBL) Import(Texture texture)
         {
             Debug.Assert(texture.ImportSettings.Sources.Any());
             using var textureData = new TextureData();
@@ -348,15 +393,34 @@ namespace DXForgeEditor.DllWrappers
             {
                 textureData.ImportSettings.FromContentSettings(texture);
                 Import(textureData);
+                ThrowIfImportError(textureData, "インポート");
 
-                if (textureData.Info.ImportError != 0)
+                Texture? diffuseIBL = null;
+                if (texture.ImportSettings.PrefilterCubeMap &&
+                    ((TextureFlags)textureData.Info.Flags).HasFlag(TextureFlags.IsCubeMap))
                 {
-                    Logger.Log(MessageType.Error, $"テクスチャのインポートエラー: {EnumExtensions.GetDescription((TextureImportError)textureData.Info.ImportError)}");
-                    throw new Exception($"Error while trying to import image. Error code {textureData.Info.ImportError}");
+                    // NOTE: Import()は事前フィルタするキューブマップを圧縮しない。拡散光のIBLはそのコピーから作り、
+                    //       元のキューブマップはPrefilterSpecularIBL()で(鏡面反射のフィルタは#36で実装予定)圧縮する。
+                    using var diffuseData = textureData.Clone();
+                    var diffuseTask = Task.Run(() => PrefilterDiffuseIBL(diffuseData));
+                    PrefilterSpecularIBL(textureData);
+                    diffuseTask.Wait();
+                    ThrowIfImportError(diffuseData, "拡散光のIBLの事前フィルタ");
+                    ThrowIfImportError(textureData, "鏡面反射のIBLの事前フィルタ");
+
+                    // 再インポートでは、既存の拡散光のIBLのテクスチャ(GUIDとファイル)を使い回す。
+                    diffuseIBL = texture.IBLPair ?? new Texture();
+                    IAssetImportSettings.CopyImportSettings(texture.ImportSettings, diffuseIBL.ImportSettings);
+                    diffuseIBL.ImportSettings.Sources.Clear();
+                    GetTextureInfo(diffuseIBL, diffuseData);
+                    if (!diffuseIBL.SetData(GetSlices(diffuseData), GetIcon(diffuseData), texture, texture.FullPath))
+                    {
+                        throw new Exception("Failed to set the diffuse IBL texture data.");
+                    }
                 }
 
                 GetTextureInfo(texture, textureData);
-                return (GetSlices(textureData), GetIcon(textureData));
+                return (GetSlices(textureData), GetIcon(textureData), diffuseIBL);
             }
             catch (Exception ex)
             {

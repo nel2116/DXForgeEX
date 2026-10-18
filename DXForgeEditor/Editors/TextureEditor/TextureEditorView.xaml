@@ -87,6 +87,26 @@
                     </ToggleButton.Style>
                 </ToggleButton>
 
+                <!-- 事前フィルタしたキューブマップと拡散光のIBL(irradiance map)の表示の切り替え(Primal Day 073) -->
+                <Button Padding="5" Margin="5,0" d:Visibility="Visible" d:Content="Diffuse IBL" Command="{Binding ShowIBLPairCommand}">
+                    <Button.Style>
+                        <Style TargetType="{x:Type Button}" BasedOn="{StaticResource DXForgeButtonStyle}">
+                            <Setter Property="IsEnabled" Value="False"/>
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Setter Property="Content" Value="Diffuse IBL"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Texture.IsPrefilteredIBL}" Value="True">
+                                    <Setter Property="IsEnabled" Value="True"/>
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Texture.IsDiffuseIBL}" Value="True">
+                                    <Setter Property="Content" Value="Source Cube Map"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
                 <TextBlock Margin="5,0" Text="Layer:" Visibility="{Binding Path=Visibility, ElementName=arraySlider}"/>
                 <Slider x:Name="arraySlider" Width="200" VerticalAlignment="Center" TickFrequency="1" IsSnapToTickEnabled="True"
                         Maximum="{Binding MaxArrayIndex}" Minimum="0" TickPlacement="BottomRight" Value="{Binding ArrayIndex}"
