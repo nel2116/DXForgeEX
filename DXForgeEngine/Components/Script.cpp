@@ -8,6 +8,7 @@
 // 2024/12/2 新規作成
 // 2026/10/18 remove()の世代チェックが密なインデックスでgenerationsを参照していたのを修正 (#21)
 // 2026/10/18 set_orientation()を削除し、向きを回転から導出するローカルフレーム(right/up/front)で保持するよう変更 (#4)
+// 2026/10/18 begin_play()が呼ばれていなかったのを修正し、生成後最初のupdate()の前に1回だけ呼ぶよう変更 (#47)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Script.h"
@@ -24,6 +25,7 @@ namespace dxforge::script
 		utl::vector<id::id_type> id_mapping;						///< IDマッピング
 		utl::vector<id::generation_type> generations;				///< 世代情報
 		utl::deque<script_id> free_ids;								///< 解放されたID
+		utl::vector<script_id> pending_begin_play;					///< begin_play()をまだ呼んでいないスクリプトのID
 
 		utl::vector<transform::component_cache> transform_cache;	///< Transformコンポーネントのキャッシュ
 #if USE_TRANSFORM_CACHE_MAP
@@ -166,6 +168,10 @@ namespace dxforge::script
 		entity_scripts.emplace_back(info.script_creator(entity));
 		assert(entity_scripts.back()->get_id() == entity.get_id());
 		id_mapping[id::index(id)] = index;
+
+		// NOTE: begin_play()はここでは呼ばず、次のupdate()の冒頭で呼ぶ。
+		// エディタはゲームDLLを読み込んだ状態でエンティティを生成するため、ここで呼ぶとエディタ内でゲームコードが動いてしまう。
+		pending_begin_play.emplace_back(id);
 		return component{ id };
 	}
 
@@ -188,6 +194,19 @@ namespace dxforge::script
 
 	void update(f32 dt)
 	{
+		// NOTE: begin_play()の中で新しいスクリプトが生成されることがあるため添字で回し、追加された分も同じフレームで処理する。
+		//		 begin_play()の前に削除されたスクリプトは、id_mappingと世代で判定して飛ばす。
+		for (u32 i{ 0 }; i < pending_begin_play.size(); ++i)
+		{
+			const script_id id{ pending_begin_play[i] };
+			const id::id_type index{ id::index(id) };
+			if (id::is_valid(id_mapping[index]) && generations[index] == id::generation(id))
+			{
+				entity_scripts[id_mapping[index]]->begin_play();
+			}
+		}
+		pending_begin_play.clear();
+
 		for (const auto& ptr : entity_scripts)
 		{
 			ptr->update(dt);

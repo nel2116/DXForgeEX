@@ -7,6 +7,7 @@
 // 更新履歴
 // 2026/10/18 新規作成
 // 2026/10/18 世代が上限に達したスクリプトIDを再利用しないことのテストを追加 (#21)
+// 2026/10/18 begin_play()がupdate()より前に1回だけ呼ばれることのテストを追加 (#47)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
@@ -26,6 +27,8 @@ namespace
 		u32 created{ 0 };
 		u32 destroyed{ 0 };
 		u32 updated{ 0 };
+		u32 begun{ 0 };
+		u32 updated_before_begin_play{ 0 };
 		f32 total_dt{ 0.f };
 		game_entity::entity_id last_updated_id{ id::invalid_id };
 	};
@@ -47,12 +50,22 @@ namespace
 			++counters.destroyed;
 		}
 
+		void begin_play() override
+		{
+			++counters.begun;
+			++_begin_play_count;
+		}
+
 		void update(f32 dt) override
 		{
+			if (_begin_play_count != 1) ++counters.updated_before_begin_play;
 			++counters.updated;
 			counters.total_dt += dt;
 			counters.last_updated_id = get_id();
 		}
+
+	private:
+		u32 _begin_play_count{ 0 };
 	};
 
 	// update内でset_position()を呼び、Transformキャッシュ経由の反映を検証するスクリプト
@@ -301,4 +314,50 @@ DXFORGE_TEST_CASE(script_id_at_max_generation_is_not_reused)
 	{
 		game_entity::remove(h.entity_id);
 	}
+}
+
+DXFORGE_TEST_CASE(script_begin_play_is_called_once_before_first_update)
+{
+	const script_counters before{ counters };
+
+	const game_entity::entity a{ create_entity(&script::detail::create_script<script_test_counter>) };
+	REQUIRE(a.is_valid() && a.script().is_valid());
+	// NOTE: begin_play()は生成時ではなく、最初のscript::update()の冒頭で呼ばれる。
+	// エディタはゲームDLLを読み込んだままエンティティを生成するため、生成時に呼ぶとエディタ内でゲームコードが動いてしまう。
+	CHECK(counters.begun == before.begun);
+
+	script::update(1.f);
+	CHECK(counters.begun == before.begun + 1);
+	CHECK(counters.updated == before.updated + 1);
+
+	// 2回目以降のupdateではbegin_play()は呼ばれない
+	script::update(1.f);
+	script::update(1.f);
+	CHECK(counters.begun == before.begun + 1);
+	CHECK(counters.updated == before.updated + 3);
+
+	// 途中で追加されたスクリプトは、次のupdateで自分のupdate()より前に1回だけbegin_play()が呼ばれる
+	const game_entity::entity b{ create_entity(&script::detail::create_script<script_test_counter>) };
+	REQUIRE(b.is_valid() && b.script().is_valid());
+	script::update(1.f);
+	script::update(1.f);
+	CHECK(counters.begun == before.begun + 2);
+	CHECK(counters.updated == before.updated + 7);
+	CHECK(counters.updated_before_begin_play == before.updated_before_begin_play);
+
+	game_entity::remove(a.get_id());
+	game_entity::remove(b.get_id());
+}
+
+DXFORGE_TEST_CASE(script_removed_before_first_update_does_not_begin_play)
+{
+	const script_counters before{ counters };
+
+	const game_entity::entity entity{ create_entity(&script::detail::create_script<script_test_counter>) };
+	REQUIRE(entity.is_valid() && entity.script().is_valid());
+	game_entity::remove(entity.get_id());
+
+	script::update(1.f);
+	CHECK(counters.begun == before.begun);
+	CHECK(counters.updated == before.updated);
 }
