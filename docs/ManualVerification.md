@@ -128,7 +128,7 @@ Build: DebugEditor configuration 成功
 - `SpinScript`を選ぶと、インスペクタにScriptコンポーネント(Name: `SpinScript`)が追加される。
 - Geometry/Physicsは未実装のため無効(#20)。
 
-TransformのScaleは`0, 0, 0`で表示されます。これは既知の不具合(#49)です。
+追加したエンティティのTransformは、Positionが`0, 0, 0`、Rotationが`0, 0, 0`、Scaleが`1, 1, 1`で表示される(#49で修正。それ以前はScaleも`0, 0, 0`だった)。
 
 ## 6. ゲームの実行
 
