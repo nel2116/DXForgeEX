@@ -8,6 +8,8 @@
 // 2024/12/2 新規作成
 // 2026/10/18 remove()の世代チェックが密なインデックスでgenerationsを参照していたのを修正 (#21)
 // 2026/10/18 set_orientation()を削除し、向きを回転から導出するローカルフレーム(right/up/front)で保持するよう変更 (#4)
+// 2026/10/18 begin_play()が呼ばれていなかったのを修正し、生成後最初のupdate()の前に1回だけ呼ぶよう変更 (#47)
+// 2026/10/18 削除したスクリプトをbegin_play()の待ちリストから外すよう修正(エディタで待ちリストが増え続けるため) (#47)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Script.h"
@@ -24,6 +26,7 @@ namespace dxforge::script
 		utl::vector<id::id_type> id_mapping;						///< IDマッピング
 		utl::vector<id::generation_type> generations;				///< 世代情報
 		utl::deque<script_id> free_ids;								///< 解放されたID
+		utl::vector<script_id> pending_begin_play;					///< begin_play()をまだ呼んでいないスクリプトのID
 
 		utl::vector<transform::component_cache> transform_cache;	///< Transformコンポーネントのキャッシュ
 #if USE_TRANSFORM_CACHE_MAP
@@ -128,6 +131,11 @@ namespace dxforge::script
 			return script->second;
 		}
 
+		u32 pending_begin_play_count()
+		{
+			return (u32)pending_begin_play.size();
+		}
+
 #ifdef USE_WITH_EDITOR
 		u8 add_script_name(const char* name)
 		{
@@ -166,6 +174,10 @@ namespace dxforge::script
 		entity_scripts.emplace_back(info.script_creator(entity));
 		assert(entity_scripts.back()->get_id() == entity.get_id());
 		id_mapping[id::index(id)] = index;
+
+		// NOTE: begin_play()はここでは呼ばず、次のupdate()の冒頭で呼ぶ。
+		// エディタはゲームDLLを読み込んだ状態でエンティティを生成するため、ここで呼ぶとエディタ内でゲームコードが動いてしまう。
+		pending_begin_play.emplace_back(id);
 		return component{ id };
 	}
 
@@ -179,6 +191,18 @@ namespace dxforge::script
 		id_mapping[id::index(last_id)] = index;
 		id_mapping[id::index(id)] = id::invalid_id;
 
+		// NOTE: エディタはscript::update()を呼ばないため、ここで待ちリストから外さないと、
+		//		 ゲームDLLを読み直すたびに削除済みのIDがたまり続ける。
+		//		 begin_play()を呼ぶ順番を変えないよう、erase_unorderedではなくeraseを使う。
+		for (u32 i{ 0 }; i < pending_begin_play.size(); ++i)
+		{
+			if (pending_begin_play[i] == id)
+			{
+				pending_begin_play.erase(pending_begin_play.begin() + i);
+				break;
+			}
+		}
+
 		// NOTE: generationsは疎なIDのインデックス(id::index(id))で引く。indexはentity_scripts上の密なインデックスなので使えない。
 		if (generations[id::index(id)] < id::max_generation)
 		{
@@ -188,6 +212,22 @@ namespace dxforge::script
 
 	void update(f32 dt)
 	{
+		// NOTE: begin_play()の中でスクリプトが生成・削除されることがある(削除はremove()が待ちリストを詰める)ため、
+		//		 その時点の待ちリストを取り出してから処理する。begin_play()の中で生成された分は待ちリストに積まれるので、
+		//		 空になるまで繰り返して同じフレームで処理する。取り出した後に削除されたスクリプトは、id_mappingと世代で判定して飛ばす。
+		while (!pending_begin_play.empty())
+		{
+			const utl::vector<script_id> pending{ std::move(pending_begin_play) };
+			for (const script_id id : pending)
+			{
+				const id::id_type index{ id::index(id) };
+				if (id::is_valid(id_mapping[index]) && generations[index] == id::generation(id))
+				{
+					entity_scripts[id_mapping[index]]->begin_play();
+				}
+			}
+		}
+
 		for (const auto& ptr : entity_scripts)
 		{
 			ptr->update(dt);
