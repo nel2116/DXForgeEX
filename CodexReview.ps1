@@ -55,7 +55,14 @@ foreach ($tool in "git", "gh", "codex") {
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
-$info = gh pr view $Pr --json number,title,url,baseRefName,headRefOid | ConvertFrom-Json
+# gh は呼び出し元のディレクトリで対象リポジトリを決めるため、このリポジトリの中で実行する
+Push-Location $RepoRoot
+try {
+	$info = gh pr view $Pr --json number,title,url,baseRefName,headRefOid | ConvertFrom-Json
+}
+finally {
+	Pop-Location
+}
 if (-not $info) { throw "PR #$Pr の情報を取得できませんでした。" }
 $base = $info.baseRefName
 $head = $info.headRefOid
@@ -92,7 +99,9 @@ try {
 	if ($codexExit -ne 0 -or -not $review) {
 		throw "codex review が失敗しました(終了コード $codexExit)。ログ: $log"
 	}
-	if ($logText -match "blocked by policy") {
+	# ログにはCodexが読んだファイルの内容も残るため、文字列が含まれるだけでは判定せず、
+	# 実際にコマンドの実行が拒否されたときのエラー行だけを見る
+	if ($logText -match "(?m)^\S+\s+ERROR codex_core::tools::router: .*blocked by policy") {
 		throw "Codexがコマンドを実行できず、差分を読めていない可能性があります(blocked by policy)。ログ: $log"
 	}
 
@@ -122,12 +131,14 @@ $review
 ``CodexReview.ps1`` による自動レビューです。ビルドやテストは行っていません。指摘は、修正するか、修正しない理由を返信してください。
 "@
 	$bodyFile = [System.IO.Path]::GetTempFileName()
+	Push-Location $RepoRoot
 	try {
 		[System.IO.File]::WriteAllText($bodyFile, $body, [System.Text.UTF8Encoding]::new($false))
 		gh pr comment $Pr --body-file $bodyFile
 		if ($LASTEXITCODE -ne 0) { throw "PRへのコメントに失敗しました。" }
 	}
 	finally {
+		Pop-Location
 		Remove-Item -ErrorAction SilentlyContinue $bodyFile
 	}
 }
