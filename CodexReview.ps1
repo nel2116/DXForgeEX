@@ -59,24 +59,35 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 Push-Location $RepoRoot
 try {
 	$info = gh pr view $Pr --json number,title,url,baseRefName,headRefOid | ConvertFrom-Json
+	$repoUrl = gh repo view --json url --jq .url
 }
 finally {
 	Pop-Location
 }
-if (-not $info) { throw "PR #$Pr の情報を取得できませんでした。" }
+if (-not $info -or -not $repoUrl) { throw "PR #$Pr の情報を取得できませんでした。" }
 $base = $info.baseRefName
 $head = $info.headRefOid
 
-git -C $RepoRoot fetch --quiet origin $base "refs/pull/$Pr/head"
+# originの設定(fork、single-branch clone など)に左右されないよう、ghが選んだリポジトリから
+# baseとPRのheadを、このスクリプト専用のrefに取得先を明示して取得する
+$ref = "refs/codex-review/$Pr"
+git -C $RepoRoot fetch --quiet --no-tags $repoUrl "+refs/heads/${base}:$ref/base" "+refs/pull/$Pr/head:$ref/head"
 if ($LASTEXITCODE -ne 0) { throw "git fetch に失敗しました。" }
+$baseSha = git -C $RepoRoot rev-parse "$ref/base"
+# gh で情報を取得してから push されていても、実際に取得したheadをレビューする
+$head = git -C $RepoRoot rev-parse "$ref/head"
 
 $work = Join-Path ([System.IO.Path]::GetTempPath()) "DXForgeCodexReview-$Pr-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
 $log = "$work.log"
 git -C $RepoRoot worktree add --quiet --detach $work $head
-if ($LASTEXITCODE -ne 0) { throw "一時worktreeの作成に失敗しました。" }
+if ($LASTEXITCODE -ne 0) {
+	git -C $RepoRoot update-ref -d "$ref/base"
+	git -C $RepoRoot update-ref -d "$ref/head"
+	throw "一時worktreeの作成に失敗しました。"
+}
 
 $prompt = @"
-このリポジトリは、PR #$Pr「$($info.title)」のheadをチェックアウトしたものです。``git diff origin/$base...HEAD`` の変更をレビューしてください。
+このリポジトリは、PR #$Pr「$($info.title)」のheadをチェックアウトしたものです。``git diff $baseSha...HEAD`` (``$baseSha`` はPRの向き先 $base の先端)の変更をレビューしてください。
 - ファイルは変更せず、ビルドやテストも実行しないこと。
 - 指摘は日本語で書き、それぞれに重大度(P0〜P3)、ファイル:行、その不具合が起きる具体的な手順や入力を書くこと。推測で書いた指摘はそうと分かるようにすること。
 - 変更された行だけでなく、呼び出し元や関連する箇所も読んで、変更が既存の挙動を壊していないかを確かめること。
@@ -114,6 +125,8 @@ try {
 finally {
 	git -C $RepoRoot worktree remove --force $work 2>$null
 	if ($LASTEXITCODE -ne 0) { Write-Warning "一時worktreeを削除できませんでした: $work" }
+	git -C $RepoRoot update-ref -d "$ref/base"
+	git -C $RepoRoot update-ref -d "$ref/head"
 }
 
 Remove-Item -ErrorAction SilentlyContinue $log
@@ -123,7 +136,7 @@ if ($Post) {
 	$body = @"
 ## Codex レビュー
 
-対象: $($head.Substring(0, 7))(``origin/$base`` との差分) / モデル: $model / 推論: $Effort
+対象: $($head.Substring(0, 7))(``$base`` の $($baseSha.Substring(0, 7)) との差分) / モデル: $model / 推論: $Effort
 
 $review
 
