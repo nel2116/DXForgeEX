@@ -82,15 +82,21 @@ function Invoke-BuildStep
 
 	if ($ShowFullLog)
 	{
-		& $Command
-		return $LASTEXITCODE
+		# Out-Hostで画面に流す: そのままだとログが関数の戻り値に混ざって呼び出し側の変数に
+		# 吸い込まれ、画面に出ないうえ終了コードも配列になってしまうため(#40)
+		& $Command | Out-Host
+		$exit = $LASTEXITCODE
+		if ($exit -ne 0) { Write-Host "  失敗 (終了コード $exit)" }
+		return $exit
 	}
 
 	$output = (& $Command 2>&1 | Out-String)
 	$exit = $LASTEXITCODE
 
-	$errorLines = [regex]::Matches($output, '(?m)^.*\berror [A-Z]+[0-9]+.*$') |
-		ForEach-Object { $_.Value.Trim() } | Select-Object -Unique
+	# コードのないエラー行(NuGetのターゲットが出す「error : …」など)も拾う(#40)。
+	# 「error」の直後に(コードと)コロンが続く形に限り、パス中の単語や「0 Error(s)」は拾わない。
+	$errorLines = @([regex]::Matches($output, '(?m)^.*\berror(?: [A-Z]+[0-9]+)?\s*:.*$') |
+		ForEach-Object { $_.Value.Trim() } | Select-Object -Unique)
 	foreach ($line in $errorLines) { Write-Host "  $line" }
 
 	# @()で包む: パイプラインの結果が1要素だと配列ではなく要素そのものが代入され、
@@ -106,6 +112,18 @@ function Invoke-BuildStep
 	else
 	{
 		Write-Host "  警告 0件"
+	}
+
+	if ($exit -ne 0)
+	{
+		Write-Host "  失敗 (終了コード $exit)"
+		# エラー行を1つも拾えなかったときは、手がかりとしてログの末尾を出す
+		if ($errorLines.Count -eq 0)
+		{
+			Write-Host "  エラー行を抽出できませんでした。ログの末尾:"
+			$output -split '\r?\n' | Where-Object { $_.Trim() } | Select-Object -Last 15 |
+				ForEach-Object { Write-Host "    $_" }
+		}
 	}
 
 	Write-Host "  (完全なログは -DetailedLog で表示できます)"
