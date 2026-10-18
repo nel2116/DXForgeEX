@@ -70,14 +70,16 @@ $head = $info.headRefOid
 
 # originの設定(fork、single-branch clone など)に左右されないよう、ghが選んだリポジトリから
 # baseとPRのheadを、このスクリプト専用のrefに取得先を明示して取得する
-$ref = "refs/codex-review/$Pr"
+# 同じPRを並行してレビューしても衝突しないよう、refとworktreeの名前には実行ごとのIDを含める
+$runId = [guid]::NewGuid().ToString('N').Substring(0, 8)
+$ref = "refs/codex-review/$Pr-$runId"
 git -C $RepoRoot fetch --quiet --no-tags $repoUrl "+refs/heads/${base}:$ref/base" "+refs/pull/$Pr/head:$ref/head"
 if ($LASTEXITCODE -ne 0) { throw "git fetch に失敗しました。" }
 $baseSha = git -C $RepoRoot rev-parse "$ref/base"
 # gh で情報を取得してから push されていても、実際に取得したheadをレビューする
 $head = git -C $RepoRoot rev-parse "$ref/head"
 
-$work = Join-Path ([System.IO.Path]::GetTempPath()) "DXForgeCodexReview-$Pr-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
+$work = Join-Path ([System.IO.Path]::GetTempPath()) "DXForgeCodexReview-$Pr-$runId"
 $log = "$work.log"
 git -C $RepoRoot worktree add --quiet --detach $work $head
 if ($LASTEXITCODE -ne 0) {
