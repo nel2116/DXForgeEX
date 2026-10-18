@@ -327,6 +327,7 @@ namespace DXForgeEditor.Editors
         private void OnRegenerateBitmapsCommand(bool isNormalMap)
         {
             GenerateSliceBitMaps(isNormalMap);
+            SetCubeMap();
             OnPropertyChanged(nameof(SelectedSliceBitmap));
             SetImageChannels();
         }
