@@ -10,6 +10,7 @@
 // 2026/10/18 set_orientation()を削除し、向きを回転から導出するローカルフレーム(right/up/front)で保持するよう変更 (#4)
 // 2026/10/18 begin_play()が呼ばれていなかったのを修正し、生成後最初のupdate()の前に1回だけ呼ぶよう変更 (#47)
 // 2026/10/18 削除したスクリプトをbegin_play()の待ちリストから外すよう修正(エディタで待ちリストが増え続けるため) (#47)
+// 2026/10/18 update()の中でスクリプトを生成・削除するとイテレータが無効になるのを修正(添字で回し、削除はupdate()の最後にまとめて行う) (#54)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Script.h"
@@ -27,6 +28,8 @@ namespace dxforge::script
 		utl::vector<id::generation_type> generations;				///< 世代情報
 		utl::deque<script_id> free_ids;								///< 解放されたID
 		utl::vector<script_id> pending_begin_play;					///< begin_play()をまだ呼んでいないスクリプトのID
+		utl::vector<detail::script_ptr> removed_scripts;			///< update()の実行中に削除され、破棄を待っているスクリプト
+		bool is_updating{ false };									///< update()の実行中かどうか
 
 		utl::vector<transform::component_cache> transform_cache;	///< Transformコンポーネントのキャッシュ
 #if USE_TRANSFORM_CACHE_MAP
@@ -186,9 +189,19 @@ namespace dxforge::script
 		assert(c.is_valid() && exists(c.get_id()));
 		const script_id id{ c.get_id() };
 		const id::id_type index{ id_mapping[id::index(id)] };
-		const script_id last_id{ entity_scripts.back()->script().get_id() };
-		utl::erase_unordered(entity_scripts, index);
-		id_mapping[id::index(last_id)] = index;
+		if (is_updating)
+		{
+			// NOTE: update()の実行中にerase_unordered()で要素を入れ替えると、ループで飛ばされる・二重に呼ばれるスクリプトが出る。
+			//		 また、自分自身を削除したスクリプトは実行中に破棄されてしまう。そのため、ここではスロットを空にするだけにして、
+			//		 スクリプトはupdate()の最後に詰めてから破棄する。
+			removed_scripts.emplace_back(std::move(entity_scripts[index]));
+		}
+		else
+		{
+			const script_id last_id{ entity_scripts.back()->script().get_id() };
+			utl::erase_unordered(entity_scripts, index);
+			id_mapping[id::index(last_id)] = index;
+		}
 		id_mapping[id::index(id)] = id::invalid_id;
 
 		// NOTE: エディタはscript::update()を呼ばないため、ここで待ちリストから外さないと、
@@ -212,6 +225,9 @@ namespace dxforge::script
 
 	void update(f32 dt)
 	{
+		assert(!is_updating);
+		is_updating = true;
+
 		// NOTE: begin_play()の中でスクリプトが生成・削除されることがある(削除はremove()が待ちリストを詰める)ため、
 		//		 その時点の待ちリストを取り出してから処理する。begin_play()の中で生成された分は待ちリストに積まれるので、
 		//		 空になるまで繰り返して同じフレームで処理する。取り出した後に削除されたスクリプトは、id_mappingと世代で判定して飛ばす。
@@ -228,9 +244,38 @@ namespace dxforge::script
 			}
 		}
 
-		for (const auto& ptr : entity_scripts)
+		// NOTE: update()の中でスクリプトが生成されるとentity_scriptsが再確保されるため、範囲forではなく添字で回す。
+		//		 生成されたスクリプトは末尾に積まれ、次のupdate()でbegin_play()を呼んでからupdate()を呼ぶため(#47)、
+		//		 ループの前の数だけ回す。削除されたスクリプトのスロットは空になっているので飛ばす。
+		const u32 count{ (u32)entity_scripts.size() };
+		for (u32 i{ 0 }; i < count; ++i)
 		{
-			ptr->update(dt);
+			if (entity_scripts[i])
+			{
+				entity_scripts[i]->update(dt);
+			}
+		}
+
+		is_updating = false;
+
+		// update()の実行中に削除されたスクリプトの空きスロットを、末尾の要素で埋めて詰める。
+		// 後ろから見ていくので、末尾の要素は常に空ではない。
+		for (u32 i{ (u32)entity_scripts.size() }; i > 0;)
+		{
+			--i;
+			if (entity_scripts[i]) continue;
+
+			if (i != entity_scripts.size() - 1)
+			{
+				const script_id last_id{ entity_scripts.back()->script().get_id() };
+				id_mapping[id::index(last_id)] = i;
+			}
+			utl::erase_unordered(entity_scripts, i);
+		}
+
+		// NOTE: 破棄するスクリプトのデストラクタがさらにエンティティを削除しても壊れないよう、取り出してから破棄する。
+		{
+			utl::vector<detail::script_ptr> removed{ std::move(removed_scripts) };
 		}
 
 		if (transform_cache.size())
