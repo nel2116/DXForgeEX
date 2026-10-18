@@ -8,7 +8,7 @@ C++によるプラットフォーム非依存のエンジンコア、C ABIのDLL
 
 - Windows 10/11
 - Visual Studio 2022 (ワークロード: 「C++によるデスクトップ開発」+「.NETデスクトップ開発」、`v143` toolset)
-- .NET 6 SDK (`dotnet` CLI。`DXForgeEditor`のビルドに使用)
+- .NET 8 SDK以降 (`dotnet` CLI。`DXForgeEditor`のビルドに使用)
 - DirectX 12対応GPU (レンダラーを実際に動かす場合のみ必要。`EngineUnitTests`はGPU/ウィンドウ不要)
 
 ## ソリューション構成
@@ -22,7 +22,7 @@ C++によるプラットフォーム非依存のエンジンコア、C ABIのDLL
 | `EngineTest` | 実行ファイル | ウィンドウ+GPUを使う対話的なビジュアルテスト。CLI/CIには不向き |
 | `EngineUnitTests` | 実行ファイル | GPU/ウィンドウ不要の自動テスト。CLI/CI向け |
 | `ContentTools` | DLL | FBX/テクスチャのオフラインインポートパイプライン(エディタから使用) |
-| `DXForgeEditor` | WPFアプリ (.NET 6) | レベルエディタ |
+| `DXForgeEditor` | WPFアプリ (.NET 8) | レベルエディタ |
 
 ## ビルド方法
 
