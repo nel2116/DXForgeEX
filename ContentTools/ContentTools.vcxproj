@@ -11,6 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="EnvMapProcessing.h" />
     <ClInclude Include="FbxImporter.h" />
     <ClInclude Include="Geometry.h" />
     <ClInclude Include="MikkTSpace\mikktspace.h" />
@@ -19,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ContentTools.cpp" />
+    <ClCompile Include="EnvMapProcessing.cpp" />
     <ClCompile Include="FbxImporter.cpp" />
     <ClCompile Include="Geometry.cpp" />
     <ClCompile Include="MikkTSpace\mikktspace.c">
@@ -30,6 +32,8 @@
     <ClCompile Include="TextureImpoter.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="CompileShaders.cmd" />
+    <None Include="EnvMapProcessing.hlsl" />
     <None Include="packages.config" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -67,6 +71,9 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <CompiledShadersDir>$(ProjectDir)$(PlatformTarget)\Compiled\</CompiledShadersDir>
+  </PropertyGroup>
   <Import Project="FbxSdk.props" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DebugEditor|x64'">
     <ClCompile>
@@ -78,7 +85,7 @@
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)DXForgeEngine;$(SolutionDir)DXForgeEngine\Common;$(FbxSdkIncludeDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)DXForgeEngine;$(SolutionDir)DXForgeEngine\Common;$(FbxSdkIncludeDir);$(CompiledShadersDir)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -100,7 +107,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>$(SolutionDir)DXForgeEngine;$(SolutionDir)DXForgeEngine\Common;$(FbxSdkIncludeDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)DXForgeEngine;$(SolutionDir)DXForgeEngine\Common;$(FbxSdkIncludeDir);$(CompiledShadersDir)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -123,5 +130,24 @@
       <ErrorText>このプロジェクトは、このコンピューター上にない NuGet パッケージを参照しています。それらのパッケージをダウンロードするには、[NuGet パッケージの復元] を使用します。詳細については、http://go.microsoft.com/fwlink/?LinkID=322105 を参照してください。見つからないファイルは {0} です。</ErrorText>
     </PropertyGroup>
     <Error Condition="!Exists('..\packages\directxtex_desktop_win10.2024.10.29.1\build\native\directxtex_desktop_win10.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\directxtex_desktop_win10.2024.10.29.1\build\native\directxtex_desktop_win10.targets'))" />
+  </Target>
+  <!-- Compile the ContentTools compute shaders (EnvMapProcessing.hlsl) into .inc headers with fxc before the C++ build. -->
+  <Target Name="CompileShaders" BeforeTargets="PrepareForBuild" Inputs="EnvMapProcessing.hlsl;CompileShaders.cmd" Outputs="$(CompiledShadersDir)EnvMapProcessing_EquirectangularToCubeMapCS.inc">
+    <PropertyGroup>
+      <FXCPath>$(WindowsSDK_ExecutablePath_x64.Split(';')[0])</FXCPath>
+      <FXCPath Condition="'$(FXCPath)' != '' and !HasTrailingSlash('$(FXCPath)')">$(FXCPath)\</FXCPath>
+    </PropertyGroup>
+    <Exec Command="CompileShaders" WorkingDirectory="$(ProjectDir)" EnvironmentVariables="WindowsSDKExecutablePathX64=$(FXCPath);CompileShadersOutput=$(ProjectDir)$(PlatformTarget)\Compiled" LogStandardErrorAsError="true" />
+    <PropertyGroup>
+      <FXCPath />
+    </PropertyGroup>
+  </Target>
+  <Target Name="DeleteShaders" AfterTargets="Clean">
+    <ItemGroup>
+      <ShaderHeaders Include="$(CompiledShadersDir)*.inc" />
+      <ShaderSymbols Include="$(CompiledShadersDir)*.pdb" />
+    </ItemGroup>
+    <Delete Files="@(ShaderHeaders)" />
+    <Delete Files="@(ShaderSymbols)" />
   </Target>
 </Project>

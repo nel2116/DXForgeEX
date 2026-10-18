@@ -6,6 +6,7 @@
 //
 // 更新履歴
 // 2024/11/11 新規作成
+// 2026/10/18 inv_pi, inv_two_piの追加
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -15,8 +16,10 @@ namespace dxforge::math
 {
 	// ====== 定数定義 ======
 	constexpr f32 pi{ 3.1415926535897932384626433832795f };
+	constexpr f32 inv_pi{ 1.f / pi };
 	constexpr f32 half_pi{ pi * 0.5f };
 	constexpr f32 two_pi{ 2.f * pi };
+	constexpr f32 inv_two_pi{ 1.f / two_pi };
 	constexpr f32 epsilon{ 1e-5f };
 
 #if defined(_WIN64)

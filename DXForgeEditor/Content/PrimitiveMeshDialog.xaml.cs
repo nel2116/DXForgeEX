@@ -163,7 +163,8 @@ namespace DXForgeEditor.Content
                 Debug.Assert(!string.IsNullOrEmpty(dlg.SaveFilePath));
                 var asset = ((IAssetEditor)DataContext).Asset;
                 Debug.Assert(asset != null);
-                asset.Save(dlg.SaveFilePath);
+                asset.FullPath = dlg.SaveFilePath;
+                asset.SaveAsset();
 
                 // NOTE: 保存後、このウィンドウを閉じることもできます。
             }

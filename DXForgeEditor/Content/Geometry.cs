@@ -356,7 +356,7 @@ namespace DXForgeEditor.Content
                 var lods = ReadMeshLODs(numMeshes, reader);
 
                 var lodGroup = new LODGroup() { Name = lodGroupName };
-                lods.ForEach(l => lodGroup.LODs.Add(l));
+                lods.ForEach(lodGroup.LODs.Add);
 
                 _lodGroups.Add(lodGroup);
             }
