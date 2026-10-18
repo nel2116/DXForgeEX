@@ -26,6 +26,9 @@ bld/
 [Bb]in/
 [Oo]bj/
 [Ll]og/
+# DXForgeEditor built without Platform=x64 (e.g. plain `dotnet build`) lands in the repo root
+/[Dd]ebugEditor/
+/[Rr]eleaseEditor/
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
