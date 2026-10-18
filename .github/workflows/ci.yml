@@ -46,12 +46,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # DXForgeEditor は net6.0-windows を対象にしている。.NET 6 はサポート終了済みで
-      # ランナーに同梱されていない可能性があるため、SDKを明示的に用意する。
+      # DXForgeEditor は net8.0-windows を対象にしている。ランナーに必要なバージョンの
+      # SDKが同梱されているとは限らないため、SDKを明示的に用意する。
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 6.0.x
+          dotnet-version: 8.0.x
 
       - name: Build editor
         shell: pwsh
