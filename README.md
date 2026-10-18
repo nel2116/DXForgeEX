@@ -83,6 +83,8 @@ PowerShell 7+ (`pwsh`) から実行します。
 
 `Graphics/Direct3D12/*` などGPUデバイス初期化が前提のコードは対象外です。そちらの動作確認は`EngineTest`を実行し、目視で確認してください。
 
+エディタの基本操作(プロジェクトの作成 → スクリプトの追加 → ゲームコードDLLの読み込み → ゲームの実行)の確認手順は [docs/ManualVerification.md](docs/ManualVerification.md) にまとめています。
+
 ### 新しいテストケースの追加方法
 
 1. `EngineUnitTests/` に `Tests_<対象>.cpp` を作成
