@@ -4,16 +4,20 @@
 #     CI・codex-review がそろっていても、hold を外すまで自動マージされない(人が止めるための手段)。
 #   - close-issues: develop にマージされたPRの本文にある "Closes #NN" のIssueを閉じる。
 #     GitHub がPRの本文でIssueを閉じるのは既定のブランチ(main)へのマージだけなので、ここで代わりに行う。
+#     forkからのPRでは pull_request のトークンが読み取り専用になるため、pull_request_target の closed で動かす。
+#     このジョブはPRのコードをチェックアウトも実行もせず、本文は環境変数で受け取るだけなので安全。
 name: PR automation
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize, labeled, unlabeled, closed]
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+  pull_request_target:
+    types: [closed]
 
 jobs:
   hold:
     name: No hold label
-    if: github.event.action != 'closed'
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Fail while the hold label is set
@@ -26,7 +30,7 @@ jobs:
 
   close-issues:
     name: Close linked issues
-    if: github.event.action == 'closed' && github.event.pull_request.merged && github.event.pull_request.base.ref == 'develop'
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.merged && github.event.pull_request.base.ref == 'develop'
     runs-on: ubuntu-latest
     permissions:
       issues: write

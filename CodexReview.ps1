@@ -27,8 +27,9 @@
 
 .PARAMETER SetStatus
 	マージの関門として、レビューしたコミットにコミットステータス codex-review を付ける。
-	Codexの判定が「指摘なし」なら success を付けて自動マージ(gh pr merge --auto --merge)を予約し、
-	「指摘あり」または判定を読み取れないときは failure を付ける。developのブランチ保護はCI・hold・
+	Codexの出力に指摘("- [P0〜P3] ..." の行)がなければ success を付けて自動マージ(gh pr merge --auto --merge)を
+	予約し、指摘があれば重大度を問わず failure を付ける。向き先のブランチ保護が codex-review と No hold label を
+	必須にしていないPRには使えない(レビューの前に確かめて止まる)。developのブランチ保護はCI・hold・
 	codex-review の成功を必須にしているため、残りがそろった時点でGitHubがマージする。
 	ステータスはコミットに付くので、修正をpushすると外れ、再レビューで success になるまでマージされない。
 	PRの完了条件(GUIでの確認など)がそろってから、コーディネーターが指定すること。マージ済みのPRには使えない。
@@ -104,6 +105,22 @@ if ($SetStatus -and $info.state -ne "OPEN") {
 	git -C $RepoRoot update-ref -d "$ref/head"
 	throw "-SetStatus はオープンなPRにしか使えません(PR #$Pr は $($info.state))。"
 }
+if ($SetStatus) {
+	# gh pr merge --auto は必須のチェックがないブランチでは即座にマージするため、向き先のブランチ保護が
+	# codex-review と hold のチェックを必須にしていることを確かめてから進む(レビューの前に確かめる)
+	Push-Location $RepoRoot
+	try {
+		$required = @(gh api "repos/{owner}/{repo}/branches/$base/protection/required_status_checks" --jq '.contexts[]' 2>$null)
+	}
+	finally {
+		Pop-Location
+	}
+	if ($LASTEXITCODE -ne 0 -or "codex-review" -notin $required -or "No hold label" -notin $required) {
+		git -C $RepoRoot update-ref -d "$ref/base"
+		git -C $RepoRoot update-ref -d "$ref/head"
+		throw "向き先 $base のブランチ保護が codex-review と No hold label を必須にしていないため、-SetStatus(自動マージ)は使えません。"
+	}
+}
 $currentSha = $baseSha
 if ($merged) {
 	$mergeSha = $info.mergeCommit.oid
@@ -144,7 +161,6 @@ $prompt += "`n" + @"
 - 変更された行だけでなく、呼び出し元や関連する箇所も読んで、変更が既存の挙動を壊していないかを確かめること。
 - リポジトリのCLAUDE.mdの規約も確認すること(特に: C++/C#のファイルはUTF-8 BOM、日本語ヘッダの更新履歴は追記のみ、狭い文字列リテラルに日本語を入れない、async void・OpenProjectViewから呼ばれる経路で例外を投げない、警告を握りつぶさない)。
 - 問題がなければ、そう書くこと。
-- 出力の最後の行には、修正を求める指摘が1つでもあれば ``VERDICT: FINDINGS``、なければ ``VERDICT: PASS`` とだけ書くこと(この行は機械的に読み取る)。
 "@
 
 try {
@@ -184,11 +200,10 @@ finally {
 Remove-Item -ErrorAction SilentlyContinue $log
 Write-Output $review
 
-# 最後の行の判定を読む。見つからないときは、指摘がないとはみなさない
-$lastLine = @($review -split "`r?`n" | Where-Object { $_.Trim() }) | Select-Object -Last 1
-$verdict = if ($lastLine -match '^\W*VERDICT:\s*PASS\W*$') { "PASS" }
-	elseif ($lastLine -match '^\W*VERDICT:\s*FINDINGS\W*$') { "FINDINGS" }
-	else { "UNKNOWN" }
+# codex review は独自の出力形式に従い、カスタム指示で最後の行の書式を指定しても守らない。
+# 指摘は必ず "- [P1] 見出し — ファイル:行" の形の行で出る("Full review comments:" の下)ので、
+# その行が1つでもあれば指摘あり(重大度を問わない)、なければ指摘なしとする
+$verdict = if ($review -match '(?m)^\s*-\s*\[P[0-3]\]' -or $review -match '(?m)^Full review comments:') { "FINDINGS" } else { "PASS" }
 Write-Output "判定: $verdict"
 
 $commentUrl = $null
@@ -225,11 +240,8 @@ $review
 
 if ($SetStatus) {
 	$state = if ($verdict -eq "PASS") { "success" } else { "failure" }
-	$description = switch ($verdict) {
-		"PASS" { "Codex review: no findings ($model, $Effort)" }
-		"FINDINGS" { "Codex review: findings to address ($model, $Effort)" }
-		default { "Codex review: verdict line not found" }
-	}
+	$description = if ($verdict -eq "PASS") { "Codex review: no findings ($model, $Effort)" }
+		else { "Codex review: findings to address ($model, $Effort)" }
 	Push-Location $RepoRoot
 	try {
 		# レビューしたコミット($head)に付ける。レビュー中にpushされていても、新しいheadは未レビューのまま残る
