@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Tests_Id.cpp" />
+    <ClCompile Include="Tests_FreeList.cpp" />
+    <ClCompile Include="Tests_Vector.cpp" />
+    <ClCompile Include="Tests_Entity.cpp" />
+    <ClCompile Include="Tests_Script.cpp" />
+    <ClCompile Include="Tests_Camera.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="MicroTest.h" />
+  </ItemGroup>
+</Project>

@@ -1,20 +1,62 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+﻿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [CommonHeaders.h]
-// �쐬�� : 2024/08/12
-// �쐬�� : �c���~�m��
-// �T�v
-// �@���ʃw�b�_�[���܂Ƃ߂��t�@�C��
-// �X�V����
-// 2024/08/12 �V�K�쐬
+// 作成日 : 2024/08/12
+// 作成者 : 田中ミノル
+// 概要
+// 　共通ヘッダーをまとめたファイル
+// 更新履歴
+// 2024/08/12 新規作成
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== �C���N���[�h�� ======
-// C/C++�W�����C�u����
-#include <stdint.h>
-#include <assert.h>
-#include <typeinfo>
 
-// ���[�e�B���e�B�֐�
-#include "..\Utilities\Utilities.h"
-// ��{�I�Ȍ^���`�����t�@�C��
+// ====== プリプロセッサ定義 ======
+#ifdef _WIN64
+// 例外に関する警告(C4530)を無効化
+#pragma warning(disable: 4530)
+#endif // _WIN64
+
+// ====== インクルード部 ======
+// C/C++標準ライブラリ
+// NOTE: std::vectorやstd::dequeをインクルードするヘッダーはここに書かないでください。
+#include <cstdint>          // 固定幅整数型のヘッダー
+#include <assert.h>         // アサーション
+#include <memory>           // スマートポインタ
+#include <unordered_map>    // ハッシュマップ
+#include <mutex>            // 排他制御
+#include <cstring>          // C文字列操作
+
+// ====== マクロ定義 ======
+// コピーを禁止するマクロ
+#ifndef DISABLE_COPY
+#define DISABLE_COPY(T)             \
+    explicit T(const T&) = delete;  \
+    T& operator=(const T&) = delete;
+#endif // !DISABLE_COPY
+
+// ムーブを禁止するマクロ
+#ifndef DISABLE_MOVE
+#define DISABLE_MOVE(T)             \
+    explicit T(T&&) = delete;       \
+    T& operator=(T&&) = delete;
+#endif // !DISABLE_MOVE
+
+// コピーとムーブを禁止するマクロ
+#ifndef DISABLE_COPY_AND_MOVE
+#define DISABLE_COPY_AND_MOVE(T) DISABLE_COPY(T) DISABLE_MOVE(T)
+#endif // !DISABLE_COPY_AND_MOVE
+
+// デバッグ時のみ処理を行うマクロ
+#ifdef _DEBUG
+#define DEBUG_OP(x) x // デバッグビルド時にのみ有効化
+#else
+#define DEBUG_OP(x)
+#endif // _DEBUG
+
+// ====== ユーティリティ関数のインクルード ======
+// 基本的な型を定義するファイル
 #include "PrimitiveTypes.h"
+
+// 数学関連のユーティリティ関数
+#include "../Utilities/Utilities.h"
+#include "../Common/Id.h"
+#include "../Utilities/Math.h"

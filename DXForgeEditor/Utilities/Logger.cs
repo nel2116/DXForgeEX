@@ -42,7 +42,7 @@ namespace DXForgeEditor.Utilities
     static class Logger
     {
         private static int _messageFilter = (int)(MessageType.Info) | (int)(MessageType.Warning) | (int)(MessageType.Error);
-        private static readonly ObservableCollection<LogMessage> _messages = new ObservableCollection<LogMessage>();
+        private static readonly ObservableCollection<LogMessage> _messages = new();
         public static ReadOnlyObservableCollection<LogMessage> Messages { get; } = new ReadOnlyObservableCollection<LogMessage>(_messages);
         public static CollectionViewSource FilterdMessages { get; } = new CollectionViewSource() { Source = Messages };
 
@@ -58,10 +58,7 @@ namespace DXForgeEditor.Utilities
 
         public static async void Clear()
         {
-            await Application.Current.Dispatcher.BeginInvoke(new Action(() =>
-            {
-                _messages.Clear();
-            }));
+            await Application.Current.Dispatcher.BeginInvoke(new Action(_messages.Clear));
         }
 
         public static void SetMessageFillter(int mask)
@@ -74,7 +71,7 @@ namespace DXForgeEditor.Utilities
         {
             FilterdMessages.Filter += (s, e) =>
             {
-                var type = (int)(e.Item as LogMessage).MessageType;
+                var type = (int)((LogMessage)e.Item).MessageType;
                 e.Accepted = (type & _messageFilter) != 0;
             };
         }

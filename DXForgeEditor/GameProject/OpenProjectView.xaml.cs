@@ -39,7 +39,9 @@ namespace DXForgeEditor.GameProject
 
         private void OpenSelectProject()
         {
-            var project = OpenProject.Open(projectListBox.SelectedItem as ProjectData);
+            // The recent-project list can be empty, leaving nothing to open.
+            if (projectListBox.SelectedItem is not ProjectData data) return;
+            var project = OpenProject.Open(data);
             bool dialogResult = false;
             var win = Window.GetWindow(this);
             if (project != null)

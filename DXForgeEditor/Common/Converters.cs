@@ -1,0 +1,72 @@
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Data;
+
+namespace DXForgeEditor
+{
+    class BooleanToYesNoConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture) => (value is bool b && b) ? "Yes" : "No";
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => value is string s && s.ToLower() == "yes";
+    }
+
+    class IndexOfConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (values?.Length != 2 || values[0] == null || values[0] == DependencyProperty.UnsetValue || values[1] is not IList) return -1;
+            return ((IList)values[1]).IndexOf(values[0]) + 1;
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) => throw new NotImplementedException();
+    }
+
+    class EnumDescriptionConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is Array array)
+            {
+                var list = new List<string>();
+                foreach (var item in array)
+                {
+                    if (item is Enum e)
+                    {
+                        list.Add(e.GetDescription());
+                    }
+                }
+
+                return list;
+            }
+            else if (value is Enum e)
+            {
+                return e.GetDescription();
+            }
+
+            return value;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => throw new NotImplementedException();
+    }
+
+    class ReciprocalConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is double n && double.IsNormal(n))
+            {
+                return 1.0 / n;
+            }
+            return 1.0;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) => Convert(value, targetType, parameter, culture);
+    }
+}

@@ -1,4 +1,7 @@
-﻿using DXForgeEditor.Utilities;
+﻿using DXForgeEditor.Components;
+using DXForgeEditor.DllWrappers;
+using DXForgeEditor.GameDev;
+using DXForgeEditor.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -14,17 +17,66 @@ namespace DXForgeEditor.GameProject
     [DataContract(Name = "Game")]
     class Project : ViewModelBase
     {
-        public static string Extension { get; } = ".dxproj";
+        public static string Extension => ".dxproj";
         [DataMember]
         public string Name { get; private set; } = "New Project";
         [DataMember]
-        public string Path { get; set; }
-        public string FullPath => $@"{Path}{Name}\{Name}{Extension}";
-        [DataMember(Name = "Scenes")]
-        private ObservableCollection<Scene> _scenes = new ObservableCollection<Scene>();
-        public ReadOnlyObservableCollection<Scene> Scenes { get; private set; }
 
-        private Scene _activeScene;
+        /// <summary>
+        /// 現在のプロジェクトを含むルート・フォルダーを取得する
+        /// </summary>
+        public string Path { get; set; }
+
+        /// <summary>
+        /// 現在の DXForge プロジェクトファイルのフルパスを取得する
+        /// </summary>
+        public string FullPath => $@"{Path}{Name}{Extension}";
+        public string Solution => $@"{Path}{Name}.sln";
+        public string ContentPath => $@"{Path}Content\";
+
+        public string TempFolder => $@"{Path}.DXForge\Temp\";
+
+        private int _buildConfig;
+
+        [DataMember]
+        public int BuildConfig
+        {
+            get => _buildConfig;
+            set
+            {
+                if (_buildConfig != value)
+                {
+                    _buildConfig = value;
+                    OnPropertyChanged(nameof(BuildConfig));
+                }
+            }
+        }
+
+        public BuildConfiguration StandAloneBuildConfig => BuildConfig == 0 ? BuildConfiguration.Debug : BuildConfiguration.Release;
+
+        public BuildConfiguration DLLBuildConfig => BuildConfig == 0 ? BuildConfiguration.DebugEditor : BuildConfiguration.ReleaseEditor;
+
+        private string[]? _availableScripts;
+        public string[]? AvailableScripts
+        {
+            get => _availableScripts;
+            private set
+            {
+                if (_availableScripts != value)
+                {
+                    _availableScripts = value;
+                    OnPropertyChanged(nameof(AvailableScripts));
+                }
+            }
+        }
+
+        [DataMember(Name = nameof(Scenes))]
+        private readonly ObservableCollection<Scene> _scenes = new();
+        // Initialized by OnDeserialized before its first await.
+        public ReadOnlyObservableCollection<Scene> Scenes { get; private set; } = null!;
+
+        // Initialized by OnDeserialized before its first await.
+        private Scene _activeScene = null!;
 
         public Scene ActiveScene
         {
@@ -39,19 +91,67 @@ namespace DXForgeEditor.GameProject
             }
         }
 
-        public static Project Currnt => Application.Current.MainWindow.DataContext as Project;
+        public static Project? Current => Application.Current.MainWindow?.DataContext as Project;
 
         public static UndoRedo UndoRedo { get; } = new UndoRedo();
 
-        public ICommand UndoCommand { get; private set; }
+        public ICommand? UndoCommand { get; private set; }
 
-        public ICommand RedoCommand { get; private set; }
+        public ICommand? RedoCommand { get; private set; }
 
-        public ICommand AddSceneCommand { get; private set; }
+        public ICommand? AddSceneCommand { get; private set; }
 
-        public ICommand RemoveSceneCommand { get; private set; }
-        public ICommand SaveCommand { get; private set; }
+        public ICommand? RemoveSceneCommand { get; private set; }
+        public ICommand? SaveCommand { get; private set; }
 
+        public ICommand? DebugStartCommand { get; private set; }
+        public ICommand? DebugStartWithoutDebuggingCommand { get; private set; }
+        public ICommand? DebugStopCommand { get; private set; }
+        public ICommand? BuildCommand { get; private set; }
+
+        private void SetCommands()
+        {
+            AddSceneCommand = new RelayCommand<object>(x =>
+            {
+                AddScene($"New Scene {_scenes.Count}");
+                var newScene = _scenes.Last();
+                var sceneIndex = _scenes.Count - 1;
+
+                UndoRedo.Add(new UndoRedoAction(
+                    () => RemoveScene(newScene),
+                    () => _scenes.Insert(sceneIndex, newScene),
+                    $"Add {newScene.Name}"));
+            });
+
+            RemoveSceneCommand = new RelayCommand<Scene>(x =>
+            {
+                var sceneIndex = _scenes.IndexOf(x);
+                RemoveScene(x);
+
+                UndoRedo.Add(new UndoRedoAction(
+                    () => _scenes.Insert(sceneIndex, x),
+                    () => RemoveScene(x),
+                    $"Remove {x.Name}"));
+            }, x => !x.IsActive);
+
+            UndoCommand = new RelayCommand<object>(x => UndoRedo.Undo(), x => UndoRedo.UndoList.Any());
+            RedoCommand = new RelayCommand<object>(x => UndoRedo.Redo(), x => UndoRedo.RedoList.Any());
+            SaveCommand = new RelayCommand<object>(x => Save(this));
+            DebugStartCommand = new RelayCommand<object>(async x => await RunGame(true), x => !VisualStudio.IsDebugging() && VisualStudio.BuildDone);
+            DebugStartWithoutDebuggingCommand = new RelayCommand<object>(async x => await RunGame(false), x => !VisualStudio.IsDebugging() && VisualStudio.BuildDone);
+            DebugStopCommand = new RelayCommand<object>(async x => await StopGame(), x => VisualStudio.IsDebugging());
+            BuildCommand = new RelayCommand<bool>(async x => await BuildGameCodeDLL(x), x => !VisualStudio.IsDebugging() && VisualStudio.BuildDone);
+
+            OnPropertyChanged(nameof(AddSceneCommand));
+            OnPropertyChanged(nameof(RemoveSceneCommand));
+            OnPropertyChanged(nameof(UndoCommand));
+            OnPropertyChanged(nameof(RedoCommand));
+            OnPropertyChanged(nameof(SaveCommand));
+            OnPropertyChanged(nameof(DebugStartCommand));
+            OnPropertyChanged(nameof(DebugStartWithoutDebuggingCommand));
+            OnPropertyChanged(nameof(DebugStopCommand));
+            OnPropertyChanged(nameof(BuildCommand));
+        }
 
         public void AddScene(string sceneName)
         {
@@ -61,7 +161,7 @@ namespace DXForgeEditor.GameProject
 
         public void RemoveScene(Scene scene)
         {
-            Debug.Assert(scene != null);
+            Debug.Assert(_scenes.Contains(scene));
             _scenes.Remove(scene);
         }
 
@@ -73,55 +173,132 @@ namespace DXForgeEditor.GameProject
 
         public void Unload()
         {
+            UnloadGameCodeDLL();
+            VisualStudio.CloseVisualStudio();
             UndoRedo.Reset();
+            Logger.Clear();
+            DeleteTmpFolder();
         }
 
-        public static void Save(Project project)
+        private void DeleteTmpFolder()
+        {
+            if (Directory.Exists(TempFolder))
+            {
+                Directory.Delete(TempFolder, true);
+            }
+        }
+
+        private static void Save(Project project)
         {
             Serializer.ToFile(project, project.FullPath);
-            Logger.Log(MessageType.Info, $"Project saved to {project.FullPath}");
+            Logger.Log(MessageType.Info, $"プロジェクトの保存: {project.FullPath}");
+        }
+
+        private void SaveToBinary()
+        {
+            var configName = VisualStudio.GetConfigurationName(StandAloneBuildConfig);
+            var bin = $@"{Path}x64\{configName}\game.bin";
+
+            using (var bw = new BinaryWriter(File.Open(bin, FileMode.Create, FileAccess.Write)))
+            {
+                bw.Write(ActiveScene.GameEntities.Count);
+                foreach (var entity in ActiveScene.GameEntities)
+                {
+                    bw.Write(0); // entity type (reserved for later)
+                    bw.Write(entity.Components.Count);
+                    foreach (var component in entity.Components)
+                    {
+                        bw.Write((int)component.ToEnumType());
+                        component.WriteToBinary(bw);
+                    }
+                }
+            }
+        }
+
+        private async Task RunGame(bool debug)
+        {
+            await Task.Run(() => VisualStudio.BuildSolution(this, StandAloneBuildConfig, debug));
+            if (VisualStudio.BuildSucceeded)
+            {
+                SaveToBinary();
+                await Task.Run(() => VisualStudio.Run(this, StandAloneBuildConfig, debug));
+            }
+        }
+
+        private async Task StopGame() => await Task.Run(VisualStudio.Stop);
+
+        private async Task BuildGameCodeDLL(bool showWindow = true)
+        {
+            try
+            {
+                UnloadGameCodeDLL();
+                await Task.Run(() => VisualStudio.BuildSolution(this, DLLBuildConfig, showWindow));
+                if (VisualStudio.BuildSucceeded)
+                {
+                    LoadGameCodeDLL();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                throw;
+            }
+        }
+
+        private void LoadGameCodeDLL()
+        {
+            var configName = VisualStudio.GetConfigurationName(DLLBuildConfig);
+            var dll = $@"{Path}x64\{configName}\{Name}.dll";
+            AvailableScripts = null;
+            if (File.Exists(dll) && EngineAPI.LoadGameCodeDll(dll) != 0)
+            {
+                AvailableScripts = EngineAPI.GetScriptNames();
+                ActiveScene.GameEntities.Where(x => x.GetComponent<Script>() != null).ToList().ForEach(x => x.IsActive = true);
+                Logger.Log(MessageType.Info, "ゲームコードDLLは正常にロードされました。");
+            }
+            else
+            {
+                Logger.Log(MessageType.Warning, "ゲームコードDLLファイルのロードに失敗しました。 まずプロジェクトをビルドしてみてください！");
+            }
+        }
+
+        private void UnloadGameCodeDLL()
+        {
+            ActiveScene.GameEntities.Where(x => x.GetComponent<Script>() != null).ToList().ForEach(x => x.IsActive = false);
+            if (EngineAPI.UnloadGameCodeDll() != 0)
+            {
+                Logger.Log(MessageType.Info, "ゲームコードDLLのアンロード");
+                AvailableScripts = null;
+            }
         }
 
         [OnDeserialized]
-        private void OnDeserialized(StreamingContext context)
+        private async void OnDeserialized(StreamingContext context)
         {
             if (_scenes != null)
             {
                 Scenes = new ReadOnlyObservableCollection<Scene>(_scenes);
                 OnPropertyChanged(nameof(Scenes));
             }
-            ActiveScene = Scenes.FirstOrDefault(x => x.IsActive);
 
-            AddSceneCommand = new RelayCommand<object>(x =>
-            {
-                AddScene($"New Scene {_scenes.Count}");
-                var newScene = _scenes.Last();
-                var sceneIndex = _scenes.Count - 1;
-                UndoRedo.Add(new UndoRedoAction(
-                    () => RemoveScene(newScene),
-                    () => _scenes.Insert(sceneIndex, newScene),
-                    $"Add {newScene.Name}"));
-            });
+            Debug.Assert(_scenes != null);
+            // アクティブなシーンは必ず存在する前提(直後のDebug.Assertで検証)。ロード中にthrowすると
+            // 呼び出し元(OpenProjectView)で捕捉されずエディタが落ちるため、従来どおりthrowしない
+            ActiveScene = _scenes.FirstOrDefault(x => x.IsActive)!;
+            Debug.Assert(ActiveScene != null);
 
-            RemoveSceneCommand = new RelayCommand<Scene>(x =>
-            {
-                var sceneIndex = _scenes.IndexOf(x);
-                RemoveScene(x);
-                UndoRedo.Add(new UndoRedoAction(
-                    () => _scenes.Insert(sceneIndex, x),
-                    () => RemoveScene(x),
-                    $"Remove {x.Name}"));
-            }, x => !x.IsActive);
+            await BuildGameCodeDLL(false);
 
-            UndoCommand = new RelayCommand<object>(x => UndoRedo.Undo());
-            RedoCommand = new RelayCommand<object>(x => UndoRedo.Redo());
-            SaveCommand = new RelayCommand<object>(x => Save(this));
+            SetCommands();
         }
+
 
         public Project(string name, string path)
         {
             Name = name;
             Path = path;
+
+            Debug.Assert(File.Exists((Path + Name + Extension).ToLower()));
             OnDeserialized(new StreamingContext());
         }
     }

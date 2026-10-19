@@ -1,0 +1,44 @@
+﻿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+// [MathType.h]
+// 作成日 : 2024/11/11
+// 作成者 : 田中ミノル
+// 概要
+//
+// 更新履歴
+// 2024/11/11 新規作成
+// 2026/10/18 inv_pi, inv_two_piの追加
+// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+#pragma once
+// ====== インクルード部 ======
+#include "CommonHeaders.h"
+
+namespace dxforge::math
+{
+	// ====== 定数定義 ======
+	constexpr f32 pi{ 3.1415926535897932384626433832795f };
+	constexpr f32 inv_pi{ 1.f / pi };
+	constexpr f32 half_pi{ pi * 0.5f };
+	constexpr f32 two_pi{ 2.f * pi };
+	constexpr f32 inv_two_pi{ 1.f / two_pi };
+	constexpr f32 epsilon{ 1e-5f };
+
+#if defined(_WIN64)
+	using v2 = DirectX::XMFLOAT2;
+	using v2a = DirectX::XMFLOAT2A;
+	using v3 = DirectX::XMFLOAT3;
+	using v3a = DirectX::XMFLOAT3A;
+	using v4 = DirectX::XMFLOAT4;
+	using v4a = DirectX::XMFLOAT4A;
+	using u32v2 = DirectX::XMUINT2;
+	using u32v3 = DirectX::XMUINT3;
+	using u32v4 = DirectX::XMUINT4;
+	using s32v2 = DirectX::XMINT2;
+	using s32v3 = DirectX::XMINT3;
+	using s32v4 = DirectX::XMINT4;
+	using m3x3 = DirectX::XMFLOAT3X3;	// NOTE : DirectXMathには整列された3x3行列がない
+	using m4x4 = DirectX::XMFLOAT4X4;
+	using m4x4a = DirectX::XMFLOAT4X4A;
+
+
+#endif
+}

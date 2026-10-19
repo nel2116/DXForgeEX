@@ -17,12 +17,12 @@ namespace DXForgeEditor.Utilities
 
     public class UndoRedoAction : IUndoRedo
     {
-        private Action _undoAction;
-        private Action _redoAction;
+        private Action? _undoAction;
+        private Action? _redoAction;
         public string Name { get; }
 
-        public void Undo() => _undoAction();
-        public void Redo() => _redoAction();
+        public void Undo() => (_undoAction ?? throw new InvalidOperationException("No undo action was supplied."))();
+        public void Redo() => (_redoAction ?? throw new InvalidOperationException("No redo action was supplied."))();
 
         public UndoRedoAction(string name)
         {
@@ -37,10 +37,10 @@ namespace DXForgeEditor.Utilities
             _redoAction = redo;
         }
 
-        public UndoRedoAction(string property, object instance, object undoValue, object redoValue, string name)
+        public UndoRedoAction(string property, object instance, object? undoValue, object? redoValue, string name)
             : this(
-                  () => instance.GetType().GetProperty(property).SetValue(instance, undoValue),
-                  () => instance.GetType().GetProperty(property).SetValue(instance, redoValue),
+                  () => (instance.GetType().GetProperty(property) ?? throw new ArgumentException("The property does not exist.", nameof(property))).SetValue(instance, undoValue),
+                  () => (instance.GetType().GetProperty(property) ?? throw new ArgumentException("The property does not exist.", nameof(property))).SetValue(instance, redoValue),
                   name)
         {
         }
@@ -50,8 +50,8 @@ namespace DXForgeEditor.Utilities
     public class UndoRedo
     {
         private bool _enableAdd = true;
-        private readonly ObservableCollection<IUndoRedo> _redoList = new ObservableCollection<IUndoRedo>();
-        private readonly ObservableCollection<IUndoRedo> _undoList = new ObservableCollection<IUndoRedo>();
+        private readonly ObservableCollection<IUndoRedo> _redoList = new();
+        private readonly ObservableCollection<IUndoRedo> _undoList = new();
         public ReadOnlyObservableCollection<IUndoRedo> RedoList { get; }
         public ReadOnlyObservableCollection<IUndoRedo> UndoList { get; }
 
@@ -76,8 +76,9 @@ namespace DXForgeEditor.Utilities
                 var cmd = _undoList.Last();
                 _undoList.RemoveAt(_undoList.Count - 1);
                 _enableAdd = false;
-                cmd.Undo();
-                _enableAdd = true;
+                // cmd.Undo()が例外を投げても_enableAddを戻す。戻さないと以後の操作がすべて履歴に記録されなくなる
+                try { cmd.Undo(); }
+                finally { _enableAdd = true; }
                 _redoList.Insert(0, cmd);
             }
         }
@@ -89,8 +90,8 @@ namespace DXForgeEditor.Utilities
                 var cmd = _redoList.First();
                 _redoList.RemoveAt(0);
                 _enableAdd = false;
-                cmd.Redo();
-                _enableAdd = true;
+                try { cmd.Redo(); }
+                finally { _enableAdd = true; }
                 _undoList.Add(cmd);
             }
         }

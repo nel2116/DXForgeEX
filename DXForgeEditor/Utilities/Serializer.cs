@@ -21,7 +21,7 @@ namespace DXForgeEditor.Utilities
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
-                Logger.Log(MessageType.Error, $"Failed to deseralze {instance} to {path}");
+                Logger.Log(MessageType.Error, $"デシリアライズに失敗: {instance} 場所: {path}");
                 throw;
             }
         }
@@ -33,13 +33,14 @@ namespace DXForgeEditor.Utilities
             {
                 using var fs = new FileStream(path, FileMode.Open);
                 var serializer = new DataContractSerializer(typeof(T));
-                T instance = (T)serializer.ReadObject(fs);
+                // ルート要素がnilの場合は従来どおりnullを返す(呼び出し元はnullを失敗として扱う)
+                T instance = (T)serializer.ReadObject(fs)!;
                 return instance;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
-                Logger.Log(MessageType.Error, $"Failed to deseralze {path}");
+                Logger.Log(MessageType.Error, $"デシリアライズに失敗: {path}");
                 throw;
             }
         }

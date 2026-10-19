@@ -26,9 +26,9 @@ namespace DXForgeEditor.Utilities
 
             Loaded += (s, e) =>
             {
-                Logger.Log(MessageType.Info, "Infomation message");
-                Logger.Log(MessageType.Warning, "Warning message");
-                Logger.Log(MessageType.Error, "Error message");
+                // Logger.Log(MessageType.Info, "Infomation message");
+                // Logger.Log(MessageType.Warning, "Warning message");
+                // Logger.Log(MessageType.Error, "Error message");
             };
         }
 

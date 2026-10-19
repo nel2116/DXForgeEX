@@ -1,0 +1,186 @@
+# DXForgeEX
+
+[Game Engine Series (TheGameEngineers / Arash Khatami)](https://www.youtube.com/playlist?list=PLU2nPsAdxKWQYxkmQ3TdbLsyc1l2j25XM) と、その実装である [Primal](https://github.com/TheGameEngineers/Primal) を参考に実装している、学習用の3Dゲームエンジン + WPFレベルエディタです。
+
+C++によるプラットフォーム非依存のエンジンコア、C ABIのDLL境界、その上で動くC#/WPFエディタ、オフラインのコンテンツ(FBX/テクスチャ)インポートパイプラインという構成を踏襲しています。現在の実装は、PBRの直接光(GGX/Smith/Schlickフレネル)まで到達しており、IBL(Image Based Lighting)は未実装です。
+
+## 必要環境
+
+- Windows 10/11
+- Visual Studio 2022 (ワークロード: 「C++によるデスクトップ開発」+「.NETデスクトップ開発」、`v143` toolset)
+- .NET 8 SDK以降 (`dotnet` CLI。`DXForgeEditor`のビルドに使用)
+- DirectX 12対応GPU (レンダラーを実際に動かす場合のみ必要。`EngineUnitTests`はGPU/ウィンドウ不要)
+
+## ソリューション構成
+
+`DXForge.sln` は `x64` 固定で4つの構成を持ちます: `Debug` / `DebugEditor` / `Release` / `ReleaseEditor`。`*Editor`構成はエンジンを`DXForgeEngineDLL`としてビルドしエディタから使う構成、無印の`Debug`/`Release`は`EngineTest`/`EngineUnitTests`を単独実行ファイルとしてビルドする構成です。
+
+| プロジェクト | 種類 | 概要 |
+|---|---|---|
+| `DXForgeEngine` | 静的ライブラリ | エンジン本体 |
+| `DXForgeEngineDLL` | DLL | エンジンをエディタに公開するC ABIラッパー |
+| `EngineTest` | 実行ファイル | ウィンドウ+GPUを使う対話的なビジュアルテスト。CLI/CIには不向き |
+| `EngineUnitTests` | 実行ファイル | GPU/ウィンドウ不要の自動テスト。CLI/CI向け |
+| `ContentTools` | DLL | FBX/テクスチャのオフラインインポートパイプライン(エディタから使用) |
+| `DXForgeEditor` | WPFアプリ (.NET 8) | レベルエディタ |
+
+## ビルド方法
+
+### Visual Studioから
+
+`DXForge.sln` を開き、任意の構成でビルドしてください。
+
+### CLIから (`build.ps1`)
+
+PowerShell 7+ (`pwsh`) から実行します。
+
+```powershell
+# ネイティブ側+エディタ側の両方をビルド (既定構成 DebugEditor)
+./build.ps1
+
+# 構成を指定してビルド
+./build.ps1 -Configuration Debug
+
+# ネイティブ側だけ、特定プロジェクトだけビルド(最速のフィードバックループ)
+./build.ps1 -Target native -Project EngineUnitTests
+
+# エディタ側だけビルド
+./build.ps1 -Target editor
+
+# ビルド後に自動テストも実行し、終了コードに反映する
+./build.ps1 -Target native -Project EngineUnitTests -RunTests
+
+# 終了コードに加えて、最後に1行のJSON要約も出力する(AIエージェント/CI向け)
+./build.ps1 -Target native -Project EngineUnitTests -RunTests -Json
+```
+
+| パラメータ | 値 | 既定値 |
+|---|---|---|
+| `-Configuration` | `Debug` / `DebugEditor` / `Release` / `ReleaseEditor` | `DebugEditor` |
+| `-Target` | `native` / `editor` / `all` | `all` |
+| `-Project` | `DXForge.sln`内のプロジェクト名(`-Target native`時のみ有効) | 省略時はソリューション全体 |
+| `-RunTests` | スイッチ。ビルド後に`EngineUnitTests.exe`を実行。`EngineUnitTests`は`Debug`/`Release`構成にしかないため、`*Editor`構成・`-Target editor`・別の`-Project`のときは対応する`Debug`/`Release`構成で`EngineUnitTests`を追加でビルドしてから実行する(古い実行ファイルを実行しないため)。ビルドに失敗したときはテストを実行しない | - |
+| `-NoRestore` | スイッチ。ネイティブビルド前の`packages/`の復元(`Restore.ps1`)を省く | - |
+| `-WarningsAsErrors` | スイッチ。ネイティブ側とエディタ側の警告をエラーとして扱う(CI用) | - |
+| `-Json` | スイッチ。1行のJSON要約を標準出力に出す | - |
+| `-DetailedLog` | スイッチ。ビルドツールの出力を全文表示する | - |
+
+**注意:** ネイティブ側は必ず`DXForge.sln`経由でビルドしてください。`.vcxproj`を直接MSBuildに渡すと、`$(SolutionDir)`がプロジェクト自身のディレクトリにフォールバックしてしまい、インクルードパスが崩れてビルドに失敗します(MSBuildの既知の挙動)。`build.ps1`は常に`/t:<プロジェクト名>`で`DXForge.sln`を経由するため、この問題を踏みません。
+
+### `packages/`の復元 (`Restore.ps1`)
+
+`packages/`は`.gitignore`で除外しているため、新しいclone/worktreeでは空です。`build.ps1`はネイティブ側をビルドする前に`Restore.ps1`を呼び、足りないものだけを取得します。手作業でのコピーは不要です。
+
+- **NuGet** (`ContentTools/packages.config`の`directxtex_desktop_win10`と、`DXForgeEditor`の`PackageReference`): `packages/<id>.<version>`か`DXForgeEditor/obj/project.assets.json`が無ければ`MSBuild DXForge.sln -t:restore -p:RestorePackagesConfig=true`で両方を復元します(`nuget.exe`は不要)。ネイティブのビルドは*Editor構成でソリューション内の`DXForgeEditor`もビルドするため、`obj`だけを消した状態でも`NETSDK1004`にならないようにしています。どちらも`*Editor`構成でしかビルドされないため、`Debug`/`Release`構成では復元しません。
+- **DXC** (`packages/DirectXShaderCompiler`): フォルダが空なら`GetDXC.ps1`で最新版を取得します(GitHub APIを使います)。DXCを使うのは`EngineTest`だけなので、`EngineTest`をビルドするとき(`Debug`/`Release`構成で、`-Project`を省略したときか`EngineTest`を指定したとき)だけ取得します。`-Project EngineUnitTests`や`*Editor`構成のビルドは、オフラインやGitHub APIのレート制限の下でもDXCなしで進みます。
+
+既に揃っているときは、ファイルの有無を見るだけでネットワークにはアクセスせず、すぐに終わります(実測: 数十ms)。`Restore.ps1`は単体でも実行でき(`./Restore.ps1 -Configuration DebugEditor`)、`build.ps1 -NoRestore`で復元を省けます。DXCを最新版に更新したいときは、`packages/DirectXShaderCompiler`を削除してから実行してください。
+
+## テスト
+
+`EngineUnitTests` はGPU・ウィンドウを使わない自動テストです。ビルド後、生成された実行ファイルを直接実行できます。
+
+```powershell
+./x64/Debug/EngineUnitTests.exe          # 人間が読める出力
+./x64/Debug/EngineUnitTests.exe --json   # 機械可読なJSON出力
+```
+
+終了コードは全テストPASSなら`0`、1件以上FAILなら`1`です。各失敗には式・ファイル・行番号が出力されます。
+
+現在カバーしているのは、GPU/ウィンドウに依存しない純粋ロジックのみです:
+- `Common/Id.h` — 世代付きID(インデックス/世代のエンコード、`new_generation`、`DEFINE_TYPED_ID`)
+- `Utilities/FreeList.h` — 削除済みインデックスの再利用ロジック
+
+`Graphics/Direct3D12/*` などGPUデバイス初期化が前提のコードは対象外です。そちらの動作確認は`EngineTest`を実行し、目視で確認してください。
+
+エディタの基本操作(プロジェクトの作成 → スクリプトの追加 → ゲームコードDLLの読み込み → ゲームの実行)の確認手順は [docs/ManualVerification.md](docs/ManualVerification.md) にまとめています。
+
+### 新しいテストケースの追加方法
+
+1. `EngineUnitTests/` に `Tests_<対象>.cpp` を作成
+2. `EngineUnitTests.vcxproj` と `.vcxproj.filters` の `ClCompile` に追加
+3. 以下の形式でテストケースを書く
+
+```cpp
+#include "MicroTest.h"
+#include "CommonHeaders.h"
+
+DXFORGE_TEST_CASE(my_new_test)
+{
+	CHECK(1 + 1 == 2);   // 失敗しても後続のCHECKは実行される
+	REQUIRE(true);       // 失敗したらこのテストケースのみ即中断する
+}
+```
+
+**新規ファイルは必ずUTF-8 BOM付きで保存してください。** このリポジトリの既存ファイルは全て日本語のヘッダーコメントで始まっており、BOMが無いとMSVCがShift-JISと誤認してコンパイルエラー(一見無関係な箇所でのエラー)になります。
+
+## 品質ゲート
+
+### CI (GitHub Actions)
+
+`.github/workflows/ci.yml` が、`main`/`develop`へのpushとすべてのPRで以下を実行します。
+
+- **ネイティブビルド + 自動テスト** — `Debug`と`Release`の両構成(`Release`では`NDEBUG`で`assert`が無効化され挙動が変わるため、両方を検証)。警告をエラーとして扱います。
+- **エディタビルド** — `dotnet build`で`DXForgeEditor`をビルド。
+
+CIの対象範囲は意図的に絞っています:
+
+- `ContentTools`はFBX SDKが必要なためランナーではビルドできません(ソリューション構成`Debug`/`Release`ではビルド対象外なので問題になりません)。
+  ローカルでは既定でFBX SDK 2020.3.7の標準インストール先を参照します。別の場所にある場合は、環境変数または`/p:FbxSdkDir=<SDKのルート>`で指定してください(`ContentTools/FbxSdk.props`)。SDKが見つからない場合はビルド開始時に分かりやすいエラーで停止します。
+- `EngineTest`はビルドのみ(実行にはウィンドウとGPUが必要)。
+- `EngineUnitTests`はGPU・ウィンドウ不要なので、CIで実際に実行されます。
+
+### ビルド出力の要約
+
+ビルドツールの出力は非常に大きくなり得るため(実測: ネイティブ約7,400文字、エディタはnull許容参照型の警告が残っていた頃に**約132,000文字**)、`build.ps1`は既定で要約だけを表示します。エラーは原因特定に必要なので全文表示し、警告はコード別の件数に畳みます。
+
+エディタ側の警告はIssue #9で0件になり、ネイティブ側と同様に`-WarningsAsErrors`で警告をエラー化できます(エディタには`-p:TreatWarningsAsErrors=true`を付けてフルビルドします)。CIはこのオプション付きでビルドするため、新しい警告を入れるとCIが失敗します。
+
+ビルド失敗の調査などで全文が必要な場合は`-DetailedLog`を指定してください。
+
+### 警告のエラー化
+
+ローカル開発では警告はエラーになりません。CIだけが厳格に扱います。
+
+```powershell
+./build.ps1 -Target native -WarningsAsErrors   # ローカルでCIと同じ厳しさで確認したいとき
+```
+
+**注意:** MSBuildの`/p:TreatWarningAsError=true`はグローバルプロパティであり、**C++プロジェクトには効きません**(`/WX-`のままになります)。そのためルートの`Directory.Build.props`で`ItemDefinitionGroup`として設定し、`/p:DXForgeWarningsAsErrors=true`で切り替える方式にしています。`build.ps1 -WarningsAsErrors`がこれを渡します。
+
+現在、ネイティブ側は`Debug`/`Release`ともに警告0件です。この状態を維持してください。
+
+**日本語をナロー文字列リテラルに書かないでください。** CIランナーのシステムコードページは1252(日本語環境ではない)で、MSVCはナロー文字列を実行文字セットへ変換するため、日本語は1文字ごとに`C4566`が出てビルドが失敗します。これはCI特有のノイズではなく、ビルドするマシンのロケールによって文字列データが変わってしまう実際の移植性問題です。コメントは問題ありません(リテラルのみが対象)。日本語が必要な場合はワイド文字版API(`OutputDebugStringW(L"...")`)を使ってください。なお`#if _DEBUG`の中にある場合、Debug構成だけが失敗するため原因が分かりにくくなります。
+
+### コーディング規約の自動化
+
+`.editorconfig`に、実測に基づいた文字コードとインデントの規約を定義しています。とくに**C/C++のUTF-8 BOM必須**(`charset = utf-8-bom`)は、BOM無しだとMSVCがShift-JISと誤認してコンパイルエラーになる問題を、エディタ側で自動的に防ぐためのものです。
+
+### Codexによるレビュー (`CodexReview.ps1`)
+
+PRの差分を[Codex CLI](https://github.com/openai/codex)(`codex review`)にレビューさせ、実装したエージェントとは別の視点から指摘を得ます。PRのheadを`%TEMP%`の下の使い捨てのworktreeに展開してレビューし、終わったら削除します。ビルドやテストは行わないので、CIの代わりにはなりません。1PRあたり1〜2分かかります。
+
+```powershell
+# 結果を表示するだけ
+./CodexReview.ps1 -Pr 52
+
+# 結果をPRにコメントとして投稿する
+./CodexReview.ps1 -Pr 52 -Post
+```
+
+Codex CLIがインストール済みで、ログインしている必要があります。Windowsでは、Codexのサンドボックスが無効だと、レビューのためのコマンドがすべて拒否されます。そのため、スクリプトは呼び出しごとに`-c windows.sandbox="unelevated"`を渡しています。
+
+## 既知の制約
+
+- `EngineTest`は対話的なビジュアルテストで、ウィンドウとGPUが必須のため、CLI/CIでは実行できません。
+- グラフィックスバックエンドはDirect3D12のみ実装済みです。Vulkan/OpenGLは未実装のスタブです。
+- **シェーダファイルの文字コードが統一されていません。** 日本語コメントを含む`.hlsl`/`.hlsli`の8ファイルがShift-JISのまま残っており(C++側だけが過去にUTF-8へ変換された)、残りはASCIIです。DXCは現状これを許容していますが、統一するのが望ましい状態です。`.editorconfig`でもこのためHLSLの`charset`は指定していません(指定すると保存時に文字化けする恐れがあるため)。
+- `.clang-format`は未導入です(既存コード全体が再フォーマットされ巨大な差分になるため見送り)。
+
+## 今後の方向性
+
+将来的に、Unity CLI(`-batchmode`等)のように、エディタUIを介さずCLIからエンジンを操作・ビルドできる「AIフレンドリー」な構成を目指しています。`EngineUnitTests`はその最初の一歩(ウィンドウ/GPU無しでエンジンコードを動かすヘッドレスなCLIプログラム)という位置づけです。今後、`--load-project`のような引数や、ContentToolsのCLI化などを通じて拡張していく想定です。
+
+## サードパーティライセンス
+
+`Licenses/` 配下にサードパーティコンポーネントのライセンスをまとめています(例: `Licenses/MikkTSpace/LICENSE.txt`)。

@@ -1,0 +1,58 @@
+# ネイティブ側のビルドと、ヘッドレス自動テストを実行するCI。
+#
+# スコープについて:
+#   - ContentTools は FBX SDK(Autodesk の配布物でランナーに無い)が必要なため、ランナーではビルドできない。
+#     ソリューション構成 Debug / Release ではそもそもビルド対象外なので、ここでは触らない。
+#   - EngineTest はビルドのみ可能(実行にはウィンドウとGPUが必要)。
+#   - EngineUnitTests は GPU もウィンドウも不要なため、CIで実際に実行できる。
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  native:
+    name: Native build & tests (${{ matrix.configuration }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Release は NDEBUG で assert が無効化され挙動が変わるため、両構成を検証する。
+        configuration: [Debug, Release]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # GetDXC.ps1 は packages/ が空のとき DXC の最新版をダウンロードする。
+      # packages/ はリポジトリに含めていないため、キャッシュしないと毎回ダウンロードが走り、
+      # GitHub API のレート制限でCIが不安定になる。
+      - name: Cache DirectX Shader Compiler
+        uses: actions/cache@v4
+        with:
+          path: packages/DirectXShaderCompiler
+          key: dxc-${{ runner.os }}-v1
+
+      - name: Build and run unit tests
+        shell: pwsh
+        run: ./build.ps1 -Target native -Configuration ${{ matrix.configuration }} -RunTests -WarningsAsErrors
+
+  editor:
+    name: Editor build
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # DXForgeEditor は net8.0-windows を対象にしている。ランナーに必要なバージョンの
+      # SDKが同梱されているとは限らないため、SDKを明示的に用意する。
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build editor
+        shell: pwsh
+        run: ./build.ps1 -Target editor -Configuration DebugEditor -WarningsAsErrors

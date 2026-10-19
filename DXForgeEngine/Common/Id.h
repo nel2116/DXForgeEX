@@ -1,103 +1,93 @@
-// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+ï»¿// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // [Id.h]
-// ì¬“ú : 2024/08/12
-// ì¬Ò : “c’†ƒ~ƒmƒ‹
-// ŠT—v
-// @ID‚ğ’è‹`‚µ‚½ƒtƒ@ƒCƒ‹
-// XV—š—ğ
-// 2024/08/12 V‹Kì¬
+// ä½œæˆæ—¥ : 2024/08/12
+// ä½œæˆè€… : ç”°ä¸­ãƒŸãƒãƒ«
+// æ¦‚è¦
+// ã€€IDã‚’å®šç¾©ã—ãŸãƒ•ã‚¡ã‚¤ãƒ«
+// æ›´æ–°å±¥æ­´
+// 2024/08/12 æ–°è¦ä½œæˆ
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
-// ====== ƒCƒ“ƒNƒ‹[ƒh•” ======
+// ====== ã‚¤ãƒ³ã‚¯ãƒ«ãƒ¼ãƒ‰éƒ¨ ======
 #include "CommonHeaders.h"
 
 namespace dxforge::id
 {
-	using id_type = u32; // id_type ‚ğ 32 ƒrƒbƒg•„†‚È‚µ®” (u32) ‚Æ‚µ‚Ä’è‹`
+	using id_type = u32;	///< IDã®å‹
 
-	namespace internal
+	namespace detail
 	{
-		constexpr u32 generation_bits{ 8 }; // ¢‘ã”Ô†‚ğ•Û‚·‚é‚½‚ß‚Ég—p‚·‚éƒrƒbƒg”‚ğ 8 ‚Éİ’è
-		// ƒCƒ“ƒfƒbƒNƒX‚Ég—p‚·‚éƒrƒbƒg”‚ğŒvZ
-		constexpr u32 index_bits{ sizeof(id_type) * 8 - generation_bits };
-		// ƒCƒ“ƒfƒbƒNƒXƒ}ƒXƒN‚ğ’è‹`‚µA‰ºˆÊƒrƒbƒg‚ğƒCƒ“ƒfƒbƒNƒX‚Æ‚µ‚Äg—p
-		constexpr id_type index_mask{ (id_type{1} << index_bits) - 1 };
-		// ¢‘ãƒ}ƒXƒN‚ğ’è‹`‚µAãˆÊƒrƒbƒg‚ğ¢‘ã”Ô†‚Æ‚µ‚Äg—p
-		constexpr id_type generation_mask{ (id_type{1} << generation_bits) - 1 };
-	}	// namespace internal
-	// ID ‚ÌÅ‘å’li–³Œø‚È ID ‚ğ¦‚·j‚ğ’è‹`
-	constexpr id_type invalid_id{ (id_type)-1 };
-	// íœ‚³‚ê‚½—v‘f‚ÌÅ¬”‚ğ’è‹`
-	constexpr u32 min_deleted_elements{ 1024 };
+		constexpr u32 generation_bits{ 8 };											///< 8
+		constexpr u32 index_bits{ sizeof(id_type) * 8 - generation_bits };			///< 24
+		constexpr id_type index_mask{ (id_type{1} << index_bits) - 1 };				///< 16777215
+		constexpr id_type generation_mask{ (id_type{1} << generation_bits) - 1 };	///< 255
+	} // detail namespace
 
-	// generation_type ‚ğğŒ‚ÉŠî‚Ã‚¢‚ÄŒˆ’è (generation_bits ‚ª 8 ˆÈ‰º‚È‚ç u8A16 ˆÈ‰º‚È‚ç u16A‚»‚êˆÈŠO‚Í u32)
-	using generation_type = std::conditional_t<internal::generation_bits <= 8, u8, std::conditional_t<internal::generation_bits <= 16, u16, u32>>;
+	constexpr id_type invalid_id{ id_type(-1) };	///< ç„¡åŠ¹ãªID
+	constexpr u32 min_deleted_elements{ 1024 };		///< æœ€å°å‰Šé™¤è¦ç´ æ•°
 
-	// generation_type ‚ÌƒTƒCƒY‚ªAgeneration_bits ‚É‚æ‚Á‚Ä•K—v‚Èƒrƒbƒg”‚ğŠm•Û‚Å‚«‚é‚±‚Æ‚ğŠm”F‚·‚é
-	static_assert(sizeof(generation_type) * 8 >= internal::generation_bits);
+	using generation_type = std::conditional_t<detail::generation_bits <= 16, std::conditional_t<detail::generation_bits <= 8, u8, u16>, u32>;	///< ä¸–ä»£ã®å‹
+	static_assert(sizeof(generation_type) * 8 >= detail::generation_bits);	///< ä¸–ä»£ã®ãƒ“ãƒƒãƒˆæ•°ãŒè¶³ã‚Šãªã„å ´åˆã¯ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«ã‚¨ãƒ©ãƒ¼
+	static_assert((sizeof(id_type) - sizeof(generation_type)) > 0);			///< 0ã‚ˆã‚Šå¤§ãããªã‘ã‚Œã°ãªã‚‰ãªã„
 
-	// id_type ‚ÌƒTƒCƒY‚ªAgeneration_type ‚ÌƒTƒCƒYˆÈã‚Å‚ ‚é‚±‚Æ‚ğŠm”F
-	static_assert((sizeof(id_type) - sizeof(generation_type)) > 0);
+	constexpr generation_type max_generation{ (generation_type)(detail::generation_mask - 1) }; // ä¾‹ï¼š8ãƒ“ãƒƒãƒˆä¸–ä»£ã¯254ã€‚
 
-	/// @brief ID ‚ª—LŒø‚©‚Ç‚¤‚©‚ğ”»’è‚·‚éŠÖ”
-	/// @param id ”»’è‚·‚é ID
-	/// @return ID ‚ª—LŒø‚È‚ç trueA–³Œø‚È‚ç false
-	inline bool is_valid(id_type id)
+	/// @brief IDãŒæœ‰åŠ¹ã‹ã©ã†ã‹
+	/// @param id ID
+	/// @return æœ‰åŠ¹ãªã‚‰true
+	constexpr bool is_valid(id_type id)
 	{
-		return id != invalid_id; // –³Œø‚È ID ‚Í invalid_id ‚Æˆê’v‚·‚é‚½‚ßA‚»‚êˆÈŠO‚Í—LŒø‚Æ‚·‚é
+		return id != invalid_id;
 	}
 
-	/// @brief ID ‚ÌƒCƒ“ƒfƒbƒNƒX•”•ª‚ğæ“¾‚·‚éŠÖ”
-	/// @param id ƒCƒ“ƒfƒbƒNƒX•”•ª‚ğæ“¾‚·‚é ID
-	/// @return ID ‚ÌƒCƒ“ƒfƒbƒNƒX•”•ª
-	inline id_type index(id_type id)
+	/// @brief IDã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã‚’å–å¾—
+	/// @param id ID
+	/// @return ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹
+	constexpr id_type index(id_type id)
 	{
-		id_type index{ id & internal::index_mask }; // ID ‚ÌƒCƒ“ƒfƒbƒNƒX•”•ª‚ğƒ}ƒXƒN‚µ‚Äæ“¾
-		assert(index != internal::index_mask); // ƒCƒ“ƒfƒbƒNƒX‚ªÅ‘å’l‚Å‚È‚¢‚±‚Æ‚ğŠm”F
+		id_type index{ id & detail::index_mask };
+		assert(index != detail::index_mask);
 		return index;
 	}
 
-	/// @brief ID ‚Ì¢‘ã•”•ª‚ğæ“¾‚·‚éŠÖ”
-	/// @param id ¢‘ã•”•ª‚ğæ“¾‚·‚é ID
-	/// @return ID ‚Ì¢‘ã•”•ª
-	inline id_type generation(id_type id)
+	/// @brief IDã®ä¸–ä»£ã‚’å–å¾—
+	/// @param id ID
+	/// @return ä¸–ä»£
+	constexpr id_type generation(id_type id)
 	{
-		return (id >> internal::index_bits) & internal::generation_mask; // ID ‚Ì¢‘ã•”•ª‚ğ‰EƒVƒtƒg‚µ‚Äæ“¾‚µA¢‘ãƒ}ƒXƒN‚ğ“K—p
+		return (id >> detail::index_bits) & detail::generation_mask;
 	}
 
-	/// @brief ID ‚Ì¢‘ã•”•ª‚ğXV‚·‚éŠÖ”
-	/// @param id ¢‘ã•”•ª‚ğXV‚·‚é ID
-	/// @return V‚µ‚¢ ID
-	inline id_type new_generation(id_type id)
+	/// @brief IDã®ä¸–ä»£ã‚’æ›´æ–°
+	/// @param id ID
+	/// @retur æ–°ã—ã„ID
+	constexpr id_type new_generation(id_type id)
 	{
-		const id_type generation{ id::generation(id) + 1 }; // Œ»İ‚Ì¢‘ã‚É 1 ‚ğ‰Á‚¦‚é
-		assert(generation < (((u64)1 << internal::generation_bits) - 1));	// ¢‘ã”Ô†‚ªÅ‘å’l‚É’B‚µ‚Ä‚¢‚È‚¢‚±‚Æ‚ğŠm”F
-		return index(id) | (generation << internal::index_bits); // V‚µ‚¢¢‘ã‚ğ¶¬‚µAƒCƒ“ƒfƒbƒNƒX•”•ª‚Æ‘g‚İ‡‚í‚¹‚ÄV‚µ‚¢ ID ‚ğ•Ô‚·
+		const id_type generation{ id::generation(id) + 1 };
+		assert(generation < (((u64)1 << detail::generation_bits) - 1));
+		return index(id) | (generation << detail::index_bits);
 	}
 
 #if _DEBUG
-	namespace internal
+	namespace detail
 	{
 		struct id_base
 		{
-			constexpr explicit id_base(id_type id) : _id{ id } {} // ƒRƒ“ƒXƒgƒ‰ƒNƒ^: id_type Œ^‚Ì ID ‚ğó‚¯æ‚èAƒvƒ‰ƒCƒx[ƒgƒƒ“ƒo _id ‚Éİ’è
-			constexpr operator id_type() const { return _id; }    // id_base ‚ğ id_type ‚ÉˆÃ–Ù“I‚É•ÏŠ·‚·‚éƒIƒyƒŒ[ƒ^
-
+			constexpr explicit id_base(id_type id) : _id{ id } {}
+			constexpr operator id_type() const { return _id; }
 		private:
-			id_type _id;  // ƒvƒ‰ƒCƒx[ƒgƒƒ“ƒo: ID ‚ğ•Û‚·‚é
+			id_type _id;
 		};
-	}	// namespace internal
+	} // detail namespace
 
-#define DEFINE_TYPED_ID(name)								\
-    struct name final : id::internal::id_base				\
-    {														\
-        constexpr explicit name(id::id_type id)				\
-            : id_base{ id } {}								\
-        constexpr name() : id_base{ 0 } {}					\
-    };
-
+#define DEFINE_TYPED_ID(name)                                   \
+        struct name final : id::detail::id_base                 \
+        {                                                       \
+            constexpr explicit name(id::id_type id)             \
+                : id_base{ id } {}                              \
+            constexpr name() : id_base{ 0 } {}                  \
+        };
 #else
-	// ƒfƒoƒbƒOˆÈŠO‚Ìƒrƒ‹ƒh‚Å‚ÍADEFINE_TYPED_ID ƒ}ƒNƒ‚Í’P‚É id::id_type ‚Ì•Ê–¼‚ğì¬
 #define DEFINE_TYPED_ID(name) using name = id::id_type;
 #endif
 

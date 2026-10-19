@@ -1,0 +1,377 @@
+﻿using DXForgeEditor.Content;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+
+namespace DXForgeEditor
+{
+    static class EnumExtensions
+    {
+        public static string GetDescription(this Enum value)
+        {
+            if (value == null)
+            {
+                throw new ArgumentNullException(nameof(value), "Enum value cannot be null.");
+            }
+
+            // フィールド情報を取得
+            var field = value.GetType().GetField(value.ToString());
+            if (field == null)
+            {
+                return value.ToString(); // フィールドが存在しない場合はデフォルトの文字列を返す
+            }
+
+            // DescriptionAttribute を取得
+            var attributes = field.GetCustomAttributes(typeof(DescriptionAttribute), false) as DescriptionAttribute[];
+            if (attributes == null || attributes.Length == 0)
+            {
+                return value.ToString(); // 属性が存在しない場合はデフォルトの文字列を返す
+            }
+
+            // Description プロパティを返す
+            return attributes.FirstOrDefault()?.Description ?? value.ToString();
+        }
+    }
+
+    static class VisualExtensions
+    {
+        public static T? FindVisualParent<T>(this DependencyObject depObject) where T : DependencyObject
+        {
+            if (depObject is not Visual) return null;
+
+            var parent = VisualTreeHelper.GetParent(depObject);
+            while (parent != null)
+            {
+                if (parent is T type)
+                {
+                    return type;
+                }
+                parent = VisualTreeHelper.GetParent(parent);
+            }
+            return null;
+        }
+
+        public static T? FindVisualChild<T>(this DependencyObject depObj) where T : DependencyObject
+        {
+            if (depObj is not Visual) return null;
+
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(depObj); i++)
+            {
+                var child = VisualTreeHelper.GetChild(depObj, i);
+
+                var result = (child as T) ?? FindVisualChild<T>(child);
+                if (result != null) return result;
+            }
+            return null;
+        }
+    }
+
+    public static class ContentHelper
+    {
+        public static string[] MeshFileExtensions { get; } = { ".fbx" };
+        public static string[] ImageFileExtensions { get; } = { ".bmp", ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".tga", ".dds", ".hdr" };
+        public static string[] AudioFileExtensions { get; } = { ".ogg", ".wav" };
+
+        public static string GetRandomString(int length = 8)
+        {
+            if (length <= 0) length = 8;
+            var n = length / 11;
+            var sb = new StringBuilder();
+            for (int i = 0; i <= n; ++i)
+            {
+                sb.Append(Path.GetRandomFileName().Replace(".", ""));
+            }
+
+            return sb.ToString(0, length);
+        }
+
+        public static bool IsDirectory(string path)
+        {
+            try
+            {
+                return File.GetAttributes(path).HasFlag(FileAttributes.Directory);
+            }
+            catch (Exception ex) { Debug.WriteLine(ex.Message); }
+            return false;
+        }
+
+        public static bool IsDirectory(this FileInfo info) => info.Attributes.HasFlag(FileAttributes.Directory);
+
+        public static bool IsOlder(this DateTime date, DateTime other) => date < other;
+
+        public static Uri GetPackUri(string relativePath, Type type)
+        {
+            var assemblyShortName = type.Assembly.ToString().Split(',')[0];
+            var packUriString = $"pack://application:,,,/{assemblyShortName};component/{relativePath}";
+            return new(packUriString);
+        }
+
+        public static string SanitizeFileName(string name)
+        {
+            Debug.Assert(!string.IsNullOrEmpty(name));
+            var path = new StringBuilder(name.Substring(0, name.LastIndexOf(Path.DirectorySeparatorChar) + 1));
+            var file = new StringBuilder(name[(name.LastIndexOf(Path.DirectorySeparatorChar) + 1)..]);
+            foreach (var c in Path.GetInvalidPathChars())
+            {
+                path.Replace(c, '_');
+            }
+            foreach (var c in Path.GetInvalidFileNameChars())
+            {
+                file.Replace(c, '_');
+            }
+            return path.Append(file).ToString();
+        }
+
+        public static byte[]? ComputeHash(byte[]? data, int offset = 0, int count = 0)
+        {
+            if (data?.Length > 0)
+            {
+                using var sha256 = SHA256.Create();
+                return sha256.ComputeHash(data, offset, count > 0 ? count : data.Length);
+            }
+            return null;
+        }
+
+        internal static IEnumerable<string> SaveAsset(this Asset asset)
+        {
+            try
+            {
+                ContentWatcher.EnableFileWatcher(false);
+                Debug.Assert(!string.IsNullOrEmpty(asset.FullPath));
+                return asset.Save(asset.FullPath);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to save asset {asset.FullPath}");
+                Debug.WriteLine(ex.Message);
+                return new List<string>();
+            }
+            finally
+            {
+                ContentWatcher.EnableFileWatcher(true);
+            }
+        }
+
+        internal static async Task<List<Asset?>> ImportFilesAsync(IEnumerable<AssetProxy> proxies)
+        {
+            List<Asset?> assets = new();
+            try
+            {
+                ImportingItemCollection.Init();
+                ContentWatcher.EnableFileWatcher(false);
+                var tasks = proxies.Select(async proxy =>
+                await Task.Run(() =>
+                {
+                    assets.Add(Import(proxy.FileInfo.FullName, proxy.ImportSettings, proxy.DestinationFolder));
+                }));
+
+                await Task.WhenAll(tasks);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Failed to import files.");
+                Debug.WriteLine(ex.Message);
+            }
+            finally
+            {
+                ContentWatcher.EnableFileWatcher(true);
+            }
+
+            return assets;
+        }
+
+        private static Asset? Import(string file, IAssetImportSettings importSettings, string destination)
+        {
+            Debug.Assert(!string.IsNullOrEmpty(file));
+            if (IsDirectory(file)) return null;
+            var name = Path.GetFileNameWithoutExtension(file).ToLower();
+            var ext = Path.GetExtension(file).ToLower();
+
+            Asset? asset = ext switch
+            {
+                { } when MeshFileExtensions.Contains(ext) => new Content.Geometry(importSettings),
+                { } when ImageFileExtensions.Contains(ext) => new Texture(importSettings),
+                { } when AudioFileExtensions.Contains(ext) => null,
+                _ => null
+            };
+
+            if (asset != null)
+            {
+                Import(asset, name, file, destination);
+            }
+
+            return asset;
+        }
+
+        private static void Import(Asset asset, string name, string file, string destination)
+        {
+            destination = destination.Trim();
+
+            Debug.Assert(asset != null);
+            Debug.Assert(!string.IsNullOrEmpty(destination) && Directory.Exists(destination));
+
+            if (!destination.EndsWith(Path.DirectorySeparatorChar)) destination += Path.DirectorySeparatorChar;
+            asset.FullPath = destination + name + Asset.AssetFileExtension;
+
+            var importingItem = new ImportingItem(name, asset);
+            ImportingItemCollection.Add(importingItem);
+            bool importSucceeded = false;
+            try
+            {
+                // NOTE: FullPathは、asset.Import()を呼び出す前に設定する必要があります。
+                Debug.Assert(asset.FullPath?.Contains(destination) == true);
+                importSucceeded = !string.IsNullOrEmpty(file) && asset.Import(file);
+
+                if (importSucceeded)
+                {
+                    asset.Save(asset.FullPath);
+                }
+
+                return;
+            }
+            finally
+            {
+                importingItem.Status = importSucceeded ? ImportStatus.Succeeded : ImportStatus.Failed;
+            }
+        }
+    }
+
+    static class CompressionHelper
+    {
+        public static byte[] Compress(byte[] data)
+        {
+            Debug.Assert(data?.Length > 0);
+            byte[] compressedData;
+            using (var output = new MemoryStream())
+            {
+                using (var compressor = new DeflateStream(output, CompressionLevel.Optimal, true))
+                {
+                    compressor.Write(data, 0, data.Length);
+                }
+
+                compressedData = output.ToArray();
+            }
+
+            return compressedData;
+        }
+
+        public static byte[] Decompress(byte[] data)
+        {
+            Debug.Assert(data?.Length > 0);
+            byte[] decompressedData;
+            using (var output = new MemoryStream())
+            {
+                using (var compressor = new DeflateStream(new MemoryStream(data), CompressionMode.Decompress))
+                {
+                    compressor.CopyTo(output);
+                }
+
+                decompressedData = output.ToArray();
+            }
+
+            return decompressedData;
+        }
+    }
+
+    static class BitmapHelper
+    {
+        public static byte[] CreateThumbnail(BitmapSource image, int maxWidth, int maxHeight)
+        {
+            var scaleX = maxWidth / (double)image.PixelWidth;
+            var scaleY = maxHeight / (double)image.PixelHeight;
+            var ratio = Math.Min(scaleX, scaleY);
+
+            var thumbnail = new TransformedBitmap(image, new ScaleTransform(ratio, ratio, 0.5, 0.5));
+
+            using var memStream = new MemoryStream();
+            memStream.SetLength(0);
+
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(thumbnail));
+            encoder.Save(memStream);
+
+            return memStream.ToArray();
+        }
+
+        internal static BitmapSource? ImageFromSlice(Slice slice, bool isNormalMap = false)
+        {
+            var data = slice.RawContent;
+            var bytesPerPixel = data.Length / (slice.Width * slice.Height);
+            var stride = slice.Width * bytesPerPixel; // これはslice.RowPitchと同じでなければならない。
+            var format = PixelFormats.Default;
+            byte[]? bgrData = null;
+
+            if (bytesPerPixel == 16) format = PixelFormats.Rgba128Float;
+            else if (bytesPerPixel == 4) format = PixelFormats.Bgra32;
+            else if (bytesPerPixel == 3 || bytesPerPixel == 2) format = PixelFormats.Bgr24;
+            else if (bytesPerPixel == 1) format = PixelFormats.Gray8;
+
+            if (bytesPerPixel == 16)
+            {
+                bgrData = new byte[data.Length];
+                Buffer.BlockCopy(data, 0, bgrData, 0, data.Length);
+            }
+            else if (bytesPerPixel == 4 || bytesPerPixel == 3)
+            {
+                bgrData = new byte[data.Length];
+                Buffer.BlockCopy(data, 0, bgrData, 0, data.Length);
+
+                // RチャンネルとBチャンネルを入れ替える： RGB -> BGR
+                for (int i = 0; i < data.Length; i += bytesPerPixel)
+                {
+                    (bgrData[i], bgrData[i + 2]) = (bgrData[i + 2], bgrData[i]);
+                }
+            }
+            else if (bytesPerPixel == 2)
+            {
+                bgrData = new byte[slice.Width * slice.Height * 3];
+                stride = slice.Width * 3;
+                int index = 0;
+                for (int i = 0; i < data.Length; i += 2)
+                {
+                    bgrData[index + 2] = data[i + 0];
+                    bgrData[index + 1] = data[i + 1];
+                    bgrData[index + 0] = 0;
+                    index += 3;
+                }
+
+                if (isNormalMap)
+                {
+                    var inv255 = 1.0 / 255.0;
+                    index = 0;
+                    for (int i = 0; i < data.Length; i += 2)
+                    {
+                        var r = data[i + 0] * inv255 * 2.0 - 1.0;
+                        var g = data[i + 1] * inv255 * 2.0 - 1.0;
+                        var b = (Math.Sqrt(Math.Clamp(1.0 - (r * r + g * g), 0.0, 1.0)) + 1.0) * 0.5 * 255.0;
+                        bgrData[index + 0] = (byte)b;
+                        index += 3;
+                    }
+
+                }
+            }
+            else if (bytesPerPixel == 1)
+            {
+                bgrData = new byte[data.Length];
+                Buffer.BlockCopy(data, 0, bgrData, 0, data.Length);
+            }
+
+            BitmapSource? image = null;
+            if (bgrData != null)
+            {
+                image = BitmapSource.Create(slice.Width, slice.Height, 96.0, 96.0, format, null, bgrData, stride);
+            }
+            return image;
+        }
+    }
+}

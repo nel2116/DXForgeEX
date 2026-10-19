@@ -6,9 +6,78 @@
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UseWPF>true</UseWPF>
+		<XamlDebuggingInformation>True</XamlDebuggingInformation>
 		<PlatformTarget>x64</PlatformTarget>
-		<BaseOutputPath>..\x64\</BaseOutputPath>
+		<BaseOutputPath>../</BaseOutputPath>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+		<Configurations>DebugEditor;ReleaseEditor</Configurations>
+		<Platforms>x64</Platforms>
 	</PropertyGroup>
 
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugEditor|x64'">
+		<Optimize>False</Optimize>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseEditor|x64'">
+		<Optimize>True</Optimize>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<Resource Include="Resources\ContentBrowser\OpenImportCfg.png" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Resource Include="Resources\TextureEditor\Checker64.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Resource>
+	</ItemGroup>
+
+	<ItemGroup>
+		<Resource Include="Resources\ContentBrowser\TileView.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Resource>
+	</ItemGroup>
+
+	<ItemGroup>
+		<Resource Include="Resources\ContentBrowser\ListView.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Resource>
+	</ItemGroup>
+
+	<ItemGroup>
+		<Resource Include="Resources\ContentBrowser\FolderLarge.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Resource>
+		<Resource Include="Resources\ContentBrowser\FolderSmall.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Resource>
+	</ItemGroup>
+	<ItemGroup>
+		<Resource Include="Resources\PrimitiveMeshView\CheckerMap.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Resource>
+	</ItemGroup>
+	<ItemGroup>
+		<None Include="Resources\PrimitiveMeshView\PlaneTexture.png" />
+		<Resource Include="Resources\TextureEditor\ChannelSelectShader.cso">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Resource>
+		<None Include="Resources\TextureEditor\ChannelSelectShader.hlsl" />
+	</ItemGroup>
+	<ItemGroup>
+		<!-- プロジェクト・テンプレートを出力フォルダにコピーする。NewProjectは実行ファイルの場所(AppContext.BaseDirectory)からテンプレートを読む -->
+		<!-- 既定のNone項目はproject.dxprojを除外する(DefaultItemExcludesの**/*.*proj)ので、明示的に含め直す -->
+		<None Remove="ProjectTemplates\**" />
+		<None Include="ProjectTemplates\**" CopyToOutputDirectory="PreserveNewest" />
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="envdte" Version="17.12.40391" />
+		<PackageReference Include="envdte80" Version="17.12.40391" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Resource Include="Resources\PrimitiveMeshView\PlaneTexture.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Resource>
+	</ItemGroup>
 </Project>

@@ -16,14 +16,14 @@ namespace DXForgeEditor.GameProject
     public class ProjectData
     {
         [DataMember]
-        public string ProjectName { get; set; }
+        public string ProjectName { get; set; } = string.Empty;
         [DataMember]
-        public string ProjectPath { get; set; }
+        public string ProjectPath { get; set; } = string.Empty;
         [DataMember]
         public DateTime Date { get; set; }
         public string FullPath { get => $"{ProjectPath}{ProjectName}{Project.Extension}"; }
-        public byte[] Icon { get; set; }
-        public byte[] Screenshot { get; set; }
+        public byte[] Icon { get; set; } = Array.Empty<byte>();
+        public byte[] Screenshot { get; set; } = Array.Empty<byte>();
 
     }
 
@@ -31,14 +31,14 @@ namespace DXForgeEditor.GameProject
     public class ProjectDataList
     {
         [DataMember]
-        public List<ProjectData> Projects { get; set; }
+        public List<ProjectData> Projects { get; set; } = new();
     }
 
     class OpenProject
     {
         private static readonly string _applicationDataPath = $@"{Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)}\DXForgeEditor\";
         private static readonly string _projectDataPath;
-        private static ObservableCollection<ProjectData> _projects = new ObservableCollection<ProjectData>();
+        private static ObservableCollection<ProjectData> _projects = new();
         public static ReadOnlyCollection<ProjectData> Projects { get; }
 
         private static void ReadProjectData()
@@ -95,7 +95,7 @@ namespace DXForgeEditor.GameProject
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
-                Logger.Log(MessageType.Error, $"Failed to read project data");
+                Logger.Log(MessageType.Error, $"プロジェクトデータの読み込みに失敗しました");
                 throw;
             }
         }
