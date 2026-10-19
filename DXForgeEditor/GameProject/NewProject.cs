@@ -162,6 +162,18 @@ namespace DXForgeEditor.GameProject
             ProjectPath = expandedPath;
             var path = $@"{expandedPath}{ProjectName}\";
 
+            // テンプレートのファイルが欠けていたら、フォルダを何も作らずに失敗させる
+            var missingFiles = GetMissingTemplateFiles(template);
+            if (missingFiles.Any())
+            {
+                Logger.Log(MessageType.Error, $"テンプレートのファイルが見つかりません: {string.Join(", ", missingFiles)}");
+                ErrorMsg = $"テンプレート「{template.ProjectType}」のファイルが足りません: {string.Join(", ", missingFiles.Select(Path.GetFileName))}";
+                return null;
+            }
+
+            // 検証済みなので、このフォルダは存在しないか空。失敗したときはこの状態に戻す
+            // (Path欄のフォルダもまだなければ一緒に作られるので、新しく作られる一番上のフォルダを控えておく)
+            var topCreatedFolder = GetTopMissingFolder(path);
             try
             {
                 if (!Directory.Exists(path)) Directory.CreateDirectory(path);
@@ -187,7 +199,57 @@ namespace DXForgeEditor.GameProject
             {
                 Debug.WriteLine(ex.Message);
                 Logger.Log(MessageType.Error, $"作成に失敗: {ProjectName}");
-                throw;
+                // UIのボタンから呼ばれるので投げ直さない(エディタが落ちる)。作りかけのフォルダを消してnullを返す
+                DeletePartialProject(path, topCreatedFolder);
+                ErrorMsg = $"プロジェクトの作成に失敗しました: {ex.Message}";
+                return null;
+            }
+        }
+
+        private static List<string> GetMissingTemplateFiles(ProjectTemplate template)
+        {
+            var requiredFiles = new[]
+            {
+                template.IconFilePath,
+                template.ScreenshotFilePath,
+                template.ProjectFilePath,
+                Path.Combine(template.TemplatePath, "MSVCSolution"),
+                Path.Combine(template.TemplatePath, "MSVCProject"),
+            };
+            return requiredFiles.Where(x => !File.Exists(x)).ToList();
+        }
+
+        // pathとその親のうち、まだ存在しない一番上のフォルダを返す。pathがすでにあればnull
+        private static string? GetTopMissingFolder(string path)
+        {
+            string? topMissing = null;
+            for (var dir = new DirectoryInfo(path); dir != null && !dir.Exists; dir = dir.Parent)
+            {
+                topMissing = dir.FullName;
+            }
+            return topMissing;
+        }
+
+        private static void DeletePartialProject(string path, string? topCreatedFolder)
+        {
+            try
+            {
+                if (topCreatedFolder != null)
+                {
+                    // このフォルダから下は今回の作成で作ったものだけなので、まとめて消す
+                    if (Directory.Exists(topCreatedFolder)) Directory.Delete(topCreatedFolder, true);
+                    return;
+                }
+                // 元から空のフォルダがあった場合は、フォルダ自体は残して中身だけを消す
+                var dirInfo = new DirectoryInfo(path);
+                if (!dirInfo.Exists) return;
+                foreach (var dir in dirInfo.EnumerateDirectories()) dir.Delete(true);
+                foreach (var file in dirInfo.EnumerateFiles()) file.Delete();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                Logger.Log(MessageType.Error, $"作りかけのプロジェクトフォルダを削除できませんでした: {path}");
             }
         }
 
@@ -197,7 +259,8 @@ namespace DXForgeEditor.GameProject
             Debug.Assert(File.Exists(Path.Combine(template.TemplatePath, "MSVCProject")));
 
             var engineAPIPath = @"$(DXFORGE_ENGINE)DXForgeEngine\EngineAPI\";
-            Debug.Assert(Directory.Exists(engineAPIPath));
+            // engineAPIPathはMSBuildのマクロを含む文字列なので、実際のフォルダはエンジンのパスから確かめる
+            Debug.Assert(Directory.Exists(Path.Combine(MainWindow.DXForgePath, @"DXForgeEngine\EngineAPI\")));
 
             var _0 = ProjectName;
             var _1 = "{" + Guid.NewGuid().ToString().ToUpper() + "}";

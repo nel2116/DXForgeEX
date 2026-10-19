@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -31,15 +32,31 @@ namespace DXForgeEditor.GameProject
             if (templateListBox.SelectedItem is not ProjectTemplate template) return;
             var vm = (NewProject)DataContext;
             var projectPath = vm.CreateProject(template);
-            bool dialogResult = false;
-            var win = Window.GetWindow(this);
-            if (!string.IsNullOrEmpty(projectPath))
+            if (string.IsNullOrEmpty(projectPath))
             {
-                dialogResult = true;
-                var project = OpenProject.Open(new ProjectData() { ProjectName = vm.ProjectName, ProjectPath = projectPath });
-                win.DataContext = project;
+                // 作成に失敗しても画面は閉じない(閉じるとエディタが終了する)。理由を表示して入力し直せるようにする
+                if (!string.IsNullOrEmpty(vm.ErrorMsg))
+                {
+                    MessageBox.Show(vm.ErrorMsg, "プロジェクトの作成に失敗", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                return;
             }
-            win.DialogResult = dialogResult;
+
+            Project project;
+            try
+            {
+                project = OpenProject.Open(new ProjectData() { ProjectName = vm.ProjectName, ProjectPath = projectPath });
+            }
+            catch (Exception ex)
+            {
+                // UIのボタンから呼ばれるので、例外でエディタを落とさない
+                Debug.WriteLine(ex.Message);
+                MessageBox.Show($"作成したプロジェクトを開けませんでした: {ex.Message}", "プロジェクトを開けません", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            var win = Window.GetWindow(this);
+            win.DataContext = project;
+            win.DialogResult = true;
             win.Close();
         }
     }
