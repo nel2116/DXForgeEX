@@ -31,6 +31,8 @@ namespace DXForgeEditor
         private void OnMainWindowLoaded(object sender, RoutedEventArgs e)
         {
             Loaded -= OnMainWindowLoaded;
+            // エディタの既定アセット(BRDF LUTなど)がなければ作る(Primal Day 075)。
+            DefaultAssets.GenerateDefaultAssets();
             GetEnginePath();
             OpenProjectBrowserDialog();
         }

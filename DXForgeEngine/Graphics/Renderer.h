@@ -11,6 +11,7 @@
 // 2025/01/13 add_material()、remove_material()の追加
 // 2025/01/18 light関連の構造体、関数を追加
 // 2026/10/18 camera_init_infoから上方向を削除し、up_vectorを取得専用にした (#62)
+// 2026/10/19 環境光(IBL)のライトの初期化情報 ambient_params を追加 (Primal Day 075)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -76,6 +77,16 @@ namespace dxforge::graphics
 		f32 penumbra;
 	};
 
+	/// @brief 環境光(IBL)のテクスチャのID(add_texture()の戻り値)。
+	/// @details 無名の共用体のメンバーなので既定値を持てない(light_init_info{}では0になる)。使わないテクスチャにはid::invalid_idを設定すること。
+	///          どれかが無効なIDの場合、環境光は描画に使われない(直接光だけになる)。
+	struct ambient_light_params
+	{
+		id::id_type diffuse_texture_id;		// 拡散光のIBL(irradiance map)のキューブマップ
+		id::id_type specular_texture_id;	// 鏡面反射のIBLのキューブマップ(ミップmがラフネスm / 5)
+		id::id_type brdf_lut_texture_id;	// 鏡面反射のIBLのBRDF LUT
+	};
+
 	struct light_init_info
 	{
 		u64 light_set_key{ 0 };
@@ -88,6 +99,7 @@ namespace dxforge::graphics
 			directional_light_params directional_params;
 			point_light_params point_params;
 			spot_light_params spot_params;
+			ambient_light_params ambient_params;
 		};
 		bool is_enabled{ true };
 	};

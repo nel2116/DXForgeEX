@@ -6,6 +6,7 @@
 // Direct3D12のライトクラス
 // 更新履歴
 // 2025/01/18 新規作成
+// 2026/10/19 シェーダに渡す環境光(IBL)を取得する ambient_light() を追加 (Primal Day 075)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -14,6 +15,11 @@
 namespace dxforge::graphics::d3d12
 {
 	struct d3d12_frame_info;
+
+	namespace hlsl
+	{
+		struct AmbientLightParameters;
+	}
 }
 
 namespace dxforge::graphics::d3d12::light
@@ -33,6 +39,7 @@ namespace dxforge::graphics::d3d12::light
 	D3D12_GPU_VIRTUAL_ADDRESS cullable_light_buffer(u32 frame_index);
 	D3D12_GPU_VIRTUAL_ADDRESS culling_info_buffer(u32 frame_index);
 	D3D12_GPU_VIRTUAL_ADDRESS bounding_spheres_buffer(u32 frame_index);
+	hlsl::AmbientLightParameters ambient_light(u64 light_set_key);
 	u32 non_cullable_light_count(u64 light_set_key);
 	u32 cullable_light_count(u64 light_set_key);
 

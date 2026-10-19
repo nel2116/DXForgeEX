@@ -561,6 +561,8 @@ namespace DXForgeEditor.Content
         public bool IsPrefilteredIBL => IBLPair != null;
         // 拡散光のIBLのテクスチャはソース画像を持たない(再インポートできない)。
         public bool IsDiffuseIBL => IsPrefilteredIBL && !ImportSettings.Sources.Any();
+        // ソース画像を持つか。拡散光のIBLや、ContentToolsで作った既定アセット(BRDF LUTなど)は持たない(再インポートできない)。
+        public bool HasSourceImages => ImportSettings.Sources.Any();
 
         private bool _isSaving;
         // 再インポートで事前フィルタしなくなったときに、保存時に削除する古い拡散光のIBLのファイル。
@@ -635,7 +637,9 @@ namespace DXForgeEditor.Content
                 icon = firstMip;
             }
 
-            var iconImage = BitmapHelper.ImageFromSlice(icon, IsNormalMap) ?? throw new InvalidDataException("アイコン画像を生成できませんでした。");
+            // 圧縮したテクスチャのアイコンは解凍した画像なので、フォーマットはこのテクスチャのものではない。
+            var iconFormat = ImportSettings.Compress ? DXGI_FORMAT.DXGI_FORMAT_UNKNOWN : Format;
+            var iconImage = BitmapHelper.ImageFromSlice(icon, iconFormat, IsNormalMap) ?? throw new InvalidDataException("アイコン画像を生成できませんでした。");
             Icon = BitmapHelper.CreateThumbnail(iconImage, ContentInfo.IconWidth, ContentInfo.IconWidth);
 
             if (iblPair == null && IBLPair != null && !string.IsNullOrEmpty(IBLPair.FullPath))

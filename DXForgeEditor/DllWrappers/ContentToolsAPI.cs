@@ -371,6 +371,37 @@ namespace DXForgeEditor.DllWrappers
         [DllImport(_toolsDLL)]
         private static extern void PrefilterSpecularIBL([In, Out] TextureData data);
 
+        [DllImport(_toolsDLL)]
+        private static extern void ComputeBrdfIntegrationLut([In, Out] TextureData data);
+
+        /// <summary>
+        /// 鏡面反射のIBL用のBRDF LUT(256x256、ミップ1つ、R16G16_FLOAT、圧縮なし)を作り、テクスチャに設定する(Primal Day 075)。
+        /// ソース画像はないので、再インポートはできない。
+        /// </summary>
+        /// <param name="file">保存先のファイル(ログ用)</param>
+        public static bool ComputeBrdfIntegrationLut(Texture texture, string file)
+        {
+            using var textureData = new TextureData();
+
+            try
+            {
+                texture.ImportSettings.Compress = false;
+                texture.ImportSettings.MipLevels = 1;
+                textureData.ImportSettings.FromContentSettings(texture);
+                ComputeBrdfIntegrationLut(textureData);
+                ThrowIfImportError(textureData, "BRDF LUTの作成");
+
+                GetTextureInfo(texture, textureData);
+                return texture.SetData(GetSlices(textureData), null, null, file);
+            }
+            catch (Exception ex)
+            {
+                Logger.Log(MessageType.Error, $"BRDF LUTの作成に失敗しました: {file}");
+                Debug.WriteLine(ex.Message);
+                return false;
+            }
+        }
+
         private static void ThrowIfImportError(TextureData data, string step)
         {
             if (data.Info.ImportError != 0)

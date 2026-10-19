@@ -4,6 +4,15 @@
 
 #define USE_BOUNDING_SPHERES 1
 
+// 環境光(IBL)。環境光がないときはIntensityが-1、SRVのインデックスが0xffffffff(u32_invalid_id)になる。
+struct AmbientLightParameters
+{
+    float Intensity;
+    uint DiffuseSrvIndex;
+    uint SpecularSrvIndex;
+    uint BrdfLutSrvIndex;
+};
+
 struct GlobalShaderData
 {
     float4x4 View;
@@ -17,6 +26,8 @@ struct GlobalShaderData
 
     float3 CameraDirection;
     float ViewHeight;
+
+    AmbientLightParameters AmbientLight;
 
     uint NumDirectionalLights;
     float DeltaTime;
@@ -160,4 +171,6 @@ static_assert((sizeof(LightCullingLightInfo) % 16) == 0,
               "Make sure LightCullingLightInfo is formatted in 16-byte chunks without any implicit padding.");
 static_assert((sizeof(DirectionalLightParameters) % 16) == 0,
               "Make sure DirectionalLightParameters is formatted in 16-byte chunks without any implicit padding.");
+static_assert((sizeof(AmbientLightParameters) % 16) == 0,
+              "Make sure AmbientLightParameters is formatted in 16-byte chunks without any implicit padding.");
 #endif

@@ -8,6 +8,7 @@
 // 2025/01/02 新規作成
 // 2025/01/07 コメントの追加
 // 2026/10/18 ルートシグネチャの既定フラグからSAMPLER_HEAP_DIRECTLY_INDEXEDを外す(#75)
+// 2026/10/19 BRDF LUT用に、端でクランプするリニアサンプラー static_linear_clamp を追加 (#37)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -279,6 +280,22 @@ namespace dxforge::graphics::d3d12::d3dx
 			D3D12_TEXTURE_ADDRESS_MODE_WRAP,                // AddressU
 			D3D12_TEXTURE_ADDRESS_MODE_WRAP,                // AddressV
 			D3D12_TEXTURE_ADDRESS_MODE_WRAP,                // AddressW
+			0.f,                                            // MipLODBias
+			1,                                              // MaxAnisotropy
+			D3D12_COMPARISON_FUNC_ALWAYS,                   // ComparisonFunc
+			D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK,         // BorderColor
+			0.f, D3D12_FLOAT32_MAX,                         // MinLOD, MaxLOD
+			0, 0, D3D12_SHADER_VISIBILITY_PIXEL             // ShaderRegister, RegisterSpace, ShaderVisibility
+		};
+
+		// NOTE: BRDF LUTのように、UVが[0, 1]の端(NoV = 1など)で反対側の画素と補間されては困るテクスチャ用。
+		//       Primal Day 075はすべてのサンプラーをCLAMPに変えたが、マテリアルのテクスチャの繰り返し(WRAP)を変えないよう別に用意する。
+		const D3D12_STATIC_SAMPLER_DESC static_linear_clamp
+		{
+			D3D12_FILTER_MIN_MAG_MIP_LINEAR,                // Filter
+			D3D12_TEXTURE_ADDRESS_MODE_CLAMP,               // AddressU
+			D3D12_TEXTURE_ADDRESS_MODE_CLAMP,               // AddressV
+			D3D12_TEXTURE_ADDRESS_MODE_CLAMP,               // AddressW
 			0.f,                                            // MipLODBias
 			1,                                              // MaxAnisotropy
 			D3D12_COMPARISON_FUNC_ALWAYS,                   // ComparisonFunc

@@ -5,6 +5,7 @@
 // 概要 :
 // 更新履歴
 // 2025/01/13 新規作成
+// 2026/10/19 環境光(IBL)のテクスチャがあれば読み込み、環境光のライトを作る。Iキーで環境光の有効/無効を切り替える (Primal Day 075)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include <filesystem>
@@ -54,6 +55,20 @@ namespace
 
 	id::id_type texture_ids[texture_usage::count];
 
+	// 環境光(IBL)のテクスチャ。エディタで作ったテクスチャをエンジン用に書き出したもの(texture.imgと同じ形式)を置く。
+	// どれか1つでもなければ環境光は作らず、直接光だけで描画する。
+	constexpr const char* ibl_brdf_lut_path{ "..\\..\\x64\\ibl\\brdf_lut.texture" };
+	constexpr const char* ibl_diffuse_path{ "..\\..\\x64\\ibl\\diffuse.texture" };
+	constexpr const char* ibl_specular_path{ "..\\..\\x64\\ibl\\specular.texture" };
+	// 環境光の強度
+	constexpr f32 ibl_intensity{ 1.f };
+
+	id::id_type ibl_brdf_lut_id{ id::invalid_id };
+	id::id_type ibl_diffuse_id{ id::invalid_id };
+	id::id_type ibl_specular_id{ id::invalid_id };
+
+	graphics::light ibl_light{};
+
 	id::id_type vs_id{ id::invalid_id };
 	id::id_type ps_id{ id::invalid_id };
 	id::id_type textured_ps_id{ id::invalid_id };
@@ -84,6 +99,36 @@ namespace
 	{
 		// load test texture
 		return load_asset(path, content::asset_type::texture);
+	}
+
+	/// @brief ファイルがあればテクスチャを読み込む
+	/// @return テクスチャのID(ファイルがなければid::invalid_id)
+	[[nodiscard]] id::id_type load_texture_if_exists(const char* path)
+	{
+		return std::filesystem::exists(path) ? load_texture(path) : id::invalid_id;
+	}
+
+	/// @brief 環境光(IBL)のライトを作る。テクスチャがそろっていなければ作らない。
+	void create_ibl_light()
+	{
+		if (!id::is_valid(ibl_brdf_lut_id) || !id::is_valid(ibl_diffuse_id) || !id::is_valid(ibl_specular_id))
+		{
+			OutputDebugStringW(L"EngineTest: 環境光(IBL)のテクスチャ(x64\\ibl\\*.texture)がないため、直接光だけで描画します。\n");
+			return;
+		}
+
+		graphics::light_init_info info{};
+		// NOTE: ライトにはエンティティが必要(light::create()のassert)。環境光は位置や向きを使わないので、原点のエンティティを作る。
+		info.entity_id = create_one_game_entity({}, {}, nullptr, nullptr).get_id();
+		info.type = graphics::light::ambient;
+		info.light_set_key = 0;
+		info.intensity = ibl_intensity;
+		info.ambient_params.diffuse_texture_id = ibl_diffuse_id;
+		info.ambient_params.specular_texture_id = ibl_specular_id;
+		info.ambient_params.brdf_lut_texture_id = ibl_brdf_lut_id;
+
+		ibl_light = graphics::create_light(info);
+		assert(ibl_light.is_valid());
 	}
 
 	void load_shaders()
@@ -195,6 +240,10 @@ void create_render_items()
 		std::thread{ [] { texture_ids[texture_usage::metal_rough] = load_texture("..\\..\\x64\\metal_rough.texture"); }},
 		std::thread{ [] { texture_ids[texture_usage::normal] = load_texture("..\\..\\x64\\normal.texture"); }},
 
+		std::thread{ [] { ibl_brdf_lut_id = load_texture_if_exists(ibl_brdf_lut_path); } },
+		std::thread{ [] { ibl_diffuse_id = load_texture_if_exists(ibl_diffuse_path); } },
+		std::thread{ [] { ibl_specular_id = load_texture_if_exists(ibl_specular_path); } },
+
 		std::thread{ [] { lab_model_id = load_model("..\\..\\x64\\lab_model.model"); } },
 		std::thread{ [] { fan_model_id = load_model("..\\..\\x64\\fan_model.model"); } },
 		std::thread{ [] { int_model_id = load_model("..\\..\\x64\\int_model.model"); } },
@@ -207,6 +256,9 @@ void create_render_items()
 	{
 		t.join();
 	}
+
+	// NOTE: ライトセットはgenerate_lights()で作ってある。
+	create_ibl_light();
 
 	// NOTE: マテリアルを作成する前に、シェーダーを準備する必要がある。
 	create_material();
@@ -245,6 +297,24 @@ void create_render_items()
 	}
 }
 
+bool ibl_textures_exist()
+{
+	return std::filesystem::exists(ibl_brdf_lut_path) && std::filesystem::exists(ibl_diffuse_path) && std::filesystem::exists(ibl_specular_path);
+}
+
+bool has_ibl_light()
+{
+	return ibl_light.is_valid();
+}
+
+void toggle_ibl()
+{
+	if (ibl_light.is_valid())
+	{
+		ibl_light.is_enabled(!ibl_light.is_enabled());
+	}
+}
+
 void destroy_render_items()
 {
 	remove_game_entity(lab_entity_id);
@@ -262,6 +332,15 @@ void destroy_render_items()
 	remove_model(int_model_id);
 	remove_model(fembot_model_id);
 	remove_model(sphere_model_id);
+
+	// NOTE: 環境光はテクスチャのSRVのインデックスを持つので、テクスチャより先に取り除く。
+	if (ibl_light.is_valid())
+	{
+		const game_entity::entity_id entity_id{ ibl_light.entity_id() };
+		graphics::remove_light(ibl_light.get_id(), ibl_light.light_set_key());
+		remove_game_entity(entity_id);
+		ibl_light = {};
+	}
 
 	// Materialを取り除く
 	if (id::is_valid(default_mtl_id))
@@ -288,6 +367,15 @@ void destroy_render_items()
 		if (id::is_valid(id))
 		{
 			content::destroy_resource(id, content::asset_type::texture);
+		}
+	}
+
+	for (id::id_type* id : { &ibl_brdf_lut_id, &ibl_diffuse_id, &ibl_specular_id })
+	{
+		if (id::is_valid(*id))
+		{
+			content::destroy_resource(*id, content::asset_type::texture);
+			*id = id::invalid_id;
 		}
 	}
 

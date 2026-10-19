@@ -10,6 +10,7 @@
 // 2026/10/18 D3D11の機能レベル11_0のアダプタも使えるよう修正
 // 2026/10/18 拡散光のIBL用の事前フィルタ(PrefilterDiffuseIBL)を追加し、プリフィルタするキューブマップの圧縮をフィルタの後に回すよう変更 (Primal Day 073)
 // 2026/10/19 鏡面反射のIBL用の事前フィルタ(PrefilterSpecularIBL)で、ラフネスごとのミップへのフィルタを行うよう変更 (Primal Day 074)
+// 2026/10/19 鏡面反射のIBL用のBRDF LUTを作る ComputeBrdfIntegrationLut を追加 (Primal Day 075)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "ToolsCommon.h"
@@ -887,6 +888,37 @@ namespace dxforge::tools
 	EDITOR_INTERFACE void PrefilterSpecularIBL(texture_data* const data)
 	{
 		prefilter_ibl(data, ibl_filter::specular);
+	}
+
+	/// @brief 鏡面反射のIBL用のBRDF LUTを作る(Primal Day 075)
+	/// @details 結果は256x256でミップ1つのDXGI_FORMAT_R16G16_FLOATの2Dテクスチャ(圧縮しない)。インポート設定は使わない。
+	///          GPUが使えない場合や、GPUでの処理に失敗した場合はCPUで作る。
+	/// @param data テクスチャデータ(結果で置き換える。失敗した場合はimport_errorを設定する)
+	EDITOR_INTERFACE void ComputeBrdfIntegrationLut(texture_data* const data)
+	{
+		assert(data);
+		HRESULT hr{ S_OK };
+		ScratchImage brdf_lut{};
+
+		const bool computed_on_gpu{ run_on_gpu([&](ID3D11Device* device)
+			{
+				hr = brdf_integration_lut(device, brdf_lut);
+			}) };
+
+		if (!computed_on_gpu || FAILED(hr))
+		{
+			brdf_lut.Release();
+			hr = brdf_integration_lut(brdf_lut);
+		}
+
+		if (FAILED(hr))
+		{
+			data->info.import_error = import_error::unknown;
+			return;
+		}
+
+		copy_subresources(brdf_lut, data);
+		texture_info_from_metadata(brdf_lut.GetMetadata(), data->info);
 	}
 
 	/// @brief テクスチャの解凍

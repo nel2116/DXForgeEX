@@ -1,6 +1,6 @@
 @echo off
 rem Compiles the ContentTools compute shaders into C++ headers (.inc) with fxc.
-rem Ported from Primal (Day 072 - Day 074), which adapted it from the DirectXTex library
+rem Ported from Primal (Day 072 - Day 075), which adapted it from the DirectXTex library
 rem (see https://github.com/microsoft/DirectXTex/blob/main/DirectXTex/Shaders/CompileShaders.cmd).
 rem Invoked by the CompileShaders target in ContentTools.vcxproj, which skips it while the .inc files are up to date.
 setlocal
@@ -19,6 +19,7 @@ if not defined CompileShadersOutput set CompileShadersOutput=x64\Compiled
 call :CompileShader EnvMapProcessing EquirectangularToCubeMapCS
 call :CompileShader EnvMapProcessing PrefilterDiffuseEnvMapCS
 call :CompileShader EnvMapProcessing PrefilterSpecularEnvMapCS
+call :CompileShader EnvMapProcessing ComputeBrdfIntegrationLutCS
 
 endlocal & exit /b %error%
 

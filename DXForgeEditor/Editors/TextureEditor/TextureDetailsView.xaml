@@ -90,6 +90,10 @@
                             <DataTrigger Binding="{Binding Texture.IsDiffuseIBL}" Value="True">
                                 <Setter Property="IsEnabled" Value="False"/>
                             </DataTrigger>
+                            <!-- ContentToolsで作った既定アセット(BRDF LUTなど)もソース画像を持たない。 -->
+                            <DataTrigger Binding="{Binding Texture.HasSourceImages}" Value="False">
+                                <Setter Property="IsEnabled" Value="False"/>
+                            </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </StackPanel.Style>

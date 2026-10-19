@@ -3,6 +3,7 @@
 struct ShaderConstants
 {
     uint GPassMainBufferIndex;
+    uint GPassDepthBufferIndex;
 };
 
 ConstantBuffer<GlobalShaderData> GlobalData : register(b0, space0);
@@ -12,6 +13,8 @@ ConstantBuffer<ShaderConstants> ShaderParams : register(b1, space0);
 #define TILE_SIZE 16
 StructuredBuffer<Frustum> Frustums : register(t0, space0);
 StructuredBuffer<uint2> LightGridOpaque : register(t1, space0);
+SamplerState PointSampler : register(s0, space0);
+SamplerState LinearSampler : register(s1, space0);
 
 uint GetGridIndex(float2 posXY, float viewWidth)
 {
@@ -102,6 +105,23 @@ float4 PostProcessPS(in noperspective float4 Position : SV_Position,
 #elif 0 // LIGHT GRID OPAQUE
     return Heatmap(LightGridOpaque, Position.xy, 0.75f);
 #elif 1 // SCENE
+
+    // 環境光(IBL)があれば、何も描かれていない画素(リバースZなので深度0 = 遠クリップ面)に空として鏡面反射のIBLのキューブマップを描く(Primal Day 075)。
+    // 環境光がなければ、今までどおりGパスのメインバッファをそのまま出す。
+    const AmbientLightParameters ibl = GlobalData.AmbientLight;
+    if (HasAmbientLight(ibl))
+    {
+        Texture2D gpassDepth = ResourceDescriptorHeap[ShaderParams.GPassDepthBufferIndex];
+        const float depth = gpassDepth[Position.xy].r;
+        if (depth <= 0.f)
+        {
+            // NOTE: Primalは遠クリップ面上の点の位置をそのまま方向に使っているが、カメラの位置からの方向にする。
+            const float3 position = UnprojectUV(UV, depth, GlobalData.InvViewProjection).xyz;
+            const float3 direction = position - GlobalData.CameraPosition;
+            return float4(TextureCube(ResourceDescriptorHeap[ibl.SpecularSrvIndex])
+                              .SampleLevel(LinearSampler, direction, 0.1f).rgb * ibl.Intensity, 1.f);
+        }
+    }
 
     Texture2D gpassMain = ResourceDescriptorHeap[ShaderParams.GPassMainBufferIndex];
     return float4(gpassMain[Position.xy].xyz, 1.f);

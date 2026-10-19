@@ -1,7 +1,7 @@
 // EnvMapProcessing.hlsl
 // Environment map processing compute shaders used by ContentTools (D3D11, cs_5_0).
 // Compiled by CompileShaders.cmd into x64/Compiled/EnvMapProcessing_<entry point>.inc.
-// Ported from Primal (Day 072 - Day 074). Keep the comments in this file ASCII-only.
+// Ported from Primal (Day 072 - Day 075). Keep the comments in this file ASCII-only.
 const static float PI = 3.1415926535897932f;
 const static float SAMPLE_OFFSET = 0.5f;
 
@@ -44,6 +44,12 @@ float Pow4(float x)
     return xx * xx;
 }
 
+float Pow5(float x)
+{
+    float xx = x * x;
+    return xx * xx * x;
+}
+
 float3 GetSampleDirectionEquirectangular(uint face, float x, float y)
 {
     float3 direction[6] = {
@@ -84,6 +90,15 @@ float2 DirectionToEquirectangularUV(float3 dir)
     return float2(u, v);
 }
 
+// [Heitz 2014, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs"]
+// Same as V_SmithGGXCorrelated() in the engine's BRDF.hlsli. a is alpha^2 = roughness^4.
+float V_SmithGGXCorrelated(float NoV, float NoL, float a)
+{
+    float GGXL = NoV * sqrt((-NoL * a + NoL) * NoL + a);
+    float GGXV = NoL * sqrt((-NoV * a + NoV) * NoV + a);
+    return 0.5f / (GGXV + GGXL);
+}
+
 // GGX / Trowbridge-Reitz
 // [Walter et al. 2007, "Microfacet models for refraction through rough surfaces"]
 // a is alpha^2 = roughness^4.
@@ -108,7 +123,10 @@ float3 ImportanceSampleGGX(float2 E, float a)
 {
     float Phi = 2.f * PI * E.x;
     float CosTheta = sqrt((1.f - E.y) / (1.f + (a - 1.f) * E.y));
-    float SinTheta = sqrt(1.f - CosTheta * CosTheta);
+    // NOTE: For a tiny a (a - 1 == -1 in float), CosTheta can round to slightly above 1, which made
+    //       SinTheta NaN and silently dropped the sample (e.g. 32 of 1024 samples at roughness 0.5 / 256).
+    //       Clamp like the CPU version (importance_sample_ggx() in EnvMapProcessing.cpp).
+    float SinTheta = sqrt(max(1.f - CosTheta * CosTheta, 0.f));
 
     float3 H;
     H.x = SinTheta * cos(Phi);
@@ -116,6 +134,47 @@ float3 ImportanceSampleGGX(float2 E, float a)
     H.z = CosTheta;
 
     return H;
+}
+
+// Scale (x) and bias (y) to F0 of the specular IBL (the second sum of the split sum approximation):
+// the integral of the specular BRDF times NoL over the hemisphere, with the Schlick Fresnel term
+// F0 + (1 - F0) * Fc split into F0 * (1 - Fc) and Fc. Uses the same GGX importance sampling as
+// PrefilterEnvMap(), with N = (0, 0, 1) and V in the xz plane.
+// [Karis 2013, "Real Shading in Unreal Engine 4"]
+// The pdf of L is D * NoH / (4 * VoH), so D * Vis * NoL / pdf = 4 * Vis * NoL * VoH / NoH.
+// For roughness 0 every sample is H = N, which gives (1 - Fc, Fc) with Fc = (1 - NoV)^5.
+// The CPU version (integrate_brdf() in EnvMapProcessing.cpp) computes the same sum (in double precision).
+float2 IntegrateBRDF(float NoV, float roughness)
+{
+    float a4 = Pow4(roughness);
+    float3 V;
+    V.x = sqrt(1.f - NoV * NoV); // sin
+    V.y = 0.f;
+    V.z = NoV; // cos
+    float A = 0.f;
+    float B = 0.f;
+    uint NumSamples = g_SampleCount;
+
+    for (uint i = 0; i < NumSamples; i++)
+    {
+        float2 Xi = Hammersley(i, NumSamples);
+        float3 H = ImportanceSampleGGX(Xi, a4);
+        float3 L = 2.f * dot(V, H) * H - V;
+
+        float NoL = saturate(L.z);
+        float NoH = saturate(H.z);
+        float VoH = saturate(dot(V, H));
+
+        if (NoL > 0.f)
+        {
+            float G = V_SmithGGXCorrelated(NoV, NoL, a4);
+            float G_Vis = 4.f * NoL * G * VoH / NoH;
+            float Fc = Pow5(1.f - VoH);
+            A += (1.f - Fc) * G_Vis;
+            B += Fc * G_Vis;
+        }
+    }
+    return float2(A, B) / NumSamples;
 }
 
 // Pre-filtered radiance for the specular IBL (the first sum of the split sum approximation),
@@ -233,6 +292,21 @@ void PrefilterDiffuseEnvMapCS(uint3 DispatchThreadID : SV_DispatchThreadID, uint
     float3 irradiance = SampleHemisphereBrute(sampleDirection);
 
     Output[uint3(DispatchThreadID.x, DispatchThreadID.y, face)] = float4(irradiance, 1.f);
+}
+
+// Output: the BRDF integration LUT (g_CubeMapOutSize x g_CubeMapOutSize). x is NoV and y is the (perceptual)
+// roughness, both sampled at the texel center (SAMPLE_OFFSET), so that sampling the LUT at uv = (NoV, roughness)
+// with a linear clamp sampler returns the integral at that point.
+// NOTE: Primal Day 075 (00dc198) uses uv = DispatchThreadID / (size - 1), i.e. the texel corners.
+[numthreads(16, 16, 1)]
+void ComputeBrdfIntegrationLutCS(uint3 DispatchThreadID : SV_DispatchThreadID)
+{
+    uint size = g_CubeMapOutSize;
+    if (DispatchThreadID.x >= size || DispatchThreadID.y >= size) return;
+
+    float2 uv = (float2(DispatchThreadID.xy) + SAMPLE_OFFSET) / size;
+    float2 result = IntegrateBRDF(uv.x, uv.y);
+    Output[uint3(DispatchThreadID.x, DispatchThreadID.y, 0)] = float4(result, 0.f, 1.f);
 }
 
 // Output: one roughness mip of the specular IBL cubemap (g_Roughness). Each output texel is sampled at its center (SAMPLE_OFFSET).

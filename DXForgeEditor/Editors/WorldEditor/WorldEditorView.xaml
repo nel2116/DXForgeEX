@@ -61,7 +61,9 @@
                     <MenuItem Header="Exit" Command="ApplicationCommands.Close"/>
                 </MenuItem>
                 <MenuItem Header="Setting"></MenuItem>
-                <MenuItem Header="View"></MenuItem>
+                <MenuItem Header="View">
+                    <MenuItem Header="BRDF Integration LUT" Click="OnViewBrdfIntegrationLut_MenuItem_Click"/>
+                </MenuItem>
                 <MenuItem Header="Create" IsEnabled="False"></MenuItem>
                 <MenuItem Header="Window"></MenuItem>
             </Menu>
