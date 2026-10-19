@@ -69,11 +69,12 @@ jobs:
               | { grep -oiE '\b(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]+#[0-9]+' || true; } \
               | grep -oE '[0-9]+$' | sort -un || true)
             for n in $numbers; do
-              state=$(gh issue view "$n" --json state --jq .state 2>/dev/null || echo "")
+              # 取得に失敗したら(存在しない番号を含めて)ジョブを失敗させ、取りこぼしを見えるようにする
+              state=$(gh issue view "$n" --json state --jq .state)
               if [ "$state" = "OPEN" ]; then
                 gh issue close "$n" --comment "PR #$pr (${merge_sha:0:7}) で develop にマージしました。"
               else
-                echo "PR #$pr -> #$n: skipped (state: ${state:-not found})"
+                echo "PR #$pr -> #$n: skipped (state: $state)"
               fi
             done
           done

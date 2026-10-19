@@ -201,10 +201,10 @@ Remove-Item -ErrorAction SilentlyContinue $log
 Write-Output $review
 
 # codex review は独自の出力形式に従い、カスタム指示で最後の行の書式を指定しても守らない。
-# 指摘は必ず "- [P1] 見出し — ファイル:行" の形の行で出る("Full review comments:" の下)ので、
+# 指摘は必ず "- [P1] 見出し — ファイル:行" の形の行で出る("Full review comments:" / 1件なら "Review comment:" の下)ので、
 # その行が1つでもあれば指摘あり(重大度を問わない)。指摘なしとするのは、その行がなく、かつ指示した
 # 「問題は見つかりませんでした」を含むときだけ(レビュー不能のメッセージなどを指摘なしと取り違えない)
-$verdict = if ($review -match '(?m)^\s*-\s*\[P[0-3]\]' -or $review -match '(?m)^Full review comments:') { "FINDINGS" }
+$verdict = if ($review -match '(?m)^\s*-\s*\[P[0-3]\]' -or $review -match '(?m)^(Full review comments|Review comments?):') { "FINDINGS" }
 	elseif ($review -match '問題は見つかりませんでした') { "PASS" }
 	else { "UNKNOWN" }
 Write-Output "判定: $verdict"
