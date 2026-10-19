@@ -6,15 +6,57 @@
 // GPU・ウィンドウを使わずにCLI/CIから実行できる自動テストランナー。
 // 更新履歴
 // 2026/10/18 新規作成
+// 2026/10/19 assert/abort()でダイアログを出さずに標準エラーへ出して終了するように変更(#89)。--interactiveを追加
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
 
+#include <crtdbg.h>
+#include <csignal>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
 
 namespace
 {
+	// 実行中のテストケース名。assertなどでabort()されたとき、どのケースで止まったかを出すために使う
+	const char* running_case_name{ nullptr };
+
+	void on_abort_signal(int)
+	{
+		// 状態を壊したあとに呼ばれるので、標準エラーへ1行出すだけにする(戻るとabort()がそのまま終了コード3で終える)
+		std::fprintf(stderr, "[ABORT] %s\n", running_case_name ? running_case_name : "(outside of test case)");
+		std::fflush(stderr);
+	}
+
+	// CI/CLIから無人で実行したとき、assert・abort()・クラッシュでダイアログを出して止まらないようにする。
+	// assertの内容は標準エラーへ出し、プロセスはすぐに非ゼロ(abort()なら3)で終わる。
+	void configure_unattended_error_reporting()
+	{
+		// assert()の報告先を標準エラーにする(既定ではメッセージボックスになる場合がある)
+		_set_error_mode(_OUT_TO_STDERR);
+		// abort()の「Debug Error! abort() has been called」ダイアログとWindowsエラー報告を出さない
+		_set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+		// デバッグCRTの_ASSERT/_ASSERTE/_RPTなどの報告先を標準エラーにする(Releaseでは何もしない)
+		_CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+		_CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+		_CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
+		_CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
+		_CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
+		_CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDERR);
+		// アクセス違反などで出るWindowsのエラーダイアログも出さない
+		SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+		std::signal(SIGABRT, on_abort_signal);
+	}
+
 	struct case_result
 	{
 		std::string                                   name;
@@ -97,10 +139,15 @@ namespace
 int main(int argc, char** argv)
 {
 	bool as_json{ false };
+	bool interactive{ false };
 	for (int i{ 1 }; i < argc; ++i)
 	{
-		if (std::string{ argv[i] } == "--json") as_json = true;
+		const std::string arg{ argv[i] };
+		if (arg == "--json") as_json = true;
+		else if (arg == "--interactive") interactive = true;	// 対話的にデバッグするため、CRT既定のダイアログを残す
 	}
+
+	if (!interactive) configure_unattended_error_reporting();
 
 	std::vector<case_result> results;
 	results.reserve(dxforge::test::registry().size());
@@ -108,7 +155,9 @@ int main(int argc, char** argv)
 
 	for (const dxforge::test::test_case& tc : dxforge::test::registry())
 	{
+		running_case_name = tc.name.c_str();
 		case_result result{ run_case(tc) };
+		running_case_name = nullptr;
 		if (result.failures.empty()) ++passed;
 		results.push_back(std::move(result));
 	}
