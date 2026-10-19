@@ -172,7 +172,8 @@ namespace DXForgeEditor.GameProject
             }
 
             // 検証済みなので、このフォルダは存在しないか空。失敗したときはこの状態に戻す
-            var createdProjectFolder = !Directory.Exists(path);
+            // (Path欄のフォルダもまだなければ一緒に作られるので、新しく作られる一番上のフォルダを控えておく)
+            var topCreatedFolder = GetTopMissingFolder(path);
             try
             {
                 if (!Directory.Exists(path)) Directory.CreateDirectory(path);
@@ -199,7 +200,7 @@ namespace DXForgeEditor.GameProject
                 Debug.WriteLine(ex.Message);
                 Logger.Log(MessageType.Error, $"作成に失敗: {ProjectName}");
                 // UIのボタンから呼ばれるので投げ直さない(エディタが落ちる)。作りかけのフォルダを消してnullを返す
-                DeletePartialProject(path, createdProjectFolder);
+                DeletePartialProject(path, topCreatedFolder);
                 ErrorMsg = $"プロジェクトの作成に失敗しました: {ex.Message}";
                 return null;
             }
@@ -218,18 +219,30 @@ namespace DXForgeEditor.GameProject
             return requiredFiles.Where(x => !File.Exists(x)).ToList();
         }
 
-        private static void DeletePartialProject(string path, bool createdProjectFolder)
+        // pathとその親のうち、まだ存在しない一番上のフォルダを返す。pathがすでにあればnull
+        private static string? GetTopMissingFolder(string path)
+        {
+            string? topMissing = null;
+            for (var dir = new DirectoryInfo(path); dir != null && !dir.Exists; dir = dir.Parent)
+            {
+                topMissing = dir.FullName;
+            }
+            return topMissing;
+        }
+
+        private static void DeletePartialProject(string path, string? topCreatedFolder)
         {
             try
             {
-                var dirInfo = new DirectoryInfo(path);
-                if (!dirInfo.Exists) return;
-                if (createdProjectFolder)
+                if (topCreatedFolder != null)
                 {
-                    dirInfo.Delete(true);
+                    // このフォルダから下は今回の作成で作ったものだけなので、まとめて消す
+                    if (Directory.Exists(topCreatedFolder)) Directory.Delete(topCreatedFolder, true);
                     return;
                 }
                 // 元から空のフォルダがあった場合は、フォルダ自体は残して中身だけを消す
+                var dirInfo = new DirectoryInfo(path);
+                if (!dirInfo.Exists) return;
                 foreach (var dir in dirInfo.EnumerateDirectories()) dir.Delete(true);
                 foreach (var file in dirInfo.EnumerateFiles()) file.Delete();
             }
