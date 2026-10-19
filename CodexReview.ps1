@@ -160,7 +160,7 @@ $prompt += "`n" + @"
 - 指摘は日本語で書き、それぞれに重大度(P0〜P3)、ファイル:行、その不具合が起きる具体的な手順や入力を書くこと。推測で書いた指摘はそうと分かるようにすること。
 - 変更された行だけでなく、呼び出し元や関連する箇所も読んで、変更が既存の挙動を壊していないかを確かめること。
 - リポジトリのCLAUDE.mdの規約も確認すること(特に: C++/C#のファイルはUTF-8 BOM、日本語ヘッダの更新履歴は追記のみ、狭い文字列リテラルに日本語を入れない、async void・OpenProjectViewから呼ばれる経路で例外を投げない、警告を握りつぶさない)。
-- 問題がなければ、そう書くこと。
+- 問題がなければ、「問題は見つかりませんでした」という文をそのまま含めて書くこと(この文は機械的に読み取る)。
 "@
 
 try {
@@ -202,8 +202,11 @@ Write-Output $review
 
 # codex review は独自の出力形式に従い、カスタム指示で最後の行の書式を指定しても守らない。
 # 指摘は必ず "- [P1] 見出し — ファイル:行" の形の行で出る("Full review comments:" の下)ので、
-# その行が1つでもあれば指摘あり(重大度を問わない)、なければ指摘なしとする
-$verdict = if ($review -match '(?m)^\s*-\s*\[P[0-3]\]' -or $review -match '(?m)^Full review comments:') { "FINDINGS" } else { "PASS" }
+# その行が1つでもあれば指摘あり(重大度を問わない)。指摘なしとするのは、その行がなく、かつ指示した
+# 「問題は見つかりませんでした」を含むときだけ(レビュー不能のメッセージなどを指摘なしと取り違えない)
+$verdict = if ($review -match '(?m)^\s*-\s*\[P[0-3]\]' -or $review -match '(?m)^Full review comments:') { "FINDINGS" }
+	elseif ($review -match '問題は見つかりませんでした') { "PASS" }
+	else { "UNKNOWN" }
 Write-Output "判定: $verdict"
 
 $commentUrl = $null
@@ -240,8 +243,11 @@ $review
 
 if ($SetStatus) {
 	$state = if ($verdict -eq "PASS") { "success" } else { "failure" }
-	$description = if ($verdict -eq "PASS") { "Codex review: no findings ($model, $Effort)" }
-		else { "Codex review: findings to address ($model, $Effort)" }
+	$description = switch ($verdict) {
+		"PASS" { "Codex review: no findings ($model, $Effort)" }
+		"FINDINGS" { "Codex review: findings to address ($model, $Effort)" }
+		default { "Codex review: could not confirm the review completed" }
+	}
 	Push-Location $RepoRoot
 	try {
 		# レビューしたコミット($head)に付ける。レビュー中にpushされていても、新しいheadは未レビューのまま残る
