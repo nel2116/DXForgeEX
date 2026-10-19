@@ -4,15 +4,16 @@
 #     CI・codex-review がそろっていても、hold を外すまで自動マージされない(人が止めるための手段)。
 #   - close-issues: develop にマージされたPRの本文にある "Closes #NN" のIssueを閉じる。
 #     GitHub がPRの本文でIssueを閉じるのは既定のブランチ(main)へのマージだけなので、ここで代わりに行う。
-#     forkからのPRでは pull_request のトークンが読み取り専用になるため、pull_request_target の closed で動かす。
-#     このジョブはPRのコードをチェックアウトも実行もせず、本文は環境変数で受け取るだけなので安全。
+#     pull_request_target は向き先に関係なく既定のブランチ(main)のワークフローを使うため、develop に
+#     置いただけでは動かない。そこで develop への push(マージコミット)を契機にし、コミットからPRを引く。
+#     develop に push できるのは書き込み権限のある人だけなので、forkからのPRでも権限は足りる。
 name: PR automation
 
 on:
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled]
-  pull_request_target:
-    types: [closed]
+  push:
+    branches: [develop]
 
 jobs:
   hold:
@@ -30,25 +31,34 @@ jobs:
 
   close-issues:
     name: Close linked issues
-    if: github.event_name == 'pull_request_target' && github.event.pull_request.merged && github.event.pull_request.base.ref == 'develop'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       issues: write
+      pull-requests: read
     steps:
-      - name: Close issues referenced by closing keywords
+      - name: Close issues referenced by merged PRs
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_BODY: ${{ github.event.pull_request.body }}
-          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
         run: |
-          numbers=$(printf '%s' "$PR_BODY" | grep -oiE '\b(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]+#[0-9]+' | grep -oE '[0-9]+$' | sort -un || true)
-          for n in $numbers; do
-            state=$(gh issue view "$n" --json state --jq .state 2>/dev/null || echo "")
-            if [ "$state" = "OPEN" ]; then
-              gh issue close "$n" --comment "PR #$PR_NUMBER (${MERGE_SHA:0:7}) で develop にマージしました。"
-            else
-              echo "#$n: skipped (state: ${state:-not found})"
-            fi
+          # このpushに含まれるコミットに対応する、develop へマージ済みのPR
+          prs=$(for sha in $(jq -r '.commits[].id' "$GITHUB_EVENT_PATH"); do
+            gh api "repos/$GH_REPO/commits/$sha/pulls" \
+              --jq '.[] | select(.merged_at != null and .base.ref == "develop") | .number'
+          done | sort -un)
+          for pr in $prs; do
+            merge_sha=$(gh pr view "$pr" --json mergeCommit --jq '.mergeCommit.oid')
+            numbers=$(gh pr view "$pr" --json body --jq '.body' \
+              | grep -oiE '\b(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]+#[0-9]+' \
+              | grep -oE '[0-9]+$' | sort -un || true)
+            for n in $numbers; do
+              state=$(gh issue view "$n" --json state --jq .state 2>/dev/null || echo "")
+              if [ "$state" = "OPEN" ]; then
+                gh issue close "$n" --comment "PR #$pr (${merge_sha:0:7}) で develop にマージしました。"
+              else
+                echo "PR #$pr -> #$n: skipped (state: ${state:-not found})"
+              fi
+            done
           done

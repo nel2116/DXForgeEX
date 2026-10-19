@@ -253,9 +253,13 @@ if ($SetStatus) {
 		Write-Output "codex-review: $state ($($head.Substring(0, 7)))"
 
 		if ($verdict -eq "PASS") {
-			$nowHead = gh pr view $Pr --json headRefOid --jq .headRefOid
-			if ($nowHead -ne $head) {
-				Write-Warning "レビュー中にPRのheadが $($nowHead.Substring(0, 7)) に進みました。新しいheadは未レビューのため、自動マージは予約しません。"
+			$now = gh pr view $Pr --json headRefOid,baseRefName | ConvertFrom-Json
+			if ($now.headRefOid -ne $head) {
+				Write-Warning "レビュー中にPRのheadが $($now.headRefOid.Substring(0, 7)) に進みました。新しいheadは未レビューのため、自動マージは予約しません。"
+			}
+			elseif ($now.baseRefName -ne $base) {
+				# 保護を確かめたのはレビュー開始時の向き先なので、変わっていたら予約しない
+				Write-Warning "レビュー中にPRの向き先が $base から $($now.baseRefName) に変わりました。自動マージは予約しません。"
 			}
 			else {
 				# 必須のチェックがそろっていれば即座に、そうでなければそろった時点でGitHubがマージする
