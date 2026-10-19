@@ -10,10 +10,13 @@
 // 2026/10/18 CPU版のキューブマップ変換のサンプリング位置をGPU版と同じ画素の中心に修正(キューブ面と正距円筒画像の両方で半画素ずれていた)
 // 2026/10/18 拡散光のIBL用にキューブマップを事前フィルタする処理(irradiance map)のGPU版とCPU版を追加 (Primal Day 073)
 // 2026/10/19 拡散光の事前フィルタの入力が大きいときは縮小してから処理し、処理量に上限を設けた
+// 2026/10/19 鏡面反射のIBL用にキューブマップをラフネスごとのミップへ事前フィルタする処理のGPU版とCPU版を追加 (Primal Day 074)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "EnvMapProcessing.h"
 #include <dxgi1_6.h>
+#include <algorithm>
+#include <atomic>
 #include <thread>
 
 using namespace DirectX;
@@ -28,10 +31,15 @@ namespace dxforge::tools
 			// CompileShaders.cmdがビルド前に生成するシェーダのバイトコード(x64/Compiled)
 #include "EnvMapProcessing_EquirectangularToCubeMapCS.inc"
 #include "EnvMapProcessing_PrefilterDiffuseEnvMapCS.inc"
+#include "EnvMapProcessing_PrefilterSpecularEnvMapCS.inc"
 		}
 
 		constexpr u32 prefiltered_diffuse_cubemap_size{ 64 };
 		constexpr u32 prefiltered_specular_cubemap_size{ 256 };
+		// 鏡面反射のIBLのミップの数。ミップmのラフネスはm / (roughness_mip_levels - 1)で、最後のミップがラフネス1。
+		constexpr u32 roughness_mip_levels{ 6 };
+		// 鏡面反射の事前フィルタで、出力の1画素あたりに使うGGXの重点サンプリングのサンプル数(Primalと同じ)。
+		constexpr u32 prefilter_specular_sample_count{ 1024 };
 		// EnvMapProcessing.hlslのSAMPLE_OFFSETと同じ値にすること(画素の中心からサンプリングする)。
 		constexpr f32 sample_offset{ 0.5f };
 
@@ -288,6 +296,350 @@ namespace dxforge::tools
 					dst[3] = 1.f;
 				}
 			}
+		}
+
+		/// @brief 鏡面反射の事前フィルタのミップのラフネス
+		/// @details NOTE: PrimalはRoughness = mip / roughness_mip_levelsとしていて最後のミップが5/6になるが、
+		///          Primal Day 075のシェーダはPerceptualRoughness * 5のミップをサンプリングするので、ミップ5がラフネス1になるようにする。
+		constexpr f32 roughness_of_mip(u32 mip)
+		{
+			return (f32)mip / (f32)(roughness_mip_levels - 1);
+		}
+
+		/// @brief Van der Corputの基数2の根基逆関数(ビットの反転)。EnvMapProcessing.hlslのRadicalInverse_VdCと同じ。
+		f32 radical_inverse_vdc(u32 bits)
+		{
+			bits = (bits << 16u) | (bits >> 16u);
+			bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+			bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+			bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+			bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+			return (f32)bits * 2.3283064365386963e-10f; // / 0x100000000
+		}
+
+		/// @brief GGXの重点サンプリングの1サンプル(EnvMapProcessing.hlslのPrefilterEnvMapの1回のループ)のうち、出力の画素によらない部分
+		struct specular_sample
+		{
+			math::v3 half_vector;	// 接空間のハーフベクトル(z軸が法線)
+			f32 mip_level;			// サンプリングする入力のミップ(小数。トライリニア)
+		};
+
+		/// @brief EnvMapProcessing.hlslのPrefilterEnvMapと同じ式で、すべてのサンプルのハーフベクトルとミップを求める
+		/// @details N == Vなので、NoHは接空間のハーフベクトルのzで、ミップは出力の画素によらない。
+		/// @param roughness ラフネス
+		/// @param sample_count サンプル数
+		/// @param input_size 入力のキューブマップの1面のサイズ
+		/// @return サンプル
+		utl::vector<specular_sample> get_specular_samples(f32 roughness, u32 sample_count, u32 input_size)
+		{
+			utl::vector<specular_sample> samples(sample_count);
+			const f32 r2{ roughness * roughness };
+			const f32 a4{ r2 * r2 };
+			const f32 inv_omega_p{ (6.f * (f32)input_size * (f32)input_size) / (4.f * math::pi) };
+
+			for (u32 i{ 0 }; i < sample_count; ++i)
+			{
+				// ImportanceSampleGGX(Hammersley(i, sample_count), a4)
+				const f32 phi{ 2.f * math::pi * ((f32)i / (f32)sample_count) };
+				const f32 e_y{ radical_inverse_vdc(i) };
+				const f32 cos_theta{ sqrtf((1.f - e_y) / (1.f + (a4 - 1.f) * e_y)) };
+				const f32 sin_theta{ sqrtf(std::max(1.f - cos_theta * cos_theta, 0.f)) };
+
+				specular_sample& sample{ samples[i] };
+				sample.half_vector = { sin_theta * cosf(phi), sin_theta * sinf(phi), cos_theta };
+
+				// D_GGX(NoH, a4) / 4 が出射方向Lの確率密度。
+				const f32 no_h{ std::min(cos_theta, 1.f) };
+				const f32 d{ (no_h * a4 - no_h) * no_h + 1.f };
+				const f32 pdf{ a4 / (math::pi * d * d) * 0.25f };
+				const f32 omega_s{ 1.f / ((f32)sample_count * pdf + 0.0001f) };
+				sample.mip_level = roughness == 0.f ? 0.f : 0.5f * log2f(omega_s * inv_omega_p);
+			}
+
+			return samples;
+		}
+
+		/// @brief 方向をD3Dのキューブマップの面と面上の座標に変換する(get_sample_direction_cubemap()の逆)
+		/// @param dir 方向(正規化されていなくてよい)
+		/// @param face 面のインデックス
+		/// @param s 面上の横方向の座標[0, 1]
+		/// @param t 面上の縦方向の座標[0, 1]
+		void direction_to_cubemap(const math::v3& dir, u32& face, f32& s, f32& t)
+		{
+			const f32 ax{ fabsf(dir.x) };
+			const f32 ay{ fabsf(dir.y) };
+			const f32 az{ fabsf(dir.z) };
+			f32 ma, sc, tc;
+
+			if (ax >= ay && ax >= az)
+			{
+				face = dir.x >= 0.f ? 0 : 1;
+				ma = ax;
+				sc = dir.x >= 0.f ? -dir.z : dir.z;
+				tc = -dir.y;
+			}
+			else if (ay >= az)
+			{
+				face = dir.y >= 0.f ? 2 : 3;
+				ma = ay;
+				sc = dir.x;
+				tc = dir.y >= 0.f ? dir.z : -dir.z;
+			}
+			else
+			{
+				face = dir.z >= 0.f ? 4 : 5;
+				ma = az;
+				sc = dir.z >= 0.f ? dir.x : -dir.x;
+				tc = -dir.y;
+			}
+
+			s = (sc / ma + 1.f) * 0.5f;
+			t = (tc / ma + 1.f) * 0.5f;
+		}
+
+		/// @brief 鏡面反射の事前フィルタの入力(32ビット浮動小数点の、すべてのミップを持つキューブマップ)をサンプリングする(CPU版)
+		struct specular_input
+		{
+			const ScratchImage& cubemaps;
+			u32 mip_levels;
+
+			/// @brief 面faceのミップmipの画素(x, y)。x, yが面の外(-1かsize)なら、その画素の中心の方向にある隣の面の画素を返す。
+			///        x, yの両方が面の外(面の角)ならnullptrを返す。
+			const f32* texel(u32 cubemap, u32 mip, u32 face, s32 x, s32 y) const
+			{
+				const Image& image{ *cubemaps.GetImage(mip, cubemap * 6 + face, 0) };
+				const s32 size{ (s32)image.width };
+				const bool x_out{ x < 0 || x >= size };
+				const bool y_out{ y < 0 || y >= size };
+				if (x_out && y_out) return nullptr;
+
+				if (x_out || y_out)
+				{
+					// 面の平面を延長した座標で画素の中心の方向を求め、その方向にある隣の面の画素を使う(継ぎ目のないキューブマップのフィルタ)。
+					const f32 inv_size{ 1.f / (f32)size };
+					const f32 u{ ((x + sample_offset) * inv_size) * 2.f - 1.f };
+					const f32 v{ ((y + sample_offset) * inv_size) * 2.f - 1.f };
+					f32 s, t;
+					direction_to_cubemap(get_sample_direction_cubemap(face, u, v), face, s, t);
+					x = std::clamp((s32)(s * size), 0, size - 1);
+					y = std::clamp((s32)(t * size), 0, size - 1);
+					return texel(cubemap, mip, face, x, y);
+				}
+
+				return (const f32*)(image.pixels + image.rowPitch * y) + x * 4;
+			}
+
+			/// @brief 1つのミップをバイリニアでサンプリングする
+			void sample_bilinear(u32 cubemap, u32 mip, u32 face, f32 s, f32 t, f32* rgb) const
+			{
+				const f32 size{ (f32)cubemaps.GetImage(mip, cubemap * 6 + face, 0)->width };
+				const f32 px{ s * size - sample_offset };
+				const f32 py{ t * size - sample_offset };
+				const f32 fx0{ floorf(px) };
+				const f32 fy0{ floorf(py) };
+				const f32 wx{ px - fx0 };
+				const f32 wy{ py - fy0 };
+				const s32 x0{ (s32)fx0 };
+				const s32 y0{ (s32)fy0 };
+
+				const f32* texels[4]{
+					texel(cubemap, mip, face, x0, y0), texel(cubemap, mip, face, x0 + 1, y0),
+					texel(cubemap, mip, face, x0, y0 + 1), texel(cubemap, mip, face, x0 + 1, y0 + 1),
+				};
+				const f32 weights[4]{ (1.f - wx) * (1.f - wy), wx * (1.f - wy), (1.f - wx) * wy, wx * wy };
+
+				// 面の角では4つ目の画素がないので、ほかの3つの平均で代える(D3D11の仕様と同じ)。
+				f32 corner[3]{};
+				for (u32 i{ 0 }; i < 4; ++i)
+				{
+					if (texels[i]) continue;
+					for (u32 j{ 0 }; j < 4; ++j)
+					{
+						if (j == i) continue;
+						assert(texels[j]);
+						for (u32 c{ 0 }; c < 3; ++c) corner[c] += texels[j][c] * (1.f / 3.f);
+					}
+					texels[i] = corner;
+				}
+
+				for (u32 c{ 0 }; c < 3; ++c)
+				{
+					rgb[c] = texels[0][c] * weights[0] + texels[1][c] * weights[1] + texels[2][c] * weights[2] + texels[3][c] * weights[3];
+				}
+			}
+
+			/// @brief 方向dirを、ミップmip_level(小数)でトライリニアにサンプリングする(GPU版のSampleLevelと同じ)
+			void sample(u32 cubemap, const math::v3& dir, f32 mip_level, f32* rgb) const
+			{
+				u32 face;
+				f32 s, t;
+				direction_to_cubemap(dir, face, s, t);
+
+				mip_level = std::clamp(mip_level, 0.f, (f32)(mip_levels - 1));
+				const u32 mip0{ (u32)mip_level };
+				const f32 w{ mip_level - (f32)mip0 };
+				sample_bilinear(cubemap, mip0, face, s, t, rgb);
+
+				if (w > 0.f && mip0 + 1 < mip_levels)
+				{
+					f32 rgb1[3];
+					sample_bilinear(cubemap, mip0 + 1, face, s, t, rgb1);
+					for (u32 c{ 0 }; c < 3; ++c) rgb[c] += (rgb1[c] - rgb[c]) * w;
+				}
+			}
+		};
+
+		/// @brief 鏡面反射の事前フィルタの入力をそろえる(CPU版とGPU版で同じ入力を使うように、どちらもこの関数を通す)
+		/// @details 各キューブマップのミップ0を32ビット浮動小数点に変換し、1面がprefiltered_specular_cubemap_sizeでなければ面積で重み付けて
+		///          縮小(または拡大)し、すべてのミップを作る。入力が大きくても、事前フィルタの処理量はこのサイズで決まる(TDR対策)。
+		/// @param cubemaps 入力のキューブマップ
+		/// @param input 出力先(DXGI_FORMAT_R32G32B32A32_FLOAT、1面がprefiltered_specular_cubemap_size、すべてのミップ)
+		/// @return 結果
+		HRESULT prepare_prefilter_specular_input(const ScratchImage& cubemaps, ScratchImage& input)
+		{
+			const TexMetadata& metadata{ cubemaps.GetMetadata() };
+
+			utl::vector<Image> faces{};
+			for (u32 i{ 0 }; i < (u32)metadata.arraySize; ++i)
+			{
+				const Image* const image{ cubemaps.GetImage(0, i, 0) };
+				assert(image);
+				faces.emplace_back(*image);
+			}
+
+			TexMetadata mip0_metadata{ metadata };
+			mip0_metadata.mipLevels = 1;
+
+			const Image* images{ faces.data() };
+			const TexMetadata* images_metadata{ &mip0_metadata };
+			HRESULT hr{ S_OK };
+
+			ScratchImage f32_faces{};
+			if (metadata.format != DXGI_FORMAT_R32G32B32A32_FLOAT)
+			{
+				hr = Convert(images, faces.size(), *images_metadata, DXGI_FORMAT_R32G32B32A32_FLOAT,
+							 TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT, f32_faces);
+				if (FAILED(hr))
+				{
+					return hr;
+				}
+
+				images = f32_faces.GetImages();
+				images_metadata = &f32_faces.GetMetadata();
+			}
+
+			// WICは使わない(32ビット浮動小数点のまま処理し、COMの初期化も要らない)。
+			ScratchImage resized{};
+			constexpr u32 size{ prefiltered_specular_cubemap_size };
+			if (metadata.width != size)
+			{
+				hr = Resize(images, faces.size(), *images_metadata, size, size, TEX_FILTER_TRIANGLE | TEX_FILTER_FORCE_NON_WIC, resized);
+				if (FAILED(hr))
+				{
+					return hr;
+				}
+
+				images = resized.GetImages();
+				images_metadata = &resized.GetMetadata();
+			}
+
+			return GenerateMipMaps(images, faces.size(), *images_metadata, TEX_FILTER_BOX | TEX_FILTER_FORCE_NON_WIC, 0, input);
+		}
+
+		/// @brief 鏡面反射の事前フィルタの出力(DXGI_FORMAT_R32G32B32A32_FLOAT)のミップ0(ラフネス0)に、入力のミップ0をコピーする
+		/// @details ラフネス0ではGGXの分布が反射方向だけになり、フィルタしても入力と変わらないので、フィルタせずにコピーする(Primalと同じ)。
+		/// @param input prepare_prefilter_specular_input()でそろえた入力
+		/// @param prefiltered 出力
+		void copy_roughness_zero_mip(const ScratchImage& input, const ScratchImage& prefiltered)
+		{
+			const u32 array_size{ (u32)input.GetMetadata().arraySize };
+			assert(array_size == prefiltered.GetMetadata().arraySize);
+			for (u32 i{ 0 }; i < array_size; ++i)
+			{
+				const Image& src{ *input.GetImage(0, i, 0) };
+				const Image& dst{ *prefiltered.GetImage(0, i, 0) };
+				assert(src.slicePitch == dst.slicePitch);
+				memcpy(dst.pixels, src.pixels, src.slicePitch);
+			}
+		}
+
+		/// @brief 鏡面反射のIBLの1画素を求める(CPU版, EnvMapProcessing.hlslのPrefilterEnvMapと同じ和)
+		/// @param input 入力
+		/// @param cubemap 入力のキューブマップのインデックス
+		/// @param samples get_specular_samples()で求めたサンプル
+		/// @param normal 出力の画素の中心の方向(N = V = R)
+		/// @param rgb 出力
+		void prefilter_specular_texel(const specular_input& input, u32 cubemap, const utl::vector<specular_sample>& samples,
+									  const math::v3& normal, f32* rgb)
+		{
+			// GetTangentFrame(N)
+			const math::v3 up{ fabsf(normal.z) < 0.999f ? math::v3{ 0.f, 0.f, 1.f } : math::v3{ 1.f, 0.f, 0.f } };
+			const XMVECTOR n{ XMLoadFloat3(&normal) };
+			const XMVECTOR tangent_x{ XMVector3Normalize(XMVector3Cross(XMLoadFloat3(&up), n)) };
+			const XMVECTOR tangent_y{ XMVector3Cross(n, tangent_x) };
+			math::v3 tx, ty;
+			XMStoreFloat3(&tx, tangent_x);
+			XMStoreFloat3(&ty, tangent_y);
+
+			double color[3]{};
+			double total_weight{ 0.0 };
+
+			for (const specular_sample& sample : samples)
+			{
+				// H = mul(ImportanceSampleGGX(Xi, a4), tangentFrame), L = 2 * dot(V, H) * H - V
+				const math::v3& h_t{ sample.half_vector };
+				const math::v3 h{
+					h_t.x * tx.x + h_t.y * ty.x + h_t.z * normal.x,
+					h_t.x * tx.y + h_t.y * ty.y + h_t.z * normal.y,
+					h_t.x * tx.z + h_t.y * ty.z + h_t.z * normal.z,
+				};
+				const f32 v_dot_h{ normal.x * h.x + normal.y * h.y + normal.z * h.z };
+				const math::v3 l{ 2.f * v_dot_h * h.x - normal.x, 2.f * v_dot_h * h.y - normal.y, 2.f * v_dot_h * h.z - normal.z };
+				const f32 n_dot_l{ std::clamp(normal.x * l.x + normal.y * l.y + normal.z * l.z, 0.f, 1.f) };
+
+				if (n_dot_l > 0.f)
+				{
+					f32 radiance[3];
+					input.sample(cubemap, l, sample.mip_level, radiance);
+					for (u32 c{ 0 }; c < 3; ++c) color[c] += (double)radiance[c] * n_dot_l;
+					total_weight += n_dot_l;
+				}
+			}
+
+			// i = 0のサンプルはH = N(L = N)なので、total_weightは0にならない。
+			for (u32 c{ 0 }; c < 3; ++c) rgb[c] = (f32)(color[c] / total_weight);
+		}
+
+		/// @brief func(0) ~ func(count - 1)を、CPUのコアの数のスレッドで並列に実行する
+		/// @param count 回数
+		/// @param func 実行する処理(引数はインデックス)
+		template<typename F> void parallel_for(u32 count, F func)
+		{
+			std::atomic<u32> next{ 0 };
+			auto worker{ [&] { for (u32 i{ next++ }; i < count; i = next++) func(i); } };
+
+			const u32 thread_count{ std::max(std::thread::hardware_concurrency(), 1u) - 1 };
+			utl::vector<std::thread> threads{};
+			for (u32 i{ 0 }; i < thread_count; ++i) threads.emplace_back(worker);
+			worker();
+			for (std::thread& thread : threads) thread.join();
+		}
+
+		/// @brief 32ビット浮動小数点の結果を、入力のキューブマップのフォーマットに変換して出力する
+		/// @param working_scratch 結果(DXGI_FORMAT_R32G32B32A32_FLOAT)
+		/// @param format 出力のフォーマット
+		/// @param prefiltered 出力先
+		/// @return 結果
+		HRESULT convert_prefiltered_output(ScratchImage& working_scratch, DXGI_FORMAT format, ScratchImage& prefiltered)
+		{
+			if (format == DXGI_FORMAT_R32G32B32A32_FLOAT)
+			{
+				prefiltered = std::move(working_scratch);
+				return S_OK;
+			}
+
+			return Convert(working_scratch.GetImages(), working_scratch.GetImageCount(), working_scratch.GetMetadata(), format,
+						   TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT, prefiltered);
 		}
 
 		/// @brief コンピュートシェーダにバインドされているリソースをすべて解除する
@@ -900,5 +1252,236 @@ namespace dxforge::tools
 		reset_d3d11_context(ctx.Get());
 		return download_texture_2d(ctx.Get(), prefiltered_diffuse_cubemap_size, prefiltered_diffuse_cubemap_size, array_size, 1, format, true,
 								   cubemaps_out.Get(), cubemaps_cpu.Get(), prefiltered_diffuse);
+	}
+
+	HRESULT prefilter_specular(const ScratchImage& cubemaps, ScratchImage& prefiltered_specular)
+	{
+		const TexMetadata& metadata{ cubemaps.GetMetadata() };
+		const u32 array_size{ (u32)metadata.arraySize };
+		const u32 cubemap_count{ array_size / 6 };
+		assert(metadata.IsCubemap() && cubemap_count && !(array_size % 6));
+		assert(metadata.width == metadata.height && !IsCompressed(metadata.format));
+		HRESULT hr{ S_OK };
+
+		ScratchImage input{};
+		hr = prepare_prefilter_specular_input(cubemaps, input);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		ScratchImage working_scratch{};
+		hr = working_scratch.InitializeCube(DXGI_FORMAT_R32G32B32A32_FLOAT, prefiltered_specular_cubemap_size, prefiltered_specular_cubemap_size,
+										   cubemap_count, roughness_mip_levels);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		copy_roughness_zero_mip(input, working_scratch);
+
+		const specular_input sampler{ input, (u32)input.GetMetadata().mipLevels };
+
+		for (u32 mip{ 1 }; mip < roughness_mip_levels; ++mip)
+		{
+			const utl::vector<specular_sample> samples{ get_specular_samples(roughness_of_mip(mip), prefilter_specular_sample_count,
+																			   prefiltered_specular_cubemap_size) };
+			const u32 size{ std::max(prefiltered_specular_cubemap_size >> mip, 1u) };
+			const f32 inv_size{ 1.f / (f32)size };
+
+			// すべてのキューブマップの全面の行を、CPUのコアの数のスレッドで分けて処理する。
+			parallel_for(array_size * size, [&](u32 row_index)
+				{
+					const u32 image_index{ row_index / size };
+					const u32 y{ row_index % size };
+					const u32 face{ image_index % 6 };
+					const Image& dst_face{ *working_scratch.GetImage(mip, image_index, 0) };
+					f32* const dst_row{ (f32*)(dst_face.pixels + dst_face.rowPitch * y) };
+					const f32 v{ ((y + sample_offset) * inv_size) * 2.f - 1.f };
+
+					for (u32 x{ 0 }; x < size; ++x)
+					{
+						const f32 u{ ((x + sample_offset) * inv_size) * 2.f - 1.f };
+						f32* const dst{ &dst_row[x * 4] };
+						prefilter_specular_texel(sampler, image_index / 6, samples, get_sample_direction_cubemap(face, u, v), dst);
+						dst[3] = 1.f;
+					}
+				});
+		}
+
+		return convert_prefiltered_output(working_scratch, metadata.format, prefiltered_specular);
+	}
+
+	HRESULT prefilter_specular(ID3D11Device* device, const ScratchImage& cubemaps, ScratchImage& prefiltered_specular)
+	{
+		const TexMetadata& metadata{ cubemaps.GetMetadata() };
+		const u32 array_size{ (u32)metadata.arraySize };
+		const u32 cubemap_count{ array_size / 6 };
+		assert(device && metadata.IsCubemap() && cubemap_count && !(array_size % 6));
+		assert(metadata.width == metadata.height && !IsCompressed(metadata.format));
+		ComPtr<ID3D11DeviceContext> ctx{};
+		device->GetImmediateContext(ctx.GetAddressOf());
+		assert(ctx.Get());
+
+		HRESULT hr{ S_OK };
+
+		// CPU版と同じ入力を使う。フォーマットはDXGI_FORMAT_R32G32B32A32_FLOATにそろうので、UAVに使えないフォーマット(sRGBなど)で失敗することもない。
+		ScratchImage input{};
+		hr = prepare_prefilter_specular_input(cubemaps, input);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		const TexMetadata& input_metadata{ input.GetMetadata() };
+		const u32 input_mip_levels{ (u32)input_metadata.mipLevels };
+		constexpr DXGI_FORMAT format{ DXGI_FORMAT_R32G32B32A32_FLOAT };
+		constexpr u32 size{ prefiltered_specular_cubemap_size };
+
+		// 出力先のリソースを作成
+		ComPtr<ID3D11Texture2D> cubemaps_out{};
+		ComPtr<ID3D11Texture2D> cubemaps_cpu{};
+		{
+			D3D11_TEXTURE2D_DESC desc{};
+			desc.Width = desc.Height = size;
+			desc.MipLevels = roughness_mip_levels;
+			desc.ArraySize = array_size;
+			desc.Format = format;
+			desc.SampleDesc = { 1, 0 };
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+			desc.CPUAccessFlags = 0;
+			desc.MiscFlags = 0;
+
+			hr = device->CreateTexture2D(&desc, nullptr, cubemaps_out.GetAddressOf());
+			if (FAILED(hr))
+			{
+				return hr;
+			}
+
+			desc.BindFlags = 0;
+			desc.Usage = D3D11_USAGE_STAGING;
+			desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+
+			hr = device->CreateTexture2D(&desc, nullptr, cubemaps_cpu.GetAddressOf());
+			if (FAILED(hr))
+			{
+				return hr;
+			}
+		}
+
+		ComPtr<ID3D11ComputeShader> shader{};
+		hr = device->CreateComputeShader(shaders::EnvMapProcessing_PrefilterSpecularEnvMapCS,
+										 sizeof(shaders::EnvMapProcessing_PrefilterSpecularEnvMapCS),
+										 nullptr, shader.GetAddressOf());
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		ComPtr<ID3D11Buffer> constant_buffer{};
+		hr = create_constant_buffer(device, constant_buffer.GetAddressOf());
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		ComPtr<ID3D11SamplerState> linear_sampler{};
+		hr = create_linear_sampler(device, linear_sampler.GetAddressOf());
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		reset_d3d11_context(ctx.Get());
+
+		for (u32 i{ 0 }; i < cubemap_count; ++i)
+		{
+			// 入力のキューブマップをすべてのミップと一緒にアップロードする(サンプルの確率密度に応じてミップを選ぶため)。
+			// NOTE: Primalはすべてのキューブマップを1つのテクスチャにまとめ、TEXTURECUBEARRAYのビューを
+			//       シェーダのTextureCubeにバインドしていたが、拡散光と同じくキューブマップごとにTEXTURECUBEのテクスチャを作る。
+			ComPtr<ID3D11Texture2D> cubemap_in{};
+			{
+				D3D11_TEXTURE2D_DESC desc{};
+				desc.Width = (u32)input_metadata.width;
+				desc.Height = (u32)input_metadata.height;
+				desc.MipLevels = input_mip_levels;
+				desc.ArraySize = 6;
+				desc.Format = format;
+				desc.SampleDesc = { 1, 0 };
+				desc.Usage = D3D11_USAGE_IMMUTABLE;
+				desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+				desc.CPUAccessFlags = 0;
+				desc.MiscFlags = D3D11_RESOURCE_MISC_TEXTURECUBE;
+
+				utl::vector<D3D11_SUBRESOURCE_DATA> data(6ull * input_mip_levels);
+				for (u32 face{ 0 }; face < 6; ++face)
+				{
+					for (u32 mip{ 0 }; mip < input_mip_levels; ++mip)
+					{
+						const Image* const image{ input.GetImage(mip, i * 6 + face, 0) };
+						assert(image);
+						D3D11_SUBRESOURCE_DATA& subresource{ data[face * input_mip_levels + mip] };
+						subresource.pSysMem = image->pixels;
+						subresource.SysMemPitch = (u32)image->rowPitch;
+					}
+				}
+
+				hr = device->CreateTexture2D(&desc, data.data(), cubemap_in.GetAddressOf());
+				if (FAILED(hr))
+				{
+					return hr;
+				}
+			}
+
+			ComPtr<ID3D11ShaderResourceView> cubemap_in_srv{};
+			hr = device->CreateShaderResourceView(cubemap_in.Get(), nullptr, cubemap_in_srv.GetAddressOf());
+			if (FAILED(hr))
+			{
+				return hr;
+			}
+
+			// NOTE: ミップ0(ラフネス0)は入力のミップ0と同じなので、フィルタせずに後でコピーする(Primalと同じ)。
+			//       Dispatchはミップごとに分ける。1回あたり最大(128 x 128 x 6画素) x 1024サンプルで、入力のサイズによらない。
+			for (u32 mip{ 1 }; mip < roughness_mip_levels; ++mip)
+			{
+				ComPtr<ID3D11UnorderedAccessView> cubemap_out_uav{};
+				hr = create_texture_2d_uav(device, format, 6, i * 6, mip, cubemaps_out.Get(), cubemap_out_uav.GetAddressOf());
+				if (FAILED(hr))
+				{
+					return hr;
+				}
+
+				const u32 mip_size{ std::max(size >> mip, 1u) };
+				ShaderConstants constants{};
+				constants.CubeMapInSize = (u32)input_metadata.width;
+				constants.CubeMapOutSize = mip_size;
+				constants.SampleCount = prefilter_specular_sample_count;
+				constants.Roughness = roughness_of_mip(mip);
+				hr = set_constants(ctx.Get(), constant_buffer.Get(), constants);
+				if (FAILED(hr))
+				{
+					return hr;
+				}
+
+				const u32 block_size{ (mip_size + 15) >> 4 };
+				dispatch(ctx.Get(), cubemap_in_srv.GetAddressOf(), cubemap_out_uav.GetAddressOf(), constant_buffer.GetAddressOf(),
+						 linear_sampler.GetAddressOf(), shader.Get(), { block_size, block_size, 6 });
+			}
+		}
+
+		reset_d3d11_context(ctx.Get());
+
+		ScratchImage working_scratch{};
+		hr = download_texture_2d(ctx.Get(), size, size, array_size, roughness_mip_levels, format, true,
+								 cubemaps_out.Get(), cubemaps_cpu.Get(), working_scratch);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		copy_roughness_zero_mip(input, working_scratch);
+
+		return convert_prefiltered_output(working_scratch, metadata.format, prefiltered_specular);
 	}
 }
