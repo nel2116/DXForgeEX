@@ -64,6 +64,7 @@ $verifyRoot = Join-Path $env:TEMP "DXForgeVerify"
 Set-Clipboard "$verifyRoot\"
 "$verifyRoot\"
 # エディタはテンプレートを実行ファイルの場所(x64\DebugEditor\ProjectTemplates)から読むので、作業フォルダはどこでもよい
+# (テクスチャ/ジオメトリの読み込み時の試験用の書き出し先 <リポジトリ>\x64\texture.img / model.model も実行ファイルの場所から決まる。#91)
 Start-Process -FilePath "$PWD\x64\DebugEditor\DXForgeEditor.exe"
 ```
 

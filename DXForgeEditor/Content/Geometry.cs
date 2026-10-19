@@ -516,7 +516,7 @@ namespace DXForgeEditor.Content
                 }
 
                 // For Testing. Remove later!
-                PackForEngine();
+                WriteForEngineTest("model.model", PackForEngine);
                 // For Testing. Remove later!
 
                 return true;
@@ -649,12 +649,6 @@ namespace DXForgeEditor.Content
             writer.Flush();
             var data = ((MemoryStream)writer.BaseStream).ToArray();
             Debug.Assert(data?.Length > 0);
-            // For Testing. Remove later!
-            using (var fs = new FileStream(@"..\..\x64\model.model", FileMode.Create))
-            {
-                fs.Write(data, 0, data.Length);
-            }
-            // For Testing. Remove later!
             return data;
         }
 

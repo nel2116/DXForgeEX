@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using DXForgeEditor.Utilities;
 
 namespace DXForgeEditor.Content
 {
@@ -87,6 +88,34 @@ namespace DXForgeEditor.Content
         public abstract bool Load(string file);
         public abstract IEnumerable<string> Save(string file);
         public abstract byte[] PackForEngine();
+
+        // For Testing. Remove later!
+        /// <summary>
+        /// EngineTest で使うための試験用の書き出し(リポジトリの x64 フォルダに fileName の名前で書く)。
+        /// 書き出し先は作業フォルダではなく実行ファイルの場所(x64\構成名\)から決める(Issue #91)。
+        /// 書き出しに失敗しても、呼び出し元(アセットの読み込み)は失敗にしない。
+        /// </summary>
+        protected static void WriteForEngineTest(string fileName, Func<byte[]> pack)
+        {
+            try
+            {
+                var dir = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, @"..\..\x64"));
+                if (!Directory.Exists(dir))
+                {
+                    // リポジトリの x64\構成名\ 以外に置いた実行ファイルから起動した場合は書き出さない。
+                    Debug.WriteLine($"Skipped writing {fileName} for EngineTest: {dir} does not exist.");
+                    return;
+                }
+
+                File.WriteAllBytes(Path.Combine(dir, fileName), pack());
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                Logger.Log(MessageType.Warning, $"試験用のファイルを書き出せませんでした: {fileName}");
+            }
+        }
+        // For Testing. Remove later!
 
         private static AssetInfo GetAssetInfo(BinaryReader reader)
         {
