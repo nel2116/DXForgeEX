@@ -7,6 +7,7 @@
 // 更新履歴
 // 2025/01/02 新規作成
 // 2025/01/07 コメントの追加
+// 2026/10/18 ルートシグネチャの既定フラグからSAMPLER_HEAP_DIRECTLY_INDEXEDを外す(#75)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -475,8 +476,10 @@ namespace dxforge::graphics::d3d12::d3dx
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_PIXEL_SHADER_ROOT_ACCESS |
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_AMPLIFICATION_SHADER_ROOT_ACCESS |
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_MESH_SHADER_ROOT_ACCESS |
-			D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED |
-			D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED
+			D3D12_ROOT_SIGNATURE_FLAG_CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED
+			// サンプラーのdescriptor heapはバインドしていない(static samplerのみ)ので、
+			// SAMPLER_HEAP_DIRECTLY_INDEXEDは付けない(付けるとD3D12 ERROR #1419になる)
+			// | D3D12_ROOT_SIGNATURE_FLAG_SAMPLER_HEAP_DIRECTLY_INDEXED
 		};
 
 		constexpr explicit d3d12_root_signature_desc(const d3d12_root_parameter* parameters,
