@@ -11,6 +11,7 @@
 // 2026/10/18 削除したスクリプトがbegin_play()の待ちリストに残らないことのテストを追加 (#47)
 // 2026/10/18 update()/begin_play()の中でスクリプト付きエンティティを生成・削除するテストを追加 (#54)
 // 2026/10/18 update()/begin_play()の中で削除されたスクリプトのデストラクタからTransformを読めることのテストを追加 (#54)
+// 2026/10/19 update()の中でset_position()したエンティティを削除するテストと、同じフレームでIDを再利用したエンティティのTransformが上書きされないことのテストを追加 (#78)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
@@ -163,9 +164,32 @@ namespace
 		}
 	};
 
-	game_entity::entity create_entity(script::detail::script_creator creator)
+	// update()の中でset_position()を呼んでから、テストが指定した処理を行うスクリプト
+	constexpr f32 moved_position{ 9.f };
+	std::function<void(game_entity::entity_id)> after_move_hook{};
+
+	class script_test_move_then_hook : public script::entity_script
+	{
+	public:
+		explicit script_test_move_then_hook(game_entity::entity entity)
+			: script::entity_script{ entity } {}
+
+		// NOTE: フックの中で自分自身が削除されることがあるため、フックを取り出してから呼び、呼んだ後はメンバーに触れない。
+		void update(f32) override
+		{
+			set_position(math::v3{ moved_position, moved_position, moved_position });
+			const auto hook{ std::move(after_move_hook) };
+			after_move_hook = nullptr;
+			if (hook) hook(get_id());
+		}
+	};
+
+	game_entity::entity create_entity(script::detail::script_creator creator, math::v3 position = {})
 	{
 		transform::init_info transform_info{};
+		transform_info.position[0] = position.x;
+		transform_info.position[1] = position.y;
+		transform_info.position[2] = position.z;
 		script::init_info script_info{ creator };
 
 		game_entity::entity_info entity_info{};
@@ -685,4 +709,88 @@ DXFORGE_TEST_CASE(script_removed_by_another_script_can_read_transform_in_destruc
 	begin_play_hook = nullptr;
 	update_hook = nullptr;
 	game_entity::remove(actor.get_id());
+}
+
+DXFORGE_TEST_CASE(script_entity_removed_after_set_position_in_update_is_not_written)
+{
+	// NOTE: update()の中でset_position()を呼んだエンティティが同じフレームで削除されると、
+	//		 script::update()の最後に適用するTransformのキャッシュが、削除済みのスロットに書き込んでいた(#78)。
+	//		 Releaseでは死んだスロットの中身は外から見えないため、Debugではtransform::update()のassertで検出する。
+	const game_entity::entity mover{ create_entity(&script::detail::create_script<script_test_move_then_hook>) };
+	REQUIRE(mover.is_valid() && mover.script().is_valid());
+
+	after_move_hook = [](game_entity::entity_id self)
+	{
+		game_entity::remove(self);
+	};
+	script::update(1.f);
+	CHECK(!game_entity::is_alive(mover.get_id()));
+
+	// 次のフレームに古いキャッシュが残っていないこと
+	script::update(1.f);
+
+	after_move_hook = nullptr;
+}
+
+DXFORGE_TEST_CASE(script_stale_transform_cache_does_not_overwrite_entity_reusing_id)
+{
+	// NOTE: エンティティIDの再利用はfree_ids.size() > id::min_deleted_elementsで初めて発生し、free_idsは先入れ先出しである。
+	//		 そのため、update()の中で「set_position()したエンティティを削除し、その後ろに1025個以上削除してから、
+	//		 削除したエンティティのインデックスが再利用されるまで生成する」と、同じフレームの中で同じインデックス・別の世代の
+	//		 エンティティができる。修正前は、削除した古いエンティティ用のキャッシュが新しいエンティティのTransformを上書きしていた(#78)。
+	const math::v3 new_position{ 1.f, 2.f, 3.f };
+	constexpr u32 helper_count{ id::min_deleted_elements + 1 };
+	constexpr u32 max_creations{ id::min_deleted_elements * 4 };
+
+	utl::vector<game_entity::entity_id> helpers{};
+	for (u32 i{ 0 }; i < helper_count; ++i)
+	{
+		const game_entity::entity helper{ create_entity(nullptr) };
+		REQUIRE(helper.is_valid());
+		helpers.emplace_back(helper.get_id());
+	}
+
+	const game_entity::entity mover{ create_entity(&script::detail::create_script<script_test_move_then_hook>) };
+	REQUIRE(mover.is_valid() && mover.script().is_valid());
+
+	utl::vector<game_entity::entity_id> created{};
+	game_entity::entity_id reused{ id::invalid_id };
+	after_move_hook = [&](game_entity::entity_id self)
+	{
+		const id::id_type stale_index{ id::index(self) };
+		game_entity::remove(self);
+		for (const game_entity::entity_id helper : helpers)
+		{
+			game_entity::remove(helper);
+		}
+
+		for (u32 i{ 0 }; i < max_creations; ++i)
+		{
+			const game_entity::entity entity{ create_entity(nullptr, new_position) };
+			created.emplace_back(entity.get_id());
+			if (id::index(entity.get_id()) == stale_index)
+			{
+				reused = entity.get_id();
+				break;
+			}
+		}
+	};
+	script::update(1.f);
+
+	CHECK(id::is_valid(reused));
+	if (id::is_valid(reused))
+	{
+		CHECK(reused != mover.get_id());
+		CHECK(game_entity::is_alive(reused));
+		const math::v3 position{ game_entity::entity{ reused }.position() };
+		CHECK(position.x == new_position.x);
+		CHECK(position.y == new_position.y);
+		CHECK(position.z == new_position.z);
+	}
+
+	after_move_hook = nullptr;
+	for (const game_entity::entity_id entity_id : created)
+	{
+		game_entity::remove(entity_id);
+	}
 }
