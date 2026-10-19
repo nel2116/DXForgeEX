@@ -710,7 +710,7 @@ namespace DXForgeEditor.Content
                 }
 
                 // For Testing. Remove later.
-                PackForEngine();
+                WriteForEngineTest("texture.img", PackForEngine);
                 // For Testing. Remove later.
 
                 return true;
@@ -868,13 +868,6 @@ namespace DXForgeEditor.Content
             writer.Flush();
             var data = (writer.BaseStream as MemoryStream)?.ToArray();
             Debug.Assert(data?.Length > 0);
-
-            // For Testing. Remove later!
-            using (var fs = new FileStream(@"..\..\x64\texture.img", FileMode.Create))
-            {
-                fs.Write(data, 0, data.Length);
-            }
-            // For Testing. Remove later!
 
             return data;
         }
