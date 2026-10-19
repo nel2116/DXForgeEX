@@ -1,6 +1,6 @@
 # このリポジトリの既存ファイルを実測した結果に基づく設定。
 # 実測値: .cpp/.h = UTF-8 BOM + タブ / .cs/.xaml = UTF-8 BOM + 4スペース
-#         .hlsl/.hlsli = UTF-8 (BOM 無し) + 4スペース(後述)
+#         .hlsl/.hlsli = UTF-8 BOM + 4スペース(fxc でコンパイルするものだけ BOM 無し。後述)
 root = true
 
 [*]
@@ -20,13 +20,19 @@ charset = utf-8-bom
 indent_style = space
 indent_size = 4
 
-# HLSL: UTF-8 (BOM 無し)。C++ と違い BOM を付けてはいけない。
-# fxc (ContentTools/CompileShaders.cmd、Visual Studio の HLSL ビルドの SM5.x) は BOM 付きを
-# "error X3000: Illegal character in shader file" で拒否する。DXC は BOM の有無どちらも受け付ける。
+# HLSL: C++ と同じ UTF-8 BOM。
+# エンジンのシェーダは DXC が読み(BOM の有無どちらも受け付ける)、CommonTypes.hlsli は
+# SharedTypes.h 経由で MSVC も読むため、C++ と同じ理由で BOM が必須。
 [*.{hlsl,hlsli}]
-charset = utf-8
+charset = utf-8-bom
 indent_style = space
 indent_size = 4
+
+# fxc でコンパイルする HLSL だけは BOM 無し。fxc (ContentTools/CompileShaders.cmd、WPF のピクセル
+# シェーダ、Visual Studio の HLSL ビルドの SM5.x) は BOM 付きを
+# "error X3000: Illegal character in shader file" で拒否する。
+[{ContentTools,DXForgeEditor}/**.{hlsl,hlsli}]
+charset = utf-8
 
 [*.ps1]
 charset = utf-8-bom

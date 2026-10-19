@@ -1,4 +1,4 @@
-#if !defined(DXFORGE_COMMON_HLSLI) && !defined(__cplusplus)
+﻿#if !defined(DXFORGE_COMMON_HLSLI) && !defined(__cplusplus)
 #error Do not include this header directly in shader files. Only include this file via Common.hlsli.
 #endif
 

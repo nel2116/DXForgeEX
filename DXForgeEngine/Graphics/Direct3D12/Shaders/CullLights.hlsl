@@ -1,4 +1,4 @@
-#include "Common.hlsli"
+﻿#include "Common.hlsli"
 
 #if USE_BOUNDING_SPHERES
 // NOTE: この定数は、ライトカリングモジュールのmax_lights_per_tile（256と定義されている）より大きい。

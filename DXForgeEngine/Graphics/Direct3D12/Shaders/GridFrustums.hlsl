@@ -1,4 +1,4 @@
-#include "Common.hlsli"
+﻿#include "Common.hlsli"
 
 ConstantBuffer<GlobalShaderData> GlobalData : register(b0, space0);
 ConstantBuffer<LightCullingDispatchParameters> ShaderParams : register(b1, space0);

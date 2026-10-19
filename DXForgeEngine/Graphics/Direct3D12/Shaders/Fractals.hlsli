@@ -1,4 +1,4 @@
-// マンデルブロ・フラクタル定数
+﻿// マンデルブロ・フラクタル定数
 #define M_RE_START -2.8f
 #define M_RE_END 1.f
 #define M_IM_START -1.5f
