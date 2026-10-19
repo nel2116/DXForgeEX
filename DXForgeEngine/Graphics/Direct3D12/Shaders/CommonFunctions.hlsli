@@ -2,9 +2,9 @@
 #error Do not include this header directly in shader files. Only include this file via Common.hlsli.
 #endif
 
-// OŠpŒ`‚ğŒ`¬‚·‚é3‚Â‚Ì”ñ’¼ü“_‚©‚ç•½–Ê‚ğŒvZ‚·‚éB
-// ‚±‚Ì®‚ÍA•½–Ê‚Ì–@ü‚Ì•ûŒü‚ğŒˆ’è‚·‚é‚½‚ß‚ÉA‰E‰ñ‚èi”½Œv‰ñ‚è‚ÌŠª‚«‡j‚ÌÀ•WŒn‚ğ‰¼’è‚µ‚Ä‚¢‚éB
-// ¶‰ñ‚è‚ÌÀ•WŒn‚ğg—p‚·‚éê‡‚ÍAcross(v0, v2)‚ğcross(v2, v0)‚É’u‚«Š·‚¦‚éB
+// ä¸‰è§’å½¢ã‚’å½¢æˆã™ã‚‹3ã¤ã®éç›´ç·šç‚¹ã‹ã‚‰å¹³é¢ã‚’è¨ˆç®—ã™ã‚‹ã€‚
+// ã“ã®å¼ã¯ã€å¹³é¢ã®æ³•ç·šã®æ–¹å‘ã‚’æ±ºå®šã™ã‚‹ãŸã‚ã«ã€å³å›ã‚Šï¼ˆåæ™‚è¨ˆå›ã‚Šã®å·»ãé †ï¼‰ã®åº§æ¨™ç³»ã‚’ä»®å®šã—ã¦ã„ã‚‹ã€‚
+// å·¦å›ã‚Šã®åº§æ¨™ç³»ã‚’ä½¿ç”¨ã™ã‚‹å ´åˆã¯ã€cross(v0, v2)ã‚’cross(v2, v0)ã«ç½®ãæ›ãˆã‚‹ã€‚
 Plane ComputePlane(float3 p0, float3 p1, float3 p2)
 {
     Plane plane;
@@ -18,38 +18,38 @@ Plane ComputePlane(float3 p0, float3 p1, float3 p2)
     return plane;
 }
 
-// “_‚ª•½–Ê‚ÌŠ®‘S‚ÉŒã‚ëi•‰‚Ì”¼’l‹óŠÔ‚Ì“à‘¤j‚É‚ ‚é‚©‚Ç‚¤‚©‚ğƒ`ƒFƒbƒN‚·‚éB
+// ç‚¹ãŒå¹³é¢ã®å®Œå…¨ã«å¾Œã‚ï¼ˆè² ã®åŠå€¤ç©ºé–“ã®å†…å´ï¼‰ã«ã‚ã‚‹ã‹ã©ã†ã‹ã‚’ãƒã‚§ãƒƒã‚¯ã™ã‚‹ã€‚
 bool PointInsidePlane(float3 p, Plane plane)
 {
     return dot(plane.Normal, p) - plane.Distance < 0;
 }
 
-// ‹…‚ª•½–Ê‚ÌŠ®‘S‚ÉŒã‚ëi•‰‚Ì”¼’l‹óŠÔ‚Ì“à‘¤j‚É‚ ‚é‚©‚Ç‚¤‚©‚ğƒ`ƒFƒbƒN‚·‚éB
+// çƒãŒå¹³é¢ã®å®Œå…¨ã«å¾Œã‚ï¼ˆè² ã®åŠå€¤ç©ºé–“ã®å†…å´ï¼‰ã«ã‚ã‚‹ã‹ã©ã†ã‹ã‚’ãƒã‚§ãƒƒã‚¯ã™ã‚‹ã€‚
 // Source: Real-time collision detection, Christer Ericson (2005)
 bool SphereInsidePlane(Sphere sphere, Plane plane)
 {
     return dot(plane.Normal, sphere.Center) - plane.Distance < -sphere.Radius;
 }
 
-// ‰~‚ªŠ®‘S‚É•½–Ê‚ÌŒã‚ëi•½–Ê‚Ì•‰‚Ì”¼’l‹óŠÔ‚Ì“à‘¤j‚É‚ ‚é‚©‚Ç‚¤‚©‚ğƒ`ƒFƒbƒN‚·‚éB
+// å††éŒãŒå®Œå…¨ã«å¹³é¢ã®å¾Œã‚ï¼ˆå¹³é¢ã®è² ã®åŠå€¤ç©ºé–“ã®å†…å´ï¼‰ã«ã‚ã‚‹ã‹ã©ã†ã‹ã‚’ãƒã‚§ãƒƒã‚¯ã™ã‚‹ã€‚
 // Source: Real-time collision detection, Christer Ericson (2005)
 bool ConeInsidePlane(Cone cone, Plane plane)
 {
-    // ‰~‚Ì’[‚©‚ç•½–Ê‚Ì³‚Ì‹óŠÔ‚Ü‚Å‚ÌÅ‚à‰“‚¢“_‚ğŒvZ‚·‚éB
+    // å††éŒã®ç«¯ã‹ã‚‰å¹³é¢ã®æ­£ã®ç©ºé–“ã¾ã§ã®æœ€ã‚‚é ã„ç‚¹ã‚’è¨ˆç®—ã™ã‚‹ã€‚
     float3 m = cross(cross(plane.Normal, cone.Direction), cone.Direction);
     float3 Q = cone.Tip + cone.Direction * cone.Height - m * cone.Radius;
 
-    // ‰~‚Ìæ’[‚ÆA•½–Ê‚Ì³”¼•ª‹óŠÔ‚É‘Î‚µ‚Ä‰~‚Ì’[‚ÌÅ‚à‰“‚¢“_‚Ì—¼•û‚ª•½–Ê‚Ì•‰”¼•ª‹óŠÔ“à‚É‚ ‚éê‡
-    // ‰~‚Í•½–Ê‚Ì•‰”¼•ª‹óŠÔ“à‚É‚ ‚éB
+    // å††éŒã®å…ˆç«¯ã¨ã€å¹³é¢ã®æ­£åŠåˆ†ç©ºé–“ã«å¯¾ã—ã¦å††éŒã®ç«¯ã®æœ€ã‚‚é ã„ç‚¹ã®ä¸¡æ–¹ãŒå¹³é¢ã®è² åŠåˆ†ç©ºé–“å†…ã«ã‚ã‚‹å ´åˆ
+    // å††éŒã¯å¹³é¢ã®è² åŠåˆ†ç©ºé–“å†…ã«ã‚ã‚‹ã€‚
     return PointInsidePlane(cone.Tip, plane) && PointInsidePlane(Q, plane);
 }
 
 #if !USE_BOUNDING_SPHERES
-// ƒ‰ƒCƒg‚Ìˆê•”‚ªƒtƒ‰ƒXƒgƒ‰ƒ€‚Éû‚Ü‚Á‚Ä‚¢‚é‚©Šm”F‚·‚éB
+// ãƒ©ã‚¤ãƒˆã®ä¸€éƒ¨ãŒãƒ•ãƒ©ã‚¹ãƒˆãƒ©ãƒ ã«åã¾ã£ã¦ã„ã‚‹ã‹ç¢ºèªã™ã‚‹ã€‚
 bool SphereInsideFrustum(Sphere sphere, Frustum frustum, float zNear, float zFar)
 {
-    // Å‰‚É[‚³‚ğŠm”F‚·‚é
-    // NOTE: ‚±‚±‚ÅAƒrƒ…[ƒxƒNƒgƒ‹‚Í-Z²‚ğw‚µ‚Ä‚¢‚é‚Ì‚ÅA‰“Œi‚Ì[“x’l‚Í-‡‚É‹ß‚Ã‚­B
+    // æœ€åˆã«æ·±ã•ã‚’ç¢ºèªã™ã‚‹
+    // NOTE: ã“ã“ã§ã€ãƒ“ãƒ¥ãƒ¼ãƒ™ã‚¯ãƒˆãƒ«ã¯-Zè»¸ã‚’æŒ‡ã—ã¦ã„ã‚‹ã®ã§ã€é æ™¯ã®æ·±åº¦å€¤ã¯-âˆã«è¿‘ã¥ãã€‚
     return !((sphere.Center.z - sphere.Radius > zNear || sphere.Center.z + sphere.Radius < zFar) ||
              SphereInsidePlane(sphere, frustum.Planes[0]) ||
              SphereInsidePlane(sphere, frustum.Planes[1]) ||
@@ -64,13 +64,13 @@ bool ConeInsideFrustum(Cone cone, Frustum frustum, float zNear, float zFar)
     Plane nearPlane = { float3(0, 0, -1), -zNear };
     Plane farPlane = { float3(0, 0, 1), zFar };
 
-    // ‚Ü‚¸A‹ß‹——£‚Æ‰“‹——£‚ÌƒNƒŠƒbƒsƒ“ƒOƒvƒŒ[ƒ“‚ğƒ`ƒFƒbƒN‚·‚éB
+    // ã¾ãšã€è¿‘è·é›¢ã¨é è·é›¢ã®ã‚¯ãƒªãƒƒãƒ”ãƒ³ã‚°ãƒ—ãƒ¬ãƒ¼ãƒ³ã‚’ãƒã‚§ãƒƒã‚¯ã™ã‚‹ã€‚
     if (ConeInsidePlane(cone, nearPlane) || ConeInsidePlane(cone, farPlane))
     {
         result = false;
     }
 
-    // Ÿ‚ÉAƒtƒ‰ƒXƒgƒ‰ƒ€ƒvƒŒ[ƒ“‚ğƒ`ƒFƒbƒN‚·‚éB
+    // æ¬¡ã«ã€ãƒ•ãƒ©ã‚¹ãƒˆãƒ©ãƒ ãƒ—ãƒ¬ãƒ¼ãƒ³ã‚’ãƒã‚§ãƒƒã‚¯ã™ã‚‹ã€‚
     for (int i = 0; i < 4 && result; i++)
     {
         if (ConeInsidePlane(cone, frustum.Planes[i]))
@@ -83,20 +83,20 @@ bool ConeInsideFrustum(Cone cone, Frustum frustum, float zNear, float zFar)
 }
 #endif
 
-// "inverse" ƒpƒ‰ƒ[ƒ^‚É‚æ‚Á‚ÄA³‹K‰»‚³‚ê‚½ƒXƒNƒŠ[ƒ“‹óŠÔ‚ÌˆÊ’u‚ğ3DÀ•W‚É•ÏŠ·‚·‚éB
-// uv‚ÍƒsƒNƒZƒ‹‚ÌƒXƒNƒŠ[ƒ“‹óŠÔuvÀ•WB
-// [‚³‚ÍZƒoƒbƒtƒ@‚Ì[‚³
-// ‹tƒpƒ‰ƒ[ƒ^‚Í
-//      - ‹t“Š‰e¨ƒXƒNƒŠ[ƒ“¨ƒrƒ…[‹óŠÔ
-//      - ‹t‰f‘œ¨ƒXƒNƒŠ[ƒ“¨ƒ[ƒ‹ƒhƒXƒy[ƒX
-//      - ‹t¢ŠEŠÏ“Š‰e¨ƒXƒNƒŠ[ƒ“¨ƒIƒuƒWƒFƒNƒg‹óŠÔ
+// "inverse" ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã«ã‚ˆã£ã¦ã€æ­£è¦åŒ–ã•ã‚ŒãŸã‚¹ã‚¯ãƒªãƒ¼ãƒ³ç©ºé–“ã®ä½ç½®ã‚’3Dåº§æ¨™ã«å¤‰æ›ã™ã‚‹ã€‚
+// uvã¯ãƒ”ã‚¯ã‚»ãƒ«ã®ã‚¹ã‚¯ãƒªãƒ¼ãƒ³ç©ºé–“uvåº§æ¨™ã€‚
+// æ·±ã•ã¯Zãƒãƒƒãƒ•ã‚¡ã®æ·±ã•
+// é€†ãƒ‘ãƒ©ãƒ¡ãƒ¼ã‚¿ã¯
+//      - é€†æŠ•å½±â†’ã‚¹ã‚¯ãƒªãƒ¼ãƒ³â†’ãƒ“ãƒ¥ãƒ¼ç©ºé–“
+//      - é€†æ˜ åƒâ†’ã‚¹ã‚¯ãƒªãƒ¼ãƒ³â†’ãƒ¯ãƒ¼ãƒ«ãƒ‰ã‚¹ãƒšãƒ¼ã‚¹
+//      - é€†ä¸–ç•Œè¦³æŠ•å½±â†’ã‚¹ã‚¯ãƒªãƒ¼ãƒ³â†’ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆç©ºé–“
 float4 UnprojectUV(float2 uv, float depth, float4x4 inverse)
 {
-    // ƒNƒŠƒbƒvƒXƒy[ƒX‚É•ÏŠ·
+    // ã‚¯ãƒªãƒƒãƒ—ã‚¹ãƒšãƒ¼ã‚¹ã«å¤‰æ›
     float4 clip = float4(float2(uv.x, 1.f - uv.y) * 2.f - 1.f, depth, 1.f);
-    // 3D‹óŠÔ‚ÌˆÊ’uiƒp[ƒXƒyƒNƒeƒBƒu•ªŠ„‘OjB
+    // 3Dç©ºé–“ã®ä½ç½®ï¼ˆãƒ‘ãƒ¼ã‚¹ãƒšã‚¯ãƒ†ã‚£ãƒ–åˆ†å‰²å‰ï¼‰ã€‚
     float4 position = mul(inverse, clip);
-    // w‚ÅŠ„‚Á‚Ä3D‹óŠÔ‚ÌˆÊ’u‚ğ“¾‚éB
+    // wã§å‰²ã£ã¦3Dç©ºé–“ã®ä½ç½®ã‚’å¾—ã‚‹ã€‚
     return position / position.w;
 }
 

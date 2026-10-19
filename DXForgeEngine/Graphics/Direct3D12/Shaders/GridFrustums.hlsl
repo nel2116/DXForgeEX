@@ -6,7 +6,7 @@ RWStructuredBuffer<Frustum> Frustums : register(u0, space0);
 
 #if USE_BOUNDING_SPHERES
 
-// NOTE: TILE_SIZE‚ÍƒRƒ“ƒpƒCƒ‹‚ÉƒGƒ“ƒWƒ“‚É‚æ‚Á‚Ä’è‹`‚³‚ê‚éB
+// NOTE: TILE_SIZEã¯ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«æ™‚ã«ã‚¨ãƒ³ã‚¸ãƒ³ã«ã‚ˆã£ã¦å®šç¾©ã•ã‚Œã‚‹ã€‚
 [numthreads(TILE_SIZE, TILE_SIZE, 1)]
 void ComputeGridFrustumsCS(uint3 DispatchThreadID : SV_DispatchThreadID)
 {
@@ -19,26 +19,26 @@ void ComputeGridFrustumsCS(uint3 DispatchThreadID : SV_DispatchThreadID)
     float3 centerVS = UnprojectUV(center, 0, GlobalData.InvProjection).xyz;
     const float farClipRcp = -GlobalData.InvProjection._m33;
     Frustum frustum = { normalize(centerVS), distance(centerVS, topLeftVS) * farClipRcp };
-    // ƒOƒŠƒbƒh‚Ì‹«ŠE“à‚É‚ ‚éƒXƒŒƒbƒhID‚É‘Î‚µ‚ÄAŒvZ‚³‚ê‚½ƒtƒ‰ƒXƒgƒ‰ƒ€‚ğƒOƒ[ƒoƒ‹ƒƒ‚ƒŠ‚ÉŠi”[‚·‚éB
+    // ã‚°ãƒªãƒƒãƒ‰ã®å¢ƒç•Œå†…ã«ã‚ã‚‹ã‚¹ãƒ¬ãƒƒãƒ‰IDã«å¯¾ã—ã¦ã€è¨ˆç®—ã•ã‚ŒãŸãƒ•ãƒ©ã‚¹ãƒˆãƒ©ãƒ ã‚’ã‚°ãƒ­ãƒ¼ãƒãƒ«ãƒ¡ãƒ¢ãƒªã«æ ¼ç´ã™ã‚‹ã€‚
     Frustums[DispatchThreadID.x + (DispatchThreadID.y * ShaderParams.NumThreads.x)] = frustum;
 }
 
 #else
-// ƒOƒŠƒbƒhEƒtƒ‰ƒXƒgƒ‰ƒ€EƒVƒF[ƒ_[‚ÌÀ‘•‚ÍAˆÈ‰º‚Ì‚à‚Ì‚ÉŠî‚Ã‚¢‚Ä‚¢‚éB
+// ã‚°ãƒªãƒƒãƒ‰ãƒ»ãƒ•ãƒ©ã‚¹ãƒˆãƒ©ãƒ ãƒ»ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã®å®Ÿè£…ã¯ã€ä»¥ä¸‹ã®ã‚‚ã®ã«åŸºã¥ã„ã¦ã„ã‚‹ã€‚
 // "Forward vs Deferred vs Forward+ Rendering with DirectX 11" (2015) by Jeremiah van Oosten.
 // https://www.3dgep.com/forward-plus/#grid-frustums-compute-shader
-// NOTE: TILE_SIZE‚ÍƒRƒ“ƒpƒCƒ‹‚ÉƒGƒ“ƒWƒ“‚É‚æ‚Á‚Ä’è‹`‚³‚ê‚éB
+// NOTE: TILE_SIZEã¯ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«æ™‚ã«ã‚¨ãƒ³ã‚¸ãƒ³ã«ã‚ˆã£ã¦å®šç¾©ã•ã‚Œã‚‹ã€‚
 [numthreads(TILE_SIZE, TILE_SIZE, 1)]
 void ComputeGridFrustumsCS(uint3 DispatchThreadID : SV_DispatchThreadID)
 {
     const uint x = DispatchThreadID.x;
     const uint y = DispatchThreadID.y;
 
-    // ƒXƒŒƒbƒhID‚ªƒOƒŠƒbƒh‚Ì”ÍˆÍ“à‚É‚È‚¢ê‡‚É–ß‚é
+    // ã‚¹ãƒ¬ãƒƒãƒ‰IDãŒã‚°ãƒªãƒƒãƒ‰ã®ç¯„å›²å†…ã«ãªã„å ´åˆã«æˆ»ã‚‹
     if (x >= ShaderParams.NumThreads.x || y >= ShaderParams.NumThreads.y)
         return;
 
-    // ƒtƒ‰ƒXƒgƒ‰ƒ€’¸“_‚Æ‚µ‚Äg—p‚·‚é‰“•ûƒNƒŠƒbƒsƒ“ƒO•½–Ê‚Ì4‚Â‚ÌƒR[ƒi[“_‚ğŒvZ‚·‚éB
+    // ãƒ•ãƒ©ã‚¹ãƒˆãƒ©ãƒ é ‚ç‚¹ã¨ã—ã¦ä½¿ç”¨ã™ã‚‹é æ–¹ã‚¯ãƒªãƒƒãƒ”ãƒ³ã‚°å¹³é¢ã®4ã¤ã®ã‚³ãƒ¼ãƒŠãƒ¼ç‚¹ã‚’è¨ˆç®—ã™ã‚‹ã€‚
     float4 screenSpace[4];
     screenSpace[0] = float4(float2(x, y) * TILE_SIZE, 0.f, 1.f);
     screenSpace[1] = float4(float2(x + 1, y) * TILE_SIZE, 0.f, 1.f);
@@ -47,13 +47,13 @@ void ComputeGridFrustumsCS(uint3 DispatchThreadID : SV_DispatchThreadID)
     const float2 invViewDimensions = 1.f / float2(GlobalData.ViewWidth, GlobalData.ViewHeight);
     float3 viewSpace[4];
 
-    // ‚±‚±‚ÅAƒXƒNƒŠ[ƒ“‹óŠÔ‚Ìƒ|ƒCƒ“ƒg‚ğƒrƒ…[‹óŠÔ‚É•ÏŠ·‚·‚éB
+    // ã“ã“ã§ã€ã‚¹ã‚¯ãƒªãƒ¼ãƒ³ç©ºé–“ã®ãƒã‚¤ãƒ³ãƒˆã‚’ãƒ“ãƒ¥ãƒ¼ç©ºé–“ã«å¤‰æ›ã™ã‚‹ã€‚
     viewSpace[0] = ScreenToView(screenSpace[0], invViewDimensions, GlobalData.InvProjection).xyz;
     viewSpace[1] = ScreenToView(screenSpace[1], invViewDimensions, GlobalData.InvProjection).xyz;
     viewSpace[2] = ScreenToView(screenSpace[2], invViewDimensions, GlobalData.InvProjection).xyz;
     viewSpace[3] = ScreenToView(screenSpace[3], invViewDimensions, GlobalData.InvProjection).xyz;
 
-    // ƒrƒ…[‹óŠÔ‚Ì“_‚©‚çƒtƒ‰ƒXƒgƒ‰ƒ€ƒvƒŒ[ƒ“‚ğ\’z‚·‚éB
+    // ãƒ“ãƒ¥ãƒ¼ç©ºé–“ã®ç‚¹ã‹ã‚‰ãƒ•ãƒ©ã‚¹ãƒˆãƒ©ãƒ ãƒ—ãƒ¬ãƒ¼ãƒ³ã‚’æ§‹ç¯‰ã™ã‚‹ã€‚
     const float3 eyePos = (float3) 0;
     Frustum frustum;
     // Left, right, top, bottom
@@ -62,7 +62,7 @@ void ComputeGridFrustumsCS(uint3 DispatchThreadID : SV_DispatchThreadID)
     frustum.Planes[2] = ComputePlane(viewSpace[1], eyePos, viewSpace[0]);
     frustum.Planes[3] = ComputePlane(viewSpace[2], eyePos, viewSpace[3]);
 
-    // ƒOƒŠƒbƒh‚Ì‹«ŠE“à‚É‚ ‚éƒXƒŒƒbƒhID‚É‘Î‚µ‚ÄAŒvZ‚³‚ê‚½ƒtƒ‰ƒXƒgƒ‰ƒ€‚ğƒOƒ[ƒoƒ‹ƒƒ‚ƒŠ‚ÉŠi”[‚·‚éB
+    // ã‚°ãƒªãƒƒãƒ‰ã®å¢ƒç•Œå†…ã«ã‚ã‚‹ã‚¹ãƒ¬ãƒƒãƒ‰IDã«å¯¾ã—ã¦ã€è¨ˆç®—ã•ã‚ŒãŸãƒ•ãƒ©ã‚¹ãƒˆãƒ©ãƒ ã‚’ã‚°ãƒ­ãƒ¼ãƒãƒ«ãƒ¡ãƒ¢ãƒªã«æ ¼ç´ã™ã‚‹ã€‚
     Frustums[x + (y * ShaderParams.NumThreads.x)] = frustum;
 }
 #endif

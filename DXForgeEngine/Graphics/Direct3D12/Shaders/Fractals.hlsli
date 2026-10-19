@@ -1,11 +1,11 @@
-// マンデルブロ・フラクタル定数
+// 繝槭Φ繝�繝ｫ繝悶Ο繝ｻ繝輔Λ繧ｯ繧ｿ繝ｫ螳壽焚
 #define M_RE_START -2.8f
 #define M_RE_END 1.f
 #define M_IM_START -1.5f
 #define M_IM_END 1.5f
 #define M_MAX_ITERATION 1000
 
-// ジュリア集合定数
+// 繧ｸ繝･繝ｪ繧｢髮�蜷亥ｮ壽焚
 #define J_RE_START -2.f
 #define J_RE_END 2.f
 #define J_IM_START -1.5f

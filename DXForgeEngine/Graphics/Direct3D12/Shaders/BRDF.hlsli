@@ -1,4 +1,4 @@
-// MITƒ‰ƒCƒZƒ“ƒX‚Ì‰º‚Å”z•z‚³‚ê‚Ä‚¢‚Ü‚·B Ú‚µ‚­‚ÍƒvƒƒWƒFƒNƒgƒ‹[ƒg‚É‚ ‚éLICENSEƒtƒ@ƒCƒ‹‚ğ‚²——‚­‚¾‚³‚¢B
+// MITãƒ©ã‚¤ã‚»ãƒ³ã‚¹ã®ä¸‹ã§é…å¸ƒã•ã‚Œã¦ã„ã¾ã™ã€‚ è©³ã—ãã¯ãƒ—ãƒ­ã‚¸ã‚§ã‚¯ãƒˆãƒ«ãƒ¼ãƒˆã«ã‚ã‚‹LICENSEãƒ•ã‚¡ã‚¤ãƒ«ã‚’ã”è¦§ãã ã•ã„ã€‚
 float Pow5(float x)
 {
     float xx = x * x;
@@ -21,7 +21,7 @@ float V_SmithGGXCorrelated(float NoV, float NoL, float a)
     return 0.5f / (GGXV + GGXL);
 }
 
-// GGX‚ÌƒWƒ‡ƒCƒ“ƒgEƒXƒ~ƒX€‚Ì‹ß—’l
+// GGXã®ã‚¸ãƒ§ã‚¤ãƒ³ãƒˆãƒ»ã‚¹ãƒŸã‚¹é …ã®è¿‘ä¼¼å€¤
 // [Heitz 2014, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs"]
 float V_SmithGGXCorrelatedApprox(float NoV, float NoL, float a)
 {
@@ -34,7 +34,7 @@ float V_SmithGGXCorrelatedApprox(float NoV, float NoL, float a)
 float3 F_Schlick(float3 F0, float VoH)
 {
     float u = Pow5(1.f - VoH);
-    // 2“–¢–‚Í•¨—“I‚É•s‰Â”\‚Å‚ ‚èAƒVƒƒƒh[ƒCƒ“ƒO‚Æ‚İ‚È‚³‚ê‚éB
+    // 2ï¼…æœªæº€ã¯ç‰©ç†çš„ã«ä¸å¯èƒ½ã§ã‚ã‚Šã€ã‚·ãƒ£ãƒ‰ãƒ¼ã‚¤ãƒ³ã‚°ã¨ã¿ãªã•ã‚Œã‚‹ã€‚
     float3 F90Approx = saturate(50.f * F0.g);
     return F90Approx * u + (1 - u) * F0;
 }

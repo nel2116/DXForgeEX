@@ -1,19 +1,19 @@
 #include "Common.hlsli"
 
 #if USE_BOUNDING_SPHERES
-// NOTE: ‚±‚Ì’è”‚ÍAƒ‰ƒCƒgƒJƒŠƒ“ƒOƒ‚ƒWƒ…[ƒ‹‚Ìmax_lights_per_tilei256‚Æ’è‹`‚³‚ê‚Ä‚¢‚éj‚æ‚è‘å‚«‚¢B
-//       ‚Æ‚¢‚¤‚Ì‚àA256‚Í1ƒ^ƒCƒ‹‚ ‚½‚è‚Ìƒ‰ƒCƒg‚Ì*•½‹Ï*”‚ÌÅ‘å’l‚¾‚©‚ç‚¾B
-//       ‚±‚Ì’è”‚Íƒ^ƒCƒ‹‚ ‚½‚è‚ÌÅ‘åƒ‰ƒCƒg”‚Å‚ ‚éB
+// NOTE: ã“ã®å®šæ•°ã¯ã€ãƒ©ã‚¤ãƒˆã‚«ãƒªãƒ³ã‚°ãƒ¢ã‚¸ãƒ¥ãƒ¼ãƒ«ã®max_lights_per_tileï¼ˆ256ã¨å®šç¾©ã•ã‚Œã¦ã„ã‚‹ï¼‰ã‚ˆã‚Šå¤§ãã„ã€‚
+//       ã¨ã„ã†ã®ã‚‚ã€256ã¯1ã‚¿ã‚¤ãƒ«ã‚ãŸã‚Šã®ãƒ©ã‚¤ãƒˆã®*å¹³å‡*æ•°ã®æœ€å¤§å€¤ã ã‹ã‚‰ã ã€‚
+//       ã“ã®å®šæ•°ã¯ã‚¿ã‚¤ãƒ«ã‚ãŸã‚Šã®æœ€å¤§ãƒ©ã‚¤ãƒˆæ•°ã§ã‚ã‚‹ã€‚
 static const uint MaxLightsPerGroup = 1024;
 
-groupshared uint _minDepthVS; // ƒ^ƒCƒ‹‚Ìƒrƒ…[‹óŠÔ‚É‚¨‚¯‚éÅ¬[“xB
-groupshared uint _maxDepthVS; // ƒrƒ…[‹óŠÔ‚É‚¨‚¯‚éƒ^ƒCƒ‹‚ÌÅ‘å[“xB
-groupshared uint _lightCount; // ‚±‚Ìƒ^ƒCƒ‹‚ÌƒsƒNƒZƒ‹‚É‰e‹¿‚ğ—^‚¦‚éƒ‰ƒCƒg‚Ì”B
-groupshared uint _lightIndexStartOffset; // lightIndexList‚ğƒRƒs[‚·‚éƒOƒ[ƒoƒ‹Eƒ‰ƒCƒgEƒCƒ“ƒfƒbƒNƒXEƒŠƒXƒg“à‚ÌƒIƒtƒZƒbƒgB
-groupshared uint _lightIndexList[MaxLightsPerGroup]; // ‚±‚Ìƒ^ƒCƒ‹‚É‰e‹¿‚ğ—^‚¦‚éƒ‰ƒCƒg‚ÌƒCƒ“ƒfƒbƒNƒXB
-groupshared uint _lightFlagsOpaque[MaxLightsPerGroup]; // ‚ÍAÀÛ‚ÉƒsƒNƒZƒ‹‚É‰e‹¿‚ğ—^‚¦‚éƒ^ƒCƒ‹“à‚Ìƒ‰ƒCƒg‚Éƒtƒ‰ƒO‚ğ—§‚Ä‚éB
+groupshared uint _minDepthVS; // ã‚¿ã‚¤ãƒ«ã®ãƒ“ãƒ¥ãƒ¼ç©ºé–“ã«ãŠã‘ã‚‹æœ€å°æ·±åº¦ã€‚
+groupshared uint _maxDepthVS; // ãƒ“ãƒ¥ãƒ¼ç©ºé–“ã«ãŠã‘ã‚‹ã‚¿ã‚¤ãƒ«ã®æœ€å¤§æ·±åº¦ã€‚
+groupshared uint _lightCount; // ã“ã®ã‚¿ã‚¤ãƒ«ã®ãƒ”ã‚¯ã‚»ãƒ«ã«å½±éŸ¿ã‚’ä¸ãˆã‚‹ãƒ©ã‚¤ãƒˆã®æ•°ã€‚
+groupshared uint _lightIndexStartOffset; // lightIndexListã‚’ã‚³ãƒ”ãƒ¼ã™ã‚‹ã‚°ãƒ­ãƒ¼ãƒãƒ«ãƒ»ãƒ©ã‚¤ãƒˆãƒ»ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ»ãƒªã‚¹ãƒˆå†…ã®ã‚ªãƒ•ã‚»ãƒƒãƒˆã€‚
+groupshared uint _lightIndexList[MaxLightsPerGroup]; // ã“ã®ã‚¿ã‚¤ãƒ«ã«å½±éŸ¿ã‚’ä¸ãˆã‚‹ãƒ©ã‚¤ãƒˆã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã€‚
+groupshared uint _lightFlagsOpaque[MaxLightsPerGroup]; // ã¯ã€å®Ÿéš›ã«ãƒ”ã‚¯ã‚»ãƒ«ã«å½±éŸ¿ã‚’ä¸ãˆã‚‹ã‚¿ã‚¤ãƒ«å†…ã®ãƒ©ã‚¤ãƒˆã«ãƒ•ãƒ©ã‚°ã‚’ç«‹ã¦ã‚‹ã€‚
 groupshared uint _spotlightStartOffset;
-groupshared uint2 _opaqueLightIndex; // x‚Íƒ|ƒCƒ“ƒgƒ‰ƒCƒgAy‚ÍƒXƒ|ƒbƒgƒ‰ƒCƒgB
+groupshared uint2 _opaqueLightIndex; // xã¯ãƒã‚¤ãƒ³ãƒˆãƒ©ã‚¤ãƒˆã€yã¯ã‚¹ãƒãƒƒãƒˆãƒ©ã‚¤ãƒˆã€‚
 
 ConstantBuffer<GlobalShaderData> GlobalData : register(b0, space0);
 ConstantBuffer<LightCullingDispatchParameters> ShaderParams : register(b1, space0);
@@ -54,13 +54,13 @@ bool Intersects(Frustum frustum, Sphere sphere, float minDepth, float maxDepth)
     return distSq <= radiusSq;
 }
 
-// NOTE: TILE_SIZE‚ÍƒRƒ“ƒpƒCƒ‹‚ÉƒGƒ“ƒWƒ“‚É‚æ‚Á‚Ä’è‹`‚³‚ê‚éB
+// NOTE: TILE_SIZEã¯ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«æ™‚ã«ã‚¨ãƒ³ã‚¸ãƒ³ã«ã‚ˆã£ã¦å®šç¾©ã•ã‚Œã‚‹ã€‚
 [numthreads(TILE_SIZE, TILE_SIZE, 1)]
 void CullLightsCS(ComputeShaderInput csIn)
 {
     // INITIALIZATION SECTION
     //
-    // ‰äX‚Ì‰EèÀ•WŒn‚Å‚ÍA—ñ’·Ë‰es—ñ‚ÍŸ‚Ì‚æ‚¤‚É‚È‚éF
+    // æˆ‘ã€…ã®å³æ‰‹åº§æ¨™ç³»ã§ã¯ã€åˆ—é•·å°„å½±è¡Œåˆ—ã¯æ¬¡ã®ã‚ˆã†ã«ãªã‚‹ï¼š
     //
     //      Projection:             Inverse projection:
     //      | A  0  0  0 |          | 1/A  0   0   0  |
@@ -68,7 +68,7 @@ void CullLightsCS(ComputeShaderInput csIn)
     //      | 0  0  C  D |          |  0   0   0  -1  |
     //      | 0  0 -1  0 |          |  0   0  1/D C/D |
     //
-    // ˆÊ’uƒxƒNƒgƒ‹v‚ğƒNƒŠƒbƒv‚©‚çƒrƒ…[‹óŠÔ‚É•ÏŠ·‚·‚éF
+    // ä½ç½®ãƒ™ã‚¯ãƒˆãƒ«vã‚’ã‚¯ãƒªãƒƒãƒ—ã‹ã‚‰ãƒ“ãƒ¥ãƒ¼ç©ºé–“ã«å¤‰æ›ã™ã‚‹ï¼š
     //
     // q = mul(inverse_projection, v);
     // v_viewSpace = q / q.w;
@@ -87,32 +87,32 @@ void CullLightsCS(ComputeShaderInput csIn)
 
     if (csIn.GroupIndex == 0) // only the first thread in the group need to initialize groupshared memory
     {
-        _minDepthVS = 0x7f7fffff; // uint‚Æ‚µ‚Ä‚ÌFLT_MAX
+        _minDepthVS = 0x7f7fffff; // uintã¨ã—ã¦ã®FLT_MAX
         _maxDepthVS = 0;
         _lightCount = 0;
         _opaqueLightIndex = 0;
     }
 
-    uint i = 0, index = 0; // Ä—˜—p‰Â”\‚ÈƒCƒ“ƒfƒbƒNƒX•Ï”B
+    uint i = 0, index = 0; // å†åˆ©ç”¨å¯èƒ½ãªã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹å¤‰æ•°ã€‚
 
     for (i = csIn.GroupIndex; i < MaxLightsPerGroup; i += TILE_SIZE * TILE_SIZE)
     {
         _lightFlagsOpaque[i] = 0;
     }
 
-    // [‚³Å¬/Å‘å’f–Ê
+    // æ·±ã•æœ€å°/æœ€å¤§æ–­é¢
     GroupMemoryBarrierWithGroupSync();
 
-    if (depth != 0) // ‰“‚¢•½–Ê‚ğŠÜ‚ß‚È‚¢
+    if (depth != 0) // é ã„å¹³é¢ã‚’å«ã‚ãªã„
     {
-        // [‚³‚ª‹t‚È‚Ì‚ÅAÅ¬^Å‘å‚ğ“ü‚ê‘Ö‚¦‚é
+        // æ·±ã•ãŒé€†ãªã®ã§ã€æœ€å°ï¼æœ€å¤§ã‚’å…¥ã‚Œæ›¿ãˆã‚‹
         const float depthMin = WaveActiveMax(depth);
         const float depthMax = WaveActiveMin(depth);
 
         if (WaveIsFirstLane())
         {
-            // ‰E‰ñ‚è‚ÌƒRƒŠƒi[ƒgi•‰‚ÌZ²j‚Ì‚½‚ßA[‚³‚ğ•‰‚É‚·‚éB
-            // ‚±‚ê‚Å”äŠr‚ª‚í‚©‚è‚â‚·‚­‚È‚éB
+            // å³å›ã‚Šã®ã‚³ãƒªãƒŠãƒ¼ãƒˆï¼ˆè² ã®Zè»¸ï¼‰ã®ãŸã‚ã€æ·±ã•ã‚’è² ã«ã™ã‚‹ã€‚
+            // ã“ã‚Œã§æ¯”è¼ƒãŒã‚ã‹ã‚Šã‚„ã™ããªã‚‹ã€‚
             const uint zMin = asuint(D / (depthMin + C)); // -minDepthVS as uint
             const uint zMax = asuint(D / (depthMax + C)); // -maxDepthVS as uint
             InterlockedMin(_minDepthVS, zMin);
@@ -120,7 +120,7 @@ void CullLightsCS(ComputeShaderInput csIn)
         }
     }
 
-    // ƒ‰ƒCƒgƒJƒŠƒ“ƒOƒZƒNƒVƒ‡ƒ“
+    // ãƒ©ã‚¤ãƒˆã‚«ãƒªãƒ³ã‚°ã‚»ã‚¯ã‚·ãƒ§ãƒ³
     GroupMemoryBarrierWithGroupSync();
 
     const float minDepthVS = -asfloat(_minDepthVS);
@@ -139,7 +139,7 @@ void CullLightsCS(ComputeShaderInput csIn)
         }
     }
 
-    // Œy™’’èƒZƒNƒVƒ‡ƒ“
+    // è»½å‰ªå®šã‚»ã‚¯ã‚·ãƒ§ãƒ³
     GroupMemoryBarrierWithGroupSync();
 
     const uint lightCount = min(_lightCount, MaxLightsPerGroup);
@@ -156,7 +156,7 @@ void CullLightsCS(ComputeShaderInput csIn)
 
         if (distSq <= light.Range * light.Range)
         {
-            // NOTE: -1‚ÍAƒ‰ƒCƒg‚ª“_ŒõŒ¹‚Å‚ ‚é‚±‚Æ‚ğˆÓ–¡‚µ‚Ä‚¢‚éB ‚»‚¤‚Å‚È‚¯‚ê‚ÎƒXƒ|ƒbƒgƒ‰ƒCƒg
+            // NOTE: -1ã¯ã€ãƒ©ã‚¤ãƒˆãŒç‚¹å…‰æºã§ã‚ã‚‹ã“ã¨ã‚’æ„å‘³ã—ã¦ã„ã‚‹ã€‚ ãã†ã§ãªã‘ã‚Œã°ã‚¹ãƒãƒƒãƒˆãƒ©ã‚¤ãƒˆ
             const bool isPointLight = light.CosPenumbra == -1.f;
             if (isPointLight || (dot(d * rsqrt(distSq), light.Direction) >= light.CosPenumbra))
             {
@@ -165,7 +165,7 @@ void CullLightsCS(ComputeShaderInput csIn)
         }
     }
 
-    // ƒ‰ƒCƒgƒOƒŠƒbƒh‚ÌXVƒZƒNƒVƒ‡ƒ“
+    // ãƒ©ã‚¤ãƒˆã‚°ãƒªãƒƒãƒ‰ã®æ›´æ–°ã‚»ã‚¯ã‚·ãƒ§ãƒ³
     GroupMemoryBarrierWithGroupSync();
     if (csIn.GroupIndex == 0)
     {
@@ -183,7 +183,7 @@ void CullLightsCS(ComputeShaderInput csIn)
         LightGrid_Opaque[gridIndex] = uint2(_lightIndexStartOffset, (numPointLights << 16) | numSpotlights);
     }
 
-    // ƒ‰ƒCƒgƒCƒ“ƒfƒbƒNƒXƒŠƒXƒg‚ÌXVƒZƒNƒVƒ‡ƒ“
+    // ãƒ©ã‚¤ãƒˆã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒªã‚¹ãƒˆã®æ›´æ–°ã‚»ã‚¯ã‚·ãƒ§ãƒ³
     GroupMemoryBarrierWithGroupSync();
 
     uint pointIndex, spotIndex;
@@ -204,16 +204,16 @@ void CullLightsCS(ComputeShaderInput csIn)
     }
 }
 #else
-// NOTE: ‚±‚Ì’è”‚ÍAƒ‰ƒCƒgƒJƒŠƒ“ƒOƒ‚ƒWƒ…[ƒ‹‚Ìmax_lights_per_tile‚æ‚è‘å‚«‚¢i256‚Æ’è‹`‚³‚ê‚Ä‚¢‚éjB
-//       ‚Æ‚¢‚¤‚Ì‚àA256‚Í1ƒ^ƒCƒ‹‚ ‚½‚è‚Ìƒ‰ƒCƒg‚Ì*•½‹Ï*”‚ÌÅ‘å’l‚¾‚©‚ç‚¾B
-//       ‚±‚Ì’è”‚Íƒ^ƒCƒ‹‚ ‚½‚è‚ÌÅ‘åƒ‰ƒCƒg”‚Å‚ ‚éB
+// NOTE: ã“ã®å®šæ•°ã¯ã€ãƒ©ã‚¤ãƒˆã‚«ãƒªãƒ³ã‚°ãƒ¢ã‚¸ãƒ¥ãƒ¼ãƒ«ã®max_lights_per_tileã‚ˆã‚Šå¤§ãã„ï¼ˆ256ã¨å®šç¾©ã•ã‚Œã¦ã„ã‚‹ï¼‰ã€‚
+//       ã¨ã„ã†ã®ã‚‚ã€256ã¯1ã‚¿ã‚¤ãƒ«ã‚ãŸã‚Šã®ãƒ©ã‚¤ãƒˆã®*å¹³å‡*æ•°ã®æœ€å¤§å€¤ã ã‹ã‚‰ã ã€‚
+//       ã“ã®å®šæ•°ã¯ã‚¿ã‚¤ãƒ«ã‚ãŸã‚Šã®æœ€å¤§ãƒ©ã‚¤ãƒˆæ•°ã§ã‚ã‚‹ã€‚
 static const uint MaxLightsPerGroup = 1024;
 
-groupshared uint _minDepthVS; // ƒ^ƒCƒ‹‚Ìƒrƒ…[‹óŠÔ‚É‚¨‚¯‚éÅ¬[“xB
-groupshared uint _maxDepthVS; // ƒrƒ…[‹óŠÔ‚É‚¨‚¯‚éƒ^ƒCƒ‹‚ÌÅ‘å[“xB
-groupshared uint _lightCount; // ‚±‚Ìƒ^ƒCƒ‹‚ÌƒsƒNƒZƒ‹‚É‰e‹¿‚ğ—^‚¦‚éƒ‰ƒCƒg‚Ì”B
-groupshared uint _lightIndexStartOffset; // lightIndexList‚ğƒRƒs[‚·‚éƒOƒ[ƒoƒ‹Eƒ‰ƒCƒgEƒCƒ“ƒfƒbƒNƒXEƒŠƒXƒg“à‚ÌƒIƒtƒZƒbƒgB
-groupshared uint _lightIndexList[MaxLightsPerGroup]; // ‚±‚Ìƒ^ƒCƒ‹‚É‰e‹¿‚ğ—^‚¦‚éƒ‰ƒCƒg‚ÌƒCƒ“ƒfƒbƒNƒXB
+groupshared uint _minDepthVS; // ã‚¿ã‚¤ãƒ«ã®ãƒ“ãƒ¥ãƒ¼ç©ºé–“ã«ãŠã‘ã‚‹æœ€å°æ·±åº¦ã€‚
+groupshared uint _maxDepthVS; // ãƒ“ãƒ¥ãƒ¼ç©ºé–“ã«ãŠã‘ã‚‹ã‚¿ã‚¤ãƒ«ã®æœ€å¤§æ·±åº¦ã€‚
+groupshared uint _lightCount; // ã“ã®ã‚¿ã‚¤ãƒ«ã®ãƒ”ã‚¯ã‚»ãƒ«ã«å½±éŸ¿ã‚’ä¸ãˆã‚‹ãƒ©ã‚¤ãƒˆã®æ•°ã€‚
+groupshared uint _lightIndexStartOffset; // lightIndexListã‚’ã‚³ãƒ”ãƒ¼ã™ã‚‹ã‚°ãƒ­ãƒ¼ãƒãƒ«ãƒ»ãƒ©ã‚¤ãƒˆãƒ»ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒ»ãƒªã‚¹ãƒˆå†…ã®ã‚ªãƒ•ã‚»ãƒƒãƒˆã€‚
+groupshared uint _lightIndexList[MaxLightsPerGroup]; // ã“ã®ã‚¿ã‚¤ãƒ«ã«å½±éŸ¿ã‚’ä¸ãˆã‚‹ãƒ©ã‚¤ãƒˆã®ã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ã€‚
 
 ConstantBuffer<GlobalShaderData> GlobalData : register(b0, space0);
 ConstantBuffer<LightCullingDispatchParameters> ShaderParams : register(b1, space0);
@@ -224,25 +224,25 @@ RWStructuredBuffer<uint> LightIndexCounter : register(u0, space0);
 RWStructuredBuffer<uint2> LightGrid_Opaque : register(u1, space0);
 RWStructuredBuffer<uint> LightIndexList_Opaque : register(u3, space0);
 
-// ƒ‰ƒCƒgƒJƒŠƒ“ƒOƒVƒF[ƒ_[‚ÌÀ‘•‚ÍAˆÈ‰º‚Ì‚à‚Ì‚ÉŠî‚Ã‚¢‚Ä‚¢‚éB
+// ãƒ©ã‚¤ãƒˆã‚«ãƒªãƒ³ã‚°ã‚·ã‚§ãƒ¼ãƒ€ãƒ¼ã®å®Ÿè£…ã¯ã€ä»¥ä¸‹ã®ã‚‚ã®ã«åŸºã¥ã„ã¦ã„ã‚‹ã€‚
 // "Forward vs Deferred vs Forward+ Rendering with DirectX 11" (2015) by Jeremiah van Oosten.
 // https://www.3dgep.com/forward-plus/#light-culling
 //
-// NOTE: TILE_SIZE‚ÍƒRƒ“ƒpƒCƒ‹‚ÉƒGƒ“ƒWƒ“‚É‚æ‚Á‚Ä’è‹`‚³‚ê‚éB
+// NOTE: TILE_SIZEã¯ã‚³ãƒ³ãƒ‘ã‚¤ãƒ«æ™‚ã«ã‚¨ãƒ³ã‚¸ãƒ³ã«ã‚ˆã£ã¦å®šç¾©ã•ã‚Œã‚‹ã€‚
 [numthreads(TILE_SIZE, TILE_SIZE, 1)]
 void CullLightsCS(ComputeShaderInput csIn)
 {
     // INITIALIZATION SECTION
-    if (csIn.GroupIndex == 0) // ƒOƒ‹[ƒv‚ÌÅ‰‚ÌƒXƒŒƒbƒh‚¾‚¯‚ªƒOƒ‹[ƒv‹¤—Lƒƒ‚ƒŠ‚ğ‰Šú‰»‚·‚é•K—v‚ª‚ ‚éB
+    if (csIn.GroupIndex == 0) // ã‚°ãƒ«ãƒ¼ãƒ—ã®æœ€åˆã®ã‚¹ãƒ¬ãƒƒãƒ‰ã ã‘ãŒã‚°ãƒ«ãƒ¼ãƒ—å…±æœ‰ãƒ¡ãƒ¢ãƒªã‚’åˆæœŸåŒ–ã™ã‚‹å¿…è¦ãŒã‚ã‚‹ã€‚
     {
-        _minDepthVS = 0x7f7fffff; // uint‚Æ‚µ‚Ä‚ÌFLT_MAX
+        _minDepthVS = 0x7f7fffff; // uintã¨ã—ã¦ã®FLT_MAX
         _maxDepthVS = 0;
         _lightCount = 0;
     }
 
-    uint i = 0, index = 0; // Ä—˜—p‰Â”\‚ÈƒCƒ“ƒfƒbƒNƒX•Ï”B
+    uint i = 0, index = 0; // å†åˆ©ç”¨å¯èƒ½ãªã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹å¤‰æ•°ã€‚
 
-    // [‚³Å¬/Å‘å’f–Ê
+    // æ·±ã•æœ€å°/æœ€å¤§æ–­é¢
     GroupMemoryBarrierWithGroupSync();
 
     const float depth =
@@ -250,8 +250,8 @@ void CullLightsCS(ComputeShaderInput csIn)
     Texture2D( ResourceDescriptorHeap[ShaderParams.DepthBufferSrvIndex])[csIn.DispatchThreadID.xy].
     r;
     const float depthVS = ClipToView(float4(0.f, 0.f, depth, 1.f), GlobalData.InvProjection).z;
-    // ‰E‰ñ‚è‚ÌƒRƒŠƒi[ƒgi•‰‚ÌZ²j‚Ì‚½‚ßA[‚³‚Í•‰‚É‚È‚é
-    // ‚±‚¤‚·‚é‚±‚Æ‚Å”äŠr‚ª‚í‚©‚è‚â‚·‚­‚È‚éB
+    // å³å›ã‚Šã®ã‚³ãƒªãƒŠãƒ¼ãƒˆï¼ˆè² ã®Zè»¸ï¼‰ã®ãŸã‚ã€æ·±ã•ã¯è² ã«ãªã‚‹
+    // ã“ã†ã™ã‚‹ã“ã¨ã§æ¯”è¼ƒãŒã‚ã‹ã‚Šã‚„ã™ããªã‚‹ã€‚
     const uint z = asuint(-depthVS);
 
     if (depth != 0) // Don't include far plane
@@ -260,7 +260,7 @@ void CullLightsCS(ComputeShaderInput csIn)
         InterlockedMax(_maxDepthVS, z);
     }
 
-    // ƒ‰ƒCƒgƒJƒŠƒ“ƒOƒZƒNƒVƒ‡ƒ“
+    // ãƒ©ã‚¤ãƒˆã‚«ãƒªãƒ³ã‚°ã‚»ã‚¯ã‚·ãƒ§ãƒ³
     GroupMemoryBarrierWithGroupSync();
 
     const uint gridIndex = csIn.GroupID.x + (csIn.GroupID.y * ShaderParams.NumThreadGroups.x);
@@ -297,7 +297,7 @@ void CullLightsCS(ComputeShaderInput csIn)
         }
     }
 
-    // ƒ‰ƒCƒgƒOƒŠƒbƒh‚ÌXVƒZƒNƒVƒ‡ƒ“
+    // ãƒ©ã‚¤ãƒˆã‚°ãƒªãƒƒãƒ‰ã®æ›´æ–°ã‚»ã‚¯ã‚·ãƒ§ãƒ³
     GroupMemoryBarrierWithGroupSync();
 
     const uint lightCount = min(_lightCount, MaxLightsPerGroup);
@@ -308,7 +308,7 @@ void CullLightsCS(ComputeShaderInput csIn)
         LightGrid_Opaque[gridIndex] = uint2(_lightIndexStartOffset, lightCount);
     }
 
-    // ƒ‰ƒCƒgƒCƒ“ƒfƒbƒNƒXƒŠƒXƒg‚ÌXVƒZƒNƒVƒ‡ƒ“
+    // ãƒ©ã‚¤ãƒˆã‚¤ãƒ³ãƒ‡ãƒƒã‚¯ã‚¹ãƒªã‚¹ãƒˆã®æ›´æ–°ã‚»ã‚¯ã‚·ãƒ§ãƒ³
     GroupMemoryBarrierWithGroupSync();
 
     for (i = csIn.GroupIndex; i < lightCount; i += TILE_SIZE * TILE_SIZE)
