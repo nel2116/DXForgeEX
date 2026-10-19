@@ -12,6 +12,7 @@
 // 2026/10/18 削除したスクリプトをbegin_play()の待ちリストから外すよう修正(エディタで待ちリストが増え続けるため) (#47)
 // 2026/10/18 update()の中でスクリプトを生成・削除するとイテレータが無効になるのを修正(添字で回し、削除はupdate()の最後にまとめて行う) (#54)
 // 2026/10/18 update()中に削除したスクリプトもremove()の中で破棄し、実行中のスクリプト自身の削除だけを遅らせるよう変更(デストラクタからTransformを読めるようにするため) (#54)
+// 2026/10/19 update()の中で削除されたエンティティのTransformキャッシュを、適用する前に取り除くよう修正(削除済み・再利用されたスロットに書き込んでいたため) (#78)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Script.h"
@@ -291,7 +292,23 @@ namespace dxforge::script
 
 		if (transform_cache.size())
 		{
-			transform::update(transform_cache.data(), (u32)transform_cache.size());
+			// NOTE: キャッシュを積んだ後、同じフレームの中で削除されたエンティティのキャッシュを取り除く(#78)。
+			//		 削除はscript::update()の中のどこからでも(他のスクリプトや、上で破棄したスクリプトのデストラクタからも)起こりうるため、
+			//		 削除時にキャッシュを外すのではなく、適用する直前に世代まで見て判定する。
+			//		 そのまま渡すと、死んだスロットや、同じインデックスを再利用して生成された別のエンティティのTransformを上書きしてしまう。
+			for (u32 i{ (u32)transform_cache.size() }; i > 0;)
+			{
+				--i;
+				if (!game_entity::is_alive(game_entity::entity_id{ (id::id_type)transform_cache[i].id }))
+				{
+					utl::erase_unordered(transform_cache, i);
+				}
+			}
+
+			if (transform_cache.size())
+			{
+				transform::update(transform_cache.data(), (u32)transform_cache.size());
+			}
 			transform_cache.clear();
 
 #if USE_TRANSFORM_CACHE_MAP

@@ -11,6 +11,7 @@
 // 2025/01/14 コメントの追加
 // 2026/10/18 set_orientation()が未実装である旨をTODOとして明記
 // 2026/10/18 set_orientation()を削除し、向きを回転から導出するローカルフレーム(right/up/front)で保持するよう変更 (#4)
+// 2026/10/19 update()のassertで、キャッシュの所有エンティティが生きている(世代が一致する)ことまで確かめるよう変更 (#78)
 // /_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Transform.h"
@@ -229,7 +230,9 @@ namespace dxforge::transform
 		for (u32 i{ 0 }; i < count; ++i)
 		{
 			const component_cache& c{ cache[i] };
-			assert(component{ c.id }.is_valid());
+			// NOTE: IDが無効値でないことだけでなく、所有するエンティティが生きている(世代が一致する)ことまで確かめる。
+			//		 削除済みのエンティティのキャッシュを渡すと、死んだスロットや、同じインデックスを再利用した別のエンティティに書き込んでしまう(#78)。
+			assert(component{ c.id }.is_valid() && game_entity::is_alive(game_entity::entity_id{ (id::id_type)c.id }));
 
 			if (c.flags & component_flags::rotation)
 			{
