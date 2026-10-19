@@ -1,11 +1,11 @@
-#if !defined(DXFORGE_COMMON_HLSLI) && !defined(__cplusplus)
+ï»¿#if !defined(DXFORGE_COMMON_HLSLI) && !defined(__cplusplus)
 #error Do not include this header directly in shader files. Only include this file via Common.hlsli.
 #endif
 
 static const float PI = 3.1415926535897932384626433832795f;
 
-// ƒ‰ƒCƒgƒ^ƒCƒv
-// NOTE: ‚±‚ê‚ç‚Ídxforge::graphics::light::type enumeration‚Æ“¯‚¶‚Å‚·I
+// ãƒ©ã‚¤ãƒˆã‚¿ã‚¤ãƒ—
+// NOTE: ã“ã‚Œã‚‰ã¯dxforge::graphics::light::type enumerationã¨åŒã˜ã§ã™ï¼
 static const uint LIGHT_TYPE_DIRECTIONAL_LIGHT = 0;
 static const uint LIGHT_TYPE_POINT_LIGHT = 1;
 static const uint LIGHT_TYPE_SPOTLIGHT = 2;

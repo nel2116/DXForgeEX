@@ -1,11 +1,11 @@
-// ƒ}ƒ“ƒfƒ‹ƒuƒEƒtƒ‰ƒNƒ^ƒ‹’è”
+ï»¿// ãƒãƒ³ãƒ‡ãƒ«ãƒ–ãƒ­ãƒ»ãƒ•ãƒ©ã‚¯ã‚¿ãƒ«å®šæ•°
 #define M_RE_START -2.8f
 #define M_RE_END 1.f
 #define M_IM_START -1.5f
 #define M_IM_END 1.5f
 #define M_MAX_ITERATION 1000
 
-// ƒWƒ…ƒŠƒAW‡’è”
+// ã‚¸ãƒ¥ãƒªã‚¢é›†åˆå®šæ•°
 #define J_RE_START -2.f
 #define J_RE_END 2.f
 #define J_IM_START -1.5f

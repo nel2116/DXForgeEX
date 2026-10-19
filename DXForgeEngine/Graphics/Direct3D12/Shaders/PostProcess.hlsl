@@ -1,4 +1,4 @@
-#include "Common.hlsli"
+ï»¿#include "Common.hlsli"
 
 struct ShaderConstants
 {
@@ -8,7 +8,7 @@ struct ShaderConstants
 ConstantBuffer<GlobalShaderData> GlobalData : register(b0, space0);
 ConstantBuffer<ShaderConstants> ShaderParams : register(b1, space0);
 
-// TODO: ŒõƒJƒŠƒ“ƒOƒtƒ‰ƒXƒgƒ‰ƒ€ƒOƒŠƒbƒh‚ğ‰Â‹‰»‚·‚é‚½‚ß‚Ì‰¼İŒv
+// TODO: å…‰ã‚«ãƒªãƒ³ã‚°ãƒ•ãƒ©ã‚¹ãƒˆãƒ©ãƒ ã‚°ãƒªãƒƒãƒ‰ã‚’å¯è¦–åŒ–ã™ã‚‹ãŸã‚ã®ä»®è¨­è¨ˆ
 #define TILE_SIZE 16
 StructuredBuffer<Frustum> Frustums : register(t0, space0);
 StructuredBuffer<uint2> LightGridOpaque : register(t1, space0);
@@ -20,7 +20,7 @@ uint GetGridIndex(float2 posXY, float viewWidth)
     return (pos.x / TILE_SIZE) + (tileX * (pos.y / TILE_SIZE));
 }
 
-// WickedEngine‚æ‚èˆø—p: https://github.com/turanszkij/WickedEngine/blob/master/WickedEngine/shaders/lightCullingCS.hlsl
+// WickedEngineã‚ˆã‚Šå¼•ç”¨: https://github.com/turanszkij/WickedEngine/blob/master/WickedEngine/shaders/lightCullingCS.hlsl
 float4 Heatmap(StructuredBuffer<uint2> buffer, float2 posXY, float blend)
 {
     const float w = GlobalData.ViewWidth;

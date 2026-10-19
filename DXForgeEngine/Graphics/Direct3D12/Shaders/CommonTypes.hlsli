@@ -1,4 +1,4 @@
-#if !defined(DXFORGE_COMMON_HLSLI) && !defined(__cplusplus)
+﻿#if !defined(DXFORGE_COMMON_HLSLI) && !defined(__cplusplus)
 #error Do not include this header directly in shader files. Only include this file via Common.hlsli.
 #endif
 
@@ -58,7 +58,7 @@ struct Cone
 };
 
 #if USE_BOUNDING_SPHERES
-// ���E��Ԃɂ�����t���X�g�D���R�[��
+// 視界空間におけるフルストゥムコーン
 struct Frustum
 {
     float3 ConeDirection;
@@ -66,9 +66,9 @@ struct Frustum
 };
 
 #else
-// �r���[�t���X�g�D���v���[���i�r���[��ԓ��j
-// �ʏ��F���A�E�A��A��
-// �t�����g�v���[���ƃo�b�N�v���[���̓��C�g�J�����O�Ōv�Z�����Br.
+// ビューフラストゥムプレーン（ビュー空間内）
+// 面順：左、右、上、下
+// フロントプレーンとバックプレーンはライトカリングで計算される。r.
 struct Frustum
 {
     Plane Planes[4];
@@ -78,31 +78,31 @@ struct Frustum
 #ifndef __cplusplus
 struct ComputeShaderInput
 {
-    uint3 GroupID : SV_GroupID; // �f�B�X�p�b�`���̃X���b�h�O���[�v��3D�C���f�b�N�X�B
-    uint3 GroupThreadID : SV_GroupThreadID; // �X���b�h�O���[�v���̃��[�J���X���b�hID��3D�C���f�b�N�X�B
-    uint3 DispatchThreadID : SV_DispatchThreadID; // �f�B�X�p�b�`���̃O���[�o���X���b�hID��3D�C���f�b�N�X�B
-    uint GroupIndex : SV_GroupIndex; // �X���b�h�O���[�v���̃X���b�h�̕��R�����ꂽ���[�J���C���f�b�N�X�B
+    uint3 GroupID : SV_GroupID; // ディスパッチ内のスレッドグループの3Dインデックス。
+    uint3 GroupThreadID : SV_GroupThreadID; // スレッドグループ内のローカルスレッドIDの3Dインデックス。
+    uint3 DispatchThreadID : SV_DispatchThreadID; // ディスパッチ内のグローバルスレッドIDの3Dインデックス。
+    uint GroupIndex : SV_GroupIndex; // スレッドグループ内のスレッドの平坦化されたローカルインデックス。
 };
 #endif
 
 struct LightCullingDispatchParameters
 {
-    // �h�����ꂽ�O���[�v�̐��B (���̃p�����[�^��HLSL�̃V�X�e���l�Ƃ��Ă͎g�p�ł��܂���I)
+    // 派遣されたグループの数。 (このパラメータはHLSLのシステム値としては使用できません！)
     uint2 NumThreadGroups;
 
-    // �f�B�X�p�b�`���ꂽ�X���b�h�̑����B (HLSL�̃V�X�e���l�Ƃ��Ă����p�ł��܂���!)
-    // NOTE: �X�N���[���T�C�Y���u���b�N�T�C�Y�ŋϓ��Ɋ���؂�Ȃ��ꍇ�A
-    //       ���̒l�͎��ۂɎ��s�����X���b�h����菭�Ȃ��Ȃ�\��������B
+    // ディスパッチされたスレッドの総数。 (HLSLのシステム値としても利用できません!)
+    // NOTE: スクリーンサイズがブロックサイズで均等に割り切れない場合、
+    //       この値は実際に実行されるスレッド数より少なくなる可能性がある。
     uint2 NumThreads;
 
-    // �J�����O���郉�C�g�̐��i�J�����O�ł��Ȃ��̂ŁA�w�������C�g�͊܂܂Ȃ��j�B
+    // カリングするライトの数（カリングできないので、指向性ライトは含まない）。
     uint NumLights;
 
-    // SRV�f�B�X�N���v�^�q�[�v���̃J�����g�f�v�X�o�b�t�@�̃C���f�b�N�X
+    // SRVディスクリプタヒープ内のカレントデプスバッファのインデックス
     uint DepthBufferSrvIndex;
 };
 
-// �t�H�[�}�b�g����A�A�������`�����N�Ƃ���D3D�̒萔/�\�����o�b�t�@�ɃR�s�[���鏀�����ł������C�g�J���C���f�[�^���܂܂�Ă��܂��B
+// フォーマットされ、連続したチャンクとしてD3Dの定数/構造化バッファにコピーする準備ができたライトカラインデータが含まれています。
 struct LightCullingLightInfo
 {
     float3 Position;
@@ -110,7 +110,7 @@ struct LightCullingLightInfo
 
     float3 Direction;
 #if USE_BOUNDING_SPHERES
-    // ���ꂪ-1�ɐݒ肳��Ă���ꍇ�A���C�g�͓_�����ƂȂ�B
+    // これが-1に設定されている場合、ライトは点光源となる。
     float CosPenumbra;
 #else
     float   ConeRadius;
@@ -120,7 +120,7 @@ struct LightCullingLightInfo
 #endif
 };
 
-// �t�H�[�}�b�g����AD3D�萔/�\�����o�b�t�@�ɘA�������`�����N�Ƃ��ăR�s�[���鏀�����ł��Ă��郉�C�g�f�[�^���܂܂�Ă��܂��B
+// フォーマットされ、D3D定数/構造化バッファに連続したチャンクとしてコピーする準備ができているライトデータが含まれています。
 struct LightParameters
 {
     float3 Position;
@@ -130,10 +130,10 @@ struct LightParameters
     float Range;
 
     float3 Color;
-    float CosUmbra; // �A���u���̃R�T�C��
+    float CosUmbra; // アンブラのコサイン
 
     float3 Attenuation;
-    float CosPenumbra; // �y�i���u���̃R�T�C��
+    float CosPenumbra; // ペナンブラのコサイン
 
 #if !USE_BOUNDING_SPHERES
     uint    Type;
