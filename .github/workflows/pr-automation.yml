@@ -20,14 +20,22 @@ jobs:
     name: No hold label
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
     steps:
+      # イベントに記録されたラベルではなく、実行時点のラベルを見る(古いrunを再実行しても hold を見落とさない)
       - name: Fail while the hold label is set
-        if: contains(github.event.pull_request.labels.*.name, 'hold')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          echo "::error::This PR has the 'hold' label. Remove it to allow merging."
-          exit 1
-      - name: No hold label
-        run: echo "No hold label."
+          labels=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')
+          if printf '%s\n' "$labels" | grep -qx 'hold'; then
+            echo "::error::This PR has the 'hold' label. Remove it to allow merging."
+            exit 1
+          fi
+          echo "No hold label."
 
   close-issues:
     name: Close linked issues

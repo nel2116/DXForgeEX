@@ -94,7 +94,9 @@ try {
 		git merge-base --is-ancestor "refs/heads/$branch" origin/develop
 		if ($LASTEXITCODE -ne 0) { return "PR #$pr のマージ後に足したコミットがある" }
 		if ($path) {
-			$dirty = git -C $path status --porcelain
+			# status.showUntrackedFiles などの設定に左右されないよう、追跡されていないファイルの表示を明示する
+			$dirty = git -C $path status --porcelain --untracked-files=all
+			if ($LASTEXITCODE -ne 0) { return "worktreeの状態を確認できない" }
 			if ($dirty) { return "未コミットの変更か追跡されていないファイルがある" }
 		}
 		return $null
