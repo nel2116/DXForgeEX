@@ -653,7 +653,10 @@ namespace DXForgeEditor.Content
             try
             {
                 Logger.Log(MessageType.Info, $"画像ファイルのインポート: {file}");
-                ImportSettings.Sources.Add(file);
+                // NOTE: Sources はインポート設定の画面(TextureImportSettingsConfigurator.Import)で設定済みで、
+                //       再インポートでは .asset から読んだものを使う。ここで file を足すと同じ画像が重複し、
+                //       再インポートでは .asset のパスが画像として渡ってしまう(#82, Primal Day 067 と同じ)。
+                Debug.Assert(ImportSettings.Sources.Any());
 
                 (var slices, var icon, var diffuseIBL) = ContentToolsAPI.Import(this);
                 if (slices == null) throw new InvalidDataException("ContentToolsからテクスチャデータを取得できませんでした。");
