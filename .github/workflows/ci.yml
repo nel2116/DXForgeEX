@@ -35,7 +35,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: packages/DirectXShaderCompiler
-          key: dxc-${{ runner.os }}-v1
+          key: dxc-${{ runner.os }}-v1-issue84-tmp
 
       - name: Build and run unit tests
         shell: pwsh
