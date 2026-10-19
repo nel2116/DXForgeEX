@@ -25,6 +25,15 @@
 .PARAMETER Effort
 	Codexの推論の強さ(model_reasoning_effort)。既定値: high。
 
+.PARAMETER SetStatus
+	マージの関門として、レビューしたコミットにコミットステータス codex-review を付ける。
+	Codexの出力に指摘("- [P0〜P3] ..." の行)がなければ success を付けて自動マージ(gh pr merge --auto --merge)を
+	予約し、指摘があれば重大度を問わず failure を付ける。向き先のブランチ保護が codex-review と No hold label を
+	必須にしていないPRには使えない(レビューの前に確かめて止まる)。developのブランチ保護はCI・hold・
+	codex-review の成功を必須にしているため、残りがそろった時点でGitHubがマージする。
+	ステータスはコミットに付くので、修正をpushすると外れ、再レビューで success になるまでマージされない。
+	PRの完了条件(GUIでの確認など)がそろってから、コーディネーターが指定すること。マージ済みのPRには使えない。
+
 .EXAMPLE
 	./CodexReview.ps1 -Pr 52
 	PR #52 をレビューして結果を表示する。
@@ -32,6 +41,10 @@
 .EXAMPLE
 	./CodexReview.ps1 -Pr 52 -Post
 	PR #52 をレビューして結果をPRにコメントする。
+
+.EXAMPLE
+	./CodexReview.ps1 -Pr 52 -Post -SetStatus
+	PR #52 をレビューしてコメントし、指摘がなければ codex-review を success にして自動マージを予約する。
 #>
 [CmdletBinding()]
 param(
@@ -41,7 +54,9 @@ param(
 	[switch]$Post,
 
 	[ValidateSet("low", "medium", "high", "xhigh")]
-	[string]$Effort = "high"
+	[string]$Effort = "high",
+
+	[switch]$SetStatus
 )
 
 $ErrorActionPreference = "Stop"
@@ -85,6 +100,27 @@ $head = git -C $RepoRoot rev-parse "$ref/head"
 # マージ済みのPRは、今のbaseにPR自身の変更が含まれていて差分が空になるため、
 # マージコミットの1番目の親(マージ直前のbase)と2番目の親(マージ時点のPRのhead)を比べる
 $merged = $info.state -eq "MERGED"
+if ($SetStatus -and $info.state -ne "OPEN") {
+	git -C $RepoRoot update-ref -d "$ref/base"
+	git -C $RepoRoot update-ref -d "$ref/head"
+	throw "-SetStatus はオープンなPRにしか使えません(PR #$Pr は $($info.state))。"
+}
+if ($SetStatus) {
+	# gh pr merge --auto は必須のチェックがないブランチでは即座にマージするため、向き先のブランチ保護が
+	# codex-review と hold のチェックを必須にしていることを確かめてから進む(レビューの前に確かめる)
+	Push-Location $RepoRoot
+	try {
+		$required = @(gh api "repos/{owner}/{repo}/branches/$base/protection/required_status_checks" --jq '.contexts[]' 2>$null)
+	}
+	finally {
+		Pop-Location
+	}
+	if ($LASTEXITCODE -ne 0 -or "codex-review" -notin $required -or "No hold label" -notin $required) {
+		git -C $RepoRoot update-ref -d "$ref/base"
+		git -C $RepoRoot update-ref -d "$ref/head"
+		throw "向き先 $base のブランチ保護が codex-review と No hold label を必須にしていないため、-SetStatus(自動マージ)は使えません。"
+	}
+}
 $currentSha = $baseSha
 if ($merged) {
 	$mergeSha = $info.mergeCommit.oid
@@ -124,7 +160,7 @@ $prompt += "`n" + @"
 - 指摘は日本語で書き、それぞれに重大度(P0〜P3)、ファイル:行、その不具合が起きる具体的な手順や入力を書くこと。推測で書いた指摘はそうと分かるようにすること。
 - 変更された行だけでなく、呼び出し元や関連する箇所も読んで、変更が既存の挙動を壊していないかを確かめること。
 - リポジトリのCLAUDE.mdの規約も確認すること(特に: C++/C#のファイルはUTF-8 BOM、日本語ヘッダの更新履歴は追記のみ、狭い文字列リテラルに日本語を入れない、async void・OpenProjectViewから呼ばれる経路で例外を投げない、警告を握りつぶさない)。
-- 問題がなければ、そう書くこと。
+- 問題がなければ、「問題は見つかりませんでした」という文をそのまま含めて書くこと(この文は機械的に読み取る)。
 "@
 
 try {
@@ -164,6 +200,16 @@ finally {
 Remove-Item -ErrorAction SilentlyContinue $log
 Write-Output $review
 
+# codex review は独自の出力形式に従い、カスタム指示で最後の行の書式を指定しても守らない。
+# 指摘は必ず "- [P1] 見出し — ファイル:行" の形の行で出る("Full review comments:" / 1件なら "Review comment:" の下)ので、
+# その行が1つでもあれば指摘あり(重大度を問わない)。指摘なしとするのは、その行がなく、かつ指示した
+# 「問題は見つかりませんでした」を含むときだけ(レビュー不能のメッセージなどを指摘なしと取り違えない)
+$verdict = if ($review -match '(?m)^\s*-\s*\[P[0-3]\]' -or $review -match '(?m)^(Full review comments|Review comments?):') { "FINDINGS" }
+	elseif ($review -match '問題は見つかりませんでした') { "PASS" }
+	else { "UNKNOWN" }
+Write-Output "判定: $verdict"
+
+$commentUrl = $null
 if ($Post) {
 	$target = if ($merged) {
 		"マージ済み。$($head.Substring(0, 7))(マージ直前の ``$base`` の $($baseSha.Substring(0, 7)) との差分)、現在の ``$base`` は $($currentSha.Substring(0, 7))"
@@ -185,11 +231,51 @@ $review
 	Push-Location $RepoRoot
 	try {
 		[System.IO.File]::WriteAllText($bodyFile, $body, [System.Text.UTF8Encoding]::new($false))
-		gh pr comment $Pr --body-file $bodyFile
+		$commentUrl = gh pr comment $Pr --body-file $bodyFile
 		if ($LASTEXITCODE -ne 0) { throw "PRへのコメントに失敗しました。" }
+		Write-Output $commentUrl
 	}
 	finally {
 		Pop-Location
 		Remove-Item -ErrorAction SilentlyContinue $bodyFile
+	}
+}
+
+if ($SetStatus) {
+	$state = if ($verdict -eq "PASS") { "success" } else { "failure" }
+	$description = switch ($verdict) {
+		"PASS" { "Codex review: no findings ($model, $Effort)" }
+		"FINDINGS" { "Codex review: findings to address ($model, $Effort)" }
+		default { "Codex review: could not confirm the review completed" }
+	}
+	Push-Location $RepoRoot
+	try {
+		# レビューしたコミット($head)に付ける。レビュー中にpushされていても、新しいheadは未レビューのまま残る
+		$statusArgs = @("api", "--silent", "repos/{owner}/{repo}/statuses/$head",
+			"-f", "state=$state", "-f", "context=codex-review", "-f", "description=$description")
+		if ($commentUrl) { $statusArgs += @("-f", "target_url=$commentUrl") }
+		gh @statusArgs
+		if ($LASTEXITCODE -ne 0) { throw "コミットステータスの設定に失敗しました。" }
+		Write-Output "codex-review: $state ($($head.Substring(0, 7)))"
+
+		if ($verdict -eq "PASS") {
+			$now = gh pr view $Pr --json headRefOid,baseRefName | ConvertFrom-Json
+			if ($now.headRefOid -ne $head) {
+				Write-Warning "レビュー中にPRのheadが $($now.headRefOid.Substring(0, 7)) に進みました。新しいheadは未レビューのため、自動マージは予約しません。"
+			}
+			elseif ($now.baseRefName -ne $base) {
+				# 保護を確かめたのはレビュー開始時の向き先なので、変わっていたら予約しない
+				Write-Warning "レビュー中にPRの向き先が $base から $($now.baseRefName) に変わりました。自動マージは予約しません。"
+			}
+			else {
+				# 必須のチェックがそろっていれば即座に、そうでなければそろった時点でGitHubがマージする
+				gh pr merge $Pr --auto --merge
+				if ($LASTEXITCODE -ne 0) { throw "自動マージの予約に失敗しました。" }
+				Write-Output "自動マージを予約しました(CI・hold・codex-review がそろうとマージされます)。"
+			}
+		}
+	}
+	finally {
+		Pop-Location
 	}
 }
