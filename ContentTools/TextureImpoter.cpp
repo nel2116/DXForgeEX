@@ -8,6 +8,7 @@
 // 2025/01/23 新規作成
 // 2026/10/18 正距円筒のHDR画像からキューブマップへの変換に対応 (Primal Day 072)
 // 2026/10/18 D3D11の機能レベル11_0のアダプタも使えるよう修正
+// 2026/10/18 拡散光のIBL用の事前フィルタ(PrefilterDiffuseIBL)を追加し、プリフィルタするキューブマップの圧縮をフィルタの後に回すよう変更 (Primal Day 073)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "ToolsCommon.h"
@@ -26,6 +27,15 @@ namespace dxforge::tools
 
 	namespace
 	{
+		struct ibl_filter
+		{
+			enum type : u32
+			{
+				diffuse = 0,
+				specular,
+			};
+		};
+
 		struct import_error
 		{
 			enum error_code : u32
@@ -761,6 +771,89 @@ namespace dxforge::tools
 			return scratch;
 		}
 
+		/// @brief Import()が出力した圧縮前のキューブマップをIBL用に事前フィルタし、インポート設定に従って圧縮する
+		/// @param data テクスチャデータ(結果で置き換える。失敗した場合はimport_errorを設定する)
+		/// @param filter_type フィルタの種類
+		void prefilter_ibl(texture_data* const data, ibl_filter::type filter_type)
+		{
+			using namespace dxforge::content;
+			texture_info& info{ data->info };
+			const DXGI_FORMAT format{ (DXGI_FORMAT)info.format };
+
+			// NOTE: Primalはassertで確かめているが、エディタ以外(テストなど)からも呼べるようにエラーとして返す。
+			if (!data->import_settings.prefilter_cubemap || IsCompressed(format) || !(info.flags & texture_flags::is_cube_map) ||
+				info.width != info.height || !info.array_size || info.array_size % 6)
+			{
+				info.import_error = import_error::unknown;
+				return;
+			}
+
+			utl::vector<Image> images = subresource_data_to_images(data);
+			assert(!images.empty());
+			const u32 cubemap_count{ info.array_size / 6 };
+
+			HRESULT hr{ S_OK };
+
+			ScratchImage cubemaps{};
+			hr = cubemaps.InitializeCube(format, info.width, info.height, cubemap_count, info.mip_levels);
+			if (FAILED(hr) || cubemaps.GetImageCount() != images.size())
+			{
+				info.import_error = import_error::unknown;
+				return;
+			}
+
+			for (u32 img_idx{ 0 }; img_idx < cubemaps.GetImageCount(); ++img_idx)
+			{
+				const Image& image{ cubemaps.GetImages()[img_idx] };
+				if (image.slicePitch != images[img_idx].slicePitch || image.rowPitch != images[img_idx].rowPitch)
+				{
+					info.import_error = import_error::unknown;
+					return;
+				}
+				memcpy(image.pixels, images[img_idx].pixels, image.slicePitch);
+			}
+
+			if (filter_type == ibl_filter::diffuse)
+			{
+				// GPUが使えない場合や、GPUでのフィルタに失敗した場合(例: UAVに使えないsRGBのフォーマット)はCPUでフィルタする。
+				ScratchImage prefiltered{};
+				const bool filtered_on_gpu{ run_on_gpu([&](ID3D11Device* device)
+					{
+						hr = prefilter_diffuse(device, cubemaps, prefiltered);
+					}) };
+
+				if (!filtered_on_gpu || FAILED(hr))
+				{
+					prefiltered.Release();
+					hr = prefilter_diffuse(cubemaps, prefiltered);
+				}
+
+				if (FAILED(hr))
+				{
+					info.import_error = import_error::unknown;
+					return;
+				}
+
+				cubemaps = std::move(prefiltered);
+			}
+			// TODO: 鏡面反射の事前フィルタ(Primal Day 074, #36)。それまではフィルタせずに、後回しにした圧縮だけを行う。
+
+			if (data->import_settings.compress)
+			{
+				ScratchImage bc_scratch{ compress_image(data, cubemaps) };
+				if (data->info.import_error) return;
+
+				// アイコンに使用する最初の画像を解凍する。
+				assert(bc_scratch.GetImages());
+				copy_icon(bc_scratch.GetImages()[0], data);
+
+				cubemaps = std::move(bc_scratch);
+			}
+
+			copy_subresources(cubemaps, data);
+			texture_info_from_metadata(cubemaps.GetMetadata(), data->info);
+		}
+
 	} // 匿名名前空間
 
 	/// @brief テクスチャツールの終了処理
@@ -779,6 +872,21 @@ namespace dxforge::tools
 			FreeLibrary(d3d11_module);
 			d3d11_module = nullptr;
 		}
+	}
+
+	/// @brief Import()が出力したキューブマップから拡散光のIBL用のキューブマップ(irradiance map)を作る
+	/// @param data テクスチャデータ(Import()の結果のコピー。結果で置き換える)
+	EDITOR_INTERFACE void PrefilterDiffuseIBL(texture_data* const data)
+	{
+		prefilter_ibl(data, ibl_filter::diffuse);
+	}
+
+	/// @brief Import()が出力したキューブマップを鏡面反射のIBL用に事前フィルタする
+	/// @details 鏡面反射のフィルタは未実装(#36)で、現状はImport()が後回しにした圧縮だけを行う。
+	/// @param data テクスチャデータ(Import()の結果。結果で置き換える)
+	EDITOR_INTERFACE void PrefilterSpecularIBL(texture_data* const data)
+	{
+		prefilter_ibl(data, ibl_filter::specular);
 	}
 
 	/// @brief テクスチャの解凍
@@ -867,7 +975,8 @@ namespace dxforge::tools
 		ScratchImage scratch{ initialize_from_images(data, images) };
 		if (data->info.import_error) return;
 
-		if (settings.compress)
+		// NOTE: プリフィルタするキューブマップは圧縮しない。圧縮はPrefilterSpecularIBL()でフィルタした後に行う。
+		if (settings.compress && !(scratch.GetMetadata().IsCubemap() && settings.prefilter_cubemap))
 		{
 			ScratchImage bc_scratch{ compress_image(data, scratch) };
 			if (data->info.import_error) return;

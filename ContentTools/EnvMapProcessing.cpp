@@ -8,6 +8,8 @@
 // 2026/10/18 新規作成
 // 2026/10/18 機能レベル11_0のデバイスでもUAVの解除が正しく行われるよう修正
 // 2026/10/18 CPU版のキューブマップ変換のサンプリング位置をGPU版と同じ画素の中心に修正(キューブ面と正距円筒画像の両方で半画素ずれていた)
+// 2026/10/18 拡散光のIBL用にキューブマップを事前フィルタする処理(irradiance map)のGPU版とCPU版を追加 (Primal Day 073)
+// 2026/10/19 拡散光の事前フィルタの入力が大きいときは縮小してから処理し、処理量に上限を設けた
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "EnvMapProcessing.h"
@@ -25,8 +27,10 @@ namespace dxforge::tools
 		{
 			// CompileShaders.cmdがビルド前に生成するシェーダのバイトコード(x64/Compiled)
 #include "EnvMapProcessing_EquirectangularToCubeMapCS.inc"
+#include "EnvMapProcessing_PrefilterDiffuseEnvMapCS.inc"
 		}
 
+		constexpr u32 prefiltered_diffuse_cubemap_size{ 64 };
 		constexpr u32 prefiltered_specular_cubemap_size{ 256 };
 		// EnvMapProcessing.hlslのSAMPLE_OFFSETと同じ値にすること(画素の中心からサンプリングする)。
 		constexpr f32 sample_offset{ 0.5f };
@@ -54,6 +58,32 @@ namespace dxforge::tools
 				{ -v,    u,   -1.f },   // Y- Top
 				{  1.f,  u,   -v },     // Z+ Front
 				{ -1.f, -u,   -v },     // Z- Back
+			};
+
+			XMVECTOR dir{ XMLoadFloat3(&directions[face]) };
+			dir = XMVector3Normalize(dir);
+			math::v3 normalized_dir;
+			XMStoreFloat3(&normalized_dir, dir);
+
+			return normalized_dir;
+		}
+
+		/// @brief キューブマップの面とその面上の座標からサンプリング方向を求める(D3Dのキューブマップの面の配置)
+		/// @details EnvMapProcessing.hlslのGetSampleDirectionCubemapと同じにすること。
+		///          GPU版はこの方向で入力のキューブマップをサンプリングするので、画素の中心の方向ならその画素の値そのものが返る。
+		/// @param face 面のインデックス(0: X+, 1: X-, 2: Y+, 3: Y-, 4: Z+, 5: Z-)
+		/// @param u 面上の横方向の座標[-1, 1]
+		/// @param v 面上の縦方向の座標[-1, 1]
+		/// @return 正規化されたサンプリング方向
+		math::v3 get_sample_direction_cubemap(u32 face, f32 u, f32 v)
+		{
+			math::v3 directions[6]{
+				{  1.f, -v,   -u },     // X+ Left
+				{ -1.f, -v,    u },     // X- Right
+				{  u,    1.f,  v },     // Y+ Bottom
+				{  u,   -1.f, -v },     // Y- Top
+				{  u,   -v,    1.f },   // Z+ Front
+				{ -u,   -v,   -1.f },   // Z- Back
 			};
 
 			XMVECTOR dir{ XMLoadFloat3(&directions[face]) };
@@ -115,6 +145,147 @@ namespace dxforge::tools
 
 					u8* const src_pixel{ &env_map.pixels[env_row_pitch * pos_y + pos_x * bytes_per_pixel] };
 					memcpy(dst_pixel, src_pixel, bytes_per_pixel);
+				}
+			}
+		}
+
+		/// @brief キューブマップの1画素の中心の方向と、その画素の立体角に比例する重み
+		struct cubemap_texel
+		{
+			math::v3 direction;
+			f32 solid_angle;
+		};
+
+		/// @brief 1面がsize x sizeのキューブマップの全画素について、画素の中心の方向と立体角に比例する重みを求める
+		/// @details EnvMapProcessing.hlslのSampleHemisphereBruteと同じ式を使う。並びは[面][y][x]。
+		/// @param size キューブマップの1面のサイズ
+		/// @return 6 * size * size個の画素
+		utl::vector<cubemap_texel> get_cubemap_texels(u32 size)
+		{
+			utl::vector<cubemap_texel> texels(6ull * size * size);
+			const f32 inv_size{ 1.f / (f32)size };
+			u32 index{ 0 };
+
+			for (u32 face{ 0 }; face < 6; ++face)
+				for (u32 y{ 0 }; y < size; ++y)
+				{
+					const f32 v{ ((y + sample_offset) * inv_size) * 2.f - 1.f };
+
+					for (u32 x{ 0 }; x < size; ++x)
+					{
+						const f32 u{ ((x + sample_offset) * inv_size) * 2.f - 1.f };
+						const f32 tmp{ 1.f + u * u + v * v };
+
+						cubemap_texel& texel{ texels[index++] };
+						texel.direction = get_sample_direction_cubemap(face, u, v);
+						texel.solid_angle = 4.f / (sqrtf(tmp) * tmp);
+					}
+				}
+
+			return texels;
+		}
+
+		/// @brief キューブマップの1面を拡散光のIBL用に事前フィルタする(CPU版)
+		/// 入力の面がこのサイズより大きければ、総当たりのフィルタの前に縮小する。
+		/// 処理量は(出力の画素数) x (入力の画素数)なので、縮小しないと例えば1024の6面の入力で約1.5e11回のループになり、
+		/// GPU版はTDRにかかる恐れがある。放射照度は低周波なので、出力と同じサイズまで縮小しても結果はほとんど変わらない。
+		constexpr u32 prefilter_diffuse_max_input_size{ prefiltered_diffuse_cubemap_size };
+
+		/// 入力の面がprefilter_diffuse_max_input_sizeより大きければ、各面のミップ0を縮小したキューブマップ
+		/// (DXGI_FORMAT_R32G32B32A32_FLOAT、ミップ1つ)をresizedに作る。大きくなければresizedは空のまま。
+		/// CPU版とGPU版が同じ入力を使うように、どちらもこの関数を通す。
+		HRESULT limit_prefilter_diffuse_input(const ScratchImage& cubemaps, ScratchImage& resized)
+		{
+			const TexMetadata& metadata{ cubemaps.GetMetadata() };
+			if (metadata.width <= prefilter_diffuse_max_input_size)
+			{
+				return S_OK;
+			}
+
+			utl::vector<Image> faces{};
+			for (u32 i{ 0 }; i < (u32)metadata.arraySize; ++i)
+			{
+				const Image* const image{ cubemaps.GetImage(0, i, 0) };
+				assert(image);
+				faces.emplace_back(*image);
+			}
+
+			TexMetadata mip0_metadata{ metadata };
+			mip0_metadata.mipLevels = 1;
+
+			// 面積で重み付ける縮小。WICは使わない(32ビット浮動小数点のまま処理し、COMの初期化も要らない)。
+			constexpr TEX_FILTER_FLAGS filter{ TEX_FILTER_TRIANGLE | TEX_FILTER_FORCE_NON_WIC };
+			constexpr u32 size{ prefilter_diffuse_max_input_size };
+			if (metadata.format == DXGI_FORMAT_R32G32B32A32_FLOAT)
+			{
+				return Resize(faces.data(), faces.size(), mip0_metadata, size, size, filter, resized);
+			}
+
+			ScratchImage f32_faces{};
+			const HRESULT hr{ Convert(faces.data(), faces.size(), mip0_metadata, DXGI_FORMAT_R32G32B32A32_FLOAT,
+									  TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT, f32_faces) };
+			if (FAILED(hr))
+			{
+				return hr;
+			}
+
+			return Resize(f32_faces.GetImages(), f32_faces.GetImageCount(), f32_faces.GetMetadata(), size, size, filter, resized);
+		}
+
+		/// @param texels 入力のキューブマップの全画素の方向と重み(get_cubemap_texels())
+		/// @param src_faces 入力のキューブマップのミップ0の6面(DXGI_FORMAT_R32G32B32A32_FLOAT)
+		/// @param dst_face 出力するキューブマップの面(DXGI_FORMAT_R32G32B32A32_FLOAT)
+		/// @param face_index 出力する面のインデックス
+		void prefilter_diffuse_face(const utl::vector<cubemap_texel>& texels, const Image* const* src_faces, const Image& dst_face, u32 face_index)
+		{
+			assert(dst_face.width == dst_face.height);
+			const u32 src_size{ (u32)src_faces[0]->width };
+			const f32 inv_size{ 1.f / (f32)dst_face.width };
+			constexpr u32 channel_count{ 4 };
+
+			for (u32 y{ 0 }; y < dst_face.height; ++y)
+			{
+				const f32 v{ ((y + sample_offset) * inv_size) * 2.f - 1.f };
+				f32* const dst_row{ (f32*)(dst_face.pixels + dst_face.rowPitch * y) };
+
+				for (u32 x{ 0 }; x < dst_face.width; ++x)
+				{
+					const f32 u{ ((x + sample_offset) * inv_size) * 2.f - 1.f };
+					const math::v3 normal{ get_sample_direction_cubemap(face_index, u, v) };
+
+					// 画素数が多いので、和は倍精度で求める。
+					double irradiance[3]{};
+					double weight_sum{ 0.0 };
+					const cubemap_texel* texel{ texels.data() };
+
+					for (u32 face{ 0 }; face < 6; ++face)
+					{
+						const Image& src_face{ *src_faces[face] };
+						for (u32 ty{ 0 }; ty < src_size; ++ty)
+						{
+							const f32* const src_row{ (const f32*)(src_face.pixels + src_face.rowPitch * ty) };
+							for (u32 tx{ 0 }; tx < src_size; ++tx, ++texel)
+							{
+								const math::v3& dir{ texel->direction };
+								const f32 cos_theta{ dir.x * normal.x + dir.y * normal.y + dir.z * normal.z };
+								if (cos_theta > 0.f)
+								{
+									const double weight{ (double)cos_theta * texel->solid_angle };
+									const f32* const radiance{ &src_row[tx * channel_count] };
+									irradiance[0] += radiance[0] * weight;
+									irradiance[1] += radiance[1] * weight;
+									irradiance[2] += radiance[2] * weight;
+									weight_sum += weight;
+								}
+							}
+						}
+					}
+
+					f32* const dst{ &dst_row[x * channel_count] };
+					dst[0] = (f32)(irradiance[0] / weight_sum);
+					dst[1] = (f32)(irradiance[1] / weight_sum);
+					dst[2] = (f32)(irradiance[2] / weight_sum);
+					dst[3] = 1.f;
 				}
 			}
 		}
@@ -495,5 +666,239 @@ namespace dxforge::tools
 		reset_d3d11_context(ctx.Get());
 		return download_texture_2d(ctx.Get(), cubemap_size, cubemap_size, array_size, 1, format, true,
 								   cubemaps.Get(), cubemaps_cpu.Get(), cubemaps_out);
+	}
+
+	HRESULT prefilter_diffuse(const ScratchImage& cubemaps, ScratchImage& prefiltered_diffuse)
+	{
+		const TexMetadata& metadata{ cubemaps.GetMetadata() };
+		const u32 array_size{ (u32)metadata.arraySize };
+		const u32 cubemap_count{ array_size / 6 };
+		assert(metadata.IsCubemap() && cubemap_count && !(array_size % 6));
+		assert(metadata.width == metadata.height && !IsCompressed(metadata.format));
+		const DXGI_FORMAT format{ metadata.format };
+		HRESULT hr{ S_OK };
+
+		ScratchImage resized{};
+		hr = limit_prefilter_diffuse_input(cubemaps, resized);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		const ScratchImage& input{ resized.GetImageCount() ? resized : cubemaps };
+		const DXGI_FORMAT input_format{ input.GetMetadata().format };
+		const u32 src_size{ (u32)input.GetMetadata().width };
+
+		ScratchImage working_scratch{};
+		hr = working_scratch.InitializeCube(DXGI_FORMAT_R32G32B32A32_FLOAT, prefiltered_diffuse_cubemap_size, prefiltered_diffuse_cubemap_size, cubemap_count, 1);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		const utl::vector<cubemap_texel> texels{ get_cubemap_texels(src_size) };
+
+		for (u32 i{ 0 }; i < cubemap_count; ++i)
+		{
+			// サンプリングするのはミップ0だけ。サンプリングしやすいように、32ビット浮動小数点のリニアな色空間に変換する。
+			ScratchImage f32_faces[6]{};
+			const Image* src_faces[6]{};
+			for (u32 face{ 0 }; face < 6; ++face)
+			{
+				const Image* const image{ input.GetImage(0, i * 6 + face, 0) };
+				assert(image);
+				if (input_format == DXGI_FORMAT_R32G32B32A32_FLOAT)
+				{
+					src_faces[face] = image;
+					continue;
+				}
+
+				hr = Convert(*image, DXGI_FORMAT_R32G32B32A32_FLOAT, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT, f32_faces[face]);
+				if (FAILED(hr))
+				{
+					return hr;
+				}
+
+				src_faces[face] = f32_faces[face].GetImages();
+			}
+
+			const Image* dst_images{ &working_scratch.GetImages()[i * 6] };
+
+			std::thread threads[]{
+				std::thread{ [&] { prefilter_diffuse_face(texels, src_faces, dst_images[0], 0); } },
+				std::thread{ [&] { prefilter_diffuse_face(texels, src_faces, dst_images[1], 1); } },
+				std::thread{ [&] { prefilter_diffuse_face(texels, src_faces, dst_images[2], 2); } },
+				std::thread{ [&] { prefilter_diffuse_face(texels, src_faces, dst_images[3], 3); } },
+				std::thread{ [&] { prefilter_diffuse_face(texels, src_faces, dst_images[4], 4); } },
+			};
+
+			prefilter_diffuse_face(texels, src_faces, dst_images[5], 5);
+
+			for (u32 face{ 0 }; face < 5; ++face) threads[face].join();
+		}
+
+		if (format != DXGI_FORMAT_R32G32B32A32_FLOAT)
+		{
+			hr = Convert(working_scratch.GetImages(), working_scratch.GetImageCount(), working_scratch.GetMetadata(), format,
+						 TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT, prefiltered_diffuse);
+		}
+		else
+		{
+			prefiltered_diffuse = std::move(working_scratch);
+		}
+
+		return hr;
+	}
+
+	HRESULT prefilter_diffuse(ID3D11Device* device, const ScratchImage& cubemaps, ScratchImage& prefiltered_diffuse)
+	{
+		const TexMetadata& metadata{ cubemaps.GetMetadata() };
+		const u32 array_size{ (u32)metadata.arraySize };
+		const u32 cubemap_count{ array_size / 6 };
+		assert(device && metadata.IsCubemap() && cubemap_count && !(array_size % 6));
+		assert(metadata.width == metadata.height && !IsCompressed(metadata.format));
+		const DXGI_FORMAT format{ metadata.format };
+		ComPtr<ID3D11DeviceContext> ctx{};
+		device->GetImmediateContext(ctx.GetAddressOf());
+		assert(ctx.Get());
+
+		HRESULT hr{ S_OK };
+
+		ScratchImage resized{};
+		hr = limit_prefilter_diffuse_input(cubemaps, resized);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		const ScratchImage& input{ resized.GetImageCount() ? resized : cubemaps };
+		const TexMetadata& input_metadata{ input.GetMetadata() };
+
+		// 出力先のリソースを作成
+		ComPtr<ID3D11Texture2D> cubemaps_out{};
+		ComPtr<ID3D11Texture2D> cubemaps_cpu{};
+		{
+			D3D11_TEXTURE2D_DESC desc{};
+			desc.Width = desc.Height = prefiltered_diffuse_cubemap_size;
+			desc.MipLevels = 1;
+			desc.ArraySize = array_size;
+			desc.Format = format;
+			desc.SampleDesc = { 1, 0 };
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+			desc.CPUAccessFlags = 0;
+			desc.MiscFlags = 0;
+
+			hr = device->CreateTexture2D(&desc, nullptr, cubemaps_out.GetAddressOf());
+			if (FAILED(hr))
+			{
+				return hr;
+			}
+
+			desc.BindFlags = 0;
+			desc.Usage = D3D11_USAGE_STAGING;
+			desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+
+			hr = device->CreateTexture2D(&desc, nullptr, cubemaps_cpu.GetAddressOf());
+			if (FAILED(hr))
+			{
+				return hr;
+			}
+		}
+
+		ComPtr<ID3D11ComputeShader> shader{};
+		hr = device->CreateComputeShader(shaders::EnvMapProcessing_PrefilterDiffuseEnvMapCS,
+										 sizeof(shaders::EnvMapProcessing_PrefilterDiffuseEnvMapCS),
+										 nullptr, shader.GetAddressOf());
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		ComPtr<ID3D11Buffer> constant_buffer{};
+		{
+			hr = create_constant_buffer(device, constant_buffer.GetAddressOf());
+			if (FAILED(hr))
+			{
+				return hr;
+			}
+
+			ShaderConstants constants{};
+			constants.CubeMapInSize = (u32)input_metadata.width;
+			constants.CubeMapOutSize = prefiltered_diffuse_cubemap_size;
+			hr = set_constants(ctx.Get(), constant_buffer.Get(), constants);
+			if (FAILED(hr))
+			{
+				return hr;
+			}
+		}
+
+		ComPtr<ID3D11SamplerState> linear_sampler{};
+		hr = create_linear_sampler(device, linear_sampler.GetAddressOf());
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		reset_d3d11_context(ctx.Get());
+
+		for (u32 i{ 0 }; i < cubemap_count; ++i)
+		{
+			// 入力のキューブマップをGPUにアップロード。サンプリングするのはミップ0だけなので、ミップ0の6面だけをアップロードする。
+			// NOTE: Primalはすべてのキューブマップを1つのテクスチャにまとめ、TEXTURECUBEARRAYのビューを
+			//       シェーダのTextureCubeにバインドしていたが、ビューの種類がシェーダの宣言と一致するように
+			//       キューブマップごとにTEXTURECUBEのテクスチャを作る。
+			ComPtr<ID3D11Texture2D> cubemap_in{};
+			{
+				D3D11_TEXTURE2D_DESC desc{};
+				desc.Width = (u32)input_metadata.width;
+				desc.Height = (u32)input_metadata.height;
+				desc.MipLevels = 1;
+				desc.ArraySize = 6;
+				desc.Format = input_metadata.format;
+				desc.SampleDesc = { 1, 0 };
+				desc.Usage = D3D11_USAGE_IMMUTABLE;
+				desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+				desc.CPUAccessFlags = 0;
+				desc.MiscFlags = D3D11_RESOURCE_MISC_TEXTURECUBE;
+
+				D3D11_SUBRESOURCE_DATA data[6]{};
+				for (u32 face{ 0 }; face < 6; ++face)
+				{
+					const Image* const image{ input.GetImage(0, i * 6 + face, 0) };
+					assert(image);
+					data[face].pSysMem = image->pixels;
+					data[face].SysMemPitch = (u32)image->rowPitch;
+				}
+
+				hr = device->CreateTexture2D(&desc, &data[0], cubemap_in.GetAddressOf());
+				if (FAILED(hr))
+				{
+					return hr;
+				}
+			}
+
+			ComPtr<ID3D11ShaderResourceView> cubemap_in_srv{};
+			hr = device->CreateShaderResourceView(cubemap_in.Get(), nullptr, cubemap_in_srv.GetAddressOf());
+			if (FAILED(hr))
+			{
+				return hr;
+			}
+
+			ComPtr<ID3D11UnorderedAccessView> cubemap_out_uav{};
+			hr = create_texture_2d_uav(device, format, 6, i * 6, 0, cubemaps_out.Get(), cubemap_out_uav.GetAddressOf());
+			if (FAILED(hr))
+			{
+				return hr;
+			}
+
+			const u32 block_size{ (prefiltered_diffuse_cubemap_size + 15) >> 4 };
+			dispatch(ctx.Get(), cubemap_in_srv.GetAddressOf(), cubemap_out_uav.GetAddressOf(), constant_buffer.GetAddressOf(),
+					 linear_sampler.GetAddressOf(), shader.Get(), { block_size, block_size, 6 });
+		}
+
+		reset_d3d11_context(ctx.Get());
+		return download_texture_2d(ctx.Get(), prefiltered_diffuse_cubemap_size, prefiltered_diffuse_cubemap_size, array_size, 1, format, true,
+								   cubemaps_out.Get(), cubemaps_cpu.Get(), prefiltered_diffuse);
 	}
 }

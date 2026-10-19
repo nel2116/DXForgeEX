@@ -6,6 +6,7 @@
 // 環境マップ(正距円筒のHDR画像 -> キューブマップ)の変換処理
 // 更新履歴
 // 2026/10/18 新規作成
+// 2026/10/18 拡散光のIBL用にキューブマップを事前フィルタする処理(irradiance map)を追加 (Primal Day 073)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -36,4 +37,20 @@ namespace dxforge::tools
 	/// @return 結果
 	HRESULT equirectangular_to_cubemap(const DirectX::Image* env_maps, u32 env_map_count, u32 cubemap_size,
 									   bool use_prefilter_size, bool mirror_cubemap, DirectX::ScratchImage& cubemaps);
+
+	/// @brief キューブマップを拡散光のIBL用に事前フィルタする(irradiance map, GPU版, D3D11のコンピュートシェーダを使用)
+	/// @details 出力の各画素の方向を法線とする半球について、入力のミップ0の全画素の放射輝度をcosθと立体角で重み付けた平均(放射照度 / π)を求める。
+	///          入力と出力のどちらも画素の中心からサンプリングする。
+	/// @param device D3D11デバイス
+	/// @param cubemaps 入力のキューブマップ(1つ以上, ブロック圧縮されていないこと)
+	/// @param prefiltered_diffuse 出力先(入力と同じ数とフォーマットの、1面が64x64でミップ1つのキューブマップ)
+	/// @return 結果
+	HRESULT prefilter_diffuse(ID3D11Device* device, const DirectX::ScratchImage& cubemaps, DirectX::ScratchImage& prefiltered_diffuse);
+
+	/// @brief キューブマップを拡散光のIBL用に事前フィルタする(irradiance map, CPU版, GPUが使えない場合のフォールバック)
+	/// @details GPU版と同じ和を求める(GPU版との違いは浮動小数点の丸め誤差だけ)。
+	/// @param cubemaps 入力のキューブマップ(1つ以上, ブロック圧縮されていないこと)
+	/// @param prefiltered_diffuse 出力先(入力と同じ数とフォーマットの、1面が64x64でミップ1つのキューブマップ)
+	/// @return 結果
+	HRESULT prefilter_diffuse(const DirectX::ScratchImage& cubemaps, DirectX::ScratchImage& prefiltered_diffuse);
 }
