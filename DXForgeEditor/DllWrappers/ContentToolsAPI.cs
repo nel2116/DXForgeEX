@@ -383,6 +383,7 @@ namespace DXForgeEditor.DllWrappers
         /// <summary>
         /// テクスチャをインポートする。インポート設定で事前フィルタするキューブマップの場合は、
         /// 拡散光のIBLのキューブマップ(irradiance map)も作り、diffuseIBLとして返す(Primal Day 073)。
+        /// 元のキューブマップは鏡面反射のIBL用に、ラフネスごとのミップ(1面256x256、ミップ6つ)へ事前フィルタする(Primal Day 074)。
         /// </summary>
         public static (SliceArray3D? slices, Slice? icon, Texture? diffuseIBL) Import(Texture texture)
         {
@@ -400,7 +401,7 @@ namespace DXForgeEditor.DllWrappers
                     ((TextureFlags)textureData.Info.Flags).HasFlag(TextureFlags.IsCubeMap))
                 {
                     // NOTE: Import()は事前フィルタするキューブマップを圧縮しない。拡散光のIBLはそのコピーから作り、
-                    //       元のキューブマップはPrefilterSpecularIBL()で(鏡面反射のフィルタは#36で実装予定)圧縮する。
+                    //       元のキューブマップはPrefilterSpecularIBL()で鏡面反射のIBL用にフィルタしてから圧縮する。
                     using var diffuseData = textureData.Clone();
                     var diffuseTask = Task.Run(() => PrefilterDiffuseIBL(diffuseData));
                     PrefilterSpecularIBL(textureData);

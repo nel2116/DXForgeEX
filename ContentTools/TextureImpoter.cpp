@@ -9,6 +9,7 @@
 // 2026/10/18 正距円筒のHDR画像からキューブマップへの変換に対応 (Primal Day 072)
 // 2026/10/18 D3D11の機能レベル11_0のアダプタも使えるよう修正
 // 2026/10/18 拡散光のIBL用の事前フィルタ(PrefilterDiffuseIBL)を追加し、プリフィルタするキューブマップの圧縮をフィルタの後に回すよう変更 (Primal Day 073)
+// 2026/10/19 鏡面反射のIBL用の事前フィルタ(PrefilterSpecularIBL)で、ラフネスごとのミップへのフィルタを行うよう変更 (Primal Day 074)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "ToolsCommon.h"
@@ -813,19 +814,19 @@ namespace dxforge::tools
 				memcpy(image.pixels, images[img_idx].pixels, image.slicePitch);
 			}
 
-			if (filter_type == ibl_filter::diffuse)
 			{
 				// GPUが使えない場合や、GPUでのフィルタに失敗した場合(例: UAVに使えないsRGBのフォーマット)はCPUでフィルタする。
+				const bool diffuse{ filter_type == ibl_filter::diffuse };
 				ScratchImage prefiltered{};
 				const bool filtered_on_gpu{ run_on_gpu([&](ID3D11Device* device)
 					{
-						hr = prefilter_diffuse(device, cubemaps, prefiltered);
+						hr = diffuse ? prefilter_diffuse(device, cubemaps, prefiltered) : prefilter_specular(device, cubemaps, prefiltered);
 					}) };
 
 				if (!filtered_on_gpu || FAILED(hr))
 				{
 					prefiltered.Release();
-					hr = prefilter_diffuse(cubemaps, prefiltered);
+					hr = diffuse ? prefilter_diffuse(cubemaps, prefiltered) : prefilter_specular(cubemaps, prefiltered);
 				}
 
 				if (FAILED(hr))
@@ -836,7 +837,6 @@ namespace dxforge::tools
 
 				cubemaps = std::move(prefiltered);
 			}
-			// TODO: 鏡面反射の事前フィルタ(Primal Day 074, #36)。それまではフィルタせずに、後回しにした圧縮だけを行う。
 
 			if (data->import_settings.compress)
 			{
@@ -881,8 +881,8 @@ namespace dxforge::tools
 		prefilter_ibl(data, ibl_filter::diffuse);
 	}
 
-	/// @brief Import()が出力したキューブマップを鏡面反射のIBL用に事前フィルタする
-	/// @details 鏡面反射のフィルタは未実装(#36)で、現状はImport()が後回しにした圧縮だけを行う。
+	/// @brief Import()が出力したキューブマップを鏡面反射のIBL用に、ラフネスごとのミップへ事前フィルタする(Primal Day 074)
+	/// @details 結果は1面が256x256でミップ6つ(ミップmがラフネスm / 5)のキューブマップ。その後、Import()が後回しにした圧縮を行う。
 	/// @param data テクスチャデータ(Import()の結果。結果で置き換える)
 	EDITOR_INTERFACE void PrefilterSpecularIBL(texture_data* const data)
 	{

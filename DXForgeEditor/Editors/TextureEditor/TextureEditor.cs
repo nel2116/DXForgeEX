@@ -154,6 +154,7 @@ namespace DXForgeEditor.Editors
                         IAssetImportSettings.CopyImportSettings(_texture.ImportSettings, ImportSettings);
                     }
                     OnPropertyChanged(nameof(Texture));
+                    OnPropertyChanged(nameof(SpecularIBLRoughness));
                     SetSelectedBitmap();
                     SetImageChannels();
                 }
@@ -161,6 +162,11 @@ namespace DXForgeEditor.Editors
         }
 
         public TextureImportSettings ImportSettings { get; } = new();
+
+        // 鏡面反射のIBL(事前フィルタした元のキューブマップ)を表示しているときの、表示中のミップのラフネス(#36, Primal Day 074)。
+        // ContentToolsはミップmをラフネスm / (ミップの数 - 1)でフィルタする。それ以外のテクスチャではnull。
+        public string? SpecularIBLRoughness => Texture is { IsPrefilteredIBL: true, IsDiffuseIBL: false } && MaxMipIndex > 0 ?
+            $"Roughness: {(float)MipIndex / MaxMipIndex:0.0#}" : null;
 
         public int MaxMipIndex => _sliceBitmaps.Any() && _sliceBitmaps.First().Any() ? _sliceBitmaps.First().Count - 1 : 0;
         public int MaxArrayIndex => _sliceBitmaps.Any() ? _sliceBitmaps.Count - 1 : 0;
@@ -197,6 +203,7 @@ namespace DXForgeEditor.Editors
                     DepthIndex = _depthIndex;
                     OnPropertyChanged(nameof(MipIndex));
                     OnPropertyChanged(nameof(MaxDepthIndex));
+                    OnPropertyChanged(nameof(SpecularIBLRoughness));
                     SetSelectedBitmap();
                     SetImageChannels();
                 }
@@ -421,6 +428,7 @@ namespace DXForgeEditor.Editors
             OnPropertyChanged(nameof(MaxMipIndex));
             OnPropertyChanged(nameof(MaxArrayIndex));
             OnPropertyChanged(nameof(MaxDepthIndex));
+            OnPropertyChanged(nameof(SpecularIBLRoughness));
         }
 
         private async Task OnReimportCommand(object obj)

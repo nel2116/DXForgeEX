@@ -7,6 +7,7 @@
 // 更新履歴
 // 2026/10/18 新規作成
 // 2026/10/18 拡散光のIBL用にキューブマップを事前フィルタする処理(irradiance map)を追加 (Primal Day 073)
+// 2026/10/19 鏡面反射のIBL用にキューブマップをラフネスごとのミップへ事前フィルタする処理を追加 (Primal Day 074)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -53,4 +54,23 @@ namespace dxforge::tools
 	/// @param prefiltered_diffuse 出力先(入力と同じ数とフォーマットの、1面が64x64でミップ1つのキューブマップ)
 	/// @return 結果
 	HRESULT prefilter_diffuse(const DirectX::ScratchImage& cubemaps, DirectX::ScratchImage& prefiltered_diffuse);
+
+	/// @brief キューブマップを鏡面反射のIBL用に、ラフネスごとのミップへ事前フィルタする(split sum approximationの前半, GPU版, D3D11のコンピュートシェーダを使用)
+	/// @details 入力の各キューブマップのミップ0を1面256x256の32ビット浮動小数点にそろえて(大きければ縮小、小さければ拡大)すべてのミップを作り直し、
+	///          それを入力にする。出力のミップmはラフネスm / 5で、ミップ0(ラフネス0)はそろえた入力のミップ0そのもの。
+	///          ミップ1以降の各画素は、画素の中心の方向をN = V = Rとして、GGXの重点サンプリング(1024サンプル)でNoLを重みにした放射輝度の平均を求める。
+	///          処理量は入力のサイズによらず一定。
+	/// @param device D3D11デバイス
+	/// @param cubemaps 入力のキューブマップ(1つ以上, ブロック圧縮されていないこと。使うのはミップ0だけ)
+	/// @param prefiltered_specular 出力先(入力と同じ数とフォーマットの、1面が256x256でミップ6つのキューブマップ)
+	/// @return 結果
+	HRESULT prefilter_specular(ID3D11Device* device, const DirectX::ScratchImage& cubemaps, DirectX::ScratchImage& prefiltered_specular);
+
+	/// @brief キューブマップを鏡面反射のIBL用に、ラフネスごとのミップへ事前フィルタする(CPU版, GPUが使えない場合のフォールバック)
+	/// @details GPU版と同じ和を求める。キューブマップのトライリニアのサンプリング(面の境目では隣の面の画素を使う)もCPUで行うので、
+	///          GPU版との違いは浮動小数点の丸め誤差と、ハードウェアのフィルタの重みの精度の違いだけ。
+	/// @param cubemaps 入力のキューブマップ(1つ以上, ブロック圧縮されていないこと。使うのはミップ0だけ)
+	/// @param prefiltered_specular 出力先(入力と同じ数とフォーマットの、1面が256x256でミップ6つのキューブマップ)
+	/// @return 結果
+	HRESULT prefilter_specular(const DirectX::ScratchImage& cubemaps, DirectX::ScratchImage& prefiltered_specular);
 }

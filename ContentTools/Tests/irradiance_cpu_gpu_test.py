@@ -270,9 +270,9 @@ def import_like_editor(tools, work_dir):
 		assert diffuse.info.format == DXGI_FORMAT_BC6H_UF16, f"PrefilterDiffuseIBL: format={diffuse.info.format}"
 		assert (diffuse.info.width, diffuse.info.array_size, diffuse.info.mip_levels) == (OUT_SIZE, 6, 1)
 		assert diffuse.icon and diffuse.icon_size, "PrefilterDiffuseIBL: アイコンがない"
-		# 鏡面反射のフィルタは未実装(#36)。後回しにした圧縮だけが行われる。
+		# 鏡面反射のIBL(#36)は1面256x256でミップ6つ。値は specular_cpu_gpu_test.py で確かめる。
 		assert data.info.format == DXGI_FORMAT_BC6H_UF16, f"PrefilterSpecularIBL: format={data.info.format}"
-		assert (data.info.width, data.info.array_size, data.info.mip_levels) == (IN_SIZE, 6, IN_SIZE.bit_length())
+		assert (data.info.width, data.info.array_size, data.info.mip_levels) == (256, 6, 6)
 
 		tools.Decompress(ctypes.byref(diffuse))
 		assert diffuse.info.import_error == 0, f"Decompress: import_error={diffuse.info.import_error}"

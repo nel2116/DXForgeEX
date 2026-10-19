@@ -132,7 +132,7 @@
     <Error Condition="!Exists('..\packages\directxtex_desktop_win10.2024.10.29.1\build\native\directxtex_desktop_win10.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\directxtex_desktop_win10.2024.10.29.1\build\native\directxtex_desktop_win10.targets'))" />
   </Target>
   <!-- Compile the ContentTools compute shaders (EnvMapProcessing.hlsl) into .inc headers with fxc before the C++ build. -->
-  <Target Name="CompileShaders" BeforeTargets="PrepareForBuild" Inputs="EnvMapProcessing.hlsl;CompileShaders.cmd" Outputs="$(CompiledShadersDir)EnvMapProcessing_EquirectangularToCubeMapCS.inc;$(CompiledShadersDir)EnvMapProcessing_PrefilterDiffuseEnvMapCS.inc">
+  <Target Name="CompileShaders" BeforeTargets="PrepareForBuild" Inputs="EnvMapProcessing.hlsl;CompileShaders.cmd" Outputs="$(CompiledShadersDir)EnvMapProcessing_EquirectangularToCubeMapCS.inc;$(CompiledShadersDir)EnvMapProcessing_PrefilterDiffuseEnvMapCS.inc;$(CompiledShadersDir)EnvMapProcessing_PrefilterSpecularEnvMapCS.inc">
     <PropertyGroup>
       <FXCPath>$(WindowsSDK_ExecutablePath_x64.Split(';')[0])</FXCPath>
       <FXCPath Condition="'$(FXCPath)' != '' and !HasTrailingSlash('$(FXCPath)')">$(FXCPath)\</FXCPath>

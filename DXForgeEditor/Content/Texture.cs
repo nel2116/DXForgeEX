@@ -541,6 +541,7 @@ namespace DXForgeEditor.Content
 
         // 事前フィルタしたキューブマップの組(Primal Day 073)。元のキューブマップ(ソース画像あり)と、
         // それから作った拡散光のIBLのキューブマップ(irradiance map, ソース画像なし)が、互いを IBLPair として持つ。
+        // 元のキューブマップは、鏡面反射のIBL用にラフネスごとのミップへ事前フィルタしたもの(Primal Day 074, #36)。
         private Texture? _iblPair;
         public Texture? IBLPair
         {
