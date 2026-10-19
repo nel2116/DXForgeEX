@@ -11,6 +11,7 @@
 // 2026/10/18 拡散光のIBL用にキューブマップを事前フィルタする処理(irradiance map)のGPU版とCPU版を追加 (Primal Day 073)
 // 2026/10/19 拡散光の事前フィルタの入力が大きいときは縮小してから処理し、処理量に上限を設けた
 // 2026/10/19 鏡面反射のIBL用にキューブマップをラフネスごとのミップへ事前フィルタする処理のGPU版とCPU版を追加 (Primal Day 074)
+// 2026/10/19 鏡面反射のIBL用のBRDF LUT(split sum approximationの後半)を作る処理のGPU版とCPU版を追加 (Primal Day 075)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "EnvMapProcessing.h"
@@ -32,6 +33,7 @@ namespace dxforge::tools
 #include "EnvMapProcessing_EquirectangularToCubeMapCS.inc"
 #include "EnvMapProcessing_PrefilterDiffuseEnvMapCS.inc"
 #include "EnvMapProcessing_PrefilterSpecularEnvMapCS.inc"
+#include "EnvMapProcessing_ComputeBrdfIntegrationLutCS.inc"
 		}
 
 		constexpr u32 prefiltered_diffuse_cubemap_size{ 64 };
@@ -40,6 +42,10 @@ namespace dxforge::tools
 		constexpr u32 roughness_mip_levels{ 6 };
 		// 鏡面反射の事前フィルタで、出力の1画素あたりに使うGGXの重点サンプリングのサンプル数(Primalと同じ)。
 		constexpr u32 prefilter_specular_sample_count{ 1024 };
+		// BRDF LUTの1辺のサイズとフォーマット、1画素あたりのGGXの重点サンプリングのサンプル数(Primalと同じ)。
+		constexpr u32 brdf_integration_lut_size{ 256 };
+		constexpr DXGI_FORMAT brdf_integration_lut_format{ DXGI_FORMAT_R16G16_FLOAT };
+		constexpr u32 brdf_integration_sample_count{ 1024 };
 		// EnvMapProcessing.hlslのSAMPLE_OFFSETと同じ値にすること(画素の中心からサンプリングする)。
 		constexpr f32 sample_offset{ 0.5f };
 
@@ -317,6 +323,21 @@ namespace dxforge::tools
 			return (f32)bits * 2.3283064365386963e-10f; // / 0x100000000
 		}
 
+		/// @brief EnvMapProcessing.hlslのImportanceSampleGGX(Hammersley(i, sample_count), a4)と同じ式で、接空間のハーフベクトルを求める
+		/// @param i サンプルのインデックス
+		/// @param sample_count サンプル数
+		/// @param a4 ラフネスの4乗
+		/// @return 接空間のハーフベクトル(z軸が法線)
+		math::v3 importance_sample_ggx(u32 i, u32 sample_count, f32 a4)
+		{
+			const f32 phi{ 2.f * math::pi * ((f32)i / (f32)sample_count) };
+			const f32 e_y{ radical_inverse_vdc(i) };
+			const f32 cos_theta{ sqrtf((1.f - e_y) / (1.f + (a4 - 1.f) * e_y)) };
+			const f32 sin_theta{ sqrtf(std::max(1.f - cos_theta * cos_theta, 0.f)) };
+
+			return { sin_theta * cosf(phi), sin_theta * sinf(phi), cos_theta };
+		}
+
 		/// @brief GGXの重点サンプリングの1サンプル(EnvMapProcessing.hlslのPrefilterEnvMapの1回のループ)のうち、出力の画素によらない部分
 		struct specular_sample
 		{
@@ -339,17 +360,11 @@ namespace dxforge::tools
 
 			for (u32 i{ 0 }; i < sample_count; ++i)
 			{
-				// ImportanceSampleGGX(Hammersley(i, sample_count), a4)
-				const f32 phi{ 2.f * math::pi * ((f32)i / (f32)sample_count) };
-				const f32 e_y{ radical_inverse_vdc(i) };
-				const f32 cos_theta{ sqrtf((1.f - e_y) / (1.f + (a4 - 1.f) * e_y)) };
-				const f32 sin_theta{ sqrtf(std::max(1.f - cos_theta * cos_theta, 0.f)) };
-
 				specular_sample& sample{ samples[i] };
-				sample.half_vector = { sin_theta * cosf(phi), sin_theta * sinf(phi), cos_theta };
+				sample.half_vector = importance_sample_ggx(i, sample_count, a4);
 
 				// D_GGX(NoH, a4) / 4 が出射方向Lの確率密度。
-				const f32 no_h{ std::min(cos_theta, 1.f) };
+				const f32 no_h{ std::min(sample.half_vector.z, 1.f) };
 				const f32 d{ (no_h * a4 - no_h) * no_h + 1.f };
 				const f32 pdf{ a4 / (math::pi * d * d) * 0.25f };
 				const f32 omega_s{ 1.f / ((f32)sample_count * pdf + 0.0001f) };
@@ -608,6 +623,69 @@ namespace dxforge::tools
 
 			// i = 0のサンプルはH = N(L = N)なので、total_weightは0にならない。
 			for (u32 c{ 0 }; c < 3; ++c) rgb[c] = (f32)(color[c] / total_weight);
+		}
+
+		/// @brief 倍精度の接空間のハーフベクトル(BRDF LUTのCPU版で使う)
+		struct brdf_half_vector
+		{
+			double x, y, z;
+		};
+
+		/// @brief importance_sample_ggx()と同じ式を倍精度で求める
+		brdf_half_vector importance_sample_ggx_f64(u32 i, u32 sample_count, f32 a4)
+		{
+			const double a{ a4 };
+			const double phi{ 2.0 * 3.14159265358979323846 * ((double)i / (double)sample_count) };
+			const double e_y{ (double)radical_inverse_vdc(i) };
+			const double cos_theta{ sqrt((1.0 - e_y) / (1.0 + (a - 1.0) * e_y)) };
+			const double sin_theta{ sqrt(std::max(1.0 - cos_theta * cos_theta, 0.0)) };
+
+			return { sin_theta * cos(phi), sin_theta * sin(phi), cos_theta };
+		}
+
+		/// @brief BRDF LUTの1画素を求める(CPU版, EnvMapProcessing.hlslのIntegrateBRDFと同じ和)
+		/// @details NoVが0に近いところでは、NoL = 2 * VoH * NoH - NoVの桁落ちと、少数のサンプルの大きな重みで単精度の誤差が大きくなるので、
+		///          ハーフベクトル(GPU版と同じ単精度の値)より後の計算は倍精度で行う。
+		/// @param n_dot_v NoV
+		/// @param a4 ラフネスの4乗
+		/// @param half_vectors importance_sample_ggx()で求めた接空間のハーフベクトル(ラフネスだけで決まり、NoVによらない)
+		/// @param result 出力(F0のスケールとバイアス)
+		void integrate_brdf(f32 n_dot_v, f32 a4, const utl::vector<brdf_half_vector>& half_vectors, f32* result)
+		{
+			// N = (0, 0, 1)、Vはxz平面上
+			const double nv{ n_dot_v };
+			const double a{ a4 };
+			const double v_x{ sqrt(1.0 - nv * nv) };
+			double sum_a{ 0.0 };
+			double sum_b{ 0.0 };
+
+			for (const brdf_half_vector& h : half_vectors)
+			{
+				const double v_dot_h_raw{ v_x * h.x + nv * h.z };
+				const double l_z{ 2.0 * v_dot_h_raw * h.z - nv };
+
+				const double n_dot_l{ std::clamp(l_z, 0.0, 1.0) };
+				const double n_dot_h{ std::clamp(h.z, 0.0, 1.0) };
+				const double v_dot_h{ std::clamp(v_dot_h_raw, 0.0, 1.0) };
+
+				if (n_dot_l > 0.0)
+				{
+					// V_SmithGGXCorrelated(NoV, NoL, a4)
+					const double ggx_l{ nv * sqrt((-n_dot_l * a + n_dot_l) * n_dot_l + a) };
+					const double ggx_v{ n_dot_l * sqrt((-nv * a + nv) * nv + a) };
+					const double g{ 0.5 / (ggx_v + ggx_l) };
+
+					const double g_vis{ 4.0 * n_dot_l * g * v_dot_h / n_dot_h };
+					const double one_minus_v_dot_h{ 1.0 - v_dot_h };
+					const double fc{ one_minus_v_dot_h * one_minus_v_dot_h * one_minus_v_dot_h * one_minus_v_dot_h * one_minus_v_dot_h };
+					sum_a += (1.0 - fc) * g_vis;
+					sum_b += fc * g_vis;
+				}
+			}
+
+			const double sample_count{ (double)half_vectors.size() };
+			result[0] = (f32)(sum_a / sample_count);
+			result[1] = (f32)(sum_b / sample_count);
 		}
 
 		/// @brief func(0) ~ func(count - 1)を、CPUのコアの数のスレッドで並列に実行する
@@ -1483,5 +1561,138 @@ namespace dxforge::tools
 		copy_roughness_zero_mip(input, working_scratch);
 
 		return convert_prefiltered_output(working_scratch, metadata.format, prefiltered_specular);
+	}
+
+	HRESULT brdf_integration_lut(ScratchImage& brdf_lut)
+	{
+		constexpr u32 size{ brdf_integration_lut_size };
+		HRESULT hr{ S_OK };
+
+		ScratchImage working_scratch{};
+		hr = working_scratch.Initialize2D(DXGI_FORMAT_R32G32_FLOAT, size, size, 1, 1);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		const Image& image{ *working_scratch.GetImages() };
+
+		// 1行(y)のラフネスは同じなので、行ごとにハーフベクトルを求めてから、その行のすべての画素(NoV)で使う。
+		parallel_for(size, [&](u32 y)
+			{
+				const f32 roughness{ (y + sample_offset) / (f32)size };
+				const f32 r2{ roughness * roughness };
+				const f32 a4{ r2 * r2 };
+
+				utl::vector<brdf_half_vector> half_vectors(brdf_integration_sample_count);
+				for (u32 i{ 0 }; i < brdf_integration_sample_count; ++i)
+				{
+					half_vectors[i] = importance_sample_ggx_f64(i, brdf_integration_sample_count, a4);
+				}
+
+				f32* const row{ (f32*)(image.pixels + image.rowPitch * y) };
+				for (u32 x{ 0 }; x < size; ++x)
+				{
+					const f32 n_dot_v{ (x + sample_offset) / (f32)size };
+					integrate_brdf(n_dot_v, a4, half_vectors, &row[x * 2]);
+				}
+			});
+
+		return Convert(image, brdf_integration_lut_format, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT, brdf_lut);
+	}
+
+	HRESULT brdf_integration_lut(ID3D11Device* device, ScratchImage& brdf_lut)
+	{
+		assert(device);
+		ComPtr<ID3D11DeviceContext> ctx{};
+		device->GetImmediateContext(ctx.GetAddressOf());
+		assert(ctx.Get());
+
+		HRESULT hr{ S_OK };
+		constexpr u32 size{ brdf_integration_lut_size };
+		constexpr DXGI_FORMAT format{ brdf_integration_lut_format };
+
+		// 出力先のリソースを作成
+		ComPtr<ID3D11Texture2D> output{};
+		ComPtr<ID3D11Texture2D> output_cpu{};
+		{
+			D3D11_TEXTURE2D_DESC desc{};
+			desc.Width = desc.Height = size;
+			desc.MipLevels = 1;
+			desc.ArraySize = 1;
+			desc.Format = format;
+			desc.SampleDesc = { 1, 0 };
+			desc.Usage = D3D11_USAGE_DEFAULT;
+			desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+			desc.CPUAccessFlags = 0;
+			desc.MiscFlags = 0;
+
+			hr = device->CreateTexture2D(&desc, nullptr, output.GetAddressOf());
+			if (FAILED(hr))
+			{
+				return hr;
+			}
+
+			desc.BindFlags = 0;
+			desc.Usage = D3D11_USAGE_STAGING;
+			desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+
+			hr = device->CreateTexture2D(&desc, nullptr, output_cpu.GetAddressOf());
+			if (FAILED(hr))
+			{
+				return hr;
+			}
+		}
+
+		ComPtr<ID3D11ComputeShader> shader{};
+		hr = device->CreateComputeShader(shaders::EnvMapProcessing_ComputeBrdfIntegrationLutCS,
+										 sizeof(shaders::EnvMapProcessing_ComputeBrdfIntegrationLutCS),
+										 nullptr, shader.GetAddressOf());
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		ComPtr<ID3D11Buffer> constant_buffer{};
+		hr = create_constant_buffer(device, constant_buffer.GetAddressOf());
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		ShaderConstants constants{};
+		constants.CubeMapOutSize = size;
+		constants.SampleCount = brdf_integration_sample_count;
+		hr = set_constants(ctx.Get(), constant_buffer.Get(), constants);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		ComPtr<ID3D11SamplerState> linear_sampler{};
+		hr = create_linear_sampler(device, linear_sampler.GetAddressOf());
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		reset_d3d11_context(ctx.Get());
+
+		ComPtr<ID3D11UnorderedAccessView> output_uav{};
+		hr = create_texture_2d_uav(device, format, 1, 0, 0, output.Get(), output_uav.GetAddressOf());
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		// 入力はないので、SRVはnullptrのまま。1回のDispatchは256 x 256画素 x 1024サンプル。
+		ID3D11ShaderResourceView* const srv{ nullptr };
+		const u32 block_size{ (size + 15) >> 4 };
+		dispatch(ctx.Get(), &srv, output_uav.GetAddressOf(), constant_buffer.GetAddressOf(),
+				 linear_sampler.GetAddressOf(), shader.Get(), { block_size, block_size, 1 });
+
+		reset_d3d11_context(ctx.Get());
+
+		return download_texture_2d(ctx.Get(), size, size, 1, 1, format, false, output.Get(), output_cpu.Get(), brdf_lut);
 	}
 }

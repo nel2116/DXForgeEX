@@ -30,6 +30,8 @@ namespace DXForgeEditor.Editors
     {
         private readonly List<List<List<BitmapSource>>> _sliceBitmaps = new();
         private SliceArray3D? _slices;
+        // _slicesのフォーマット(圧縮したテクスチャは解凍した画像なので不明 = DXGI_FORMAT_UNKNOWN)。
+        private DXGI_FORMAT _slicesFormat;
 
         public ICommand SetAllChannelsCommand { get; init; }
         public ICommand SetChannelCommand { get; init; }
@@ -389,6 +391,7 @@ namespace DXForgeEditor.Editors
             try
             {
                 await Task.Run(() => _slices = texture.ImportSettings.Compress ? ContentToolsAPI.Decompress(texture) : texture.Slices);
+                _slicesFormat = texture.ImportSettings.Compress ? DXGI_FORMAT.DXGI_FORMAT_UNKNOWN : texture.Format;
                 Debug.Assert(_slices?.Any() == true && _slices.First().Any());
                 GenerateSliceBitMaps(texture.IsNormalMap);
                 OnPropertyChanged(nameof(Texture));
@@ -416,7 +419,7 @@ namespace DXForgeEditor.Editors
                     List<BitmapSource> sliceBitmap = new();
                     foreach (var slice in mipLevel)
                     {
-                        var image = BitmapHelper.ImageFromSlice(slice, isNormalMap);
+                        var image = BitmapHelper.ImageFromSlice(slice, _slicesFormat, isNormalMap);
                         Debug.Assert(image != null);
                         sliceBitmap.Add(image);
                     }
@@ -434,7 +437,8 @@ namespace DXForgeEditor.Editors
         private async Task OnReimportCommand(object obj)
         {
             // 拡散光のIBLのテクスチャはソース画像を持たないので、元のキューブマップを再インポートする。
-            if (Texture == null || Texture.IsDiffuseIBL) return;
+            // ソース画像を持たない既定アセット(BRDF LUTなど)は再インポートできない。
+            if (Texture == null || Texture.IsDiffuseIBL || !Texture.HasSourceImages) return;
 
             TextureImportSettings settingsBackup = new();
             IAssetImportSettings.CopyImportSettings(Texture.ImportSettings, settingsBackup);

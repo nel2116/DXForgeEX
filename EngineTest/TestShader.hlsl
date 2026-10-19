@@ -29,6 +29,8 @@ struct Surface
     float  a2;                  // = Pow(PerceptualRoughness, 4)
     float3 SpecularColor;
     float  NoV;
+    float  SpecularStrength;    // 1 without IBL (see GetSurface())
+    bool   UseIBL;              // The ambient light (IBL) is evaluated and the BRDF LUT is available
 };
 
 #define ElementsTypePositionOnly                0x00
@@ -77,6 +79,10 @@ StructuredBuffer<uint>                          LightIndexList      : register(t
 SamplerState                                    PointSampler        : register(s0, space0);
 SamplerState                                    LinearSampler       : register(s1, space0);
 SamplerState                                    AnisotropicSampler  : register(s2, space0);
+SamplerState                                    LinearClampSampler  : register(s3, space0);
+
+// The specular IBL cubemap has 6 mips; mip m is pre-filtered for (perceptual) roughness m / 5 (Issue #36).
+static const float SpecularIBLMaxMip = 5.f;
 
 VertexOut TestShaderVS(in uint VertexIdx: SV_VertexID)
 {
@@ -139,6 +145,37 @@ float4 Sample(uint index, SamplerState sampler, float2 uv)
     return Texture2D(ResourceDescriptorHeap[index]).Sample(sampler, uv);
 }
 
+float4 Sample(uint index, SamplerState sampler, float2 uv, float mip)
+{
+    return Texture2D(ResourceDescriptorHeap[index]).SampleLevel(sampler, uv, mip);
+}
+
+float4 SampleCube(uint index, SamplerState sampler, float3 n)
+{
+    return TextureCube(ResourceDescriptorHeap[index]).Sample(sampler, n);
+}
+
+float4 SampleCube(uint index, SamplerState sampler, float3 n, float mip)
+{
+    return TextureCube(ResourceDescriptorHeap[index]).SampleLevel(sampler, n, mip);
+}
+
+// Scale (x) and bias (y) to F0 of the specular BRDF integrated over the hemisphere (the BRDF LUT made by
+// ContentTools' ComputeBrdfIntegrationLut). The LUT is computed at texel centers, so uv = (NoV, roughness)
+// with a clamp sampler (the edges NoV = 1 / roughness 1 must not wrap around).
+float2 SampleBrdfLut(float NoV, float perceptualRoughness)
+{
+    return Sample(GlobalData.AmbientLight.BrdfLutSrvIndex, LinearClampSampler, float2(NoV, perceptualRoughness), 0).rg;
+}
+
+// NOTE: See "Practical multiple scattering compensation for microfacet models"
+//       https://blog.selfshadow.com/publications/turquin/ms_comp_final.pdf
+//       Eq. (16) with Ess == BrdfLut.x (Primal Day 075).
+float3 EnergyCompensation(Surface S, float2 brdfLut)
+{
+    return 1.f + S.SpecularColor * (rcp(brdfLut.x) - 1.f);
+}
+
 float3 PhongBRDF(float3 N, float3 L, float3 V, float3 diffuseColor, float3 specularColor, float shininess)
 {
     float3 color = diffuseColor;
@@ -167,7 +204,13 @@ float3 CookTorranceBRDF(Surface S, float3 L)
     float3 diffuseBRDF = Diffuse_Lambert() * S.DiffuseColor * rho;
     //float3 diffuseBRDF = Diffuse_Burley(NoV, NoL, VoH, S.PerceptualRoughness * S.PerceptualRoughness) * S.DiffuseColor * rho;
 
-    return (diffuseBRDF + specularBRDF) * NoL;
+    // The energy compensation needs the BRDF LUT, so without IBL the direct lighting stays as it was.
+    if (S.UseIBL)
+    {
+        specularBRDF *= EnergyCompensation(S, SampleBrdfLut(saturate(S.NoV), S.PerceptualRoughness));
+    }
+
+    return (diffuseBRDF + S.SpecularStrength * specularBRDF) * NoL;
 }
 
 float3 CalculateLighting(Surface S, float3 L, float3 lightColor)
@@ -240,6 +283,38 @@ float3 Spotlight(Surface S, float3 worldPosition, LightParameters light)
     return color;
 }
 
+// [Lagarde et al. 2014, Moving Frostbite to Physically Based Rendering]
+float3 GetSpecularDominantDir(float3 N, float3 R, float roughness)
+{
+    float smoothness = saturate(1.f - roughness);
+    float lerpFactor = smoothness * (sqrt(smoothness) + roughness);
+    // The result is not normalized as we fetch in a cubemap
+    return lerp(N, R, lerpFactor);
+}
+
+// Image based lighting: the diffuse IBL (irradiance / PI, Issue #35) and the split sum approximation of the
+// specular IBL (pre-filtered radiance, Issue #36, times the BRDF LUT). Ported from Primal Day 075 (00dc198).
+float3 EvaluateIBL(Surface S)
+{
+    const float NoV = saturate(S.NoV);
+    const float3 F90 = max((1.f - S.PerceptualRoughness), S.SpecularColor);
+    const float3 F = F_Schlick(NoV, S.SpecularColor, F90);
+
+    const float roughness = S.PerceptualRoughness * S.PerceptualRoughness;
+
+    AmbientLightParameters IBL = GlobalData.AmbientLight;
+    float3 diffuse = SampleCube(IBL.DiffuseSrvIndex, LinearSampler, S.Normal).rgb * S.DiffuseColor * (1.f - F);
+    float3 specN = GetSpecularDominantDir(S.Normal, reflect(-S.V, S.Normal), roughness);
+    // Mip m holds roughness m / 5, so the (fractional) mip for a roughness r is r * 5; trilinear filtering
+    // interpolates between the two neighbouring roughness levels.
+    float3 specularIBL = SampleCube(IBL.SpecularSrvIndex, LinearSampler, specN, S.PerceptualRoughness * SpecularIBLMaxMip).rgb;
+    float2 brdfLut = SampleBrdfLut(NoV, S.PerceptualRoughness);
+    float3 specular = specularIBL * (S.SpecularStrength * S.SpecularColor * brdfLut.x + F90 * brdfLut.y);
+    specular *= EnergyCompensation(S, brdfLut);
+
+    return (diffuse + specular) * IBL.Intensity;
+}
+
 Surface GetSurface(VertexOut psIn, float3 V)
 {
     Surface S;
@@ -280,6 +355,10 @@ Surface GetSurface(VertexOut psIn, float3 V)
     S.NoV = dot(V, S.Normal);
     S.DiffuseColor = S.BaseColor * (1.f - S.Metallic);
     S.SpecularColor = lerp(0.04f, S.BaseColor, S.Metallic); // AKA F0
+    S.UseIBL = HasAmbientLight(GlobalData.AmbientLight);
+    // NOTE: Primal Day 075 dims the specular of rough dielectrics. Without IBL it is kept at 1 so that the
+    //       direct lighting is the same as before.
+    S.SpecularStrength = S.UseIBL ? lerp(1.f - min(S.PerceptualRoughness, 0.95f), 1.f, S.Metallic) : 1.f;
 
     return S;
 }
@@ -352,6 +431,12 @@ PixelOut TestShaderPS(in VertexOut psIn)
         }
     }
 #endif
+
+    // Without IBL (no ambient light, or one of its textures is not set) only the direct lighting is drawn.
+    if (S.UseIBL)
+    {
+        color += EvaluateIBL(S);
+    }
 
 #if TEXTURED_MTL
     float VoN = S.NoV * 1.3f;

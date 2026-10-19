@@ -118,3 +118,12 @@ float4 ScreenToView(float4 screen, float2 invViewDimensions, float4x4 inversePro
 
     return ClipToView(clip, inverseProjection);
 }
+
+// 環境光(IBL)を描画に使えるか。環境光がない・無効なとき(Intensityが-1)や、テクスチャが1つでも設定されていないときはfalse。
+bool HasAmbientLight(AmbientLightParameters ibl)
+{
+    return ibl.Intensity > 0.f &&
+           ibl.DiffuseSrvIndex != INVALID_SRV_INDEX &&
+           ibl.SpecularSrvIndex != INVALID_SRV_INDEX &&
+           ibl.BrdfLutSrvIndex != INVALID_SRV_INDEX;
+}

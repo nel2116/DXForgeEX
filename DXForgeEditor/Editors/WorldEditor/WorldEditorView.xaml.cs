@@ -1,6 +1,7 @@
 ﻿using DXForgeEditor.Content;
 using DXForgeEditor.GameDev;
 using DXForgeEditor.GameProject;
+using DXForgeEditor.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -45,6 +46,21 @@ namespace DXForgeEditor.Editors
         {
             var dlg = new PrimitiveMeshDialog();
             dlg.ShowDialog();
+        }
+
+        /// <summary>
+        /// エディタの既定アセットのBRDF LUT(プロジェクトのContentの外にある)を、テクスチャエディタで開く。
+        /// </summary>
+        private void OnViewBrdfIntegrationLut_MenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (DefaultAssets.BrdfIntegrationLut is AssetInfo info && System.IO.File.Exists(info.FullPath))
+            {
+                ContentBrowserView.OpenAssetEditor(info);
+            }
+            else
+            {
+                Logger.Log(MessageType.Error, $"BRDF LUTの既定アセットがありません: {DefaultAssets.BrdfIntegrationLutFile}");
+            }
         }
 
         private void UnloadAndCloseAllWindows()

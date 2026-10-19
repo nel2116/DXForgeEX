@@ -319,6 +319,7 @@ namespace dxforge::graphics::d3d12::content
 					d3dx::static_sampler(d3dx::sampler_state.static_point, 0, 0, D3D12_SHADER_VISIBILITY_PIXEL),
 					d3dx::static_sampler(d3dx::sampler_state.static_linear, 1, 0, D3D12_SHADER_VISIBILITY_PIXEL),
 					d3dx::static_sampler(d3dx::sampler_state.static_anisotropic, 2, 0, D3D12_SHADER_VISIBILITY_PIXEL),
+					d3dx::static_sampler(d3dx::sampler_state.static_linear_clamp, 3, 0, D3D12_SHADER_VISIBILITY_PIXEL),
 				};
 
 				root_signature = d3dx::d3d12_root_signature_desc{ &parameters[0], _countof(parameters), get_root_signature_flags(flags), &samplers[0], _countof(samplers) }.create();

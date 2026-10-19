@@ -8,6 +8,7 @@
 // 2024/12/27 新規作成
 // 2025/01/07 Gパスの追加
 // 2026/10/18 日本語のデバッグ出力をワイド文字版APIに変更(C4566対応)
+// 2026/10/19 シェーダのグローバルデータに環境光(IBL)を追加 (Primal Day 075)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Core.h"
@@ -337,6 +338,7 @@ namespace dxforge::graphics::d3d12::core
 			data.ViewHeight = surface.viewport().Height;
 			data.NumDirectionalLights = light::non_cullable_light_count(info.light_set_key);
 			data.DeltaTime = delta_time;
+			data.AmbientLight = light::ambient_light(info.light_set_key);
 			// NOTE: このバッファから読み込まないように注意すること。 読み込みは本当に遅い。
 			hlsl::GlobalShaderData* const shader_data{ cbuffer.allocate<hlsl::GlobalShaderData>() };
 			// TODO: cbufferが一杯になった場合の処理。

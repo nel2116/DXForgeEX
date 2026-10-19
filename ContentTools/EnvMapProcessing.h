@@ -8,6 +8,7 @@
 // 2026/10/18 新規作成
 // 2026/10/18 拡散光のIBL用にキューブマップを事前フィルタする処理(irradiance map)を追加 (Primal Day 073)
 // 2026/10/19 鏡面反射のIBL用にキューブマップをラフネスごとのミップへ事前フィルタする処理を追加 (Primal Day 074)
+// 2026/10/19 鏡面反射のIBL用のBRDF LUTを作る処理を追加 (Primal Day 075)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -73,4 +74,20 @@ namespace dxforge::tools
 	/// @param prefiltered_specular 出力先(入力と同じ数とフォーマットの、1面が256x256でミップ6つのキューブマップ)
 	/// @return 結果
 	HRESULT prefilter_specular(const DirectX::ScratchImage& cubemaps, DirectX::ScratchImage& prefiltered_specular);
+
+	/// @brief 鏡面反射のIBL用のBRDF LUT(split sum approximationの後半)を作る(GPU版, D3D11のコンピュートシェーダを使用)
+	/// @details 256x256のDXGI_FORMAT_R16G16_FLOATのテクスチャで、横(x)がNoV、縦(y)がラフネス(どちらも画素の中心の値)。
+	///          各画素はGGXの重点サンプリング(1024サンプル)で求めた、鏡面反射のBRDFとNoLの積の半球上の積分を、
+	///          SchlickのフレネルのF0のスケール(r)とバイアス(g)に分けたもの。入力はなく、処理量は一定。
+	/// @param device D3D11デバイス
+	/// @param brdf_lut 出力先
+	/// @return 結果
+	HRESULT brdf_integration_lut(ID3D11Device* device, DirectX::ScratchImage& brdf_lut);
+
+	/// @brief 鏡面反射のIBL用のBRDF LUTを作る(CPU版, GPUが使えない場合のフォールバック)
+	/// @details GPU版と同じ和を求める。NoVが0に近いところでの桁落ちを避けるため倍精度で計算するので、
+	///          GPU版(単精度)との違いは浮動小数点の丸め誤差だけ(NoVとラフネスが0に近い画素で最大1.5e-3程度)。
+	/// @param brdf_lut 出力先(256x256のDXGI_FORMAT_R16G16_FLOAT)
+	/// @return 結果
+	HRESULT brdf_integration_lut(DirectX::ScratchImage& brdf_lut);
 }

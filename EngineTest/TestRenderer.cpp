@@ -7,6 +7,7 @@
 // 更新履歴
 // 2024/12/27 新規作成
 // 2025/01/13 テストのためのワーカースレッドを追加
+// 2026/10/19 環境光(IBL)のライトのため、ライトセットを先に作って後で消すよう順番を変更し、Iキーで環境光を切り替える (Primal Day 075)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Platform/PlatformType.h"
@@ -92,6 +93,9 @@ bool test_initialize();
 void test_shutdown();
 void create_render_items();
 void destroy_render_items();
+void toggle_ibl();
+bool has_ibl_light();
+bool ibl_textures_exist();
 void generate_lights();
 void remove_lights();
 void test_lights(f32 dt);
@@ -137,6 +141,10 @@ LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		{
 			PostMessage(hwnd, WM_CLOSE, 0, 0);
 			return 0;
+		}
+		else if (wparam == 'I')
+		{
+			toggle_ibl();
 		}
 		else if (wparam == VK_F11)
 		{
@@ -237,8 +245,10 @@ void create_camera_surface(camera_surface& surface, platform::window_init_info i
 {
 	surface.surface.window = platform::create_window(&info);
 	surface.surface.surface = graphics::create_surface(surface.surface.window);
-	//surface.entity = create_one_game_entity({ 13.76f, 3.f, -1.1f }, { -0.137f, -1.70f, 0.f }, nullptr, "camera_script");
-	surface.entity = create_one_game_entity({ -5.49f, 1.73f, 9.26f }, { 0.19f, 5.61f, 0.f }, nullptr, "camera_script");
+	// NOTE: 環境光(IBL)があるときは、Primal Day 075と同じく球のPBRマテリアルとロボットを横から見る位置にする。
+	surface.entity = ibl_textures_exist()
+		? create_one_game_entity({ 13.76f, 3.f, -1.1f }, { -0.137f, -1.70f, 0.f }, nullptr, "camera_script")
+		: create_one_game_entity({ -5.49f, 1.73f, 9.26f }, { 0.19f, 5.61f, 0.f }, nullptr, "camera_script");
 	surface.camera = graphics::create_camera(graphics::perspective_camera_init_info{ surface.entity.get_id() });
 	surface.camera.aspect_ratio((f32)surface.surface.window.width() / surface.surface.window.height());
 }
@@ -278,9 +288,10 @@ bool test_initialize()
 
 	init_test_workers(buffer_test_worker);
 
-	create_render_items();
-
+	// NOTE: 環境光(IBL)のライトはcreate_render_items()で作るので、ライトセットを先に作る(Primal Day 075と同じ順番)。
 	generate_lights();
+
+	create_render_items();
 
 	render_item_id_cache.resize(num_render_items + 12);
 	geometry::get_render_item_ids(render_item_id_cache.data(), (u32)render_item_id_cache.size());
@@ -324,8 +335,9 @@ void test_shutdown()
 {
 	input::unbind(std::hash<std::string>()("move"));
 
-	remove_lights();
+	// NOTE: ライトセットを消す前に、create_render_items()で作った環境光を取り除く。
 	destroy_render_items();
+	remove_lights();
 	joint_test_workers();
 
 	for (u32 i{ 0 }; i < _countof(_surfaces); ++i)
@@ -361,8 +373,10 @@ void engine_test::run()
 			f32 thresholds[num_render_items + 12]{};
 
 			graphics::frame_info info{};
-			info.render_item_ids = render_item_id_cache.data();
-			info.render_item_count = num_render_items + 12;
+			// NOTE: 環境光(IBL)があるときは、Primal Day 075と同じく部屋(最初の描画アイテム)を描かず、空(鏡面反射のIBL)が見えるようにする。
+			const u32 first_item{ has_ibl_light() ? 1u : 0u };
+			info.render_item_ids = render_item_id_cache.data() + first_item;
+			info.render_item_count = num_render_items + 12 - first_item;
 			info.thresholds = &thresholds[0];
 			info.light_set_key = light_set_key;
 			info.average_frame_time = dt;

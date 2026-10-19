@@ -7,6 +7,7 @@
 // 更新履歴
 // 2025/01/18 新規作成
 // 2026/10/18 ライトの向きをエンティティのfront()から取得するよう変更 (#4)
+// 2026/10/19 環境光(IBL)のライトを追加 (Primal Day 075)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Light.h"
@@ -14,6 +15,7 @@
 #include "Shaders/SharedTypes.h"
 #include "EngineAPI/GameEntity.h"
 #include "Components/Transform.h"
+#include "D3D12Content.h"
 
 namespace dxforge::graphics::d3d12::light
 {
@@ -37,6 +39,21 @@ namespace dxforge::graphics::d3d12::light
 		static_assert(u32_set_bits<frame_buffer_count>::bits < (1 << 8), "That's quite a large frame buffer count!");
 
 		constexpr u8 dirty_bits_mask{ (u8)u32_set_bits<frame_buffer_count>::bits };
+
+		/// @brief 環境光がないときの値(シェーダはIntensityが0以下か、SRVのインデックスが無効なら環境光を使わない)
+		constexpr hlsl::AmbientLightParameters no_ambient_light{ -1.f, u32_invalid_id, u32_invalid_id, u32_invalid_id };
+
+		/// @brief テクスチャのSRVのインデックスを取得する
+		/// @param texture_id テクスチャのID
+		/// @return SRVのインデックス(無効なIDの場合はu32_invalid_id)
+		u32 texture_srv_index(id::id_type texture_id)
+		{
+			if (!id::is_valid(texture_id)) return u32_invalid_id;
+
+			u32 index{ u32_invalid_id };
+			content::texture::get_descriptor_indices(&texture_id, 1, &index);
+			return index;
+		}
 
 		/// @brief ライトの所有者
 		struct light_owner
@@ -94,6 +111,23 @@ namespace dxforge::graphics::d3d12::light
 
 					return graphics::light{ id, info.light_set_key };
 				}
+				else if (info.type == graphics::light::ambient)
+				{
+					// NOTE: 環境光はライトセットに1つだけ(Primalと同じ)。2つ目は作らずに無効なライトを返す。
+					assert(!id::is_valid(_ambient_light_id));
+					if (id::is_valid(_ambient_light_id)) return {};
+
+					// NOTE: テクスチャのSRVのインデックスは作成時に取得するので、テクスチャはこのライトより後に削除すること。
+					const ambient_light_params& params{ info.ambient_params };
+					_ambient_light.Intensity = std::max(info.intensity, 0.0f);
+					_ambient_light.DiffuseSrvIndex = texture_srv_index(params.diffuse_texture_id);
+					_ambient_light.SpecularSrvIndex = texture_srv_index(params.specular_texture_id);
+					_ambient_light.BrdfLutSrvIndex = texture_srv_index(params.brdf_lut_texture_id);
+
+					light_owner owner{ game_entity::entity_id{ info.entity_id }, u32_invalid_id, info.type, info.is_enabled };
+					_ambient_light_id = light_id{ _owners.add(owner) };
+					return graphics::light{ _ambient_light_id, info.light_set_key };
+				}
 				else
 				{
 					u32 index{ u32_invalid_id };
@@ -149,6 +183,12 @@ namespace dxforge::graphics::d3d12::light
 				{
 					_non_cullable_owners[owner.data_index] = light_id{ u32_invalid_id };
 				}
+				else if (owner.type == graphics::light::ambient)
+				{
+					assert(id == _ambient_light_id);
+					_ambient_light = no_ambient_light;
+					_ambient_light_id = light_id{ id::invalid_id };
+				}
 				else
 				{
 					// その他のライトの処理
@@ -198,7 +238,7 @@ namespace dxforge::graphics::d3d12::light
 			constexpr void enable(light_id id, bool is_enabled)
 			{
 				_owners[id].is_enabled = is_enabled;
-				if (_owners[id].type == graphics::light::directional)
+				if (_owners[id].type == graphics::light::directional || _owners[id].type == graphics::light::ambient)
 				{
 					return;
 				}
@@ -252,6 +292,10 @@ namespace dxforge::graphics::d3d12::light
 					assert(index < _non_cullable_lights.size());
 					_non_cullable_lights[index].Intensity = intensity;
 				}
+				else if (owner.type == graphics::light::ambient)
+				{
+					_ambient_light.Intensity = intensity;
+				}
 				else
 				{
 					assert(_owners[_cullable_owners[index]].data_index == index);
@@ -271,6 +315,12 @@ namespace dxforge::graphics::d3d12::light
 
 				const light_owner& owner{ _owners[id] };
 				const u32 index{ owner.data_index };
+
+				if (owner.type == graphics::light::ambient)
+				{
+					// 環境光は色を持たない(テクスチャの色をそのまま使う)。
+					return;
+				}
 
 				if (owner.type == graphics::light::directional)
 				{
@@ -397,6 +447,11 @@ namespace dxforge::graphics::d3d12::light
 					return _non_cullable_lights[index].Intensity;
 				}
 
+				if (owner.type == graphics::light::ambient)
+				{
+					return _ambient_light.Intensity;
+				}
+
 				assert(_owners[_cullable_owners[index]].data_index == index);
 				assert(index < _cullable_lights.size());
 				return _cullable_lights[index].Intensity;
@@ -414,6 +469,11 @@ namespace dxforge::graphics::d3d12::light
 				{
 					assert(index < _non_cullable_lights.size());
 					return _non_cullable_lights[index].Color;
+				}
+
+				if (owner.type == graphics::light::ambient)
+				{
+					return { 1.0f, 1.0f, 1.0f };
 				}
 
 				assert(_owners[_cullable_owners[index]].data_index == index);
@@ -499,6 +559,19 @@ namespace dxforge::graphics::d3d12::light
 					if (id::is_valid(id) && _owners[id].is_enabled) ++count;
 				}
 				return count;
+			}
+
+			/// @brief シェーダに渡す環境光を取得する
+			/// @return 環境光(ないか無効な場合はno_ambient_light)
+			CONSTEXPR hlsl::AmbientLightParameters ambient_light() const
+			{
+				if (id::is_valid(_ambient_light_id) && _owners[_ambient_light_id].is_enabled)
+				{
+					assert(_owners[_ambient_light_id].type == graphics::light::ambient);
+					return _ambient_light;
+				}
+
+				return no_ambient_light;
 			}
 
 			CONSTEXPR void non_cullable_lights(hlsl::DirectionalLightParameters* const lights, [[maybe_unused]] u32 buffer_size) const
@@ -712,6 +785,9 @@ namespace dxforge::graphics::d3d12::light
 			utl::vector<u8> _transform_flags_cache;								///< ライトのtransformの更新フラグ
 			u32 _enabled_light_count{ 0 };										///< 有効なライトの数
 			u8 _something_is_dirty{ 0 };										///< ライトが更新されたかどうか
+
+			hlsl::AmbientLightParameters _ambient_light{ no_ambient_light };	///< 環境光(IBL)
+			light_id _ambient_light_id{ id::invalid_id };						///< 環境光のライトID
 
 			friend class d3d12_light_buffer;
 		};
@@ -1117,6 +1193,12 @@ namespace dxforge::graphics::d3d12::light
 	{
 		const d3d12_light_buffer& light_buffer{ light_buffers[frame_index] };
 		return light_buffer.bounding_spheres();
+	}
+
+	hlsl::AmbientLightParameters ambient_light(u64 light_set_key)
+	{
+		assert(light_sets.count(light_set_key));
+		return light_sets[light_set_key].ambient_light();
 	}
 
 	u32 non_cullable_light_count(u64 light_set_key)

@@ -303,13 +303,32 @@ namespace DXForgeEditor
             return memStream.ToArray();
         }
 
-        internal static BitmapSource? ImageFromSlice(Slice slice, bool isNormalMap = false)
+        /// <param name="sliceFormat">スライスのフォーマット。バイト数だけでは判別できない
+        /// 2チャンネルの16ビット浮動小数点(DXGI_FORMAT_R16G16_FLOAT, BRDF LUT)のときだけ必要。不明ならDXGI_FORMAT_UNKNOWN。</param>
+        internal static BitmapSource? ImageFromSlice(Slice slice, DXGI_FORMAT sliceFormat, bool isNormalMap = false)
         {
             var data = slice.RawContent;
             var bytesPerPixel = data.Length / (slice.Width * slice.Height);
             var stride = slice.Width * bytesPerPixel; // これはslice.RowPitchと同じでなければならない。
             var format = PixelFormats.Default;
             byte[]? bgrData = null;
+
+            if (sliceFormat == DXGI_FORMAT.DXGI_FORMAT_R16G16_FLOAT)
+            {
+                // R, Gを32ビット浮動小数点に変換し、B = 0、A = 1 の Rgba128Float にする(Primal Day 075 の Helpers.cs と同じ)。
+                Debug.Assert(bytesPerPixel == 4);
+                var rgba = new float[slice.Width * slice.Height * 4];
+                for (int i = 0, j = 0; i + 3 < data.Length; i += 4, j += 4)
+                {
+                    rgba[j + 0] = (float)BitConverter.ToHalf(data, i);
+                    rgba[j + 1] = (float)BitConverter.ToHalf(data, i + 2);
+                    rgba[j + 2] = 0.0f;
+                    rgba[j + 3] = 1.0f;
+                }
+                bgrData = new byte[rgba.Length * sizeof(float)];
+                Buffer.BlockCopy(rgba, 0, bgrData, 0, bgrData.Length);
+                return BitmapSource.Create(slice.Width, slice.Height, 96.0, 96.0, PixelFormats.Rgba128Float, null, bgrData, slice.Width * 16);
+            }
 
             if (bytesPerPixel == 16) format = PixelFormats.Rgba128Float;
             else if (bytesPerPixel == 4) format = PixelFormats.Bgra32;
