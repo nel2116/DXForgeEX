@@ -9,6 +9,7 @@
 // 2026/10/18 機能レベル11_0のデバイスでもUAVの解除が正しく行われるよう修正
 // 2026/10/18 CPU版のキューブマップ変換のサンプリング位置をGPU版と同じ画素の中心に修正(キューブ面と正距円筒画像の両方で半画素ずれていた)
 // 2026/10/18 拡散光のIBL用にキューブマップを事前フィルタする処理(irradiance map)のGPU版とCPU版を追加 (Primal Day 073)
+// 2026/10/19 拡散光の事前フィルタの入力が大きいときは縮小してから処理し、処理量に上限を設けた
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "EnvMapProcessing.h"
@@ -185,6 +186,52 @@ namespace dxforge::tools
 		}
 
 		/// @brief キューブマップの1面を拡散光のIBL用に事前フィルタする(CPU版)
+		/// 入力の面がこのサイズより大きければ、総当たりのフィルタの前に縮小する。
+		/// 処理量は(出力の画素数) x (入力の画素数)なので、縮小しないと例えば1024の6面の入力で約1.5e11回のループになり、
+		/// GPU版はTDRにかかる恐れがある。放射照度は低周波なので、出力と同じサイズまで縮小しても結果はほとんど変わらない。
+		constexpr u32 prefilter_diffuse_max_input_size{ prefiltered_diffuse_cubemap_size };
+
+		/// 入力の面がprefilter_diffuse_max_input_sizeより大きければ、各面のミップ0を縮小したキューブマップ
+		/// (DXGI_FORMAT_R32G32B32A32_FLOAT、ミップ1つ)をresizedに作る。大きくなければresizedは空のまま。
+		/// CPU版とGPU版が同じ入力を使うように、どちらもこの関数を通す。
+		HRESULT limit_prefilter_diffuse_input(const ScratchImage& cubemaps, ScratchImage& resized)
+		{
+			const TexMetadata& metadata{ cubemaps.GetMetadata() };
+			if (metadata.width <= prefilter_diffuse_max_input_size)
+			{
+				return S_OK;
+			}
+
+			utl::vector<Image> faces{};
+			for (u32 i{ 0 }; i < (u32)metadata.arraySize; ++i)
+			{
+				const Image* const image{ cubemaps.GetImage(0, i, 0) };
+				assert(image);
+				faces.emplace_back(*image);
+			}
+
+			TexMetadata mip0_metadata{ metadata };
+			mip0_metadata.mipLevels = 1;
+
+			// 面積で重み付ける縮小。WICは使わない(32ビット浮動小数点のまま処理し、COMの初期化も要らない)。
+			constexpr TEX_FILTER_FLAGS filter{ TEX_FILTER_TRIANGLE | TEX_FILTER_FORCE_NON_WIC };
+			constexpr u32 size{ prefilter_diffuse_max_input_size };
+			if (metadata.format == DXGI_FORMAT_R32G32B32A32_FLOAT)
+			{
+				return Resize(faces.data(), faces.size(), mip0_metadata, size, size, filter, resized);
+			}
+
+			ScratchImage f32_faces{};
+			const HRESULT hr{ Convert(faces.data(), faces.size(), mip0_metadata, DXGI_FORMAT_R32G32B32A32_FLOAT,
+									  TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT, f32_faces) };
+			if (FAILED(hr))
+			{
+				return hr;
+			}
+
+			return Resize(f32_faces.GetImages(), f32_faces.GetImageCount(), f32_faces.GetMetadata(), size, size, filter, resized);
+		}
+
 		/// @param texels 入力のキューブマップの全画素の方向と重み(get_cubemap_texels())
 		/// @param src_faces 入力のキューブマップのミップ0の6面(DXGI_FORMAT_R32G32B32A32_FLOAT)
 		/// @param dst_face 出力するキューブマップの面(DXGI_FORMAT_R32G32B32A32_FLOAT)
@@ -629,8 +676,18 @@ namespace dxforge::tools
 		assert(metadata.IsCubemap() && cubemap_count && !(array_size % 6));
 		assert(metadata.width == metadata.height && !IsCompressed(metadata.format));
 		const DXGI_FORMAT format{ metadata.format };
-		const u32 src_size{ (u32)metadata.width };
 		HRESULT hr{ S_OK };
+
+		ScratchImage resized{};
+		hr = limit_prefilter_diffuse_input(cubemaps, resized);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		const ScratchImage& input{ resized.GetImageCount() ? resized : cubemaps };
+		const DXGI_FORMAT input_format{ input.GetMetadata().format };
+		const u32 src_size{ (u32)input.GetMetadata().width };
 
 		ScratchImage working_scratch{};
 		hr = working_scratch.InitializeCube(DXGI_FORMAT_R32G32B32A32_FLOAT, prefiltered_diffuse_cubemap_size, prefiltered_diffuse_cubemap_size, cubemap_count, 1);
@@ -648,9 +705,9 @@ namespace dxforge::tools
 			const Image* src_faces[6]{};
 			for (u32 face{ 0 }; face < 6; ++face)
 			{
-				const Image* const image{ cubemaps.GetImage(0, i * 6 + face, 0) };
+				const Image* const image{ input.GetImage(0, i * 6 + face, 0) };
 				assert(image);
-				if (format == DXGI_FORMAT_R32G32B32A32_FLOAT)
+				if (input_format == DXGI_FORMAT_R32G32B32A32_FLOAT)
 				{
 					src_faces[face] = image;
 					continue;
@@ -707,6 +764,16 @@ namespace dxforge::tools
 
 		HRESULT hr{ S_OK };
 
+		ScratchImage resized{};
+		hr = limit_prefilter_diffuse_input(cubemaps, resized);
+		if (FAILED(hr))
+		{
+			return hr;
+		}
+
+		const ScratchImage& input{ resized.GetImageCount() ? resized : cubemaps };
+		const TexMetadata& input_metadata{ input.GetMetadata() };
+
 		// 出力先のリソースを作成
 		ComPtr<ID3D11Texture2D> cubemaps_out{};
 		ComPtr<ID3D11Texture2D> cubemaps_cpu{};
@@ -757,7 +824,7 @@ namespace dxforge::tools
 			}
 
 			ShaderConstants constants{};
-			constants.CubeMapInSize = (u32)metadata.width;
+			constants.CubeMapInSize = (u32)input_metadata.width;
 			constants.CubeMapOutSize = prefiltered_diffuse_cubemap_size;
 			hr = set_constants(ctx.Get(), constant_buffer.Get(), constants);
 			if (FAILED(hr))
@@ -784,11 +851,11 @@ namespace dxforge::tools
 			ComPtr<ID3D11Texture2D> cubemap_in{};
 			{
 				D3D11_TEXTURE2D_DESC desc{};
-				desc.Width = (u32)metadata.width;
-				desc.Height = (u32)metadata.height;
+				desc.Width = (u32)input_metadata.width;
+				desc.Height = (u32)input_metadata.height;
 				desc.MipLevels = 1;
 				desc.ArraySize = 6;
-				desc.Format = format;
+				desc.Format = input_metadata.format;
 				desc.SampleDesc = { 1, 0 };
 				desc.Usage = D3D11_USAGE_IMMUTABLE;
 				desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
@@ -798,7 +865,7 @@ namespace dxforge::tools
 				D3D11_SUBRESOURCE_DATA data[6]{};
 				for (u32 face{ 0 }; face < 6; ++face)
 				{
-					const Image* const image{ cubemaps.GetImage(0, i * 6 + face, 0) };
+					const Image* const image{ input.GetImage(0, i * 6 + face, 0) };
 					assert(image);
 					data[face].pSysMem = image->pixels;
 					data[face].SysMemPitch = (u32)image->rowPitch;

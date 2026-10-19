@@ -22,6 +22,8 @@
 #      GPU版の子プロセスでGPUが使えずCPU版にフォールバックした疑いがあるので不合格にする。
 #   3. エディタと同じ流れ(6枚のHDR画像をImport() -> 結果のコピーにPrefilterDiffuseIBL()、
 #      元にPrefilterSpecularIBL())で、圧縮(BC6H)まで行われ、値が正しいこと
+#   4. 大きな入力(1024の6面)でも、入力を縮小してから総当たりするので処理時間が抑えられること。
+#      一様な色 -> 同じ色、面ごとに色が違う入力でCPU版とGPU版が一致すること(どちらも同じ縮小を通る)
 import argparse
 import ctypes
 import os
@@ -31,6 +33,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 
 import envmap_cpu_gpu_test as envmap
 from envmap_cpu_gpu_test import TextureData
@@ -52,6 +55,11 @@ CPU_GPU_TOLERANCE = 1e-4
 BC6H_TOLERANCE = 0.02
 # 3. RGBEで誤差なく表せる値(2のべき乗)
 IMPORT_COLOR = (4.0, 0.25, 1.0)
+# 4. 大きな入力。縮小しないと出力64x64x6画素 x 入力1024x1024x6画素 = 約1.5e11回のループになる。
+LARGE_SIZE = 1024
+LARGE_FACE_COLORS = ((4.0, 0.5, 0.5), (0.5, 4.0, 0.5), (0.5, 0.5, 4.0), (2.0, 2.0, 0.25), (0.25, 2.0, 2.0), (2.0, 0.25, 2.0))
+# 4. 2つのキューブマップ(一様な色と面ごとの色)を1回で処理する時間の上限(秒)
+LARGE_TIME_LIMIT = 10.0
 
 DXGI_FORMAT_R32G32B32A32_FLOAT = 2
 DXGI_FORMAT_BC6H_UF16 = 95
@@ -123,6 +131,23 @@ def build_subresources(cubemaps):
 	return bytes(blob), mip_levels
 
 
+def build_constant_subresources(cubemaps, size):
+	"""build_subresources()と同じ並びで、各面が1色(cubemaps = [キューブマップ][面] = rgb)のバイト列"""
+	mip_levels = size.bit_length()
+	blob = bytearray()
+	for face_colors in cubemaps:
+		for rgb in face_colors:
+			for mip in range(mip_levels):
+				mip_size = max(size >> mip, 1)
+				row_pitch = mip_size * 16
+				blob += struct.pack("<4I", mip_size, mip_size, row_pitch, row_pitch * mip_size)
+				if mip == 0:
+					blob += struct.pack("<4f", *rgb, 1.0) * (mip_size * mip_size)
+				else:
+					blob += bytes(row_pitch * mip_size)
+	return bytes(blob), mip_levels
+
+
 def read_subresources(data):
 	"""サブリソースを[画像][画素] = (r, g, b, a)のリストにする(R32G32B32A32_FLOATのみ)"""
 	blob = ctypes.string_at(data.subresource_data, data.subresource_size)
@@ -171,12 +196,16 @@ def set_settings(settings, compress):
 def prefilter_direct(tools, cubemaps):
 	"""サブリソースを直接組み立ててPrefilterDiffuseIBL()を呼び、出力の画像を返す"""
 	raw, mip_levels = build_subresources(cubemaps)
+	return prefilter_subresources(tools, raw, mip_levels, IN_SIZE, len(cubemaps))
+
+
+def prefilter_subresources(tools, raw, mip_levels, size, cubemap_count):
 	data = TextureData()
 	data.subresource_data = co_task_mem_copy(raw)
 	data.subresource_size = len(raw)
 	info = data.info
-	info.width = info.height = IN_SIZE
-	info.array_size = 6 * len(cubemaps)
+	info.width = info.height = size
+	info.array_size = 6 * cubemap_count
 	info.mip_levels = mip_levels
 	info.format = DXGI_FORMAT_R32G32B32A32_FLOAT
 	info.flags = FLAG_IS_HDR | FLAG_IS_CUBE_MAP
@@ -187,7 +216,7 @@ def prefilter_direct(tools, cubemaps):
 	try:
 		assert info.import_error == 0, f"import_error={info.import_error}"
 		assert info.format == DXGI_FORMAT_R32G32B32A32_FLOAT, f"format={info.format}"
-		assert (info.width, info.height, info.array_size, info.mip_levels) == (OUT_SIZE, OUT_SIZE, 6 * len(cubemaps), 1), \
+		assert (info.width, info.height, info.array_size, info.mip_levels) == (OUT_SIZE, OUT_SIZE, 6 * cubemap_count, 1), \
 			f"size={info.width}x{info.height} array={info.array_size} mips={info.mip_levels}"
 		return read_subresources(data)
 	finally:
@@ -270,6 +299,11 @@ def run_child(dll_path, mode, out_path):
 		"mixed": prefilter_direct(tools, [make_cubemap("linear"), make_cubemap("uniform")]),
 		"random": prefilter_direct(tools, [make_cubemap("random", seed=35)]),
 	}
+	raw, mip_levels = build_constant_subresources([[UNIFORM_COLOR] * 6, LARGE_FACE_COLORS], LARGE_SIZE)
+	start = time.perf_counter()
+	results["large"] = prefilter_subresources(tools, raw, mip_levels, LARGE_SIZE, 2)
+	results["large_seconds"] = time.perf_counter() - start
+	del raw
 	work_dir = tempfile.mkdtemp(prefix="irradiance_import_")
 	try:
 		results["import"] = import_like_editor(tools, work_dir)
@@ -326,6 +360,12 @@ def check_known_answers(mode, results):
 	import_color = envmap.from_rgbe(envmap.to_rgbe(IMPORT_COLOR))
 	passed = check("Import -> PrefilterDiffuseIBL -> BC6H -> Decompress(一様な色)", max_error(results["import"], lambda f, x, y: import_color, True),
 				   BC6H_TOLERANCE) and passed
+	passed = check(f"{LARGE_SIZE}の6面の一様な色の入力 -> 同じ色", max_error(results["large"][:6], lambda f, x, y: UNIFORM_COLOR, True),
+				   UNIFORM_TOLERANCE) and passed
+	seconds = results["large_seconds"]
+	time_ok = seconds <= LARGE_TIME_LIMIT
+	print(f"  {LARGE_SIZE}の6面のキューブマップ2つの処理時間: {seconds:.2f}秒 (上限 {LARGE_TIME_LIMIT:g}秒) {'OK' if time_ok else 'NG'}")
+	passed = passed and time_ok
 	alpha_ok = all(p[3] == 1.0 for images in (mixed, results["random"]) for pixels in images for p in pixels)
 	print(f"  出力のアルファがすべて1: {'OK' if alpha_ok else 'NG'}")
 	return passed and alpha_ok
@@ -334,7 +374,7 @@ def check_known_answers(mode, results):
 def check_cpu_gpu(cpu, gpu):
 	print("CPU版とGPU版の比較:")
 	passed = True
-	for case in ("mixed", "random"):
+	for case in ("mixed", "random", "large"):
 		c_images, g_images = cpu[case], gpu[case]
 		worst = 0.0
 		identical = True

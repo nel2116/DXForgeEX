@@ -891,9 +891,11 @@ namespace DXForgeEditor.Content
                 // 対になる拡散光のIBLのテクスチャも保存する(互いのGUIDを書くので、このテクスチャのGUIDを決めた後で保存する)。
                 // ペアを保存できなければ、存在しない・古いペアを参照しないよう、このテクスチャも保存しない。
                 string? pairFile = null;
+                IBLPairBackup? pairBackup = null;
                 if (IBLPair != null && !IBLPair._isSaving && !IsDiffuseIBL)
                 {
                     pairFile = string.IsNullOrEmpty(IBLPair.FullPath) ? GetNewIBLPairFile(file) : IBLPair.FullPath;
+                    pairBackup = new IBLPairBackup(IBLPair, pairFile);
                     var savedPairFiles = IBLPair.Save(pairFile).ToList();
                     if (!savedPairFiles.Any())
                     {
@@ -902,26 +904,16 @@ namespace DXForgeEditor.Content
                     savedFiles.AddRange(savedPairFiles);
                 }
 
-                var compressed = CompressContent();
-                Debug.Assert(compressed?.Length > 0);
-                Hash = ContentHelper.ComputeHash(compressed);
-
-                using var writer = new BinaryWriter(File.Open(file, FileMode.Create, FileAccess.Write));
-
-                WriteAssetFileHeader(writer);
-                writer.Write(FileFormatTag);
-                writer.Write(FileFormatVersion);
-                ImportSettings.ToBinary(writer);
-
-                writer.Write(Width);
-                writer.Write(Height);
-                writer.Write(ArraySize);
-                writer.Write((int)Flags);
-                writer.Write(MipLevels);
-                writer.Write((int)Format);
-                writer.Write((IBLPair?.Guid ?? Guid.Empty).ToString());
-                writer.Write(compressed.Length);
-                writer.Write(compressed);
+                try
+                {
+                    WriteAssetFile(file);
+                }
+                catch
+                {
+                    // このテクスチャを書けなければ、ペアも保存前の内容に戻し、ディスク上の2つの内容をそろえる。
+                    pairBackup?.Restore();
+                    throw;
+                }
 
                 FullPath = file;
                 Logger.Log(MessageType.Info, $"テクスチャを保存: {file}");
@@ -952,6 +944,91 @@ namespace DXForgeEditor.Content
             }
 
             return new List<string>();
+        }
+
+        /// <summary>
+        /// アセットのファイルを書く。書き終えるまで元のファイルを壊さないよう、同じフォルダの一時ファイルに書いてから置き換える
+        /// (元のファイルが読み取り専用などで置き換えられなければ例外になり、元のファイルはそのまま残る)。
+        /// </summary>
+        private void WriteAssetFile(string file)
+        {
+            var compressed = CompressContent();
+            Debug.Assert(compressed?.Length > 0);
+            Hash = ContentHelper.ComputeHash(compressed);
+
+            var tempFile = $"{file}.tmp";
+            try
+            {
+                using (var writer = new BinaryWriter(File.Open(tempFile, FileMode.Create, FileAccess.Write)))
+                {
+                    WriteAssetFileHeader(writer);
+                    writer.Write(FileFormatTag);
+                    writer.Write(FileFormatVersion);
+                    ImportSettings.ToBinary(writer);
+
+                    writer.Write(Width);
+                    writer.Write(Height);
+                    writer.Write(ArraySize);
+                    writer.Write((int)Flags);
+                    writer.Write(MipLevels);
+                    writer.Write((int)Format);
+                    writer.Write((IBLPair?.Guid ?? Guid.Empty).ToString());
+                    writer.Write(compressed.Length);
+                    writer.Write(compressed);
+                }
+
+                File.Move(tempFile, file, true);
+            }
+            finally
+            {
+                if (File.Exists(tempFile))
+                {
+                    File.Delete(tempFile);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 拡散光のIBLのテクスチャを保存する前のファイルの内容と保存先。元のキューブマップを保存できなかったときに戻すために使う。
+        /// </summary>
+        private sealed class IBLPairBackup
+        {
+            private readonly Texture _pair;
+            private readonly string _file;
+            private readonly byte[]? _content;
+            private readonly string _fullPath;
+            private readonly Guid _guid;
+
+            public IBLPairBackup(Texture pair, string file)
+            {
+                _pair = pair;
+                _file = file;
+                _content = File.Exists(file) ? File.ReadAllBytes(file) : null;
+                _fullPath = pair.FullPath;
+                _guid = pair.Guid;
+            }
+
+            public void Restore()
+            {
+                try
+                {
+                    if (_content != null)
+                    {
+                        File.WriteAllBytes(_file, _content);
+                    }
+                    else if (File.Exists(_file))
+                    {
+                        File.Delete(_file);
+                    }
+                    _pair.FullPath = _fullPath;
+                    _pair.Guid = _guid;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex.Message);
+                    Logger.Log(MessageType.Error, $"拡散光のIBLのテクスチャを保存前の内容に戻せませんでした: {_file}");
+                }
+            }
         }
 
         /// <summary>
