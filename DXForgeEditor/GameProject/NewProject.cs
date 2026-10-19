@@ -33,8 +33,9 @@ namespace DXForgeEditor.GameProject
 
     class NewProject : ViewModelBase
     {
-        // TODO: パスをインストール場所から取得する
-        private readonly string _templatePath = @"..\..\DXForgeEditor\ProjectTemplates";
+        // テンプレートはビルド時に出力フォルダへコピーされる(DXForgeEditor.csproj)。
+        // 作業フォルダではなく実行ファイルの場所を基準にするので、どこから起動しても見つかる
+        private static readonly string _templatePath = Path.Combine(AppContext.BaseDirectory, "ProjectTemplates");
         private string _projetName = "NewProject";
 
         public string ProjectName
@@ -99,11 +100,20 @@ namespace DXForgeEditor.GameProject
         private readonly ObservableCollection<ProjectTemplate> _projectTemplates = new();
         public ReadOnlyObservableCollection<ProjectTemplate> ProjectTemplates { get; }
 
+        // Path欄の値の環境変数(%TEMP%など)を展開し、末尾を区切り文字にしたもの。
+        // 絶対パスでなければnullを返す(相対パスは作業フォルダ次第で行き先が変わるため受け付けない)
+        private string? GetExpandedProjectPath()
+        {
+            var path = Environment.ExpandEnvironmentVariables(ProjectPath.Trim());
+            if (path.IndexOfAny(Path.GetInvalidPathChars()) != -1 || !Path.IsPathFullyQualified(path)) return null;
+            if (!Path.EndsInDirectorySeparator(path)) path += @"\";
+            return path;
+        }
+
         private bool ValidateProjectPath()
         {
-            var path = ProjectPath;
-            if (!Path.EndsInDirectorySeparator(path)) path += @"\";
-            path += $@"{ProjectName}\";
+            var expandedPath = GetExpandedProjectPath();
+            var path = $@"{expandedPath}{ProjectName}\";
             var nameRegex = new Regex(@"^[A-Za-z_][A-Za-z0-9_]*$");
 
             IsValid = false;
@@ -123,6 +133,10 @@ namespace DXForgeEditor.GameProject
             {
                 ErrorMsg = "プロジェクトパスに無効な文字が使用されています";
             }
+            else if (expandedPath == null)
+            {
+                ErrorMsg = "プロジェクトパスには絶対パスを入力してください";
+            }
             else if (Directory.Exists(path) && Directory.EnumerateFileSystemEntries(path).Any())
             {
                 ErrorMsg = "選択したプロジェクトフォルダはすでに存在しています";
@@ -141,8 +155,12 @@ namespace DXForgeEditor.GameProject
             // プロジェクトパスが有効かどうか
             if (!ValidateProjectPath()) return null;
 
-            if (!Path.EndsInDirectorySeparator(ProjectPath)) ProjectPath += @"\";
-            var path = $@"{ProjectPath}{ProjectName}\";
+            var expandedPath = GetExpandedProjectPath();
+            Debug.Assert(expandedPath != null);
+            if (expandedPath == null) return null;
+            // 実際に作る場所(展開済みの絶対パス)をPath欄にも表示する
+            ProjectPath = expandedPath;
+            var path = $@"{expandedPath}{ProjectName}\";
 
             try
             {
@@ -218,9 +236,11 @@ namespace DXForgeEditor.GameProject
             }
             catch (Exception ex)
             {
+                // このコンストラクタはProjectBrowserDialogのXAMLから呼ばれるので、例外を投げ直すと
+                // エディタが起動できなくなる。テンプレートの一覧を空にして、既存のプロジェクトは開けるようにする
                 Debug.WriteLine(ex.Message);
-                Logger.Log(MessageType.Error, $"プロジェクト・テンプレートの読み込みに失敗しました");
-                throw;
+                Logger.Log(MessageType.Error, $"プロジェクト・テンプレートの読み込みに失敗しました: {_templatePath}");
+                _projectTemplates.Clear();
             }
         }
     }

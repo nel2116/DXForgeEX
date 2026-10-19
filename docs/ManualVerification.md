@@ -63,18 +63,17 @@ $verifyRoot = Join-Path $env:TEMP "DXForgeVerify"
 # 手順2でPath欄に貼り付けるため、クリップボードに入れておく
 Set-Clipboard "$verifyRoot\"
 "$verifyRoot\"
-# エディタはテンプレートを作業フォルダからの相対パス(..\..\DXForgeEditor\ProjectTemplates)で読むため、
-# 作業フォルダをx64\DebugEditorにして起動する(このPowerShellの場所はリポジトリのルートのまま)
-Start-Process -FilePath "$PWD\x64\DebugEditor\DXForgeEditor.exe" -WorkingDirectory "$PWD\x64\DebugEditor"
+# エディタはテンプレートを実行ファイルの場所(x64\DebugEditor\ProjectTemplates)から読むので、作業フォルダはどこでもよい
+Start-Process -FilePath "$PWD\x64\DebugEditor\DXForgeEditor.exe"
 ```
 
 2. 「Create Project」を選び、テンプレート`Empty Project`、Nameに`$verifyName`の値(`Verify43`)、Pathに`$verifyRoot\`の値を入力して「Create」。
    - Path欄は、中身を全部選択(Ctrl+A)してから貼り付け(Ctrl+V)ます。上のコマンドで表示した値(例: `C:\Users\<ユーザー名>\AppData\Local\Temp\DXForgeVerify\`)を手で入力してもかまいません。
-   - **`%TEMP%`のような環境変数をPath欄に書かないでください。** エディタは環境変数を展開しないので、作業フォルダ(`x64\DebugEditor`)の下に`%TEMP%`という名前のフォルダが作られ、手順7の後片付けの対象からも外れます。
+   - Path欄の環境変数は展開されるので、`%TEMP%\DXForgeVerify\`と入力しても同じ場所に作られます(「Create」を押すと、Path欄の表示も展開済みの絶対パスに変わります)。相対パス(例: `DXForgeVerify\`)は「プロジェクトパスには絶対パスを入力してください」と表示されて作成できません。
    - 既定のPathは`ドキュメント\DXForgeProjects\`です。後片付けを簡単にするため、専用のフォルダを使うことをおすすめします。
    - 前回の検証のフォルダ(`$verifyRoot\$verifyName\`)が残っていると「選択したプロジェクトフォルダはすでに存在しています」と出て作成できません。手順7の後片付けを先に行ってください。
 
-**注意:** リポジトリのルートで`.\x64\DebugEditor\DXForgeEditor.exe`のように直接起動すると、作業フォルダがリポジトリのルートになり、テンプレートが見つかりません。必ず上の`Start-Process`(または`x64\DebugEditor`に移動してから起動)を使ってください。
+テンプレートは、エディタのビルド(`./build.ps1 -Target editor`)で`DXForgeEditor\ProjectTemplates`から`x64\DebugEditor\ProjectTemplates`にコピーされます。テンプレートを編集したら、エディタをビルドし直してください。テンプレートが見つからない場合は、新規プロジェクトの一覧が空になり、LoggerViewに「プロジェクト・テンプレートの読み込みに失敗しました: <パス>」と出ます。
 
 **期待される結果**
 
@@ -206,7 +205,7 @@ Remove-Item -Recurse -Force $verifyRoot
 $f = "$env:APPDATA\DXForgeEditor\ProjectData.xml"
 $bak = "$f.$(Get-Date -Format yyyyMMdd-HHmmss).bak"
 Copy-Item $f $bak
-# エディタは、Path欄の値 + プロジェクト名 + "\" をProjectPathとして登録する
+# エディタは、Path欄の値(環境変数を展開した絶対パス) + プロジェクト名 + "\" をProjectPathとして登録する
 $projectPath = "$verifyRoot\$verifyName\"
 ```
 
