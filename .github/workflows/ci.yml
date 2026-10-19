@@ -29,6 +29,8 @@ jobs:
       # GetDXC.ps1 は packages/ が空のとき DXC の最新版をダウンロードする。
       # packages/ はリポジトリに含めていないため、キャッシュしないと毎回ダウンロードが走り、
       # GitHub API のレート制限でCIが不安定になる。
+      # キャッシュはそのrunのref・PRのbase・既定のブランチのものしか使えず、外れることがあるため、
+      # 外れたときに備えて下のステップで GITHUB_TOKEN を渡し、APIを認証付きで呼ぶ(#84)。
       - name: Cache DirectX Shader Compiler
         uses: actions/cache@v4
         with:
@@ -37,6 +39,10 @@ jobs:
 
       - name: Build and run unit tests
         shell: pwsh
+        # GetDXC.ps1 が GitHub API を認証付きで呼ぶために使う(未認証の上限はランナーのIPで共有される)。
+        # secrets の値はActionsがログ上で伏せ字にし、GetDXC.ps1 自身もトークンを出力しない。
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./build.ps1 -Target native -Configuration ${{ matrix.configuration }} -RunTests -WarningsAsErrors
 
   editor:
