@@ -1,0 +1,50 @@
+# PRの自動マージを支えるワークフロー。
+#
+#   - hold: PRに hold ラベルが付いている間は失敗する。develop のブランチ保護で必須にしているため、
+#     CI・codex-review がそろっていても、hold を外すまで自動マージされない(人が止めるための手段)。
+#   - close-issues: develop にマージされたPRの本文にある "Closes #NN" のIssueを閉じる。
+#     GitHub がPRの本文でIssueを閉じるのは既定のブランチ(main)へのマージだけなので、ここで代わりに行う。
+name: PR automation
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled, closed]
+
+jobs:
+  hold:
+    name: No hold label
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail while the hold label is set
+        if: contains(github.event.pull_request.labels.*.name, 'hold')
+        run: |
+          echo "::error::This PR has the 'hold' label. Remove it to allow merging."
+          exit 1
+      - name: No hold label
+        run: echo "No hold label."
+
+  close-issues:
+    name: Close linked issues
+    if: github.event.action == 'closed' && github.event.pull_request.merged && github.event.pull_request.base.ref == 'develop'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Close issues referenced by closing keywords
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          numbers=$(printf '%s' "$PR_BODY" | grep -oiE '\b(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]]+#[0-9]+' | grep -oE '[0-9]+$' | sort -un || true)
+          for n in $numbers; do
+            state=$(gh issue view "$n" --json state --jq .state 2>/dev/null || echo "")
+            if [ "$state" = "OPEN" ]; then
+              gh issue close "$n" --comment "PR #$PR_NUMBER (${MERGE_SHA:0:7}) で develop にマージしました。"
+            else
+              echo "#$n: skipped (state: ${state:-not found})"
+            fi
+          done
