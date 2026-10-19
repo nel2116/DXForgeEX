@@ -83,9 +83,12 @@ PowerShell 7+ (`pwsh`) から実行します。
 ```powershell
 ./x64/Debug/EngineUnitTests.exe          # 人間が読める出力
 ./x64/Debug/EngineUnitTests.exe --json   # 機械可読なJSON出力
+./x64/Debug/EngineUnitTests.exe --interactive   # assert時にCRT既定のダイアログを出す(デバッガで調べたいとき)
 ```
 
 終了コードは全テストPASSなら`0`、1件以上FAILなら`1`です。各失敗には式・ファイル・行番号が出力されます。
+
+無人実行で止まらないように、テスト対象のコードが`assert`に当たったり`abort()`が呼ばれたりしても、ダイアログは出しません。assertの内容(式・ファイル・行番号)と、そのとき実行していたテストケース名(`[ABORT] <名前>`)を標準エラーへ出し、終了コード`3`ですぐに終わります。結果は全ケースの実行後にまとめて出力するため、この場合は標準出力には何も出ません(`--json`でもJSONは出ません)。終了コードが`0`/`1`以外なら中断とみなしてください。ダイアログを出してデバッガをアタッチしたいときは`--interactive`を付けます。
 
 現在カバーしているのは、GPU/ウィンドウに依存しない純粋ロジックのみです:
 - `Common/Id.h` — 世代付きID(インデックス/世代のエンコード、`new_generation`、`DEFINE_TYPED_ID`)
