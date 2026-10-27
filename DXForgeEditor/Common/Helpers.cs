@@ -194,16 +194,9 @@ namespace DXForgeEditor
         {
             Debug.Assert(!string.IsNullOrEmpty(file));
             if (IsDirectory(file)) return null;
-            var name = Path.GetFileNameWithoutExtension(file).ToLower();
-            var ext = Path.GetExtension(file).ToLower();
+            var name = GetAssetName(file);
 
-            Asset? asset = ext switch
-            {
-                { } when MeshFileExtensions.Contains(ext) => new Content.Geometry(importSettings),
-                { } when ImageFileExtensions.Contains(ext) => new Texture(importSettings),
-                { } when AudioFileExtensions.Contains(ext) => null,
-                _ => null
-            };
+            Asset? asset = CreateAsset(file, importSettings);
 
             if (asset != null)
             {
@@ -211,6 +204,34 @@ namespace DXForgeEditor
             }
 
             return asset;
+        }
+
+        /// <summary>
+        /// インポートするファイルの拡張子に合うアセットを作る。対応していない拡張子(音声を含む)なら null。
+        /// エディタのインポートとコマンドラインのインポーター(DXForgeImport)で共有する。
+        /// </summary>
+        internal static Asset? CreateAsset(string file, IAssetImportSettings importSettings)
+        {
+            var ext = Path.GetExtension(file).ToLower();
+
+            return ext switch
+            {
+                { } when MeshFileExtensions.Contains(ext) => new Content.Geometry(importSettings),
+                { } when ImageFileExtensions.Contains(ext) => new Texture(importSettings),
+                { } when AudioFileExtensions.Contains(ext) => null,
+                _ => null
+            };
+        }
+
+        /// <summary>インポートしたアセットの名前(元のファイル名を小文字にしたもの)。</summary>
+        internal static string GetAssetName(string file) => Path.GetFileNameWithoutExtension(file).ToLower();
+
+        /// <summary>出力先のフォルダとアセットの名前から、アセットのファイルのパスを作る(Save() に渡すパス)。</summary>
+        internal static string GetAssetFullPath(string name, string destination)
+        {
+            destination = destination.Trim();
+            if (!destination.EndsWith(Path.DirectorySeparatorChar)) destination += Path.DirectorySeparatorChar;
+            return destination + name + Asset.AssetFileExtension;
         }
 
         private static void Import(Asset asset, string name, string file, string destination)
@@ -221,7 +242,7 @@ namespace DXForgeEditor
             Debug.Assert(!string.IsNullOrEmpty(destination) && Directory.Exists(destination));
 
             if (!destination.EndsWith(Path.DirectorySeparatorChar)) destination += Path.DirectorySeparatorChar;
-            asset.FullPath = destination + name + Asset.AssetFileExtension;
+            asset.FullPath = GetAssetFullPath(name, destination);
 
             var importingItem = new ImportingItem(name, asset);
             ImportingItemCollection.Add(importingItem);

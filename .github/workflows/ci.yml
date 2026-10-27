@@ -69,3 +69,16 @@ jobs:
       - name: Build editor
         shell: pwsh
         run: ./build.ps1 -Target editor -Configuration DebugEditor -WarningsAsErrors
+
+      # コマンドラインのインポーター DXForgeImport(#10)の引数・異常系のテスト。ContentTools.dll は FBX SDK が要るので
+      # ランナーではビルドできないが、引数の解析と、入力なし・未対応の拡張子・設定の誤りなどの終了コードと --json の出力、
+      # ContentTools.dll がないときの終了コード7は、それなしで確かめられる。実際のインポートはローカルで確かめる。
+      - name: Test DXForgeImport (arguments only)
+        shell: pwsh
+        run: pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1 -Configuration DebugEditor -ArgumentsOnly
+
+      - name: CleanupMerged.ps1 tests
+        shell: pwsh
+        # 使い捨てのリポジトリと偽の gh / orca で動かし、本物のGitHubやOrcaは呼ばない(Issue #104)。
+        # GUIもビルドも要らないので、別のジョブにせず必須のチェックであるこのジョブに入れる。
+        run: ./Tests/CleanupMerged.Tests.ps1

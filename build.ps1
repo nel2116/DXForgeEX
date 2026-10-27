@@ -4,7 +4,8 @@
 
 .DESCRIPTION
     ネイティブ側(DXForgeEngine/EngineTest/ContentTools/EngineUnitTests)はvswhereで見つけた
-    MSBuild.exeでDXForge.slnをビルドし、エディタ側(DXForgeEditor)はdotnet buildでビルドする。
+    MSBuild.exeでDXForge.slnをビルドし、エディタ側(DXForgeEditorと、それを参照するコマンドラインの
+    インポーターDXForgeImport)はdotnet buildでビルドする。
     -RunTestsを指定すると、ビルド後にヘッドレスのEngineUnitTests.exeを実行し、その終了コードを
     このスクリプト全体の終了コードに反映する。-Jsonを指定すると、最後に1行のJSON要約を標準出力
     に出す(将来、AIエージェントやCIがこのスクリプトを呼び出す前提)。
@@ -225,7 +226,9 @@ if ($Target -eq "native" -or $Target -eq "all")
 if ($Target -eq "editor" -or $Target -eq "all")
 {
 	$editorConfiguration = Get-EditorConfiguration $Configuration
-	$csproj = "$RepoRoot\DXForgeEditor\DXForgeEditor.csproj"
+	# DXForgeImport(コマンドラインのインポーター、#10)は DXForgeEditor をProjectReferenceで参照するので、
+	# DXForgeImport をビルドするとエディタも同じ設定(構成・Platform・警告のエラー化)でビルドされる。
+	$csproj = "$RepoRoot\DXForgeImport\DXForgeImport.csproj"
 
 	# Platformを渡さないとAnyCPU扱いになり、出力先がリポジトリ直下の<Config>\になってしまう。
 	# VSのソリューションビルドと同じx64\<Config>\(エンジンのDLLと同じフォルダ)に出力させる。
@@ -234,7 +237,7 @@ if ($Target -eq "editor" -or $Target -eq "all")
 	# 警告をエラー化するときはフルビルドにして取りこぼしを防ぐ。
 	if ($WarningsAsErrors) { $editorArgs += @("-p:TreatWarningsAsErrors=true", "--no-incremental") }
 
-	Write-Host "== Editor build [$editorConfiguration|$Platform] =="
+	Write-Host "== Editor build (DXForgeEditor + DXForgeImport) [$editorConfiguration|$Platform] =="
 	$editorExit = Invoke-BuildStep -Command { & dotnet build $csproj -c $editorConfiguration --nologo -v:minimal @editorArgs } -ShowFullLog:$DetailedLog
 	$summary.editor = [ordered]@{ exitCode = $editorExit; configuration = $editorConfiguration; warningsAsErrors = [bool]$WarningsAsErrors }
 	if ($editorExit -ne 0 -and $exitCode -eq 0) { $exitCode = $editorExit }
