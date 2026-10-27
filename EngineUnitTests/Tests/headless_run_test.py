@@ -82,19 +82,22 @@ class Runner:
             f.write(data)
         return path
 
-    def run(self, args):
+    def run_raw(self, args):
         proc = subprocess.run([self.exe] + args, capture_output=True, timeout=TIMEOUT_SECONDS)
-        stdout = proc.stdout.decode("utf-8", errors="replace")
-        stderr = proc.stderr.decode("utf-8", errors="replace")
-        return proc.returncode, stdout, stderr
+        return proc.returncode, proc.stdout, proc.stderr.decode("utf-8", errors="replace")
+
+    def run(self, args):
+        code, stdout, stderr = self.run_raw(args)
+        return code, stdout.decode("utf-8", errors="replace"), stderr
 
     def run_json(self, args):
-        code, stdout, stderr = self.run(args + ["--json"])
+        code, stdout, stderr = self.run_raw(args + ["--json"])
         try:
-            result = json.loads(stdout)
-        except json.JSONDecodeError as e:
+            # 厳密なUTF-8としてデコードする(不正なバイトが混ざっていたら失敗にする)
+            result = json.loads(stdout.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as e:
             result = None
-            stderr += f"\n(stdout is not JSON: {e}: {stdout!r})"
+            stderr += f"\n(stdout is not UTF-8 JSON: {e}: {stdout!r})"
         return code, result, stderr
 
     def check(self, name, condition, detail=""):
@@ -230,6 +233,13 @@ def test_errors(r):
     r.expect_error("unregistered script (#113)",
                    ["--game-bin", r.write(game_bin(valid_entity, entity(transform(), script("no_such_script")))), "--frames", "1"],
                    EXIT_SCRIPT_NOT_FOUND, "script_not_found")
+    # スクリプト名が不正なUTF-8(0xFFの1バイト)でも、--jsonの出力は有効なUTF-8のJSONになる
+    r.expect_error("script name with invalid UTF-8",
+                   ["--game-bin", r.write(game_bin(entity(transform(), u32(1) + u32(1) + b"\xff"))), "--frames", "1"],
+                   EXIT_SCRIPT_NOT_FOUND, "script_not_found")
+    code, result, _ = r.run_json(["--game-bin", r.write(game_bin(entity(transform(), u32(1) + u32(1) + b"\xff"))), "--frames", "1"])
+    r.check("script name with invalid UTF-8: escaped in message",
+            result is not None and "script '\\xff' is not registered" in result["error"]["message"], result)
     path = r.write(game_bin(valid_entity))
     r.expect_error("missing --frames", ["--game-bin", path], EXIT_USAGE_ERROR, "usage_error")
     r.expect_error("invalid --frames", ["--game-bin", path, "--frames", "-1"], EXIT_USAGE_ERROR, "usage_error")

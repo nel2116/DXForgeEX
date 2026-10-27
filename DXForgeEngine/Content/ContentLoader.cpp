@@ -9,6 +9,7 @@
 // 2026/10/27 u32の値を1バイトで読んでいたのを直し、壊れたgame.binを範囲外読み・assertではなくエラーとして扱うようにした (#112)
 // 2026/10/27 エンティティが0個のgame.binを空のシーンとして読み込み、途中で失敗したら作成済みのエンティティを破棄するようにした (#107)
 // 2026/10/27 読み込むパスを指定できるようにし、失敗の理由を返すようにした (#11)
+// 2026/10/27 エラーメッセージに入れるスクリプト名の、表示できないASCII以外のバイトを\xNNにした(不正なUTF-8が--jsonに入っていたため) (#11)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "ContentLoader.h"
@@ -18,6 +19,7 @@
 #include "Graphics/Renderer.h"
 
 #if !defined(SHIPPING) && defined(_WIN64)
+#include <cstdio>
 #include <fstream>
 #include <filesystem>
 #include <Windows.h>
@@ -65,6 +67,29 @@ namespace dxforge::content
 			const u8* _at;
 			const u8* _end;
 		};
+
+		/// @brief game.binから読んだ文字列を、エラーメッセージに入れられるようにする
+		/// @details 表示できるASCII以外のバイトは\xNNにする。不正なUTF-8がそのまま--jsonの出力や
+		///			 デバッガの出力(コードページで解釈される)に入らないように、ASCIIだけにする。
+		std::string printable(const char* text)
+		{
+			std::string result{};
+			for (const char* c{ text }; *c; ++c)
+			{
+				const u8 byte{ (u8)*c };
+				if (byte >= 0x20 && byte < 0x7f && byte != '\\')
+				{
+					result += *c;
+				}
+				else
+				{
+					char buffer[8];
+					snprintf(buffer, sizeof(buffer), "\\x%02x", byte);
+					result += buffer;
+				}
+			}
+			return result;
+		}
 
 		/// @brief Transformを読み込む
 		/// @param data
@@ -135,7 +160,7 @@ namespace dxforge::content
 			script_info.script_creator = script::detail::get_script_creator(script::detail::string_hash()(script_name));	// スクリプトの作成関数
 			if (!script_info.script_creator)
 			{
-				last_error = std::string{ "script '" } + script_name + "' is not registered";
+				last_error = "script '" + printable(script_name) + "' is not registered";
 				return load_game_result::script_not_found;
 			}
 			info.script = &script_info;
