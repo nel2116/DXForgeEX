@@ -46,10 +46,18 @@ namespace DXForgeEditor.Utilities
         public static ReadOnlyObservableCollection<LogMessage> Messages { get; } = new ReadOnlyObservableCollection<LogMessage>(_messages);
         public static CollectionViewSource FilterdMessages { get; } = new CollectionViewSource() { Source = Messages };
 
+        /// <summary>
+        /// Log() を呼んだスレッドで、Dispatcher に積む前に同期的に通知する。
+        /// エディタの画面(LoggerView)は Messages を使い、これは使わない。コマンドラインのインポーター(DXForgeImport, Issue #10)が
+        /// Dispatcher を回さずにログを標準エラーと結果のJSONへ出すために使う。
+        /// </summary>
+        public static event Action<MessageType, string>? MessageLogged;
+
         public static async void Log(MessageType type, string msg,
             [CallerFilePath] string file = "", [CallerMemberName] string caller = "",
             [CallerLineNumber] int line = 0)
         {
+            MessageLogged?.Invoke(type, msg);
             await Application.Current.Dispatcher.BeginInvoke(new Action(() =>
             {
                 _messages.Add(new LogMessage(type, msg, file, caller, line));

@@ -316,6 +316,9 @@ namespace DXForgeEditor.Content
 
         public GeometryImportSettings ImportSettings { get; } = new();
 
+        /// <summary>インポートしたデータ(LODグループ)を持つか。FBXのインポートに失敗しても Import() は true を返すことがあるため、保存の前に確かめる。</summary>
+        internal bool HasLODGroups => _lodGroups.Count > 0;
+
         public LODGroup? GetLODGroup(int lodGroup = 0)
         {
             Debug.Assert(lodGroup >= 0 && lodGroup < _lodGroups.Count);
@@ -440,7 +443,8 @@ namespace DXForgeEditor.Content
         private bool ImportFbx(string file)
         {
             Logger.Log(MessageType.Info, $"FBXファイルのインポート: {file}");
-            var tempPath = Application.Current.Dispatcher.Invoke(() => Project.Current!.TempFolder); // インポートはプロジェクトを開いている間しか行われない
+            // エディタでは、インポートはプロジェクトを開いている間しか行われない。コマンドラインのインポーターは一時フォルダを差し替える。
+            var tempPath = ContentImportEnvironment.TempFolder ?? Application.Current.Dispatcher.Invoke(() => Project.Current!.TempFolder);
             if (string.IsNullOrEmpty(tempPath)) return false;
 
             lock (_lock)
@@ -474,7 +478,14 @@ namespace DXForgeEditor.Content
                     var files = Directory.GetFiles(embeddedMediaDir);
                     var destinationFolder = Path.GetDirectoryName(FullPath);
                     Debug.Assert(destinationFolder != null);
-                    new ConfigureImportSettings(files, destinationFolder).Import();
+                    if (ContentImportEnvironment.ImportEmbeddedFiles is { } importEmbeddedFiles)
+                    {
+                        importEmbeddedFiles(files, destinationFolder);
+                    }
+                    else
+                    {
+                        new ConfigureImportSettings(files, destinationFolder).Import();
+                    }
                 }
             }
 
