@@ -13,6 +13,7 @@
 // 2026/10/18 update()の中でスクリプトを生成・削除するとイテレータが無効になるのを修正(添字で回し、削除はupdate()の最後にまとめて行う) (#54)
 // 2026/10/18 update()中に削除したスクリプトもremove()の中で破棄し、実行中のスクリプト自身の削除だけを遅らせるよう変更(デストラクタからTransformを読めるようにするため) (#54)
 // 2026/10/19 update()の中で削除されたエンティティのTransformキャッシュを、適用する前に取り除くよう修正(削除済み・再利用されたスロットに書き込んでいたため) (#78)
+// 2026/10/27 get_script_creator()が未登録のタグでassertし、Releaseではend()を参照外ししていたのを、nullptrを返すように修正 (#113)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Script.h"
@@ -132,8 +133,10 @@ namespace dxforge::script
 
 		script_creator get_script_creator(size_t tag)
 		{
+			// NOTE: 未登録のタグはエラーではなく、nullptrを返して呼び出し側に任せる
+			//		 (game.binやエディタのシーンに、ゲームのコードから消したスクリプトの名前が残っていることがある) (#113)
 			auto script = dxforge::script::registery().find(tag);
-			assert(script != dxforge::script::registery().end() && script->first == tag);
+			if (script == dxforge::script::registery().end()) return nullptr;
 			return script->second;
 		}
 

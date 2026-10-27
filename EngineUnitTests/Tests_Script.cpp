@@ -12,6 +12,7 @@
 // 2026/10/18 update()/begin_play()の中でスクリプト付きエンティティを生成・削除するテストを追加 (#54)
 // 2026/10/18 update()/begin_play()の中で削除されたスクリプトのデストラクタからTransformを読めることのテストを追加 (#54)
 // 2026/10/19 update()の中でset_position()したエンティティを削除するテストと、同じフレームでIDを再利用したエンティティのTransformが上書きされないことのテストを追加 (#78)
+// 2026/10/27 未登録のタグでget_script_creator()がnullptrを返すことのテストを追加 (#113)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
@@ -217,6 +218,12 @@ DXFORGE_TEST_CASE(script_register_script_macro_registers_creator_by_tag)
 
 	CHECK(script::detail::get_script_creator(tag_of("script_test_counter")) == &script::detail::create_script<script_test_counter>);
 	CHECK(script::detail::get_script_creator(tag_of("script_test_mover")) == &script::detail::create_script<script_test_mover>);
+}
+
+// #113: 未登録のタグではassertせず、nullptrを返す
+DXFORGE_TEST_CASE(script_get_script_creator_returns_null_for_unregistered_tag)
+{
+	CHECK(script::detail::get_script_creator(tag_of("script_test_not_registered")) == nullptr);
 }
 
 DXFORGE_TEST_CASE(script_entity_created_with_script_has_valid_script_component)
