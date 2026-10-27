@@ -50,7 +50,16 @@ $origEngine = [Environment]::GetEnvironmentVariable("DXFORGE_ENGINE", "User")
 [Environment]::SetEnvironmentVariable("DXFORGE_ENGINE", "$PWD\", "User")
 ```
 
-Visual StudioはCOM経由で起動されるため、エディタのプロセスの環境変数ではなく、ユーザー環境変数の値が使われます。そのため、変更はエディタを起動する前に行ってください。
+エディタは起動時にユーザー環境変数`DXFORGE_ENGINE`を読む(レジストリから読むので、エディタを起動したシェルの環境変数は関係ありません)ため、変更はエディタを起動する前に行ってください。
+
+エディタがDTE(COM)で起動するVisual Studioは、DcomLaunchサービス(`svchost.exe`)の子プロセスになり、**ログオン時の環境ブロックを受け継ぎます。** ログオン後に変えたユーザー環境変数は、devenvが1つも動いていない状態で起動し直しても、Visual Studioのプロセスには反映されません(#102で実測。サインアウトするまでは古い値のまま)。そのためエディタは、ゲームのビルドの前に、ソリューションのフォルダ(`<Name>.sln`と同じ場所)に`Directory.Build.props`を書き出し、エディタが読んだ`DXFORGE_ENGINE`をMSBuildのプロパティとして渡します(プロジェクトのプロパティは環境変数より優先されます)。上位のフォルダに`Directory.Build.props`があれば、それも読み込みます。そのフォルダに、エディタが作ったものではない`Directory.Build.props`があるときは上書きせず、LoggerViewに警告を出します。その場合は、Visual Studioのプロセスの環境変数が使われます。
+
+どのlibがリンクされたかは、ゲームの`Debug`構成のビルド(手順6のF5/Ctrl+F5)のあとに、リンカーの読み込み記録で確かめられます(`$verifyRoot`/`$verifyName`は手順2で設定します)。
+
+```powershell
+Get-Content "$verifyRoot\$verifyName\GameCode\x64\Debug\$verifyName.tlog\link.read.1.tlog" -Encoding Unicode | Select-String DXFORGEENGINE.LIB
+# 例: C:\...\<このworktree>\X64\DEBUG\DXFORGEENGINE.LIB
+```
 
 ## 2. プロジェクトの作成/開く
 
@@ -276,7 +285,7 @@ if (Test-Path variable:origEngine) { [Environment]::SetEnvironmentVariable("DXFO
 
 - **WPFのToggleButtonの一部はUIAのToggle/Invokeに反応しません。** Project Browserの「Create Project」と、インスペクタの「Add Component」(`PreviewMouseLeftButtonDown`で開く)は、要素のクリックでは切り替わらず、座標でのクリックが必要でした。テキストボックスの`SetValue`も、表示が切り替わる前は「値を設定できない」と拒否されます。要素に`AutomationProperties.AutomationId`を付け、操作をコマンドに寄せると安定します。
 - **ファンクションキー(F5/F7)は`orca computer`のキー操作で送れません**(`Unsupported key: F5`)。今回はウィンドウを前面に出して`SendKeys`で送りました。ツールバーに実行/停止のボタンがあれば、UIAだけで完結します。
-- Ctrl+F5で起動したときなど、Visual Studioはウィンドウを表示しないままビルドする(`MainWindow.Visible = showWindow`)ため、失敗時の出力はUIAでは読めません。原因の調査には、生成された`.sln`を`MSBuild <Name>.sln /p:Configuration=Debug /p:Platform=x64`で直接ビルドするのが早いです。
+- Ctrl+F5で起動したときなど、Visual Studioはウィンドウを表示しないままビルドする(`MainWindow.Visible = showWindow`)ため、失敗時の出力はUIAでは読めません。原因の調査には、生成された`.sln`を`MSBuild <Name>.sln /p:Configuration=Debug /p:Platform=x64`で直接ビルドするのが早いです(エディタが一度ビルドしたあとなら、エディタが書き出した`Directory.Build.props`のエンジンのパスが使われます)。
 - 合否の判定は、LoggerViewの文字列、生成物(`<Name>.dll`、`<Name>.exe`、`game.bin`)の有無と更新日時、`tasklist /M <Name>.dll`、スクリプトが書き出すファイル、で機械的にできます。
 
 ### ヘッドレス駆動(#11)に寄せる部分
