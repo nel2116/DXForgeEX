@@ -218,7 +218,8 @@ namespace DXForgeEditor.GameProject
         private async Task RunGame(bool debug)
         {
             await Task.Run(() => VisualStudio.BuildSolution(this, StandAloneBuildConfig, debug));
-            if (VisualStudio.BuildSucceeded)
+            // 実行ファイルがなければgame.binも書き出さない(出力先のフォルダがないとSaveToBinaryが例外を投げる)
+            if (VisualStudio.BuildSucceeded && VisualStudio.ExecutableExists(this, StandAloneBuildConfig))
             {
                 SaveToBinary();
                 await Task.Run(() => VisualStudio.Run(this, StandAloneBuildConfig, debug));

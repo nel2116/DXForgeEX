@@ -313,8 +313,26 @@ namespace DXForgeEditor.GameDev
             lock (_lock) { BuildSolution_Internal(project, buildConfig, showWindow); }
         }
 
+        // VSのDebug.Start/Debug.StartWithoutDebuggingは、ゲームのプロジェクトの出力先(既定のOutDir)にある実行ファイルを起動する
+        public static string GetExecutablePath(Project project, BuildConfiguration buildConfig) =>
+            $@"{project.Path}x64\{GetConfigurationName(buildConfig)}\{project.Name}.exe";
+
+        // 実行ファイルがないままVSに実行を指示すると、VSが「開始できません」のモーダルダイアログを出す。
+        // それが閉じられるまでDTEの呼び出しが戻らず、CanExecuteから呼ばれるIsDebugging()でエディタのUIスレッドも止まる(#55)
+        public static bool ExecutableExists(Project project, BuildConfiguration buildConfig)
+        {
+            var exe = GetExecutablePath(project, buildConfig);
+            if (File.Exists(exe)) return true;
+
+            Logger.Log(MessageType.Warning, $"実行ファイルが見つからないため、ゲームを実行しません: {exe}" +
+                " (プロジェクトにソースファイルがないと、ビルドが成功しても実行ファイルは作られません。New Scriptでスクリプトを追加してください)");
+            return false;
+        }
+
         private static void Run_Internal(Project project, BuildConfiguration buildConfig, bool debug)
         {
+            if (!ExecutableExists(project, buildConfig)) return;
+
             CallOnSTAThread(() =>
             {
                 if (_vsInstance != null && !IsDebugging_Internal() && BuildSucceeded)
