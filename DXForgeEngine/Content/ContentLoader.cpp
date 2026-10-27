@@ -7,6 +7,7 @@
 // 更新履歴
 // 2024/08/20 新規作成
 // 2026/10/27 u32の値を1バイトで読んでいたのを直し、壊れたgame.binを範囲外読み・assertではなくエラーとして扱うようにした (#112)
+// 2026/10/27 エンティティが0個のgame.binを空のシーンとして読み込み、途中で失敗したら作成済みのエンティティを破棄するようにした (#107)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "ContentLoader.h"
@@ -148,9 +149,9 @@ namespace dxforge::content
 		}
 	}	// 匿名名前空間
 
-	/// @brief ゲームのBinaryファイルを読み込む
+	/// @brief game.binを読み込み、Entityを作成する(失敗時の後始末は呼び出し側で行う)
 	/// @return 読み込みに成功したらtrue
-	bool load_game()
+	static bool load_game_data()
 	{
 		// game.binを読み込み、Entityを作成する。
 		std::unique_ptr<u8[]> game_data{};
@@ -159,8 +160,8 @@ namespace dxforge::content
 		blob_reader at{ game_data.get(), size };
 		u32 num_entities{ 0 };
 		if (!at.read_u32(num_entities)) return false;
-		// エンティティ数が0ならエラー
-		if (!num_entities) return false;
+		// NOTE: エンティティが0個なら空のシーンとして成功する。
+		//		 Primalはここでfalseを返すが、エディタは空のシーンも正しい形式で書き出すため受け入れる (#107)。
 
 		// エンティティを読み込む
 		for (u32 entity_index{ 0 }; entity_index < num_entities; ++entity_index)
@@ -192,6 +193,17 @@ namespace dxforge::content
 		return !at.remaining();
 	}
 
+	/// @brief ゲームのBinaryファイルを読み込む
+	/// @details 途中で失敗した場合、それまでに作成したエンティティは破棄する
+	/// @return 読み込みに成功したらtrue
+	bool load_game()
+	{
+		assert(entities.empty());	// 前のゲームをunload_game()せずに読み込もうとしている
+		const bool result{ load_game_data() };
+		if (!result) unload_game();
+		return result;
+	}
+
 	void unload_game()
 	{
 		// エンティティを破棄
@@ -199,6 +211,7 @@ namespace dxforge::content
 		{
 			game_entity::remove(entity.get_id());
 		}
+		entities.clear();
 	}
 
 	bool load_engine_shaders(std::unique_ptr<u8[]>& shaders, u64& size)

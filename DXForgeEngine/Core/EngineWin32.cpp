@@ -6,6 +6,7 @@
 //
 // 更新履歴
 // 2024/12/20 新規作成
+// 2026/10/27 初期化が途中で失敗したときの後始末を直し、engine_shutdown()が無効なウィンドウを破棄しないようにした (#107)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // // ====== インクルード部 ======
 #if !defined(SHIPPING) && defined(_WIN64)
@@ -52,7 +53,12 @@ namespace
 bool engine_initialize()
 {
 	// ゲームをロード
-	if (!dxforge::content::load_game())return false;
+	if (!dxforge::content::load_game())
+	{
+		// コンソールがないので、失敗したことはデバッガの出力に出す
+		OutputDebugStringA("[DXForge] failed to load game.bin\n");
+		return false;
+	}
 
 	// windowの作成
 	platform::window_init_info init_info
@@ -60,7 +66,12 @@ bool engine_initialize()
 		&win_proc,nullptr,L"DXForge Game"	// TODO: 読み込んだゲームファイルからゲーム名を取得する。
 	};
 	game_window.window = platform::create_window(&init_info);
-	if (!game_window.window.is_valid())return false;			// ウィンドウの作成に失敗した場合はfalseを返す。
+	if (!game_window.window.is_valid())
+	{	// ウィンドウの作成に失敗した場合は、読み込んだゲームを破棄してfalseを返す。
+		OutputDebugStringA("[DXForge] failed to create the game window\n");
+		content::unload_game();
+		return false;
+	}
 
 	// すべての初期化が完了した場合はtrueを返す。
 	return true;
@@ -78,7 +89,12 @@ void engine_update()
 void engine_shutdown()
 {
 	// ウィンドウの破棄
-	platform::remove_window(game_window.window.get_id());
+	// NOTE: engine_initialize()が失敗してもengine_shutdown()は呼ばれるので、作成済みのときだけ破棄する (#107)
+	if (game_window.window.is_valid())
+	{
+		platform::remove_window(game_window.window.get_id());
+		game_window.window = {};
+	}
 	// ゲームのアンロード
 	dxforge::content::unload_game();
 }
