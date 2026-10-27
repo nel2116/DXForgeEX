@@ -17,6 +17,7 @@
 	  locked        フォルダの中のDLLを子プロセスが読み込んでいると、フォルダが残り、警告に子のPIDが出る
 	  orca-keep     上限まで待っても登録が残るとき、警告を出し、ブランチには触らない
 	  git-only      orcaがないとき、git worktree remove と git branch -D で消える
+	  from-worktree 消す対象のworktreeの中のスクリプトを実行しても、最後まで動く
 	  keep-unsafe   未マージ、マージ後のコミットあり、未コミットの変更あり、未追跡ファイルありは残る
 	  dry-run       -DryRun では何も消えず、orcaも呼ばれない
 
@@ -88,8 +89,9 @@ if ($env:DXFORGE_TEST_ORCA_MODE -ne "keep") {
 	$gitDir = (git -C $path rev-parse --absolute-git-dir)
 	$commonDir = (git -C $path rev-parse --path-format=absolute --git-common-dir)
 	$branch = (git -C $path rev-parse --abbrev-ref HEAD)
-	$bg = Start-Process pwsh -PassThru -WindowStyle Hidden -ArgumentList @(
-		"-NoProfile", "-File", (Join-Path $PSScriptRoot "orca-bg.ps1"), $path, $gitDir, $commonDir, $branch)
+	# Start-Process は引数を引用せずに空白でつなぐので、空白を含むパスに備えて自分で引用する
+	$bg = Start-Process pwsh -PassThru -WindowStyle Hidden -ArgumentList (@(
+		"-NoProfile", "-File", (Join-Path $PSScriptRoot "orca-bg.ps1"), $path, $gitDir, $commonDir, $branch) | ForEach-Object { "`"$_`"" })
 	Add-Content -LiteralPath $env:DXFORGE_TEST_PIDS -Value $bg.Id
 }
 Write-Output '{"ok": true}'
@@ -166,7 +168,7 @@ function New-Branch($sb, [string]$branch, [switch]$Worktree, [switch]$Merge) {
 }
 
 # テスト対象を実行する。-NoOrca なら本物も偽物もない PATH にする
-function Invoke-Cleanup($sb, [string[]]$arguments = @(), [switch]$NoOrca, [string]$OrcaMode = "async", [string]$Script) {
+function Invoke-Cleanup($sb, [string[]]$arguments = @(), [switch]$NoOrca, [string]$OrcaMode = "async", [string]$Script, [switch]$InPlace) {
 	$savedPath = $env:PATH
 	try {
 		$dirs = $env:PATH -split ';' | Where-Object { $_ }
@@ -195,7 +197,9 @@ function Invoke-Cleanup($sb, [string[]]$arguments = @(), [switch]$NoOrca, [strin
 		$env:DXFORGE_TEST_ORCA_LOG = $sb.OrcaLog
 		$env:DXFORGE_TEST_PIDS = $sb.Pids
 		# スクリプトは自分のフォルダ($PSScriptRoot)をリポジトリとして扱うので、ルートに置いて実行する
-		if ($Script) {
+		# (-InPlace なら、渡したパスのまま実行する)
+		if ($InPlace) { }
+		elseif ($Script) {
 			Copy-Item -LiteralPath $Script (Join-Path $sb.Root "CleanupMerged.baseline.ps1") -Force
 			$Script = Join-Path $sb.Root "CleanupMerged.baseline.ps1"
 		}
@@ -274,8 +278,9 @@ $cases["locked"] = {
 		New-Item -ItemType Directory -Force (Split-Path $dll) | Out-Null
 		Copy-Item -LiteralPath (Join-Path $env:SystemRoot "System32\version.dll") $dll
 		$ready = Join-Path $sb.Dir "locker-ready.txt"
-		$child = Start-Process pwsh -PassThru -WindowStyle Hidden -ArgumentList @(
-			"-NoProfile", "-File", (Join-Path $sb.Bin "locker.ps1"), $dll, $ready)
+		# Start-Process は引数を引用せずに空白でつなぐので、空白を含むパスに備えて自分で引用する
+		$child = Start-Process pwsh -PassThru -WindowStyle Hidden -ArgumentList (@(
+			"-NoProfile", "-File", (Join-Path $sb.Bin "locker.ps1"), $dll, $ready) | ForEach-Object { "`"$_`"" })
 		for ($i = 0; $i -lt 60 -and -not (Test-Path -LiteralPath $ready); $i++) { Start-Sleep -Milliseconds 500 }
 		if (-not (Test-Path -LiteralPath $ready)) { throw "子プロセスがDLLを読み込めませんでした。" }
 
@@ -321,6 +326,23 @@ $cases["git-only"] = {
 		Check (-not (Test-BranchExists $sb "fix/plain")) "worktreeのないブランチが消えた"
 		Check (-not (Test-Registered $sb $wt)) "worktreeの登録が消えた"
 		Check (-not (Test-Path -LiteralPath $wt)) "worktreeのフォルダが消えた"
+	}
+	finally { Remove-Sandbox $sb }
+}
+
+$cases["from-worktree"] = {
+	$sb = New-Sandbox
+	try {
+		# 消す対象のworktreeの中のスクリプト(developから作ったのでコミット済み)を実行する
+		$wt = New-Branch $sb "fix/self" -Worktree -Merge
+		New-Branch $sb "fix/self-plain" -Merge
+		$r = Invoke-Cleanup $sb -Script (Join-Path $wt "CleanupMerged.ps1") -InPlace
+		Check ($r.ExitCode -eq 0) "終了コードが0"
+		Check ($r.Text -notmatch 'WARNING|警告') "警告が1つも出ない"
+		Check (-not (Test-BranchExists $sb "fix/self")) "worktreeのブランチが消えた"
+		Check (-not (Test-Path -LiteralPath $wt)) "worktreeのフォルダが消えた"
+		Check (-not (Test-BranchExists $sb "fix/self-plain")) "worktreeを消したあとも「ローカルブランチ」の節が動く"
+		Check ($r.Text -match '(?m)^develop: ') "worktreeを消したあとも、ルートのdevelopを更新する"
 	}
 	finally { Remove-Sandbox $sb }
 }

@@ -51,9 +51,12 @@ foreach ($tool in "git", "gh") {
 $hasOrca = [bool](Get-Command orca -ErrorAction SilentlyContinue)
 
 # git worktree list の先頭はメインのworktree(ルートのチェックアウト)。
-# このスクリプトがworktreeの中から実行されても、ルートを基準にする
+# このスクリプトがworktreeの中から実行されても、ルートを基準にする。
+# 最初はルートを知るためにスクリプトのフォルダから読み、以後は消えることのないルートから読む
+# (スクリプトのあるworktreeを消したあとに読み直すと、消えたフォルダを -C に渡すことになるため)
+$gitBase = $PSScriptRoot
 function Get-Worktrees {
-	$porcelain = git -C $PSScriptRoot worktree list --porcelain
+	$porcelain = git -C $gitBase worktree list --porcelain
 	if ($LASTEXITCODE -ne 0) { throw "git worktree list に失敗しました。" }
 	$list = @()
 	$current = $null
@@ -69,6 +72,7 @@ function Get-Worktrees {
 }
 $worktrees = @(Get-Worktrees)
 $root = $worktrees[0].Path
+$gitBase = $root
 
 function Invoke-Step([string]$description, [scriptblock]$action) {
 	if ($DryRun) {
