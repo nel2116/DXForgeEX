@@ -147,6 +147,25 @@ $twiceId2 = $ps.UploadToEngine()
 $ps.UnloadFromEngine()
 Check ($twiceId1 -ne $invalidId -and $twiceId1 -eq $twiceId2 -and (Get-UploadedCount) -eq 0) "uploading the same instance twice is idempotent: $twiceId1, $twiceId2, $(Get-UploadedCount) left"
 
+# 登録したあとで再コンパイルに失敗したら、前の登録は解放される(参照数とエンジンのグループが残らない)
+$recompiled = New-ShaderGroup "Pixel" $code "MainPS" @("") @([uint32]::MaxValue)
+[void]$compileShader.Invoke($null, @($recompiled))
+$recompiledId = $recompiled.UploadToEngine()
+$recompiled.Code = $code.Replace("PixelOut psOut;", "PixelOut psOut = ;")
+[void]$compileShader.Invoke($null, @($recompiled))
+$failedId = $recompiled.UploadToEngine()
+$recompiled.UnloadFromEngine()
+Check ($recompiledId -ne $invalidId -and $failedId -eq $invalidId -and $recompiled.ContentId -eq $invalidId -and (Get-UploadedCount) -eq 0) "a failed recompilation releases the previous upload: $recompiledId, $failedId, $(Get-UploadedCount) left"
+
+# 内容が変わって、新しい登録(エンジンの AddShaderGroup)に失敗しても、前の登録は解放される
+$changed = New-ShaderGroup "Pixel" $code "MainPS" @("") @([uint32]::MaxValue)
+[void]$compileShader.Invoke($null, @($changed))
+$changedId = $changed.UploadToEngine()
+$changed.Type = [Enum]::ToObject($shaderType, 8) # エンジンの shader_type::count。AddShaderGroup は無効なIDを返す
+$failedId = $changed.UploadToEngine()
+$changed.UnloadFromEngine()
+Check ($changedId -ne $invalidId -and $failedId -eq $invalidId -and $changed.ContentId -eq $invalidId -and (Get-UploadedCount) -eq 0) "a failed upload of changed content releases the previous upload: $changedId, $failedId, $(Get-UploadedCount) left"
+
 $before = (Get-LogMessages).Count
 
 Write-Host "2. Broken shaders"

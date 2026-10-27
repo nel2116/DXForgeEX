@@ -56,7 +56,18 @@ namespace DXForgeEditor.Content
 
             public static UploadedShaderGroup? UploadToEngine(ShaderGroup shaderGroup)
             {
-                if (!shaderGroup.IsCompiled) return null;
+                // NOTE: null を返すときは、このインスタンスが前に登録したグループの参照を必ず解放しておく
+                //       (呼び出し側は ContentId を無効にするので、ここで解放しないと参照数が残る。Codexの指摘, #29)。
+                if (!shaderGroup.IsCompiled)
+                {
+                    // 再コンパイルに失敗した場合など。内容が変わったときと同じく、前の登録を解放する
+                    if (ID.IsValid(shaderGroup.ContentId) && _uploadedShaderIds.ContainsKey(shaderGroup.ContentId))
+                    {
+                        UnloadFromEngine(shaderGroup.ContentId);
+                    }
+
+                    return null;
+                }
 
                 var signature = GetSignature(shaderGroup);
 
@@ -259,7 +270,8 @@ namespace DXForgeEditor.Content
 
             if (uploadedShader == null || !ID.IsValid(uploadedShader.ContentId))
             {
-                // 内容が変わっていた場合、前に登録したものは解放済みなので、二重に解放しないよう無効にする
+                // 登録できなかったときは、前に登録したもの(コンパイルの失敗・内容の変更のどちらでも)は
+                // UploadedShaderGroup.UploadToEngine が解放済みなので、二重に解放しないよう無効にする
                 ContentId = ID.INVALID_ID;
                 Logger.Log(MessageType.Error, $"シェーダー {FunctionName} をエンジンに登録できませんでした。");
                 return ID.INVALID_ID;
