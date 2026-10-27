@@ -77,6 +77,15 @@ PowerShell 7+ (`pwsh`) から実行します。
 
 既に揃っているときは、ファイルの有無を見るだけでネットワークにはアクセスせず、すぐに終わります(実測: 数十ms)。`Restore.ps1`は単体でも実行でき(`./Restore.ps1 -Configuration DebugEditor`)、`build.ps1 -NoRestore`で復元を省けます。DXCを最新版に更新したいときは、`packages/DirectXShaderCompiler`を削除してから実行してください。
 
+### エディタが使うエンジンのパス
+
+エディタは、ゲームのソリューションの`Directory.Build.props`に書き込むエンジンのパス(`DXFORGE_ENGINE`)を次の順に決めます(#117)。
+
+1. エディタの実行ファイルがあるリポジトリ(`x64\<構成>\`の2つ上で、`DXForgeEngine\EngineAPI`があるフォルダ)。worktreeでビルドしたエディタから実行したゲームは、そのworktreeのエンジンとリンクされます。
+2. 見つからなければ、ユーザー環境変数`DXFORGE_ENGINE`。これも無効なら、起動時にエンジンのフォルダを選ぶダイアログを出し、選んだパスを`DXFORGE_ENGINE`に保存します。
+
+エディタはユーザー環境変数を書き換えません(2.のダイアログを除く)。起動時とゲームのビルド時に、使うパスとその出どころをLoggerViewに出し、1.のパスが`DXFORGE_ENGINE`と違うときはWarningにします。決め方のテストは`pwsh -NoProfile -File DXForgeEditor/Tests/engine_path_test.ps1`です(エディタのビルドだけで動き、GUIもGPUも不要)。
+
 ## アセットのインポート (`DXForgeImport`)
 
 `DXForgeImport`は、エディタを開かずに(GUIなしで)FBXと画像をインポートし、エディタのドラッグ&ドロップのインポートと同じ`.asset`ファイルを書き出すコマンドラインツールです(#10)。`.asset`の形式を別に実装するのではなく、エディタ(`DXForgeEditor`)の`Content`のコードをそのまま呼ぶので、エディタとCLIの出力はずれません。プロジェクトを開く必要も、ウィンドウもありません(テクスチャの圧縮はウィンドウなしでGPUを使い、使えなければCPUで行います)。

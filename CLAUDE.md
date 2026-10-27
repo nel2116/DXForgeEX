@@ -84,6 +84,7 @@ written to disk, and superseded intermediate attempts.
 - `Components/` — editor-side mirrors of engine components (transform, script, geometry) with multi-selection support, bound to WPF views.
 - `DllWrappers/` — P/Invoke boundary calling into `DXForgeEngineDLL`.
 - `Content/ContentBrowser/`, `Editors/TextureEditor/`, `Editors/GeometryEditor/`, `Editors/WorldEditor/` — asset browsing and per-asset-type editors (texture detail/RGBA channel view, geometry/primitive preview, scene/world viewport with its own render surface).
+- `GameDev/EnginePath.cs` — decides the engine path written into each game solution's `Directory.Build.props` (issue #117): the repo the running editor exe lives in (`x64\<config>\` two levels up, with `DXForgeEngine\EngineAPI`) wins, so a worktree's editor builds games against that worktree; otherwise the user env var `DXFORGE_ENGINE` (never rewritten, except by the existing `EnginePathDialog` when neither is valid). The choice is logged at startup and on every game build, as a Warning when it differs from `DXFORGE_ENGINE`. Headless check: `pwsh -NoProfile -File DXForgeEditor/Tests/engine_path_test.ps1`.
 - `Utilities/RenderSurface/` — hosts a Win32 D3D12 render surface inside WPF (HwndHost-style interop) for viewport rendering.
 
 ## Conventions to follow when adding/editing C++ files

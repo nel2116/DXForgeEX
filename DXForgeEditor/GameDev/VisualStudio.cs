@@ -338,6 +338,8 @@ $@"<?xml version=""1.0"" encoding=""utf-8""?>
                 return;
             }
 
+            // どのエンジンとリンクされるかがわかるように、ビルドのたびにログに出す(#117)
+            MainWindow.LogEnginePath();
             WriteEnginePathProps(project.Solution);
             OpenVisualStudio_Internal(project.Solution);
             // RunGame()はasync voidのコマンドから呼ばれ例外が捕捉されないため、throwせずにビルド失敗として扱う

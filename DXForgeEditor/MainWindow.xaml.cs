@@ -1,6 +1,8 @@
 ﻿using DXForgeEditor.Content;
 using DXForgeEditor.DllWrappers;
+using DXForgeEditor.GameDev;
 using DXForgeEditor.GameProject;
+using DXForgeEditor.Utilities;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -20,6 +22,7 @@ namespace DXForgeEditor
     public partial class MainWindow : Window
     {
         public static string DXForgePath { get; private set; } = string.Empty;
+        internal static EnginePathSource EnginePathSource { get; private set; } = EnginePathSource.None;
 
         public MainWindow()
         {
@@ -40,24 +43,38 @@ namespace DXForgeEditor
 
         private void GetEnginePath()
         {
-            var dxforgePath = Environment.GetEnvironmentVariable("DXFORGE_ENGINE", EnvironmentVariableTarget.User);
-            if (dxforgePath == null || !Directory.Exists(Path.Combine(dxforgePath, @"DXForgeEngine\EngineAPI")))
+            // 実行中のエディタのリポジトリを優先し、見つからなければユーザー環境変数DXFORGE_ENGINEを使う(#117)
+            var dxforgePath = Environment.GetEnvironmentVariable(EnginePath.EnvironmentVariableName, EnvironmentVariableTarget.User);
+            var resolution = EnginePath.Resolve(AppContext.BaseDirectory, dxforgePath);
+            if (resolution.Source == EnginePathSource.None)
             {
                 var dlg = new EnginePathDialog();
                 if (dlg.ShowDialog() == true)
                 {
                     DXForgePath = dlg.DXForgePath;
-                    Environment.SetEnvironmentVariable("DXFORGE_ENGINE", DXForgePath.ToUpper(), EnvironmentVariableTarget.User);
+                    EnginePathSource = EnginePathSource.EnvironmentVariable;
+                    Environment.SetEnvironmentVariable(EnginePath.EnvironmentVariableName, DXForgePath.ToUpper(), EnvironmentVariableTarget.User);
                 }
                 else
                 {
                     Application.Current.Shutdown();
+                    return;
                 }
             }
             else
             {
-                DXForgePath = dxforgePath;
+                DXForgePath = resolution.Path;
+                EnginePathSource = resolution.Source;
             }
+            LogEnginePath();
+        }
+
+        // どちらのエンジンのパスを使っているかをLoggerに出す。起動時とゲームのビルド時に呼ぶ
+        public static void LogEnginePath()
+        {
+            var environmentPath = Environment.GetEnvironmentVariable(EnginePath.EnvironmentVariableName, EnvironmentVariableTarget.User);
+            var (type, message) = EnginePath.Describe(DXForgePath, EnginePathSource, environmentPath);
+            Logger.Log(type, message);
         }
 
         private void OnMainWindowClosing(object? sender, CancelEventArgs e)
