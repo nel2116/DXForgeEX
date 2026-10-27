@@ -10,6 +10,7 @@
 // 2026/10/18 引数の個数をUINT32へ明示的にキャスト(C4244の警告対応)
 // 2026/10/27 EngineTestからDXForgeEngineDLLへ移動し、エディタからメモリ上のソースをコンパイルできるようにした(Primal Day 076)。
 //            DXCは実行時に読み込み、エラーと逆アセンブルも返せるようにした
+// 2026/10/27 TILE_SIZEを定義する条件が常に真だったのを修正し、ライトカリングの2つのコンピュートシェーダだけに渡すようにした(#101)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include <fstream>
@@ -446,7 +447,7 @@ bool compile_shaders()
 		if (!std::filesystem::exists(full_path)) return false;
 		utl::vector<std::wstring> extra_args{};
 
-		if (file.id == engine_shader::grid_frustums_cs || engine_shader::light_culling_cs)
+		if (file.id == engine_shader::grid_frustums_cs || file.id == engine_shader::light_culling_cs)
 		{
 			// TODO: d3d12からTILE_SIZE値を取得する
 			extra_args.emplace_back(L"-D");
