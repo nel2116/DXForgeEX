@@ -23,6 +23,7 @@ C++によるプラットフォーム非依存のエンジンコア、C ABIのDLL
 | `EngineUnitTests` | 実行ファイル | GPU/ウィンドウ不要の自動テスト。CLI/CI向け |
 | `ContentTools` | DLL | FBX/テクスチャのオフラインインポートパイプライン(エディタから使用) |
 | `DXForgeEditor` | WPFアプリ (.NET 8) | レベルエディタ |
+| `DXForgeImport` | コンソールアプリ (.NET 8) | GUIなしでアセットをインポートするCLI。エディタと同じ`.asset`を書き出す(`*Editor`構成のみ) |
 
 ## ビルド方法
 
@@ -76,6 +77,88 @@ PowerShell 7+ (`pwsh`) から実行します。
 
 既に揃っているときは、ファイルの有無を見るだけでネットワークにはアクセスせず、すぐに終わります(実測: 数十ms)。`Restore.ps1`は単体でも実行でき(`./Restore.ps1 -Configuration DebugEditor`)、`build.ps1 -NoRestore`で復元を省けます。DXCを最新版に更新したいときは、`packages/DirectXShaderCompiler`を削除してから実行してください。
 
+## アセットのインポート (`DXForgeImport`)
+
+`DXForgeImport`は、エディタを開かずに(GUIなしで)FBXと画像をインポートし、エディタのドラッグ&ドロップのインポートと同じ`.asset`ファイルを書き出すコマンドラインツールです(#10)。`.asset`の形式を別に実装するのではなく、エディタ(`DXForgeEditor`)の`Content`のコードをそのまま呼ぶので、エディタとCLIの出力はずれません。プロジェクトを開く必要も、ウィンドウもありません(テクスチャの圧縮はウィンドウなしでGPUを使い、使えなければCPUで行います)。
+
+### ビルド
+
+```powershell
+./build.ps1 -Target native -Configuration DebugEditor   # ContentTools.dll(FBX SDKが必要)
+./build.ps1 -Target editor -Configuration DebugEditor   # DXForgeEditor と DXForgeImport
+```
+
+`DXForgeImport.exe`はエディタと同じ`x64/<構成>/`(`DebugEditor`か`ReleaseEditor`)に出力され、同じフォルダの`ContentTools.dll`を使います。`ContentTools`はFBX SDKが必要なため(`ContentTools/FbxSdk.props`)、インポートを実際に動かせるのはFBX SDKを入れたマシンだけです。
+
+### 使い方
+
+```powershell
+./x64/DebugEditor/DXForgeImport.exe --input model.fbx --output Content/Models --settings import.json --json
+./x64/DebugEditor/DXForgeImport.exe --input albedo.png --output Content/Textures --type texture --json
+./x64/DebugEditor/DXForgeImport.exe --input albedo.png --output Content/Textures --set Compress=false --set MipLevels=1
+./x64/DebugEditor/DXForgeImport.exe --help
+```
+
+| 引数 | 説明 |
+|---|---|
+| `-i`, `--input` | インポートするファイル。`.fbx`はジオメトリ、画像(`.bmp .png .jpg .jpeg .tiff .tif .tga .dds .hdr`)はテクスチャ |
+| `-o`, `--output` | `.asset`を書き出すフォルダ(なければ作る)。ファイル名は入力の名前を小文字にしたもの(エディタと同じ) |
+| `-t`, `--type` | `auto`(既定。拡張子から決める)、`geometry`、`texture`。拡張子と合わなければ終了コード4 |
+| `-s`, `--settings` | インポート設定のJSONファイル(下記) |
+| `--set Name=Value` | インポート設定の1項目。入力の種類の設定に、設定ファイルの後で適用する。繰り返し指定できる |
+| `--json` | 結果をJSONで標準出力に出す。ログは常に標準エラー |
+
+インポート設定の項目は、エディタのインポート設定(`GeometryImportSettings`/`TextureImportSettings`)のプロパティ名そのままです(大文字・小文字は区別しません)。指定しなかった項目はエディタの既定値になります。知らない項目や型の合わない値は終了コード5になります。
+
+```json
+{
+  "geometry": { "CalculateNormals": false, "CalculateTangents": true, "SmoothingAngle": 178, "ReverseHandedness": false,
+                "ImportEmbeddedTextures": true, "ImportAnimations": true, "CoalesceMeshes": false },
+  "texture":  { "Dimension": "Texture2D", "MipLevels": 0, "AlphaThreshold": 0.5, "PreferBC7": true, "FormatIndex": 0,
+                "Compress": true, "CubeMapSize": 256, "MirrorCubeMap": true, "PrefilterCubeMap": true }
+}
+```
+
+FBXの埋め込みテクスチャ(`ImportEmbeddedTextures`)は、エディタと同じく既定のテクスチャ設定で同じフォルダへ取り込み、`--json`の`embeddedTextures`に結果を出します。埋め込み画像は、出力先の`<FBXのアセット名>.fbm`フォルダ(FBX SDKが埋め込み画像を取り出すときと同じ名前の付け方)にコピーしてから取り込みます。テクスチャの`.asset`はソース画像のパス(エディタの再インポートが使う)を持つので、CLIが終了時に消す一時フォルダを指したままにしないためです。
+
+LODグループが複数あるFBXは、エディタと同じくLODグループごとに`.asset`を書きます。一部だけ書けた場合も終了コード1にし、書けたファイルは`files`に残します。
+
+`--json`の出力(例):
+
+```json
+{
+  "input": "C:\...\Checker64.png", "type": "texture", "output": "C:\...\out",
+  "success": true, "exitCode": 0, "exitCodeName": "Success",
+  "files": [ "C:\...\out\checker64.asset" ], "embeddedTextures": [],
+  "settings": { "Dimension": "Texture2D", "MipLevels": 0, "...": "...", "Sources": [ "C:\...\Checker64.png" ] },
+  "errors": [], "warnings": []
+}
+```
+
+| 終了コード | 意味 |
+|---|---|
+| 0 | 成功 |
+| 1 | インポートまたは保存に失敗した(壊れたファイルなど) |
+| 2 | 引数の誤り |
+| 3 | 入力ファイルがない |
+| 4 | 対応していない形式、または`--type`と拡張子が合わない |
+| 5 | インポート設定の誤り |
+| 6 | 出力先のフォルダを作れない |
+| 7 | `ContentTools.dll`を読み込めない |
+| 10 | 想定外のエラー |
+
+範囲外(今後): IBLの事前計算(`PrefilterDiffuseIBL`など)の単独実行、プリミティブメッシュの生成。
+
+### テスト
+
+```powershell
+pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1                              # DebugEditor
+pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1 -Configuration ReleaseEditor
+pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1 -ArgumentsOnly               # ContentTools.dll不要(CIと同じ)
+```
+
+引数・異常系(終了コードと`--json`のエラー)、テクスチャとFBXのインポート、設定ファイルと`--set`の反映、壊れたPNG/FBXと保存の失敗(読み取り専用の`.asset`)、FBXの埋め込みテクスチャ(テスト中に`box.fbx`へ`Checker64.png`を埋め込んだFBXを作る)に加え、CLIが書いた`.asset`をエディタのコード(`Texture.Load`/`Geometry.Load`)で読めること、同じ入力をエディタのインポートの経路(`ContentHelper.Import`)で書き出したものと一致すること(GUIDとインポート日時を除く)を確かめます。FBXには既定でFBX SDKのサンプル`C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\samples\ConvertScene\box.fbx`を使います(`-FbxFile`で変更可)。LODグループが2つ以上あるFBXを`-MultiLodFbxFile`で渡すと、一部だけ保存できた場合のテストも行います(該当するFBXがリポジトリにもFBX SDKのサンプルにもないため、既定では行いません)。CIではFBX SDKがないため`-ArgumentsOnly`だけを実行します。
+
 ## テスト
 
 `EngineUnitTests` はGPU・ウィンドウを使わない自動テストです。ビルド後、生成された実行ファイルを直接実行できます。
@@ -124,7 +207,7 @@ DXFORGE_TEST_CASE(my_new_test)
 `.github/workflows/ci.yml` が、`main`/`develop`へのpushとすべてのPRで以下を実行します。
 
 - **ネイティブビルド + 自動テスト** — `Debug`と`Release`の両構成(`Release`では`NDEBUG`で`assert`が無効化され挙動が変わるため、両方を検証)。警告をエラーとして扱います。
-- **エディタビルド** — `dotnet build`で`DXForgeEditor`をビルド。
+- **エディタビルド** — `dotnet build`で`DXForgeEditor`と`DXForgeImport`をビルドし、`DXForgeImport`の引数・異常系のテスト(`import_cli_test.ps1 -ArgumentsOnly`)を実行。
 
 CIの対象範囲は意図的に絞っています:
 
@@ -132,6 +215,7 @@ CIの対象範囲は意図的に絞っています:
   ローカルでは既定でFBX SDK 2020.3.7の標準インストール先を参照します。別の場所にある場合は、環境変数または`/p:FbxSdkDir=<SDKのルート>`で指定してください(`ContentTools/FbxSdk.props`)。SDKが見つからない場合はビルド開始時に分かりやすいエラーで停止します。
 - `EngineTest`はビルドのみ(実行にはウィンドウとGPUが必要)。
 - `EngineUnitTests`はGPU・ウィンドウ不要なので、CIで実際に実行されます。
+- `DXForgeImport`の実際のインポートは`ContentTools.dll`(FBX SDK)が必要なのでローカルで確かめます(`import_cli_test.ps1`)。CIでは、それなしで確かめられる引数の解析と異常系(`ContentTools.dll`がないときの終了コード7を含む)だけを実行します。
 
 ### ビルド出力の要約
 
@@ -182,7 +266,7 @@ Codex CLIがインストール済みで、ログインしている必要があ�
 
 ## 今後の方向性
 
-将来的に、Unity CLI(`-batchmode`等)のように、エディタUIを介さずCLIからエンジンを操作・ビルドできる「AIフレンドリー」な構成を目指しています。`EngineUnitTests`はその最初の一歩(ウィンドウ/GPU無しでエンジンコードを動かすヘッドレスなCLIプログラム)という位置づけです。今後、`--load-project`のような引数や、ContentToolsのCLI化などを通じて拡張していく想定です。
+将来的に、Unity CLI(`-batchmode`等)のように、エディタUIを介さずCLIからエンジンを操作・ビルドできる「AIフレンドリー」な構成を目指しています。`EngineUnitTests`はその最初の一歩(ウィンドウ/GPU無しでエンジンコードを動かすヘッドレスなCLIプログラム)という位置づけです。ContentToolsのCLI化は`DXForgeImport`(#10)で始めました。今後、`--load-project`のような引数などを通じて拡張していく想定です。
 
 ## サードパーティライセンス
 
