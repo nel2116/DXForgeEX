@@ -49,7 +49,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)DXForgeEngine\;$(SolutionDir)DXForgeEngine\Common\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)DXForgeEngine\;$(SolutionDir)DXForgeEngine\Common\;$(SolutionDir)packages\DirectXShaderCompiler\inc\</AdditionalIncludeDirectories>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
@@ -73,7 +73,7 @@ xcopy /Y /D $(SolutionDir)packages\DirectXShaderCompiler\bin\x64\dxil.dll $(OutD
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)DXForgeEngine\;$(SolutionDir)DXForgeEngine\Common\</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)DXForgeEngine\;$(SolutionDir)DXForgeEngine\Common\;$(SolutionDir)packages\DirectXShaderCompiler\inc\</AdditionalIncludeDirectories>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
@@ -96,11 +96,11 @@ xcopy /Y /D $(SolutionDir)packages\DirectXShaderCompiler\bin\x64\dxil.dll $(OutD
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="RenderItem.cpp" />
     <ClCompile Include="Scripts.cpp" />
-    <ClCompile Include="ShaderCompilation.cpp" />
+    <ClCompile Include="..\DXForgeEngineDLL\ShaderCompilation.cpp" />
     <ClCompile Include="TestRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ShaderCompilation.h" />
+    <ClInclude Include="..\DXForgeEngineDLL\ShaderCompilation.h" />
     <ClInclude Include="Test.h" />
     <ClInclude Include="TestDll.h" />
     <ClInclude Include="TestEntityComponent.h" />

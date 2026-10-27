@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    リポジトリに含めていない packages/ (DirectXTexのNuGetパッケージ・DXC)を復元するスクリプト。
+    リポジトリに含めていない packages/ (DirectXTex・DXCのNuGetパッケージ、GitHubのDXC)を復元するスクリプト。
 
 .DESCRIPTION
     packages/ は .gitignore で除外しているため、新しいclone/worktreeでは空になっている。
@@ -8,16 +8,17 @@
     ネットワークにはアクセスせずに終わる。build.ps1 がネイティブのビルドの前に呼び出す
     (build.ps1 -NoRestore で止められる)。単体でも実行できる。
 
-    - NuGet(DirectXTex・エディタ): 各プロジェクトの packages.config に書かれたパッケージ
+    - NuGet(DirectXTex・DXC・エディタ): 各プロジェクトの packages.config に書かれたパッケージ
       (packages/<id>.<version>)か、DXForgeEditor/obj/project.assets.json が無ければ、
       MSBuild DXForge.sln -t:restore -p:RestorePackagesConfig=true で復元する(nuget.exe は不要)。
-      この1回で packages.config(ContentTools の DirectXTex)と PackageReference(DXForgeEditor)の
-      両方が復元される。どちらも *Editor 構成にしかマッピングされていないため、Debug/Release
-      構成では何もしない。ネイティブのビルドは /restore なしで DXForge.sln を呼ぶため、*Editor
+      この1回で packages.config(ContentTools の DirectXTex、DXForgeEngineDLL の Microsoft.Direct3D.DXC)と
+      PackageReference(DXForgeEditor)がまとめて復元される。いずれも *Editor 構成にしかマッピングされて
+      いないため、Debug/Release 構成では何もしない。
+      DXForgeEngineDLL の DXC はエディタ側のシェーダのコンパイル(#29)に使い、版を固定している。ネイティブのビルドは /restore なしで DXForge.sln を呼ぶため、*Editor
       構成で project.assets.json が無いと(obj だけを消したときなど)、ソリューションに含まれる
       DXForgeEditor が NETSDK1004 で失敗する(#61)。
-    - DXC: packages/DirectXShaderCompiler が空なら GetDXC.ps1 で最新版を取得する
-      (GitHub APIを使うため、既にあるときは呼ばない)。DXCを使うのは EngineTest
+    - DXC(GitHub): packages/DirectXShaderCompiler が空なら GetDXC.ps1 で最新版を取得する
+      (GitHub APIを使うため、既にあるときは呼ばない)。これを使うのは EngineTest
       (シェーダーのコンパイル)だけで、EngineTest は Debug/Release 構成にしかマッピングされて
       いないため、*Editor 構成や EngineTest を含まない -Project のときは取得しない(#61)。
       オフラインやGitHub APIのレート制限の下でも、EngineUnitTests などはビルドできる。

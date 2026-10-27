@@ -65,6 +65,11 @@
 		<None Include="Resources\TextureEditor\ChannelSelectShader.hlsl" />
 	</ItemGroup>
 	<ItemGroup>
+		<!-- 既定のマテリアル用シェーダー(Primal Day 076)。DefaultAssets がリソースから読み、DXForgeEngineDLL の CompileShader(DXC)でコンパイルする -->
+		<None Remove="Resources\MaterialEditor\DefaultMaterialShaders.hlsl" />
+		<Resource Include="Resources\MaterialEditor\DefaultMaterialShaders.hlsl" />
+	</ItemGroup>
+	<ItemGroup>
 		<!-- プロジェクト・テンプレートを出力フォルダにコピーする。NewProjectは実行ファイルの場所(AppContext.BaseDirectory)からテンプレートを読む -->
 		<!-- 既定のNone項目はproject.dxprojを除外する(DefaultItemExcludesの**/*.*proj)ので、明示的に含め直す -->
 		<None Remove="ProjectTemplates\**" />

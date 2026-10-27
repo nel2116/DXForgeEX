@@ -8,6 +8,7 @@
 // 2024/12/27 新規作成
 // 2025/01/13 テストのためのワーカースレッドを追加
 // 2026/10/19 環境光(IBL)のライトのため、ライトセットを先に作って後で消すよう順番を変更し、Iキーで環境光を切り替える (Primal Day 075)
+// 2026/10/27 ShaderCompilation を DXForgeEngineDLL へ移動したため、インクルードのパスを変更 (Primal Day 076)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Platform/PlatformType.h"
@@ -21,7 +22,7 @@
 #include "Components/Geometry.h"
 #include "Input/Input.h"
 #include "TestRenderer.h"
-#include "ShaderCompilation.h"
+#include "../DXForgeEngineDLL/ShaderCompilation.h"
 #include <filesystem>
 #include <fstream>
 #if TEST_RENDERER
