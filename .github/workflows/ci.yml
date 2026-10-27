@@ -69,3 +69,9 @@ jobs:
       - name: Test DXForgeImport (arguments only)
         shell: pwsh
         run: pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1 -Configuration DebugEditor -ArgumentsOnly
+
+      - name: CleanupMerged.ps1 tests
+        shell: pwsh
+        # 使い捨てのリポジトリと偽の gh / orca で動かし、本物のGitHubやOrcaは呼ばない(Issue #104)。
+        # GUIもビルドも要らないので、別のジョブにせず必須のチェックであるこのジョブに入れる。
+        run: ./Tests/CleanupMerged.Tests.ps1
