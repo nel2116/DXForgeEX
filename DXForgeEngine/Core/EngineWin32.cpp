@@ -7,6 +7,7 @@
 // 更新履歴
 // 2024/12/20 新規作成
 // 2026/10/27 初期化が途中で失敗したときの後始末を直し、engine_shutdown()が無効なウィンドウを破棄しないようにした (#107)
+// 2026/10/27 game.binの読み込みに失敗した理由をデバッガの出力に出すようにした (#11)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // // ====== インクルード部 ======
 #if !defined(SHIPPING) && defined(_WIN64)
@@ -16,6 +17,7 @@
 #include "Platform/Platform.h"
 #include "Graphics/Renderer.h"
 #include <thread>
+#include <string>
 
 using namespace dxforge;
 namespace
@@ -53,10 +55,13 @@ namespace
 bool engine_initialize()
 {
 	// ゲームをロード
-	if (!dxforge::content::load_game())
+	const content::load_game_result result{ content::load_game() };
+	if (result != content::load_game_result::ok)
 	{
-		// コンソールがないので、失敗したことはデバッガの出力に出す
-		OutputDebugStringA("[DXForge] failed to load game.bin\n");
+		// コンソールがないので、失敗の理由はデバッガの出力に出す
+		const std::string message{ std::string{ "[DXForge] failed to load game.bin: " } + content::to_string(result) +
+			" (" + content::last_load_game_error() + ")\n" };
+		OutputDebugStringA(message.c_str());
 		return false;
 	}
 

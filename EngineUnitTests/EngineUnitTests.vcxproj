@@ -87,6 +87,8 @@
     <ClCompile Include="Tests_Entity.cpp" />
     <ClCompile Include="Tests_Script.cpp" />
     <ClCompile Include="Tests_Camera.cpp" />
+    <ClCompile Include="Tests_ContentLoader.cpp" />
+    <ClCompile Include="HeadlessTestScripts.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MicroTest.h" />

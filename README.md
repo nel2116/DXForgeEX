@@ -59,7 +59,7 @@ PowerShell 7+ (`pwsh`) から実行します。
 | `-Configuration` | `Debug` / `DebugEditor` / `Release` / `ReleaseEditor` | `DebugEditor` |
 | `-Target` | `native` / `editor` / `all` | `all` |
 | `-Project` | `DXForge.sln`内のプロジェクト名(`-Target native`時のみ有効) | 省略時はソリューション全体 |
-| `-RunTests` | スイッチ。ビルド後に`EngineUnitTests.exe`を実行。`EngineUnitTests`は`Debug`/`Release`構成にしかないため、`*Editor`構成・`-Target editor`・別の`-Project`のときは対応する`Debug`/`Release`構成で`EngineUnitTests`を追加でビルドしてから実行する(古い実行ファイルを実行しないため)。ビルドに失敗したときはテストを実行しない | - |
+| `-RunTests` | スイッチ。ビルド後に`EngineUnitTests.exe`と、ヘッドレス実行のテスト(`EngineUnitTests/Tests/headless_run_test.py`、pythonが必要)を実行。`EngineUnitTests`は`Debug`/`Release`構成にしかないため、`*Editor`構成・`-Target editor`・別の`-Project`のときは対応する`Debug`/`Release`構成で`EngineUnitTests`を追加でビルドしてから実行する(古い実行ファイルを実行しないため)。ビルドに失敗したときはテストを実行しない | - |
 | `-NoRestore` | スイッチ。ネイティブビルド前の`packages/`の復元(`Restore.ps1`)を省く | - |
 | `-WarningsAsErrors` | スイッチ。ネイティブ側とエディタ側の警告をエラーとして扱う(CI用) | - |
 | `-Json` | スイッチ。1行のJSON要約を標準出力に出す | - |
@@ -93,8 +93,47 @@ PowerShell 7+ (`pwsh`) から実行します。
 現在カバーしているのは、GPU/ウィンドウに依存しない純粋ロジックのみです:
 - `Common/Id.h` — 世代付きID(インデックス/世代のエンコード、`new_generation`、`DEFINE_TYPED_ID`)
 - `Utilities/FreeList.h` — 削除済みインデックスの再利用ロジック
+- `Content/ContentLoader.cpp` — `game.bin`の読み込み(0エンティティ、256以上の値、壊れたファイル、途中で失敗したときの後始末)
 
 `Graphics/Direct3D12/*` などGPUデバイス初期化が前提のコードは対象外です。そちらの動作確認は`EngineTest`を実行し、目視で確認してください。
+
+### ヘッドレス実行 (`--game-bin`)
+
+`EngineUnitTests.exe`に`--game-bin`を付けると、ユニットテストの代わりに、エディタが書き出す`game.bin`を読み込み、スクリプトの更新(`script::update`)を指定フレーム数だけ回して終了します(#11の第一段)。ウィンドウもGPUも使いません。`game.bin`の読み込みとスクリプトの更新は、ゲームのexe(`Core/EngineWin32.cpp`)と同じ`content::load_game`/`script::update`を使い、実行ループと引数の解析は`DXForgeEngine/Core/Headless.cpp`にあります。
+
+```powershell
+./x64/Debug/EngineUnitTests.exe --game-bin path/to/game.bin --frames 10 [--dt 0.016] [--json]
+./x64/Debug/EngineUnitTests.exe --help   # 引数と終了コードの一覧
+```
+
+- `--frames <N>`(必須): `script::update`を呼ぶ回数(0以上)。`--dt <秒>`: 毎回渡すデルタ時間(既定0.016)。
+- `--json`: 結果を1行のJSONで標準出力に出します。ログは標準エラーに出ます。引数の誤りもJSONで返します。
+  ```json
+  {"mode":"headless","game_bin":"...","frames_requested":10,"frames_run":10,"dt":0.016,"success":true,"exit_code":0,"error":null,
+   "entity_count":1,"entities":[{"id":0,"position":[10,0,0],"rotation":[0,0,0,1],"scale":[1,1,1]}]}
+  ```
+  失敗したときは`"error":{"code":"script_not_found","message":"entity 1: script 'Foo' is not registered"}`のようになります。`entities`は最後のフレームの、生きているエンティティの状態です。
+
+| 終了コード | 意味 |
+|---|---|
+| `0` | 成功(エンティティが0個の`game.bin`は空のシーンとして成功) |
+| `2` | 引数の誤り |
+| `3` | `abort()`(assertなど。ユニットテストと同じく、ダイアログは出さない) |
+| `10` | `game.bin`が無い |
+| `11` | `game.bin`が読めない(空のファイルを含む) |
+| `12` | `game.bin`の形式が壊れている(途中で切れている・余りのバイトがある・値が範囲外) |
+| `13` | 未知のコンポーネントの種類 |
+| `14` | スクリプトが登録されていない |
+| `15` | エンティティを作成できなかった |
+
+制約: 描画はしません(Renderer/D3D12は初期化しない)。スクリプトはゲームのexeと同じく`REGISTER_SCRIPT`で実行ファイルに静的に登録されたものだけが使え、今は`EngineUnitTests`に入っているテスト用のスクリプト(`EngineUnitTests/HeadlessTestScripts.cpp`の`headless_test_mover`)だけです。ゲームのプロジェクト(`.dxproj`)の読み込み、スクリプトでの操作、スクリーンショットはまだありません。
+
+ヘッドレス実行の回帰テストは、`game.bin`を`%TEMP%`に作って実行ファイルを起動し、終了コードと`--json`を確かめます(`build.ps1 -RunTests`とCIからも実行されます)。
+
+```powershell
+python EngineUnitTests/Tests/headless_run_test.py                  # x64/Debug/EngineUnitTests.exe
+python EngineUnitTests/Tests/headless_run_test.py --config Release
+```
 
 エディタの基本操作(プロジェクトの作成 → スクリプトの追加 → ゲームコードDLLの読み込み → ゲームの実行)の確認手順は [docs/ManualVerification.md](docs/ManualVerification.md) にまとめています。
 
@@ -131,7 +170,7 @@ CIの対象範囲は意図的に絞っています:
 - `ContentTools`はFBX SDKが必要なためランナーではビルドできません(ソリューション構成`Debug`/`Release`ではビルド対象外なので問題になりません)。
   ローカルでは既定でFBX SDK 2020.3.7の標準インストール先を参照します。別の場所にある場合は、環境変数または`/p:FbxSdkDir=<SDKのルート>`で指定してください(`ContentTools/FbxSdk.props`)。SDKが見つからない場合はビルド開始時に分かりやすいエラーで停止します。
 - `EngineTest`はビルドのみ(実行にはウィンドウとGPUが必要)。
-- `EngineUnitTests`はGPU・ウィンドウ不要なので、CIで実際に実行されます。
+- `EngineUnitTests`はGPU・ウィンドウ不要なので、CIで実際に実行されます。ヘッドレス実行(`--game-bin`)のテスト(`EngineUnitTests/Tests/headless_run_test.py`)も`Debug`/`Release`の両方で実行されます。
 
 ### ビルド出力の要約
 
@@ -182,7 +221,7 @@ Codex CLIがインストール済みで、ログインしている必要があ�
 
 ## 今後の方向性
 
-将来的に、Unity CLI(`-batchmode`等)のように、エディタUIを介さずCLIからエンジンを操作・ビルドできる「AIフレンドリー」な構成を目指しています。`EngineUnitTests`はその最初の一歩(ウィンドウ/GPU無しでエンジンコードを動かすヘッドレスなCLIプログラム)という位置づけです。今後、`--load-project`のような引数や、ContentToolsのCLI化などを通じて拡張していく想定です。
+将来的に、Unity CLI(`-batchmode`等)のように、エディタUIを介さずCLIからエンジンを操作・ビルドできる「AIフレンドリー」な構成を目指しています。`EngineUnitTests`はその最初の一歩(ウィンドウ/GPU無しでエンジンコードを動かすヘッドレスなCLIプログラム)という位置づけです。`--game-bin`による`game.bin`のヘッドレス実行(上の「ヘッドレス実行」)がその第一段で、今後、`--load-project`のような引数、スクリプトでの操作、描画とスクリーンショット、ContentToolsのCLI化(#10)との接続などを通じて拡張していく想定です。
 
 ## サードパーティライセンス
 
