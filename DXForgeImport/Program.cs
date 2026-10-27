@@ -188,7 +188,8 @@ namespace DXForgeImport
                 {
                     input = result.Input,
                     type = result.Type,
-                    output = options.Output != null ? Path.GetFullPath(options.Output) : null,
+                    // 検証済みの出力先(フルパス)。検証の前に失敗したときは引数の文字列をそのまま出す(ここで再評価すると例外になりうるため)。
+                    output = _resolvedOutput ?? options.Output,
                     success = result.Success,
                     exitCode = (int)exitCode,
                     exitCodeName = exitCode.ToString(),
@@ -213,6 +214,7 @@ namespace DXForgeImport
         }
 
         private static Dictionary<string, object?>? _settingsForJson;
+        private static string? _resolvedOutput;
 
         private static ExitCode Run(CommandLineOptions options, ImportResult result, List<ImportResult> embedded)
         {
@@ -273,6 +275,7 @@ namespace DXForgeImport
             {
                 output = Path.GetFullPath(options.Output!);
                 Directory.CreateDirectory(output);
+                _resolvedOutput = output;
             }
             catch (Exception ex)
             {
@@ -289,12 +292,27 @@ namespace DXForgeImport
             ContentImportEnvironment.ImportEmbeddedFiles = (files, destination) =>
             {
                 // エディタ(ConfigureImportSettings.AddFiles)と同じく、画像の拡張子のファイルだけを、既定のテクスチャ設定で取り込む。
+                // 埋め込み画像は一時フォルダに取り出されるが、一時フォルダは終了時に消すので、テクスチャのソース画像(Sources、
+                // エディタの再インポートが使う)が消えないよう、出力先の <FBXのアセット名>.fbm フォルダへコピーしてから取り込む
+                // (FBX SDK が埋め込み画像を <FBXのファイル名>.fbm に取り出すのと同じ名前の付け方)。
+                var mediaFolder = Path.Combine(destination, ContentHelper.GetAssetName(input) + ".fbm");
                 var previous = _currentResult;
-                foreach (var file in files.Where(f => ContentHelper.ImageFileExtensions.Contains(Path.GetExtension(f).ToLower())))
+                foreach (var extracted in files.Where(f => ContentHelper.ImageFileExtensions.Contains(Path.GetExtension(f).ToLower())))
                 {
+                    var file = Path.Combine(mediaFolder, Path.GetFileName(extracted));
                     var embeddedResult = new ImportResult { Input = file, Type = TextureType };
                     _currentResult = embeddedResult;
-                    embeddedResult.Success = ImportAndSave(file, new TextureImportSettings(), destination, embeddedResult);
+                    try
+                    {
+                        Directory.CreateDirectory(mediaFolder);
+                        File.Copy(extracted, file, true);
+                        embeddedResult.Success = ImportAndSave(file, new TextureImportSettings(), destination, embeddedResult);
+                    }
+                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                    {
+                        embeddedResult.Errors.Add($"埋め込みテクスチャを {mediaFolder} にコピーできませんでした: {ex.Message}");
+                        WriteLog("error", embeddedResult.Errors[^1]);
+                    }
                     embedded.Add(embeddedResult);
                     if (!embeddedResult.Success)
                     {
@@ -356,7 +374,7 @@ namespace DXForgeImport
             var imported = asset.Import(file);
             // FBXのインポートに失敗しても、Geometry.Import() は true を返すことがある(ContentToolsAPI.ImportFbx が失敗を例外にしないため)。
             // その状態で Save() すると LODグループがなく、保存するものがないので、ここで失敗にする。
-            if (imported && asset is Geometry geometry && !geometry.HasLODGroups)
+            if (imported && asset is Geometry geometry && geometry.LODGroupCount == 0)
             {
                 imported = false;
             }
@@ -367,14 +385,20 @@ namespace DXForgeImport
                 return false;
             }
 
+            // Geometry.Save() は LODグループごとに1つのファイルを書き、途中で失敗すると(例外をログに出して)書けた分だけを返す。
+            // Texture.Save() は全部書くか何も書かない(対になるIBLのテクスチャがあれば2つ)。どちらも失敗はログのエラーとして出るので、
+            // 書いたファイルの数と、保存中に出たエラーの両方で、一部だけ保存できた場合も失敗にする。書けたファイルは files に残す。
+            var errorsBeforeSave = result.Errors.Count;
             var saved = asset.Save(asset.FullPath).ToList();
-            if (!saved.Any())
+            result.Files.AddRange(saved);
+            var expected = asset is Geometry savedGeometry ? savedGeometry.LODGroupCount : 1;
+            if (saved.Count < expected || result.Errors.Count > errorsBeforeSave)
             {
-                if (!result.Errors.Any()) result.Errors.Add($"保存に失敗しました: {asset.FullPath}");
+                result.Errors.Add($"保存に失敗しました: {asset.FullPath}(書けたファイル {saved.Count} / {expected})");
+                WriteLog("error", result.Errors[^1]);
                 return false;
             }
 
-            result.Files.AddRange(saved);
             return true;
         }
 

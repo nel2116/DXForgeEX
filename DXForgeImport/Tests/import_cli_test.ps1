@@ -7,12 +7,18 @@
     GUI は使わない(エディタのウィンドウもプロジェクトも開かない)。
 
     1. 引数・異常系(ContentTools.dll がなくても確かめられるもの。CI ではこれだけを実行する: -ArgumentsOnly)
-       --help、引数の誤り、入力なし、未対応の拡張子、--type と拡張子の不一致、設定の誤り、出力先を作れない。
+       --help、引数の誤り(空白だけの --input/--output を含む)、入力なし、未対応の拡張子、--type と拡張子の不一致、設定の誤り、
+       出力先を作れない(パスに使えない文字を含む)。
        ContentTools.dll がない場合は、正しい入力で終了コード7になることも確かめる。
     2. インポート(ContentTools.dll と FBX SDK のサンプルが必要。ローカルで実行する)
        - テクスチャ(DXForgeEditor\Resources\TextureEditor\Checker64.png)と FBX(既定は FBX SDK のサンプル box.fbx)を
          インポートし、終了コード0と、出力した .asset の一覧が返る。設定ファイルと --set が .asset に反映される。
        - 壊れた PNG / FBX で終了コード1と --json のエラーが返り、.asset を書かない(assert のダイアログやクラッシュにならない)。
+       - 保存の失敗(出力先の .asset が読み取り専用)で終了コード1になる。-MultiLodFbxFile を指定すると、LODグループが2つ以上ある
+         FBXの2つ目以降の .asset を読み取り専用にして、一部だけ保存できた場合も終了コード1になり、書けたファイルが files に残ることを確かめる。
+       - FBXの埋め込みテクスチャ: box.fbx に Checker64.png を埋め込んだFBX(ASCII の Video オブジェクト)をテスト中に作ってインポートし、
+         埋め込み画像が出力先の <名前>.fbm にコピーされ、テクスチャの Sources がそこを指し(CLI の一時フォルダは終了時に消える)、
+         エディタのコードでそこから再インポートできることを確かめる。
        - エディタとの互換: CLI が書いた .asset を、エディタのコード(DXForgeEditor.dll の Texture.Load / Geometry.Load)を
          リフレクションで呼んで読み込める。
        - 同じ入力をエディタのインポートの経路(ContentHelper.Import、エディタのドラッグ&ドロップと同じ関数)で書き出し、
@@ -28,6 +34,10 @@
 .PARAMETER FbxFile
     FBX のテストに使うファイル。既定は FBX SDK 2020.3.7 のサンプル(samples\ConvertScene\box.fbx)。
 
+.PARAMETER MultiLodFbxFile
+    LODグループが2つ以上ある FBX(省略可)。指定すると、一部だけ保存できた場合のテストを行う。リポジトリにもFBX SDKのサンプルにも
+    該当するものがないので、既定では行わない。
+
 .EXAMPLE
     pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1
 .EXAMPLE
@@ -40,7 +50,9 @@ param(
 
 	[switch]$ArgumentsOnly,
 
-	[string]$FbxFile = "C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\samples\ConvertScene\box.fbx"
+	[string]$FbxFile = "C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\samples\ConvertScene\box.fbx",
+
+	[string]$MultiLodFbxFile
 )
 
 $ErrorActionPreference = "Stop"
@@ -119,7 +131,11 @@ try
 	Check-Failure "--set の形の誤り" @("--input", $TextureFile, "--output", $outputDir, "--set", "Compress") 5 "InvalidSettings" | Out-Null
 	Check-Failure "--set の値の誤り" @("--input", $TextureFile, "--output", $outputDir, "--set", "Dimension=Texture4D") 5 "InvalidSettings" | Out-Null
 	Check-Failure "--set の項目が入力の種類に合わない" @("--input", $TextureFile, "--output", $outputDir, "--set", "SmoothingAngle=90") 5 "InvalidSettings" | Out-Null
+	Check-Failure "--input が空白だけ" @("--input", " ", "--output", $outputDir) 2 "InvalidArguments" | Out-Null
+	$r = Check-Failure "--output が空白だけ" @("--input", $TextureFile, "--output", " ") 2 "InvalidArguments"
+	Check ($null -ne $r.Json -and $r.Json.output -eq " ") "--output が空白だけ: --json の output には引数をそのまま出す(検証前のパスを解決しない)"
 	Check-Failure "出力先を作れない" @("--input", $TextureFile, "--output", (Join-Path $notAFile "sub")) 6 "OutputError" | Out-Null
+	Check-Failure "出力先のパスに使えない文字" @("--input", $TextureFile, "--output", (Join-Path $WorkDir "a|b")) 6 "OutputError" | Out-Null
 	Check (-not (Test-Path $outputDir)) "異常系では出力先に何も書かない"
 
 	if (-not $hasContentTools)
@@ -181,6 +197,80 @@ try
 		Check-Failure "壊れたPNG" @("--input", $brokenPng, "--output", $brokenDir) 1 "ImportFailed" | Out-Null
 		Check-Failure "壊れたFBX" @("--input", $brokenFbx, "--output", $brokenDir) 1 "ImportFailed" | Out-Null
 		Check (@(Get-ChildItem $brokenDir -ErrorAction SilentlyContinue).Count -eq 0) "壊れたファイルでは .asset を書かない"
+
+		# 保存の失敗(出力先の .asset が読み取り専用で上書きできない)
+		$readOnlyDir = Join-Path $WorkDir "readonly"
+		New-Item -ItemType Directory -Path $readOnlyDir | Out-Null
+		$readOnlyAsset = Join-Path $readOnlyDir "checker64.asset"
+		Set-Content -Path $readOnlyAsset -Value "read only"
+		(Get-Item $readOnlyAsset).IsReadOnly = $true
+		$r = Check-Failure "保存の失敗(読み取り専用の .asset)" @("--input", $TextureFile, "--output", $readOnlyDir) 1 "ImportFailed"
+		Check (@($r.Json.files).Count -eq 0 -and (Get-Content $readOnlyAsset) -eq "read only") "保存の失敗: files は空で、既存のファイルはそのまま"
+		(Get-Item $readOnlyAsset).IsReadOnly = $false
+
+		# 一部だけ保存できた場合(LODグループが2つ以上あるFBXが必要)
+		if ($MultiLodFbxFile)
+		{
+			$partialDir = Join-Path $WorkDir "partial"
+			$r = Invoke-Import @("--input", $MultiLodFbxFile, "--output", $partialDir)
+			$all = @($r.Json.files)
+			Check ($r.ExitCode -eq 0 -and $all.Count -ge 2) "一部の保存: 準備として、$MultiLodFbxFile から .asset が2つ以上できる (実際: $($all.Count))"
+			if ($all.Count -ge 2)
+			{
+				Remove-Item $all[0]
+				foreach ($file in $all[1..($all.Count - 1)]) { (Get-Item $file).IsReadOnly = $true }
+				$r = Check-Failure "一部の保存(2つ目以降の .asset が読み取り専用)" @("--input", $MultiLodFbxFile, "--output", $partialDir) 1 "ImportFailed"
+				Check (@($r.Json.files).Count -eq 1 -and $r.Json.files[0] -eq $all[0] -and (Test-Path $all[0])) "一部の保存: 書けたファイル(1つ目)が files に残る"
+				foreach ($file in $all[1..($all.Count - 1)]) { (Get-Item $file).IsReadOnly = $false }
+			}
+		}
+		else
+		{
+			Write-Host "  (-MultiLodFbxFile を指定していないので、一部だけ保存できた場合のテストは行いません)"
+		}
+
+		# FBXの埋め込みテクスチャ: ASCII の box.fbx に Checker64.png を Video オブジェクトとして埋め込んだFBXを作る
+		$embeddedFbx = $null
+		$embeddedDir = Join-Path $WorkDir "embedded"
+		$embeddedImage = Join-Path $embeddedDir "embedded_box.fbm\embedded_checker.png"
+		$embeddedAsset = Join-Path $embeddedDir "embedded_checker.asset"
+		if ((Test-Path $FbxFile) -and (Get-Content $FbxFile -TotalCount 1) -match '^; FBX 7')
+		{
+			$lines = [System.Collections.Generic.List[string]](Get-Content $FbxFile)
+			$base64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($TextureFile))
+			$connections = $lines.IndexOf("Connections:  {")
+			$objectsEnd = $connections - 1
+			while ($lines[$objectsEnd] -ne "}") { --$objectsEnd }
+			$lines.InsertRange($objectsEnd, [string[]]@(
+				'    Video: 900000001, "Video::embedded_checker", "Clip" {',
+				'        Type: "Clip"',
+				'        Properties70:  {',
+				'            P: "Path", "KString", "XRefUrl", "", "embedded_checker.png"',
+				'        }',
+				'        Filename: "embedded_checker.png"',
+				'        RelativeFilename: "embedded_checker.png"',
+				('        Content: , "' + $base64 + '"'),
+				'    }'))
+			# Definitions に Video の型を足す(ないと FBX SDK が埋め込み画像を取り出さない)
+			$definitions = $lines.IndexOf("Definitions:  {")
+			$count = $definitions + 1
+			while ($lines[$count] -notmatch '^\s+Count: (\d+)$') { ++$count }
+			$lines[$count] = "    Count: $([int]$Matches[1] + 1)"
+			$lines.InsertRange($count + 1, [string[]]@('    ObjectType: "Video" {', '        Count: 1', '    }'))
+			$embeddedFbx = Join-Path $WorkDir "embedded_box.fbx"
+			[System.IO.File]::WriteAllLines($embeddedFbx, $lines)
+
+			$r = Invoke-Import @("--input", $embeddedFbx, "--output", $embeddedDir)
+			$embedded = @($r.Json.embeddedTextures)
+			Check ($r.ExitCode -eq 0 -and $embedded.Count -eq 1 -and $embedded[0].success -and @($embedded[0].files)[0] -eq $embeddedAsset -and (Test-Path $embeddedAsset)) `
+				"埋め込みテクスチャ: 終了コード0で、embeddedTextures に1つ成功が入り、$embeddedAsset ができる"
+			Check ($embedded.Count -eq 1 -and $embedded[0].input -eq $embeddedImage -and (Test-Path $embeddedImage)) `
+				"埋め込みテクスチャ: 埋め込み画像が出力先の embedded_box.fbm にコピーされ、CLIの終了後も残る"
+		}
+		else
+		{
+			Check $false "埋め込みテクスチャのテスト用FBXを作れません($FbxFile が ASCII の FBX 7 ではない)"
+		}
 		Check (-not (Test-Path (Join-Path ([System.IO.Path]::GetTempPath()) "DXForgeImport"))) "FBX の一時フォルダ(%TEMP%\DXForgeImport\<id> と、空になった %TEMP%\DXForgeImport)を残さない"
 
 		# エディタのコードで読み込む・エディタの経路で書き出して比べる(このプロセスにエディタのアセンブリを読み込む)
@@ -230,6 +320,15 @@ try
 			$lodGroup = if ($loaded) { $geometryType.GetMethod("GetLODGroup").Invoke($geometry, @(0)) } else { $null }
 			Check ($loaded -and $null -ne $lodGroup -and $lodGroup.LODs.Count -gt 0 -and $lodGroup.LODs[0].Meshes[0].VertexCount -gt 0 -and $geometry.ImportSettings.SmoothingAngle -eq 90) `
 				"互換: CLI のジオメトリを Geometry.Load で読め、LOD とメッシュ(頂点)があり、設定(SmoothingAngle=90)が入っている"
+		}
+		if ($embeddedFbx -and (Test-Path $embeddedAsset))
+		{
+			# エディタの「再インポート」(TextureEditor.OnReimportCommand)と同じく、読み込んだテクスチャで Import(Texture.FullPath) を呼ぶ
+			# (ContentToolsAPI.Import はインポート設定の Sources の画像を読む)
+			$loaded, $texture = Load-Asset $textureType $embeddedAsset
+			$source = if ($loaded) { $texture.ImportSettings.Sources[0] } else { $null }
+			Check ($loaded -and $source -eq $embeddedImage) "互換: 埋め込みテクスチャの Sources が出力先の embedded_box.fbm の画像を指す(一時フォルダではない)"
+			Check ($loaded -and $textureType.GetMethod("Import").Invoke($texture, @([string]$texture.FullPath))) "互換: 埋め込みテクスチャを Sources から再インポートできる(エディタの Texture.Import)"
 		}
 
 		# エディタの経路(ContentHelper.Import)で同じ入力を書き出し、CLI の出力と比べる

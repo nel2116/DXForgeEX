@@ -316,8 +316,11 @@ namespace DXForgeEditor.Content
 
         public GeometryImportSettings ImportSettings { get; } = new();
 
-        /// <summary>インポートしたデータ(LODグループ)を持つか。FBXのインポートに失敗しても Import() は true を返すことがあるため、保存の前に確かめる。</summary>
-        internal bool HasLODGroups => _lodGroups.Count > 0;
+        /// <summary>
+        /// インポートしたLODグループの数(Save() はLODグループごとに1つのファイルを書く)。コマンドラインのインポーター(DXForgeImport)が、
+        /// インポートの失敗(FBXのインポートに失敗しても Import() は true を返すことがある)と、一部だけ保存できた場合を見分けるのに使う。
+        /// </summary>
+        internal int LODGroupCount => _lodGroups.Count;
 
         public LODGroup? GetLODGroup(int lodGroup = 0)
         {

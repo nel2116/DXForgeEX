@@ -119,7 +119,9 @@ PowerShell 7+ (`pwsh`) から実行します。
 }
 ```
 
-FBXの埋め込みテクスチャ(`ImportEmbeddedTextures`)は、エディタと同じく既定のテクスチャ設定で同じフォルダへ取り込み、`--json`の`embeddedTextures`に結果を出します。
+FBXの埋め込みテクスチャ(`ImportEmbeddedTextures`)は、エディタと同じく既定のテクスチャ設定で同じフォルダへ取り込み、`--json`の`embeddedTextures`に結果を出します。埋め込み画像は、出力先の`<FBXのアセット名>.fbm`フォルダ(FBX SDKが埋め込み画像を取り出すときと同じ名前の付け方)にコピーしてから取り込みます。テクスチャの`.asset`はソース画像のパス(エディタの再インポートが使う)を持つので、CLIが終了時に消す一時フォルダを指したままにしないためです。
+
+LODグループが複数あるFBXは、エディタと同じくLODグループごとに`.asset`を書きます。一部だけ書けた場合も終了コード1にし、書けたファイルは`files`に残します。
 
 `--json`の出力(例):
 
@@ -155,7 +157,7 @@ pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1 -Configuratio
 pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1 -ArgumentsOnly               # ContentTools.dll不要(CIと同じ)
 ```
 
-引数・異常系(終了コードと`--json`のエラー)、テクスチャとFBXのインポート、設定ファイルと`--set`の反映、壊れたPNG/FBXでの失敗に加え、CLIが書いた`.asset`をエディタのコード(`Texture.Load`/`Geometry.Load`)で読めること、同じ入力をエディタのインポートの経路(`ContentHelper.Import`)で書き出したものと一致すること(GUIDとインポート日時を除く)を確かめます。FBXには既定でFBX SDKのサンプル`C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\samples\ConvertScene\box.fbx`を使います(`-FbxFile`で変更可)。CIではFBX SDKがないため`-ArgumentsOnly`だけを実行します。
+引数・異常系(終了コードと`--json`のエラー)、テクスチャとFBXのインポート、設定ファイルと`--set`の反映、壊れたPNG/FBXと保存の失敗(読み取り専用の`.asset`)、FBXの埋め込みテクスチャ(テスト中に`box.fbx`へ`Checker64.png`を埋め込んだFBXを作る)に加え、CLIが書いた`.asset`をエディタのコード(`Texture.Load`/`Geometry.Load`)で読めること、同じ入力をエディタのインポートの経路(`ContentHelper.Import`)で書き出したものと一致すること(GUIDとインポート日時を除く)を確かめます。FBXには既定でFBX SDKのサンプル`C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\samples\ConvertScene\box.fbx`を使います(`-FbxFile`で変更可)。LODグループが2つ以上あるFBXを`-MultiLodFbxFile`で渡すと、一部だけ保存できた場合のテストも行います(該当するFBXがリポジトリにもFBX SDKのサンプルにもないため、既定では行いません)。CIではFBX SDKがないため`-ArgumentsOnly`だけを実行します。
 
 ## テスト
 
