@@ -5,6 +5,8 @@
 #     ソリューション構成 Debug / Release ではそもそもビルド対象外なので、ここでは触らない。
 #   - EngineTest はビルドのみ可能(実行にはウィンドウとGPUが必要)。
 #   - EngineUnitTests は GPU もウィンドウも不要なため、CIで実際に実行できる。
+#     build.ps1 -RunTests は、続けてヘッドレス実行(EngineUnitTests.exe --game-bin)のテストを
+#     python で実行する(EngineUnitTests/Tests/headless_run_test.py、#11)。
 name: CI
 
 on:
@@ -36,6 +38,11 @@ jobs:
         with:
           path: packages/DirectXShaderCompiler
           key: dxc-${{ runner.os }}-v1
+
+      # headless_run_test.py を実行する python を固定する(ランナーの既定に頼らない)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: Build and run unit tests
         shell: pwsh

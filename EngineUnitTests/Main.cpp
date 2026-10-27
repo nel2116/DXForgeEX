@@ -7,9 +7,11 @@
 // 更新履歴
 // 2026/10/18 新規作成
 // 2026/10/19 assert/abort()でダイアログを出さずに標準エラーへ出して終了するように変更(#89)。--interactiveを追加
+// 2026/10/27 --game-binでヘッドレス実行(game.binを読み込んでスクリプトの更新を回す)を行うモードと、--helpを追加 (#11)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
+#include "Core/Headless.h"
 
 #include <crtdbg.h>
 #include <csignal>
@@ -24,6 +26,7 @@
 #define NOMINMAX
 #endif
 #include <Windows.h>
+#include <shellapi.h>
 
 namespace
 {
@@ -140,14 +143,44 @@ int main(int argc, char** argv)
 {
 	bool as_json{ false };
 	bool interactive{ false };
+	bool help{ false };
 	for (int i{ 1 }; i < argc; ++i)
 	{
 		const std::string arg{ argv[i] };
 		if (arg == "--json") as_json = true;
 		else if (arg == "--interactive") interactive = true;	// 対話的にデバッグするため、CRT既定のダイアログを残す
+		else if (arg == "--help" || arg == "-h") help = true;
+	}
+
+	if (help)
+	{
+		std::printf(
+			"Usage:\n"
+			"  EngineUnitTests [--json] [--interactive]\n"
+			"      run the unit tests (exit code 0: all passed, 1: a test failed, 3: abort())\n"
+			"  EngineUnitTests --game-bin <path> --frames <N> [--dt <seconds>] [--json] [--interactive]\n");
+		dxforge::headless::print_usage();
+		return 0;
 	}
 
 	if (!interactive) configure_unattended_error_reporting();
+
+	// --game-binがあればヘッドレス実行を行う。パスに日本語などが入ってもよいように、引数はUTF-16で取り直す。
+	int wide_argc{ 0 };
+	wchar_t** wide_argv{ CommandLineToArgvW(GetCommandLineW(), &wide_argc) };
+	if (wide_argv && dxforge::headless::is_requested(wide_argc, wide_argv))
+	{
+		// --interactiveはこのランナーの指定なので、ヘッドレス実行には渡さない
+		std::vector<const wchar_t*> headless_args{};
+		for (int i{ 0 }; i < wide_argc; ++i)
+		{
+			if (std::wstring{ wide_argv[i] } != L"--interactive") headless_args.push_back(wide_argv[i]);
+		}
+		const int exit_code{ dxforge::headless::run((int)headless_args.size(), headless_args.data()) };
+		LocalFree(wide_argv);
+		return exit_code;
+	}
+	if (wide_argv) LocalFree(wide_argv);
 
 	std::vector<case_result> results;
 	results.reserve(dxforge::test::registry().size());

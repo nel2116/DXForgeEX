@@ -30,6 +30,8 @@
     マッピングされていないため、*Editor構成や -Target editor、別の -Project を指定したときは、
     対応するDebug/Release構成でEngineUnitTestsを追加でビルドしてから実行する(以前のビルドで
     残った古い実行ファイルを黙って実行しないため。#60)。ビルドに失敗したときはテストを実行しない。
+    続けて EngineUnitTests/Tests/headless_run_test.py(python)で、ヘッドレス実行(--game-bin)の
+    終了コードと --json の出力を確かめる(#11)。
 
 .PARAMETER WarningsAsErrors
     警告をエラーとして扱う。ネイティブ側は Directory.Build.props 経由で /WX を付与し、
@@ -279,6 +281,23 @@ if ($RunTests)
 		$testsExit = $LASTEXITCODE
 		$summary.tests = [ordered]@{ exitCode = $testsExit; path = $testExe }
 		if ($testsExit -ne 0 -and $exitCode -eq 0) { $exitCode = $testsExit }
+
+		# ヘッドレス実行(--game-bin)は、別プロセスとして起動して終了コードと--jsonの出力を確かめる(#11)
+		$headlessTest = "$RepoRoot\EngineUnitTests\Tests\headless_run_test.py"
+		Write-Host "== Running headless tests: $headlessTest =="
+		if (Get-Command python -ErrorAction SilentlyContinue)
+		{
+			& python $headlessTest --exe $testExe
+			$headlessExit = $LASTEXITCODE
+		}
+		else
+		{
+			# 実行しなかったことを成功と見なさない
+			Write-Host "  python が見つからないため、ヘッドレス実行のテストを実行できません"
+			$headlessExit = 1
+		}
+		$summary.headlessTests = [ordered]@{ exitCode = $headlessExit; path = $headlessTest }
+		if ($headlessExit -ne 0 -and $exitCode -eq 0) { $exitCode = $headlessExit }
 	}
 }
 
