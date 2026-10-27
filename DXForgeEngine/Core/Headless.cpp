@@ -6,6 +6,7 @@
 //	ウィンドウもGPUも使わずに、game.binを読み込んでスクリプトの更新を指定フレーム数だけ回す実行経路の実装
 // 更新履歴
 // 2026/10/27 新規作成 (#11)
+// 2026/10/27 終了コード11の説明に、存在の確認自体に失敗した場合を加えた (#11)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Headless.h"
@@ -300,7 +301,7 @@ namespace dxforge::headless
 			"  2  invalid arguments\n"
 			"  3  abort() (assert failure etc.)\n"
 			"  10 game.bin not found\n"
-			"  11 game.bin could not be read (or is empty)\n"
+			"  11 game.bin could not be read (empty, access denied, or its existence could not be checked)\n"
 			"  12 game.bin has an invalid format (truncated, trailing bytes, out-of-range value)\n"
 			"  13 unknown component type\n"
 			"  14 script is not registered\n"

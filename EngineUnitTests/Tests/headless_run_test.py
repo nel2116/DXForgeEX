@@ -11,7 +11,7 @@
 #   1. スクリプト付きのエンティティを含むgame.binを --frames N で回すと、終了コード0で、スクリプトのupdate()が
 #      N回呼ばれる(headless_test_mover は update() ごとに x を 1、y を dt だけ進めるので、最後の位置で分かる)。
 #   2. エンティティが0個のgame.binは空のシーンとして終了コード0になる(#107)。256個以上のエンティティも読める(#112)。
-#   3. 異常系(ファイルが無い・空・壊れている・未知のコンポーネント・未登録のスクリプト・引数の誤り)では、
+#   3. 異常系(ファイルが無い・存在の確認自体に失敗する・空・壊れている・未知のコンポーネント・未登録のスクリプト・引数の誤り)では、
 #      決められた0以外の終了コードと --json のエラーが返る。assertのダイアログやabort(終了コード3)、クラッシュにならない。
 #   4. --json では標準出力がJSONだけになり、ログは標準エラーに出る。パスに日本語が入っていても動く。
 #
@@ -217,6 +217,15 @@ def test_errors(r):
     valid_entity = entity(transform(), script(MOVER_SCRIPT))
     r.expect_error("missing game.bin", ["--game-bin", os.path.join(r.work_dir, "no_such.bin"), "--frames", "1"],
                    EXIT_FILE_NOT_FOUND, "file_not_found")
+    # 存在の確認自体が失敗するパス(デバイス名のCONでは、exists()がERROR_INVALID_PARAMETERを返す)は、
+    # 「無い」ではなく「読めない」になり、OSのメッセージ(ASCII以外は\xNN)が入る
+    r.expect_error("existence check fails (CON)", ["--game-bin", "CON", "--frames", "1"],
+                   EXIT_READ_FAILED, "read_failed")
+    code, result, _ = r.run_json(["--game-bin", "CON", "--frames", "1"])
+    message = (result or {}).get("error", {}).get("message", "")
+    r.check("existence check fails (CON): reason in message",
+            message.startswith("failed to check the file: ") and message.isascii() and len(message) > len("failed to check the file: "),
+            result)
     r.expect_error("empty game.bin", ["--game-bin", r.write(b""), "--frames", "1"],
                    EXIT_READ_FAILED, "read_failed")
     r.expect_error("truncated game.bin", ["--game-bin", r.write(game_bin(valid_entity)[:-3]), "--frames", "1"],

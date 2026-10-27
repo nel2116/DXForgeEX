@@ -10,6 +10,7 @@
 // 2026/10/27 エンティティが0個のgame.binを空のシーンとして読み込み、途中で失敗したら作成済みのエンティティを破棄するようにした (#107)
 // 2026/10/27 読み込むパスを指定できるようにし、失敗の理由を返すようにした (#11)
 // 2026/10/27 エラーメッセージに入れるスクリプト名の、表示できないASCII以外のバイトを\xNNにした(不正なUTF-8が--jsonに入っていたため) (#11)
+// 2026/10/27 ファイルの存在の確認自体に失敗したときは、file_not_foundではなくread_failedにして理由を返すようにした (#11)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "ContentLoader.h"
@@ -265,7 +266,15 @@ namespace dxforge::content
 		load_game_result load_game_data(const std::filesystem::path& path)
 		{
 			std::error_code error{};
-			if (!std::filesystem::exists(path, error))
+			const bool file_exists{ std::filesystem::exists(path, error) };
+			// 存在の確認自体に失敗した(アクセスが拒否されたなど)場合は、存在しないのではなく読めないとする
+			// NOTE: error.message()はOSの言語の文字列になりうるので、ASCII以外は\xNNにする
+			if (error)
+			{
+				last_error = "failed to check the file: " + printable(error.message().c_str());
+				return load_game_result::read_failed;
+			}
+			if (!file_exists)
 			{
 				last_error = "file not found";
 				return load_game_result::file_not_found;
