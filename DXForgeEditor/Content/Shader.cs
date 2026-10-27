@@ -41,11 +41,14 @@ namespace DXForgeEditor.Content
     /// </summary>
     class ShaderGroup
     {
-        // 同じシェーダー(ハッシュが同じもの)を何度もエンジンに登録しないための参照カウント
+        // 同じシェーダーグループを何度もエンジンに登録しないための参照カウント。
+        // 同じかどうかは、種類・キー・ハッシュの並び(Signature)で決める。
+        // NOTE: Primalはハッシュだけで決めるため、同じバイトコードでキーが違うグループに同じIDを返してしまい、
+        //       エンジンが2つ目のキーのシェーダーを探すと見つからない(Codexの指摘, #29)。
         private class UploadedShaderGroup
         {
             public int ContentId { get; private set; } = ID.INVALID_ID;
-            public byte[] CombinedHashes { get; private set; } = [];
+            public byte[] Signature { get; private set; } = [];
             public int ReferenceCount { get; private set; }
 
             private static readonly Dictionary<string, UploadedShaderGroup> _uploadedShaders = [];
@@ -55,13 +58,15 @@ namespace DXForgeEditor.Content
             {
                 if (!shaderGroup.IsCompiled) return null;
 
-                var combinedHashes = shaderGroup.Hash.SelectMany(x => x).ToArray();
+                var signature = GetSignature(shaderGroup);
 
                 if (ID.IsValid(shaderGroup.ContentId) && _uploadedShaderIds.TryGetValue(shaderGroup.ContentId, out var uploadedShader))
                 {
-                    if (uploadedShader.CombinedHashes.SequenceEqual(combinedHashes))
+                    if (uploadedShader.Signature.SequenceEqual(signature))
                     {
-                        ++uploadedShader.ReferenceCount;
+                        // NOTE: このインスタンスは既にこのグループを参照しているので、参照数は増やさない。
+                        //       Primalはここで増やすため、同じインスタンスで2回登録すると、1回の UnloadFromEngine では
+                        //       参照数が0にならず、エンジンから解放されない(Codexの指摘, #29)。
                         return uploadedShader;
                     }
                     else
@@ -74,7 +79,7 @@ namespace DXForgeEditor.Content
                     Debug.Assert(!ID.IsValid(shaderGroup.ContentId));
                 }
 
-                var hashString = Convert.ToBase64String(combinedHashes);
+                var hashString = Convert.ToBase64String(signature);
 
                 if (_uploadedShaders.TryGetValue(hashString, out var identicalShader))
                 {
@@ -88,7 +93,7 @@ namespace DXForgeEditor.Content
                 var newUploadedShader = new UploadedShaderGroup()
                 {
                     ContentId = contentId,
-                    CombinedHashes = combinedHashes,
+                    Signature = signature,
                     ReferenceCount = 1
                 };
 
@@ -110,12 +115,25 @@ namespace DXForgeEditor.Content
                     if (uploadedShader.ReferenceCount == 0)
                     {
                         EngineAPI.RemoveShaderGroup(uploadedShader.ContentId);
-                        var hashString = Convert.ToBase64String(uploadedShader.CombinedHashes);
+                        var hashString = Convert.ToBase64String(uploadedShader.Signature);
                         Debug.Assert(_uploadedShaders.ContainsKey(hashString));
                         _uploadedShaders.Remove(hashString);
                         _uploadedShaderIds.Remove(uploadedShader.ContentId);
                     }
                 }
+            }
+
+            private static byte[] GetSignature(ShaderGroup shaderGroup)
+            {
+                using var stream = new MemoryStream();
+                using (var writer = new BinaryWriter(stream))
+                {
+                    writer.Write((int)shaderGroup.Type);
+                    shaderGroup.Keys.ForEach(writer.Write);
+                    shaderGroup.Hash.ForEach(writer.Write);
+                }
+
+                return stream.ToArray();
             }
 
             private UploadedShaderGroup() { }
@@ -241,6 +259,8 @@ namespace DXForgeEditor.Content
 
             if (uploadedShader == null || !ID.IsValid(uploadedShader.ContentId))
             {
+                // 内容が変わっていた場合、前に登録したものは解放済みなので、二重に解放しないよう無効にする
+                ContentId = ID.INVALID_ID;
                 Logger.Log(MessageType.Error, $"シェーダー {FunctionName} をエンジンに登録できませんでした。");
                 return ID.INVALID_ID;
             }

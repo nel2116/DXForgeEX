@@ -43,6 +43,17 @@ if ([System.Threading.Thread]::CurrentThread.GetApartmentState() -ne "STA") { th
 Add-Type -AssemblyName PresentationFramework
 $null = [System.Windows.Application]::new()
 [void][System.Runtime.InteropServices.NativeLibrary]::Load((Join-Path $OutDir "DXForgeEngineDLL.dll"))
+if ($Configuration -eq "DebugEditor")
+{
+	# Debugのassertはモーダルなダイアログを出して止まるため、標準エラーに出してabortするようにする
+	# (例: シェーダーグループを解放し忘れると、終了時に free_list のデストラクタの assert(!_size) に当たる)
+	Add-Type -Namespace DXForgeTest -Name Crt -MemberDefinition @'
+[DllImport("ucrtbased.dll")] public static extern int _set_error_mode(int mode);
+[DllImport("ucrtbased.dll")] public static extern uint _set_abort_behavior(uint flags, uint mask);
+'@
+	[void][DXForgeTest.Crt]::_set_error_mode(1)
+	[void][DXForgeTest.Crt]::_set_abort_behavior(0, 3)
+}
 $editor = [System.Reflection.Assembly]::LoadFrom((Join-Path $OutDir "DXForgeEditor.dll"))
 
 $flags = [System.Reflection.BindingFlags]"Public,NonPublic,Static,Instance"
@@ -112,6 +123,30 @@ $vs2.UnloadFromEngine()
 $vs.UnloadFromEngine()
 $ps.UnloadFromEngine()
 Check ($vs.ContentId -eq $invalidId -and $ps.ContentId -eq $invalidId) "UnloadFromEngine"
+
+# エンジンに登録されているシェーダーグループ(ShaderGroup.UploadedShaderGroup の表)
+$uploaded = $shaderGroupType.GetNestedType("UploadedShaderGroup", $flags)
+function Get-UploadedCount { $uploaded.GetField("_uploadedShaderIds", $flags).GetValue($null).Count }
+Check ((Get-UploadedCount) -eq 0) "nothing is left uploaded: $(Get-UploadedCount)"
+
+# 同じバイトコードでもキーが違えば別のグループ(エンジンはキーでシェーダーを探すため)
+$key0 = New-ShaderGroup "Pixel" $code "MainPS" @("") @(0)
+$key1 = New-ShaderGroup "Pixel" $code "MainPS" @("") @(1)
+[void]$compileShader.Invoke($null, @($key0))
+[void]$compileShader.Invoke($null, @($key1))
+$key0Id = $key0.UploadToEngine()
+$key1Id = $key1.UploadToEngine()
+Check ($key0Id -ne $invalidId -and $key1Id -ne $invalidId -and $key0Id -ne $key1Id) "same byte code with different keys is uploaded separately: $key0Id, $key1Id"
+$key0.UnloadFromEngine()
+$key1.UnloadFromEngine()
+Check ((Get-UploadedCount) -eq 0) "both are unloaded: $(Get-UploadedCount) left"
+
+# 同じインスタンスを2回登録しても、1回の UnloadFromEngine で解放される(登録は冪等)
+$twiceId1 = $ps.UploadToEngine()
+$twiceId2 = $ps.UploadToEngine()
+$ps.UnloadFromEngine()
+Check ($twiceId1 -ne $invalidId -and $twiceId1 -eq $twiceId2 -and (Get-UploadedCount) -eq 0) "uploading the same instance twice is idempotent: $twiceId1, $twiceId2, $(Get-UploadedCount) left"
+
 $before = (Get-LogMessages).Count
 
 Write-Host "2. Broken shaders"
