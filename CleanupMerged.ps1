@@ -15,6 +15,11 @@
 
 	Orcaが管理するworktreeは orca worktree rm で消す(Orcaの記録とブランチも一緒に消える)。
 	それ以外、またはOrcaで消せなかったときは git worktree remove と git branch -D を使う。
+	orca worktree rm はブランチやフォルダを消し終える前に成功を返すことがあるので、worktreeの登録、
+	ブランチ、フォルダが消えるまで0.5秒おきに最大15秒待つ。待っても残ったブランチは git branch -D で消す
+	(worktreeの登録が残っているときは、使用中の可能性があるので触らない)。
+	削除のあとにフォルダが残っていたら(ファイルがロックされているなど)、警告を出し、そのフォルダの下の
+	DLLやexeを読み込んでいるプロセスを候補として表示する。プロセスは終了させず、フォルダも消さない。
 
 	最後に、ルートのチェックアウトが develop で、追跡しているファイルに変更がなければ
 	git pull --ff-only する。
@@ -47,18 +52,22 @@ $hasOrca = [bool](Get-Command orca -ErrorAction SilentlyContinue)
 
 # git worktree list の先頭はメインのworktree(ルートのチェックアウト)。
 # このスクリプトがworktreeの中から実行されても、ルートを基準にする
-$porcelain = git -C $PSScriptRoot worktree list --porcelain
-if ($LASTEXITCODE -ne 0) { throw "git worktree list に失敗しました。" }
-$worktrees = @()
-$current = $null
-foreach ($line in $porcelain) {
-	if ($line -match '^worktree (.+)$') {
-		$current = [ordered]@{ Path = $Matches[1]; Branch = $null; Prunable = $false }
-		$worktrees += $current
+function Get-Worktrees {
+	$porcelain = git -C $PSScriptRoot worktree list --porcelain
+	if ($LASTEXITCODE -ne 0) { throw "git worktree list に失敗しました。" }
+	$list = @()
+	$current = $null
+	foreach ($line in $porcelain) {
+		if ($line -match '^worktree (.+)$') {
+			$current = [ordered]@{ Path = $Matches[1]; Branch = $null; Prunable = $false }
+			$list += $current
+		}
+		elseif ($line -match '^branch refs/heads/(.+)$') { $current.Branch = $Matches[1] }
+		elseif ($line -match '^prunable') { $current.Prunable = $true }
 	}
-	elseif ($line -match '^branch refs/heads/(.+)$') { $current.Branch = $Matches[1] }
-	elseif ($line -match '^prunable') { $current.Prunable = $true }
+	return $list
 }
+$worktrees = @(Get-Worktrees)
 $root = $worktrees[0].Path
 
 function Invoke-Step([string]$description, [scriptblock]$action) {
@@ -102,6 +111,54 @@ try {
 		return $null
 	}
 
+	function Get-RemovalState([string]$path, [string]$branch) {
+		git show-ref --verify --quiet "refs/heads/$branch"
+		$branchExists = ($LASTEXITCODE -eq 0)
+		return [ordered]@{
+			Registered   = $path -in @(Get-Worktrees | ForEach-Object { $_.Path })
+			BranchExists = $branchExists
+			FolderExists = Test-Path -LiteralPath $path
+		}
+	}
+
+	# orca worktree rm はブランチやフォルダを消し終える前に成功を返すことがある(#104)ので、
+	# worktreeの登録、ブランチ、フォルダがすべて消えるまで待つ。上限を過ぎたら、そのときの状態を返す
+	function Wait-WorktreeRemoved([string]$path, [string]$branch) {
+		$deadline = [DateTime]::UtcNow.AddSeconds(15)
+		while ($true) {
+			$state = Get-RemovalState $path $branch
+			if (-not ($state.Registered -or $state.BranchExists -or $state.FolderExists)) { return $state }
+			if ([DateTime]::UtcNow -ge $deadline) { return $state }
+			Start-Sleep -Milliseconds 500
+		}
+	}
+
+	# 削除のあとにフォルダが残っていたら、警告と、ロックしている可能性のあるプロセスを表示する。
+	# プロセスの終了やフォルダの削除は利用者に任せる
+	function Write-LeftoverFolder([string]$path) {
+		if ($DryRun -or -not (Test-Path -LiteralPath $path)) { return }
+		$files = @(Get-ChildItem -LiteralPath $path -Recurse -File -Force -ErrorAction SilentlyContinue).Count
+		Write-Warning "worktreeのフォルダが残っています: $path(ファイル $files 個)"
+		$prefix = [IO.Path]::GetFullPath($path).TrimEnd('\') + '\'
+		$unreadable = 0
+		$lockers = foreach ($proc in Get-Process) {
+			# 権限のないプロセスは Modules が空になるか例外になる
+			try { $modules = $proc.Modules } catch { $modules = $null }
+			if (-not $modules) { $unreadable++; continue }
+			if ($modules | Where-Object { $_.FileName -and $_.FileName.Replace('/', '\').StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) }) {
+				"$($proc.ProcessName) (PID $($proc.Id))"
+			}
+		}
+		if ($lockers) {
+			Write-Warning "  このフォルダの下のDLLやexeを読み込んでいるプロセス: $($lockers -join ', ')"
+		}
+		else {
+			Write-Warning "  このフォルダの下のDLLやexeを読み込んでいるプロセスは見つかりませんでした。"
+		}
+		Write-Warning "  (調べられなかったプロセス: $unreadable 個。32bitのプロセスのDLLと、DLL以外の開いているファイルは調べられません)"
+		Write-Warning "  プロセスを終了してから、フォルダを手で消してください。"
+	}
+
 	Write-Output "== worktree"
 	$removedBranches = @()
 	foreach ($wt in $worktrees | Select-Object -Skip 1) {
@@ -123,18 +180,40 @@ try {
 			$done = ($LASTEXITCODE -eq 0) -and ($result -match '"ok":\s*true')
 			if (-not $done) { Write-Output "  Orcaでは消せなかったため、gitで消します。" }
 		}
-		if (-not $done) {
+		if ($done) {
+			$state = Wait-WorktreeRemoved $wt.Path $wt.Branch
+			if ($state.Registered) {
+				# 使用中の可能性があるので、ブランチには触らない
+				Write-Warning "Orcaの削除が終わりませんでした(worktreeの登録が残っています): $($wt.Path)"
+				continue
+			}
+			if ($state.BranchExists) {
+				$branch = $wt.Branch
+				Write-Output "  Orcaがブランチを消し終えなかったため、gitで消します。"
+				if (-not (Invoke-Step "git branch -D $branch" { git branch -D $branch | Out-Null })) {
+					# 消している間にOrcaが消し終えたのなら問題ない
+					git show-ref --verify --quiet "refs/heads/$branch"
+					if ($LASTEXITCODE -eq 0) { Write-Warning "ブランチを削除できませんでした: $branch" }
+				}
+			}
+		}
+		else {
 			$path = $wt.Path
 			if (-not (Invoke-Step "git worktree remove $path" { git worktree remove $path })) {
 				Write-Warning "worktreeを削除できませんでした: $path"
+				Write-LeftoverFolder $path
 				continue
 			}
 		}
+		Write-LeftoverFolder $wt.Path
 		$removedBranches += $wt.Branch
 	}
 
 	Write-Output "== ローカルブランチ"
-	$checkedOut = @($worktrees | Where-Object { -not $_.Prunable } | ForEach-Object { $_.Branch }) | Where-Object { $_ -and $_ -notin $removedBranches }
+	# DryRunでは何も消していないので、消すはずのworktreeのブランチも対象として表示する。
+	# 実際に消したときは、Orcaが消したブランチや登録の残ったworktreeを正しく扱えるよう、今の状態を読み直す
+	$remaining = if ($DryRun) { $worktrees | Where-Object { $_.Branch -notin $removedBranches } } else { Get-Worktrees }
+	$checkedOut = @($remaining | Where-Object { -not $_.Prunable } | ForEach-Object { $_.Branch }) | Where-Object { $_ }
 	foreach ($branch in git for-each-ref --format='%(refname:short)' refs/heads) {
 		if ($branch -in $checkedOut) { continue }
 		# Orcaがworktreeと一緒に消したブランチは、ここではもう存在しない

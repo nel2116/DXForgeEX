@@ -62,3 +62,9 @@ jobs:
       - name: Build editor
         shell: pwsh
         run: ./build.ps1 -Target editor -Configuration DebugEditor -WarningsAsErrors
+
+      - name: CleanupMerged.ps1 tests
+        shell: pwsh
+        # 使い捨てのリポジトリと偽の gh / orca で動かし、本物のGitHubやOrcaは呼ばない(Issue #104)。
+        # GUIもビルドも要らないので、別のジョブにせず必須のチェックであるこのジョブに入れる。
+        run: ./Tests/CleanupMerged.Tests.ps1
