@@ -9,14 +9,18 @@
     (build.ps1 -NoRestore で止められる)。単体でも実行できる。
 
     - NuGet(DirectXTex・DXC・エディタ): 各プロジェクトの packages.config に書かれたパッケージ
-      (packages/<id>.<version>)か、DXForgeEditor/obj/project.assets.json が無ければ、
+      (packages/<id>.<version>)か、DXForge.sln に含まれる SDK 形式の .csproj(DXForgeEditor・
+      DXForgeImport など)のどれかの obj/project.assets.json が無ければ、
       MSBuild DXForge.sln -t:restore -p:RestorePackagesConfig=true で復元する(nuget.exe は不要)。
       この1回で packages.config(ContentTools の DirectXTex、DXForgeEngineDLL の Microsoft.Direct3D.DXC)と
-      PackageReference(DXForgeEditor)がまとめて復元される。いずれも *Editor 構成にしかマッピングされて
+      PackageReference(C# のプロジェクト)がまとめて復元される。いずれも *Editor 構成にしかマッピングされて
       いないため、Debug/Release 構成では何もしない。
       DXForgeEngineDLL の DXC はエディタ側のシェーダのコンパイル(#29)に使い、版を固定している。ネイティブのビルドは /restore なしで DXForge.sln を呼ぶため、*Editor
       構成で project.assets.json が無いと(obj だけを消したときなど)、ソリューションに含まれる
-      DXForgeEditor が NETSDK1004 で失敗する(#61)。
+      C# のプロジェクトが NETSDK1004 で失敗する(#61)。以前は DXForgeEditor だけを見ていたため、
+      DXForgeImport(#10)が入る前に作った worktree では DXForgeImport の復元が漏れた(#116)。
+      プロジェクトの名前を書かずにソリューションから列挙するのは、C# のプロジェクトが増えても
+      同じ漏れを起こさないため。
     - DXC(GitHub): packages/DirectXShaderCompiler が空なら GetDXC.ps1 で最新版を取得する
       (GitHub APIを使うため、既にあるときは呼ばない)。これを使うのは EngineTest
       (シェーダーのコンパイル)だけで、EngineTest は Debug/Release 構成にしかマッピングされて
@@ -71,6 +75,24 @@ function Get-MissingNuGetPackages
 	}
 }
 
+# DXForge.sln に含まれる SDK 形式の .csproj のうち、obj/project.assets.json が無いもの(#116)。
+# SDK 形式でない .csproj は project.assets.json を作らないため対象にしない
+# (BaseIntermediateOutputPath は変えていないため、obj はプロジェクトのフォルダの直下にある)
+function Get-UnrestoredSdkProjects
+{
+	$solution = Join-Path $RepoRoot "DXForge.sln"
+	foreach ($line in Get-Content $solution)
+	{
+		# Project("{種類のGUID}") = "名前", "相対パス", "{プロジェクトのGUID}"
+		if ($line -notmatch '^Project\("\{[^}]+\}"\)\s*=\s*"([^"]+)",\s*"([^"]+\.csproj)"') { continue }
+		$name = $Matches[1]
+		$csproj = Join-Path $RepoRoot $Matches[2]
+		if (-not ([xml](Get-Content $csproj -Raw)).Project.Sdk) { continue }
+		$assets = Join-Path (Split-Path $csproj -Parent) "obj\project.assets.json"
+		if (-not (Test-Path $assets)) { "$name(project.assets.json)" }
+	}
+}
+
 # DXCを使うプロジェクト(EngineTest)が、この構成と -Project でビルドされるかどうか
 function Test-DxcRequired
 {
@@ -87,7 +109,7 @@ $restored = $false
 if ($Configuration -like "*Editor")
 {
 	$missing = @(Get-MissingNuGetPackages)
-	if (-not (Test-Path (Join-Path $RepoRoot "DXForgeEditor\obj\project.assets.json"))) { $missing += "DXForgeEditor(project.assets.json)" }
+	$missing += @(Get-UnrestoredSdkProjects)
 	if ($missing.Count -gt 0)
 	{
 		if (-not $MSBuildPath)
