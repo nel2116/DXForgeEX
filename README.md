@@ -84,7 +84,7 @@ PowerShell 7+ (`pwsh`) から実行します。
 1. エディタの実行ファイルがあるリポジトリ(`x64\<構成>\`の2つ上で、`DXForgeEngine\EngineAPI`があるフォルダ)。worktreeでビルドしたエディタから実行したゲームは、そのworktreeのエンジンとリンクされます。
 2. 見つからなければ、ユーザー環境変数`DXFORGE_ENGINE`。これも無効なら、起動時にエンジンのフォルダを選ぶダイアログを出し、選んだパスを`DXFORGE_ENGINE`に保存します。
 
-エディタはユーザー環境変数を書き換えません(2.のダイアログを除く)。起動時とゲームのビルド時に、使うパスとその出どころをLoggerViewに出し、1.のパスが`DXFORGE_ENGINE`と違うときはWarningにします。決め方のテストは`pwsh -NoProfile -File DXForgeEditor/Tests/engine_path_test.ps1`です(エディタのビルドだけで動き、GUIもGPUも不要)。
+エディタはユーザー環境変数を書き換えません(2.のダイアログを除く)。起動時とゲームのビルド時に、使うパスとその出どころをLoggerViewに出し、1.のパスが`DXFORGE_ENGINE`と違うときはWarningにします。決め方のテストは`pwsh -NoProfile -File DXForgeEditor/Tests/engine_path_test.ps1`です(エディタのビルドだけで動き、GUIもGPUも不要。CIのEditor buildジョブでも実行します)。
 
 ## アセットのインポート (`DXForgeImport`)
 

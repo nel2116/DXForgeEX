@@ -77,6 +77,12 @@ jobs:
         shell: pwsh
         run: pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1 -Configuration DebugEditor -ArgumentsOnly
 
+      - name: Test editor engine path resolution
+        shell: pwsh
+        # ビルドしたエディタの EnginePath(#117)をリフレクションで呼び、worktree・リポジトリの外・DXFORGE_ENGINE と一致の
+        # 3つの場合を、%TEMP% の偽のフォルダで確かめる。GUI・GPU・エンジンのDLLは要らない。
+        run: pwsh -NoProfile -File DXForgeEditor/Tests/engine_path_test.ps1 -Configuration DebugEditor
+
       - name: CleanupMerged.ps1 tests
         shell: pwsh
         # 使い捨てのリポジトリと偽の gh / orca で動かし、本物のGitHubやOrcaは呼ばない(Issue #104)。
