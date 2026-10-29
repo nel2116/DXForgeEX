@@ -159,12 +159,18 @@ class BlockPython3HookTest(unittest.TestCase):
 
     def test_blocks_running_python3(self):
         for command in ("python3 x.py", "cd a && python3 -c 1", "echo $(python3 -V)", "python3.exe -V",
-                        "cat <<'EOF'\nx\nEOF\npython3 y.py"):
+                        "cat <<'EOF'\nx\nEOF\npython3 y.py",
+                        # 引用符の中でも、コマンド置換は実際に実行される
+                        'output="$(python3 x.py 2>&1)"', 'echo "`python3 -V`"', "cat <<EOF\n$(python3 -V)\nEOF",
+                        '$v = @"\n$(python3 -V)\n"@'):
             self.assertEqual(self.exit_code(command), 2, command)
 
     def test_allows_python_and_quoted_mentions(self):
         for command in ("python x.py", "git grep -n -E '(python3|python)'", 'git commit -m "(python3 は使わない)"',
                         "git commit -F - <<'EOF'\npython3 は使わない\nEOF", "$m = @'\npython3 -V\n'@",
+                        "cat <<\"EOF\"\n$(python3 -V)\nEOF", "echo '$(python3 -V)'", 'echo "python3 は使わない"',
+                        # エスケープされたコマンド置換は実行されない(PR コメントの本文などに書いたもの)
+                        'gh pr comment 1 --body "例: \\"\\$(python3 x.py)\\" や \\`python3\\`"',
                         "echo 日本語 && python -V"):
             self.assertEqual(self.exit_code(command), 0, command)
 

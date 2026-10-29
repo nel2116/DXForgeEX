@@ -7,18 +7,30 @@ import json
 import re
 import sys
 
-PATTERN = re.compile(r"(?:^|[;&|(\n]|\$\()\s*python3(?:\.exe)?(?=\s|$|[;&|)])")
-# 先に取り除く部分(順番に適用する): ヒアドキュメント、PowerShell のヒア文字列、引用符で囲んだ文字列
+PATTERN = re.compile(r"(?:^|[;&|(`\n]|\$\()\s*python3(?:\.exe)?(?=\s|$|[;&|)`])")
+# \$( や \` のようにエスケープされたものは実行されないので除く
+SUBSTITUTION = re.compile(r"(?<!\\)\$\([^)]*\)|(?<!\\)`[^`\n]*`")
+# 文字列の部分(順番に適用する)と、その中身が展開されるか(グループ "q" の引用符で決まる)。
+# 展開されないものは丸ごと取り除き、展開されるものは $(...) とバッククォートのコマンド置換だけ残す
+# (例: output="$(python3 x.py)" は実際に python3 を実行する)。
 LITERALS = [
-    re.compile(r"<<-?\s*(['\"]?)(\w+)\1[^\n]*\n.*?^\s*\2\s*$", re.DOTALL | re.MULTILINE),
-    re.compile(r"@(['\"])\r?\n.*?^\1@", re.DOTALL | re.MULTILINE),
-    re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\""),
+    # bash のヒアドキュメント: 区切り文字を ' でも " でも囲めば展開されない
+    (re.compile(r"<<-?\s*(?P<q>['\"]?)(\w+)(?P=q)[^\n]*\n.*?^\s*\2\s*$", re.DOTALL | re.MULTILINE),
+     lambda q: q == ""),
+    # PowerShell のヒア文字列: @"..."@ は展開され、@'...'@ は展開されない
+    (re.compile(r"@(?P<q>['\"])\r?\n.*?^(?P=q)@", re.DOTALL | re.MULTILINE), lambda q: q == "\""),
+    # 引用符で囲んだ文字列: "..." は展開され、'...' は展開されない
+    (re.compile(r"(?P<q>')[^']*'|(?P<dq>\")(?:\\.|[^\"\\])*\""), lambda q: q is None),
 ]
 
 
 def runs_python3(command):
-    for pattern in LITERALS:
-        command = pattern.sub(" ", command)
+    for pattern, expands in LITERALS:
+        def replace(match):
+            if not expands(match.group("q")):
+                return " "
+            return " " + " ".join(SUBSTITUTION.findall(match.group(0))) + " "
+        command = pattern.sub(replace, command)
     return PATTERN.search(command) is not None
 
 
