@@ -46,7 +46,7 @@ float3 F_Schlick(float u, float3 f0, float3 f90)
 
 float3 Diffuse_Lambert()
 {
-    return 0; // NOTE: CIで差分の成果物を確かめるために、わざと壊す(取り消す)
+    return 1 / PI;
 }
 
 // [Burley 2012, "Physically-Based Shading at Disney"]
