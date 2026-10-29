@@ -161,6 +161,8 @@ class BlockPython3HookTest(unittest.TestCase):
         for command in ("python3 x.py", "cd a && python3 -c 1", "echo $(python3 -V)", "python3.exe -V",
                         "cat <<'EOF'\nx\nEOF\npython3 y.py",
                         # 引用符の中でも、コマンド置換は実際に実行される
+                        "PYTHONUTF8=1 python3 x.py", "A=1 B=2 python3 x.py", "env PYTHONUTF8=1 python3 x.py",
+                        "time python3 x.py",
                         'output="$(python3 x.py 2>&1)"', 'echo "`python3 -V`"', "cat <<EOF\n$(python3 -V)\nEOF",
                         '$v = @"\n$(python3 -V)\n"@'):
             self.assertEqual(self.exit_code(command), 2, command)
@@ -171,7 +173,7 @@ class BlockPython3HookTest(unittest.TestCase):
                         "cat <<\"EOF\"\n$(python3 -V)\nEOF", "echo '$(python3 -V)'", 'echo "python3 は使わない"',
                         # エスケープされたコマンド置換は実行されない(PR コメントの本文などに書いたもの)
                         'gh pr comment 1 --body "例: \\"\\$(python3 x.py)\\" や \\`python3\\`"',
-                        "echo 日本語 && python -V"):
+                        "echo 日本語 && python -V", "PYTHONUTF8=1 python x.py", "pip show python3-foo"):
             self.assertEqual(self.exit_code(command), 0, command)
 
 

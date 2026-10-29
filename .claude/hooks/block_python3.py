@@ -7,7 +7,10 @@ import json
 import re
 import sys
 
-PATTERN = re.compile(r"(?:^|[;&|(`\n]|\$\()\s*python3(?:\.exe)?(?=\s|$|[;&|)`])")
+# シェルを完全に解析するのではなく、よくある書き方を止めるためのもの。コマンドの位置(行頭や ; & | ( の直後)に、
+# 環境変数の代入(PYTHONUTF8=1 など)や env/time/exec/nohup/command を前置した python3 も含める。
+PATTERN = re.compile(r"(?:^|[;&|(`\n]|\$\()\s*(?:(?:env|time|exec|nohup|command)\s+|\w+=\S*\s+)*"
+                     r"python3(?:\.exe)?(?=\s|$|[;&|)`])")
 # \$( や \` のようにエスケープされたものは実行されないので除く
 SUBSTITUTION = re.compile(r"(?<!\\)\$\([^)]*\)|(?<!\\)`[^`\n]*`")
 # 文字列の部分(順番に適用する)と、その中身が展開されるか(グループ "q" の引用符で決まる)。
