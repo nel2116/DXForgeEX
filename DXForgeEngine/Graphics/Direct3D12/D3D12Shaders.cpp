@@ -6,7 +6,8 @@
 // Direct3D12のシェーダーを扱うクラス
 // 更新履歴
 // 2025/01/05 新規作成
-// // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
+// // 2026/10/29 shaders.binを読めないとき、assertで止めずに失敗を返すようにした (#128 のレビュー)
+// _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Shaders.h"
 #include "Content/ContentLoader.h"
@@ -29,7 +30,12 @@ namespace dxforge::graphics::d3d12::shaders
 			assert(!engine_shaders_blob);
 			u64 size{ 0 };
 			bool result{ content::load_engine_shaders(engine_shaders_blob, size) };
-			assert(engine_shaders_blob && size);
+			// NOTE: shaders.binがない・読めない・空のときは、assertで止めずに失敗を返す(graphics::initialize()がfalseになる)
+			if (!result || !engine_shaders_blob || !size)
+			{
+				engine_shaders_blob.reset();
+				return false;
+			}
 
 			u64 offset{ 0 };
 			u32 index{ 0 };

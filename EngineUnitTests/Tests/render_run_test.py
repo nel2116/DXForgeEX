@@ -12,7 +12,8 @@
 #      (中央に赤い球、左上に背景、下に床)。--json の出力とログ(標準エラー)の分け方。
 #   2. 同じ引数で2回実行すると、WARPではピクセル(--json の pixel_hash とデコードした画素)とPNGのファイルが一致する。
 #   3. --adapter hardware(既定のアダプタの選び方)でも動く。
-#   4. 引数の誤りは終了コード2、PNGを書けないときは23、DXC(dxcompiler.dll)やシェーダーのソースが見つからないときは21になる。
+#   4. 引数の誤りは終了コード2、PNGを書けないときは23、DXC(dxcompiler.dll)やシェーダーのソースが見つからないときは21、
+#      グラフィックスの初期化に失敗したとき(shaders.binが空)は20になる。
 #      assertのダイアログやabort(終了コード3)、クラッシュにならない。
 #
 # DXC(dxcompiler.dll)が実行ファイルの隣にないとき(packages/DirectXShaderCompiler なしで EngineUnitTests だけをビルドした場合、#61)は、
@@ -38,6 +39,7 @@ HEIGHT = 240
 EXIT_SUCCESS = 0
 EXIT_USAGE_ERROR = 2
 EXIT_ABORT = 3
+EXIT_GRAPHICS_INIT_FAILED = 20
 EXIT_SHADERS_UNAVAILABLE = 21
 EXIT_SCREENSHOT_WRITE_FAILED = 23
 
@@ -144,8 +146,9 @@ class Runner:
             print(f"[FAIL] {name}: {detail}")
 
     def check_no_crash(self, name, code, stderr):
-        self.check(f"{name}: no assert/abort", code != EXIT_ABORT and "Assertion failed" not in stderr
-                   and code >= 0, f"exit code {code}, stderr: {stderr.strip()}")
+        # NOTE: アクセス違反などのクラッシュは 0xC0000005 のような大きな終了コードになる
+        self.check(f"{name}: no assert/abort/crash", code != EXIT_ABORT and "Assertion failed" not in stderr
+                   and 0 <= code < 256, f"exit code {code}, stderr: {stderr.strip()}")
 
     def report(self, name):
         print(f"[PASS] {name}" if not any(f.startswith(name) for f in self.failures) else f"[----] {name}")
@@ -305,6 +308,34 @@ def test_shaders_unavailable(r, has_dxc):
                    exe=exe, message_part="shader sources")
 
 
+def test_graphics_init_failed(r):
+    """graphics::initialize()が失敗しても、クラッシュせずに終了コード20を返す(Codexの指摘、#128)
+
+    リポジトリと同じ並び(x64/<構成>/ と ..\\..\\ のシェーダーのソース)を一時フォルダに作り、ソースより新しい空の
+    shaders.bin を置く。compile_shaders() は最新と見なしてコンパイルせず、エンジンのシェーダーの読み込み
+    (shaders::initialize())が失敗して、D3D12の初期化が failed_init() で終わる。
+    """
+    name = "graphics initialization fails (empty shaders.bin)"
+    root = os.path.join(r.work_dir, "init_failure_repo")
+    exe_folder = os.path.join(root, "x64", "Config")
+    os.makedirs(exe_folder)
+    exe = shutil.copy2(r.exe, exe_folder)
+    for dll in ("dxcompiler.dll", "dxil.dll"):
+        shutil.copy2(os.path.join(os.path.dirname(r.exe), dll), exe_folder)
+    shutil.copytree(os.path.join(REPO_ROOT, "DXForgeEngine", "Graphics", "Direct3D12", "Shaders"),
+                    os.path.join(root, "DXForgeEngine", "Graphics", "Direct3D12", "Shaders"))
+    os.makedirs(os.path.join(root, "EngineTest"))
+    shutil.copy2(os.path.join(REPO_ROOT, "EngineTest", "TestShader.hlsl"), os.path.join(root, "EngineTest"))
+    shaders_bin = os.path.join(exe_folder, "shaders", "d3d12", "shaders.bin")
+    os.makedirs(os.path.dirname(shaders_bin))
+    open(shaders_bin, "wb").close()
+    # NOTE: copy2 はソースの更新日時を保つので、今作った shaders.bin のほうが新しい
+    png = os.path.join(r.work_dir, "init_failure.png")
+    r.expect_error(name, r.render_args(png), EXIT_GRAPHICS_INIT_FAILED, "graphics_init_failed", exe=exe,
+                   message_part="failed to initialize Direct3D 12")
+    r.check(f"{name}: nothing written", not os.path.exists(png), png)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="Debug", choices=["Debug", "Release"])
@@ -324,6 +355,7 @@ def main():
         test_usage_errors(r)
         test_shaders_unavailable(r, has_dxc)
         if has_dxc:
+            test_graphics_init_failed(r)
             test_warp_render_and_determinism(r)
             test_hardware_render(r)
             test_human_readable_and_unicode_path(r)

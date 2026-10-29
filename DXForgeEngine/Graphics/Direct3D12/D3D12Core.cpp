@@ -11,6 +11,8 @@
 // 2026/10/19 シェーダのグローバルデータに環境光(IBL)を追加 (Primal Day 075)
 // 2026/10/29 画面外のサーフェスと読み戻し、WARPの選択、無人実行のデバッグレイヤーの扱いを追加 (#127)
 // 2026/10/29 画面外のサーフェスの作成の失敗を返すようにした (#128 のレビュー)
+// 2026/10/29 初期化に失敗したときに、デバッグレイヤーのメッセージを出し、作る前のコマンドを待たないようにした (#128 のレビュー)
+// 2026/10/29 初期化の途中で失敗したとき、初期化できたモジュールだけを終了させるようにした (#128 のレビュー)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Core.h"
@@ -150,6 +152,8 @@ namespace dxforge::graphics::d3d12::core
 			/// @brief フレームのフラッシュ
 			void flush()
 			{
+				// NOTE: 作る前(初期化がコマンドの作成より前で失敗したとき)は、待つものがない(#128のレビュー)
+				if (!_fence) return;
 				for (u32 i{ 0 }; i < frame_buffer_count; ++i)
 				{
 					_cmd_frames[i].wait(_fence_event, _fence);
@@ -249,6 +253,25 @@ namespace dxforge::graphics::d3d12::core
 		constexpr D3D_FEATURE_LEVEL minimum_feature_level{ D3D_FEATURE_LEVEL_11_0 };	// 最低限必要な機能レベル
 
 		bool unattended_mode{ false };													// 無人実行(デバッグレイヤーでブレークしない)
+
+		// 初期化するモジュール(この順に初期化し、逆順に終了させる)
+		struct module_functions
+		{
+			bool(*initialize)();
+			void(*shutdown)();
+		};
+		constexpr module_functions modules[]
+		{
+			{ shaders::initialize, shaders::shutdown },
+			{ gpass::initialize, gpass::shutdown },
+			{ fx::initialize, fx::shutdown },
+			{ upload::initialize, upload::shutdown },
+			{ content::initialize, content::shutdown },
+			{ delight::initialize, delight::shutdown },
+		};
+		// 初期化できたモジュールの数。初期化の途中で失敗したとき、shutdown()は初期化できたものだけを終了させる
+		// (初期化していないモジュールのshutdown()は、作っていないフェンスを待ってクラッシュする)。
+		u32 initialized_module_count{ 0 };
 		char main_adapter_name[256]{};													// 使っているアダプタの名前(UTF-8)
 
 		// ====== 関数 ======
@@ -256,6 +279,8 @@ namespace dxforge::graphics::d3d12::core
 		/// @return bool 初期化に失敗した場合はfalseを返す
 		bool failed_init()
 		{
+			// 無人実行では、失敗の理由が分かるように、デバイスを解放する前にデバッグレイヤーのメッセージを出す
+			if (unattended_mode) flush_debug_messages();
 			shutdown();
 			return false;
 		}
@@ -492,13 +517,11 @@ namespace dxforge::graphics::d3d12::core
 		if (!gfx_command.command_queue()) return failed_init();
 
 		// モジュールの初期化
-		if (!(shaders::initialize() &&
-			gpass::initialize() &&
-			fx::initialize() &&
-			upload::initialize() &&
-			content::initialize() &&
-			delight::initialize()))
-			return failed_init();
+		for (const module_functions& module : modules)
+		{
+			if (!module.initialize()) return failed_init();
+			++initialized_module_count;
+		}
 
 		// デバッグネームを設定
 		NAME_D3D12_OBJECT(main_device, L"Main D3D12 Device");
@@ -523,13 +546,11 @@ namespace dxforge::graphics::d3d12::core
 			process_deferred_releases(i);
 		}
 
-		// モジュールのシャットダウン
-		delight::shutdown();
-		content::shutdown();
-		upload::shutdown();
-		fx::shutdown();
-		gpass::shutdown();
-		shaders::shutdown();
+		// モジュールのシャットダウン(初期化と逆順に、初期化できたものだけ)
+		while (initialized_module_count)
+		{
+			modules[--initialized_module_count].shutdown();
+		}
 
 		// DXGIファクトリの解放
 		release(dxgi_factory);

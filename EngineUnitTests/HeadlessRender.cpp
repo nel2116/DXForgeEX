@@ -8,6 +8,7 @@
 // 更新履歴
 // 2026/10/29 新規作成 (#127)
 // 2026/10/29 幅・高さの最小をライトカリングのタイルの大きさにした (#128 のレビュー)
+// 2026/10/29 初期化に失敗したときに graphics::shutdown() を重ねて呼ばないようにした (#128 のレビュー)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -701,10 +702,10 @@ namespace dxforge::headless::render
 			graphics::graphics_init_info init_info{};
 			init_info.adapter = opt.adapter;
 			init_info.unattended = true;
+			// NOTE: 初期化に失敗したときは、D3D12の側(failed_init())でデバッグレイヤーのメッセージを出してから後片付けまで
+			//		 済ませている。ここでもう一度 graphics::shutdown() を呼ぶと、解放済みのフェンスを待ってクラッシュする(#128のレビュー)。
 			if (!graphics::initialize(graphics::graphics_platform::direct3d12, init_info))
 			{
-				graphics::flush_debug_messages();
-				graphics::shutdown();
 				fail(result, exit_code::graphics_init_failed, "graphics_init_failed",
 					std::string{ "failed to initialize Direct3D 12 with the " } + adapter_label(opt.adapter) + " adapter");
 				return;
