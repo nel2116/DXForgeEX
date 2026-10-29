@@ -150,39 +150,5 @@ class ProcessTest(unittest.TestCase):
             self.assertTrue(f.read().startswith(cc.BOM))
 
 
-class BlockPython3HookTest(unittest.TestCase):
-    # .claude/hooks/block_python3.py(PreToolUse)。実行する python3 だけを止め、引数や本文の中の python3 は止めない
-    HOOK = os.path.join(os.path.dirname(SCRIPT), "..", ".claude", "hooks", "block_python3.py")
-
-    def exit_code(self, command):
-        payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}}, ensure_ascii=False)
-        return subprocess.run([sys.executable, self.HOOK], input=payload.encode("utf-8"),
-                              capture_output=True).returncode
-
-    def test_blocks_running_python3(self):
-        for command in ("python3 x.py", "cd a && python3 -c 1", "echo $(python3 -V)", "python3.exe -V",
-                        "cat <<'EOF'\nx\nEOF\npython3 y.py",
-                        # 引用符の中でも、コマンド置換は実際に実行される
-                        "PYTHONUTF8=1 python3 x.py", "A=1 B=2 python3 x.py", "env PYTHONUTF8=1 python3 x.py",
-                        "time python3 x.py",
-                        'output="$(python3 x.py 2>&1)"', 'echo "`python3 -V`"', "cat <<EOF\n$(python3 -V)\nEOF",
-                        '$v = @"\n$(python3 -V)\n"@',
-                        'result="$(python3 "Tests/check_conventions.py")"', "x=$(echo 'a' && python3 -V)",
-                        "nohup env A=1 python3 x.py &",
-                        "cat <<'EOF' && python3 x.py\nmessage\nEOF", "'python3' x.py", "& 'python3.exe' x.py",
-                        # 迷ったら止める側: 二重引用符の中の文章も止める(単一引用符か <<'EOF' で書けば通る)
-                        'git commit -m "python3 は使わない"', 'echo "it\'s python3"'):
-            self.assertEqual(self.exit_code(command), 2, command)
-
-    def test_allows_python_and_quoted_mentions(self):
-        for command in ("python x.py", "git grep -n -E '(python3|python)'", "git commit -m 'python3 は使わない'",
-                        "git commit -F - <<'EOF'\npython3 は使わない\nEOF", "$m = @'\npython3 -V\n'@",
-                        "cat <<\"EOF\"\n$(python3 -V)\nEOF", "echo '$(python3 -V)'",
-                        "gh pr comment 1 --body 'it uses \"python3\" and $(python3 x)'",
-                        "echo 日本語 && python -V", "PYTHONUTF8=1 python x.py", "pip show python3-foo",
-                        "python Tests/python3_notes.py", "ls python3.12"):
-            self.assertEqual(self.exit_code(command), 0, command)
-
-
 if __name__ == "__main__":
     unittest.main(verbosity=1)
