@@ -306,6 +306,8 @@ python Tests/check_conventions_test.py            # 検査スクリプト自体�
 
 エージェント向けの指示は、ルートの`AGENTS.md`(Claude CodeとCodexの共通。Claude Codeは`CLAUDE.md`から取り込む)に短くまとめ、詳細は`docs/dev/`に置いています。`AGENTS.md`は詳細の在りかを示す地図として短く保ち、例外のない規則は文章ではなく検査スクリプトやフックで強制します。
 
+繰り返し行う作業の手順は、Claude Codeのスキルとして`.claude/skills/`に置いています: 次の作業の提案(`next-task`)、コーディネーター向けの指示文の作成(`orchestration-prompt`)、GUIでの確認(`gui-check`)、Issueの作成(`create-issue`)。
+
 ### Codexによるレビュー (`CodexReview.ps1`)
 
 PRの差分を[Codex CLI](https://github.com/openai/codex)(`codex review`)にレビューさせ、実装したエージェントとは別の視点から指摘を得ます。PRのheadを`%TEMP%`の下の使い捨てのworktreeに展開してレビューし、終わったら削除します。ビルドやテストは行わないので、CIの代わりにはなりません。1PRあたり1〜2分かかります。
