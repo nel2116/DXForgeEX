@@ -7,6 +7,8 @@
 #   - EngineUnitTests は GPU もウィンドウも不要なため、CIで実際に実行できる。
 #     build.ps1 -RunTests は、続けてヘッドレス実行(EngineUnitTests.exe --game-bin)のテストを
 #     python で実行する(EngineUnitTests/Tests/headless_run_test.py、#11)。
+#     続けて、GPUのないランナーでWARPを使った描画のヘッドレス実行(EngineUnitTests.exe --render)を確かめる
+#     (EngineUnitTests/Tests/render_run_test.py、#127)。
 name: CI
 
 on:
@@ -48,9 +50,34 @@ jobs:
         shell: pwsh
         # GetDXC.ps1 が GitHub API を認証付きで呼ぶために使う(未認証の上限はランナーのIPで共有される)。
         # secrets の値はActionsがログ上で伏せ字にし、GetDXC.ps1 自身もトークンを出力しない。
+        #
+        # DXFORGE_REQUIRE_RENDER_TEST=1: render_run_test.py は DXC(dxcompiler.dll)が EngineUnitTests.exe の隣にないと
+        # 描画のテストをスキップするが、CIではソリューション全体をビルドして DXC があるはずなので、スキップを失敗にする(#127)。
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DXFORGE_REQUIRE_RENDER_TEST: '1'
         run: ./build.ps1 -Target native -Configuration ${{ matrix.configuration }} -RunTests -WarningsAsErrors
+
+      # WARPで描画したPNGを、ランナーでWARPが使えたことの証拠として残す(#127)。ログにはアダプタ名と
+      # デバッグレイヤーの有無(Debug)が出る。比較のテストはまだない(#127 の段階5〜6)。
+      - name: Render a screenshot with WARP
+        if: success() || failure()
+        shell: pwsh
+        run: |
+          $png = Join-Path $env:RUNNER_TEMP "render_warp_${{ matrix.configuration }}.png"
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          & x64/${{ matrix.configuration }}/EngineUnitTests.exe --render --frames 3 --width 320 --height 240 --screenshot $png --adapter warp --json
+          $code = $LASTEXITCODE
+          Write-Host "exit code $code, $($sw.Elapsed.TotalSeconds) s"
+          exit $code
+
+      - name: Upload the WARP screenshot
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-warp-${{ matrix.configuration }}
+          path: ${{ runner.temp }}/render_warp_${{ matrix.configuration }}.png
+          if-no-files-found: warn
 
   editor:
     name: Editor build

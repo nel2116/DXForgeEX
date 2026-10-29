@@ -8,10 +8,12 @@
 // 2026/10/18 新規作成
 // 2026/10/19 assert/abort()でダイアログを出さずに標準エラーへ出して終了するように変更(#89)。--interactiveを追加
 // 2026/10/27 --game-binでヘッドレス実行(game.binを読み込んでスクリプトの更新を回す)を行うモードと、--helpを追加 (#11)
+// 2026/10/29 描画のヘッドレス実行(--render)を追加 (#127)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
 #include "Core/Headless.h"
+#include "HeadlessRender.h"
 
 #include <crtdbg.h>
 #include <csignal>
@@ -158,8 +160,10 @@ int main(int argc, char** argv)
 			"Usage:\n"
 			"  EngineUnitTests [--json] [--interactive]\n"
 			"      run the unit tests (exit code 0: all passed, 1: a test failed, 3: abort())\n"
-			"  EngineUnitTests --game-bin <path> --frames <N> [--dt <seconds>] [--json] [--interactive]\n");
+			"  EngineUnitTests --game-bin <path> --frames <N> [--dt <seconds>] [--json] [--interactive]\n"
+			"  EngineUnitTests --render --frames <N> --width <w> --height <h> --screenshot <png> [--adapter warp|hardware] [--json] [--interactive]\n");
 		dxforge::headless::print_usage();
+		dxforge::headless::render::print_usage();
 		return 0;
 	}
 
@@ -168,7 +172,9 @@ int main(int argc, char** argv)
 	// --game-binがあればヘッドレス実行を行う。パスに日本語などが入ってもよいように、引数はUTF-16で取り直す。
 	int wide_argc{ 0 };
 	wchar_t** wide_argv{ CommandLineToArgvW(GetCommandLineW(), &wide_argc) };
-	if (wide_argv && dxforge::headless::is_requested(wide_argc, wide_argv))
+	// --renderがあれば描画のヘッドレス実行を行う(#127)。--game-binと一緒に指定すると、--render側が引数の誤りにする。
+	const bool render_requested{ wide_argv && dxforge::headless::render::is_requested(wide_argc, wide_argv) };
+	if (wide_argv && (render_requested || dxforge::headless::is_requested(wide_argc, wide_argv)))
 	{
 		// --interactiveはこのランナーの指定なので、ヘッドレス実行には渡さない
 		std::vector<const wchar_t*> headless_args{};
@@ -176,7 +182,9 @@ int main(int argc, char** argv)
 		{
 			if (std::wstring{ wide_argv[i] } != L"--interactive") headless_args.push_back(wide_argv[i]);
 		}
-		const int exit_code{ dxforge::headless::run((int)headless_args.size(), headless_args.data()) };
+		const int exit_code{ render_requested
+			? dxforge::headless::render::run((int)headless_args.size(), headless_args.data())
+			: dxforge::headless::run((int)headless_args.size(), headless_args.data()) };
 		LocalFree(wide_argv);
 		return exit_code;
 	}

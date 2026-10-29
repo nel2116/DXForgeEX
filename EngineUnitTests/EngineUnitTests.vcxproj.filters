@@ -10,8 +10,11 @@
     <ClCompile Include="Tests_Camera.cpp" />
     <ClCompile Include="Tests_ContentLoader.cpp" />
     <ClCompile Include="HeadlessTestScripts.cpp" />
+    <ClCompile Include="HeadlessRender.cpp" />
+    <ClCompile Include="..\DXForgeEngineDLL\ShaderCompilation.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MicroTest.h" />
+    <ClInclude Include="HeadlessRender.h" />
   </ItemGroup>
 </Project>

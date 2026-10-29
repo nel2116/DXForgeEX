@@ -6,6 +6,7 @@
 // 　Direct3D12のコア
 // 更新履歴
 // 2024/12/27 新規作成
+// 2026/10/29 画面外のサーフェスと読み戻し、WARPの選択、無人実行のデバッグレイヤーの扱いを追加 (#127)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -30,8 +31,10 @@ namespace dxforge::graphics::d3d12
 
 namespace dxforge::graphics::d3d12::core
 {
-	bool initialize(void);
+	bool initialize(const graphics_init_info& init_info);
 	void shutdown(void);
+	u32 flush_debug_messages(void);									// デバッグレイヤーのメッセージを標準エラーに出す
+	[[nodiscard]] const char* adapter_name(void);					// 使っているアダプタの名前(UTF-8)
 
 	/// @brief 安全にリリースする
 	/// @tparam T リリースするオブジェクトの型
@@ -75,6 +78,8 @@ namespace dxforge::graphics::d3d12::core
 	void set_deferred_releases_flag();								// 遅延リリースフラグを設定
 
 	[[nodiscard]] surface create_surface(platform::window window);	// サーフェスを作成
+	[[nodiscard]] surface create_offscreen_surface(u32 width, u32 height);	// 画面外のサーフェスを作成
+	bool read_back_surface(surface_id id, utl::vector<math::v4>& linear_rgba);	// 画面外のサーフェスの読み戻し
 	void remove_surface(surface_id id);								// サーフェスを削除
 	void resize_surface(surface_id id, u32 width, u32 height);		// サーフェスのリサイズ
 	[[nodiscard]] u32 surface_width(surface_id id);					// サーフェスの幅

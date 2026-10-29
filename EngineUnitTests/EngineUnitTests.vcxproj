@@ -89,10 +89,21 @@
     <ClCompile Include="Tests_Camera.cpp" />
     <ClCompile Include="Tests_ContentLoader.cpp" />
     <ClCompile Include="HeadlessTestScripts.cpp" />
+    <ClCompile Include="HeadlessRender.cpp" />
+    <ClCompile Include="..\DXForgeEngineDLL\ShaderCompilation.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MicroTest.h" />
+    <ClInclude Include="HeadlessRender.h" />
   </ItemGroup>
+  <!-- 描画のヘッドレス実行(EngineUnitTests の render モード、#127)は DXC を実行時に exe の隣から読み込む。packages/DirectXShaderCompiler があればコピーするだけで、
+       無ければ何もしない(ダウンロードはしない。EngineUnitTests だけのオフラインのビルドを保つ、#61)。 -->
+  <ItemGroup>
+    <DXForgeDxcRuntime Include="$(SolutionDir)packages\DirectXShaderCompiler\bin\x64\dxcompiler.dll;$(SolutionDir)packages\DirectXShaderCompiler\bin\x64\dxil.dll" />
+  </ItemGroup>
+  <Target Name="DXForgeCopyDxcRuntime" AfterTargets="Build" Condition="Exists('$(SolutionDir)packages\DirectXShaderCompiler\bin\x64\dxcompiler.dll')">
+    <Copy SourceFiles="@(DXForgeDxcRuntime)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" Condition="Exists('%(FullPath)')" />
+  </Target>
   <ItemGroup>
     <ProjectReference Include="..\DXForgeEngine\DXForgeEngine.vcxproj">
       <Project>{a7dbd67b-496c-463e-97d0-d522150bb52f}</Project>

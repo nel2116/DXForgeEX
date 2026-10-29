@@ -60,7 +60,7 @@ PowerShell 7+ (`pwsh`) から実行します。
 | `-Configuration` | `Debug` / `DebugEditor` / `Release` / `ReleaseEditor` | `DebugEditor` |
 | `-Target` | `native` / `editor` / `all` | `all` |
 | `-Project` | `DXForge.sln`内のプロジェクト名(`-Target native`時のみ有効) | 省略時はソリューション全体 |
-| `-RunTests` | スイッチ。ビルド後に`EngineUnitTests.exe`と、ヘッドレス実行のテスト(`EngineUnitTests/Tests/headless_run_test.py`、pythonが必要)を実行。`EngineUnitTests`は`Debug`/`Release`構成にしかないため、`*Editor`構成・`-Target editor`・別の`-Project`のときは対応する`Debug`/`Release`構成で`EngineUnitTests`を追加でビルドしてから実行する(古い実行ファイルを実行しないため)。ビルドに失敗したときはテストを実行しない | - |
+| `-RunTests` | スイッチ。ビルド後に`EngineUnitTests.exe`と、ヘッドレス実行のテスト(`EngineUnitTests/Tests/headless_run_test.py`・`render_run_test.py`、pythonが必要)を実行。`EngineUnitTests`は`Debug`/`Release`構成にしかないため、`*Editor`構成・`-Target editor`・別の`-Project`のときは対応する`Debug`/`Release`構成で`EngineUnitTests`を追加でビルドしてから実行する(古い実行ファイルを実行しないため)。ビルドに失敗したときはテストを実行しない | - |
 | `-NoRestore` | スイッチ。ネイティブビルド前の`packages/`の復元(`Restore.ps1`)を省く | - |
 | `-WarningsAsErrors` | スイッチ。ネイティブ側とエディタ側の警告をエラーとして扱う(CI用) | - |
 | `-Json` | スイッチ。1行のJSON要約を標準出力に出す | - |
@@ -218,13 +218,52 @@ pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1 -ArgumentsOnl
 | `14` | スクリプトが登録されていない |
 | `15` | エンティティを作成できなかった |
 
-制約: 描画はしません(Renderer/D3D12は初期化しない)。スクリプトはゲームのexeと同じく`REGISTER_SCRIPT`で実行ファイルに静的に登録されたものだけが使え、今は`EngineUnitTests`に入っているテスト用のスクリプト(`EngineUnitTests/HeadlessTestScripts.cpp`の`headless_test_mover`)だけです。ゲームのプロジェクト(`.dxproj`)の読み込み、スクリプトでの操作、スクリーンショットはまだありません。
+制約: 描画はしません(Renderer/D3D12は初期化しない)。スクリプトはゲームのexeと同じく`REGISTER_SCRIPT`で実行ファイルに静的に登録されたものだけが使え、今は`EngineUnitTests`に入っているテスト用のスクリプト(`EngineUnitTests/HeadlessTestScripts.cpp`の`headless_test_mover`)だけです。ゲームのプロジェクト(`.dxproj`)の読み込み、スクリプトでの操作はまだありません。描画は別のモード(下の`--render`)で、固定のテストシーンだけを描けます。
 
 ヘッドレス実行の回帰テストは、`game.bin`を`%TEMP%`に作って実行ファイルを起動し、終了コードと`--json`を確かめます(`build.ps1 -RunTests`とCIからも実行されます)。
 
 ```powershell
 python EngineUnitTests/Tests/headless_run_test.py                  # x64/Debug/EngineUnitTests.exe
 python EngineUnitTests/Tests/headless_run_test.py --config Release
+```
+
+### 描画のヘッドレス実行 (`--render`)
+
+`EngineUnitTests.exe`に`--render`を付けると、ウィンドウを作らずに、コードで組み立てた固定のテストシーン(球と床、平行光源と点光源、カメラ。IBLなし)を画面外のテクスチャに描画し、読み戻してPNGに書き出します(#127の前半)。アダプタは既定でWARP(ソフトウェアのラスタライザ)を使うので、GPUのない環境でも動き、同じ実行ファイルなら何度実行しても同じ画素になります。
+
+```powershell
+./x64/Release/EngineUnitTests.exe --render --frames 3 --width 320 --height 240 --screenshot $env:TEMP\a.png [--adapter warp|hardware] [--json]
+```
+
+`--json`では、標準出力に次の形のJSONを1行だけ出します(ログは標準エラー)。`pixel_hash`は書き出したRGB(8ビット、左上から行ごと)のFNV-1a(64ビット)です。
+
+```json
+{"mode":"render","screenshot":"...\\a.png","frames_requested":3,"frames_run":3,"width":320,"height":240,
+ "adapter":"warp","adapter_name":"Microsoft Basic Render Driver","success":true,"exit_code":0,"error":null,"pixel_hash":"e5f1cb5fef00caf3"}
+```
+
+| 終了コード | 意味 |
+|---|---|
+| `0` | 成功 |
+| `2` | 引数の誤り(`--frames`/`--width`/`--height`/`--screenshot`がない、範囲外、`--game-bin`との併用など) |
+| `3` | `abort()`(assertの失敗など) |
+| `20` | グラフィックスの初期化に失敗した(アダプタ・WARPが使えない) |
+| `21` | シェーダーを用意できない(`dxcompiler.dll`やシェーダーのソースが見つからない、コンパイルに失敗した) |
+| `22` | 描画・読み戻しに失敗した(Debugビルドでは、D3D12のデバッグレイヤーのERROR/CORRUPTIONを含む) |
+| `23` | PNGを書き出せなかった |
+
+制約:
+- シェーダーは実行時にDXCでコンパイルします(エンジンのシェーダーは`EngineTest`と同じ`compile_shaders()`で`x64/<構成>/shaders/d3d12/shaders.bin`に、マテリアルは`EngineTest/TestShader.hlsl`)。そのため、`dxcompiler.dll`/`dxil.dll`が実行ファイルの隣に要ります。ビルド後に`packages/DirectXShaderCompiler`があればコピーし、なければ何もしません(`-Project EngineUnitTests`のビルドはDXCなしのオフラインのまま通ります)。`EngineTest`をビルドしたか、`Restore.ps1`のあとに`EngineUnitTests`をビルドすれば揃います。シェーダーのソースは実行ファイルから`..\..\`(リポジトリの`x64/<構成>/`に置いたまま)で探します。
+- 出力は`R16G16B16A16_FLOAT`の描画先を[0, 1]に収めてsRGBにした8ビットのPNGです(トーンマッピングなし。ウィンドウでの見た目と同じ)。
+- 背景はGパスのクリア色なので、Debugでは灰色、Releaseでは黒です。シェーダーの最適化も違うため、DebugとReleaseで画素は一致しません。WARPとGPU(`--adapter hardware`)でも、見た目は同じでも画素は少し違います。
+- Debugビルドでは、無人実行のためデバッグレイヤーのメッセージでブレークせず、WARNING以上を標準エラーに出します。デバッグレイヤー(Graphics Tools)の有無もログに出ます。
+- 基準画像との比較はまだありません(#127の段階5〜6)。描画するのは固定のテストシーンだけで、`game.bin`やエディタのシーンは描けません。
+
+回帰テストは、別プロセスで実行して終了コード・`--json`・PNG(WARPでの2回の一致を含む)を確かめます(`build.ps1 -RunTests`とCIからも実行されます。DXCが実行ファイルの隣にないときは描画のテストをスキップし、環境変数`DXFORGE_REQUIRE_RENDER_TEST=1`のときは失敗にします。CIはこれを設定しています)。
+
+```powershell
+python EngineUnitTests/Tests/render_run_test.py                  # x64/Debug/EngineUnitTests.exe
+python EngineUnitTests/Tests/render_run_test.py --config Release
 ```
 
 エディタの基本操作(プロジェクトの作成 → スクリプトの追加 → ゲームコードDLLの読み込み → ゲームの実行)の確認手順は [docs/ManualVerification.md](docs/ManualVerification.md) にまとめています。
@@ -263,7 +302,7 @@ CIの対象範囲は意図的に絞っています:
 - `ContentTools`はFBX SDKが必要なためランナーではビルドできません(ソリューション構成`Debug`/`Release`ではビルド対象外なので問題になりません)。
   ローカルでは既定でFBX SDK 2020.3.7の標準インストール先を参照します。別の場所にある場合は、環境変数または`/p:FbxSdkDir=<SDKのルート>`で指定してください(`ContentTools/FbxSdk.props`)。SDKが見つからない場合はビルド開始時に分かりやすいエラーで停止します。
 - `EngineTest`はビルドのみ(実行にはウィンドウとGPUが必要)。
-- `EngineUnitTests`はGPU・ウィンドウ不要なので、CIで実際に実行されます。ヘッドレス実行(`--game-bin`)のテスト(`EngineUnitTests/Tests/headless_run_test.py`)も`Debug`/`Release`の両方で実行されます。
+- `EngineUnitTests`はGPU・ウィンドウ不要なので、CIで実際に実行されます。ヘッドレス実行(`--game-bin`)のテスト(`EngineUnitTests/Tests/headless_run_test.py`)と、WARPでの描画のテスト(`render_run_test.py`、`--render`)も`Debug`/`Release`の両方で実行されます。WARPで描いたPNGはCIの成果物(`render-warp-<構成>`)として残ります。
 - `DXForgeImport`の実際のインポートは`ContentTools.dll`(FBX SDK)が必要なのでローカルで確かめます(`import_cli_test.ps1`)。CIでは、それなしで確かめられる引数の解析と異常系(`ContentTools.dll`がないときの終了コード7を含む)だけを実行します。
 
 ### ビルド出力の要約

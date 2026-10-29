@@ -9,6 +9,7 @@
 // 2025/01/07 Gパスの追加
 // 2026/10/18 日本語のデバッグ出力をワイド文字版APIに変更(C4566対応)
 // 2026/10/19 シェーダのグローバルデータに環境光(IBL)を追加 (Primal Day 075)
+// 2026/10/29 画面外のサーフェスと読み戻し、WARPの選択、無人実行のデバッグレイヤーの扱いを追加 (#127)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Core.h"
@@ -22,6 +23,8 @@
 #include "D3D12LightCulling.h"
 #include "D3D12Camera.h"
 #include "Shaders/SharedTypes.h"
+#include <DirectXPackedVector.h>
+#include <cstdio>
 
 using namespace Microsoft::WRL;	// ComPtrを使うため
 
@@ -244,6 +247,9 @@ namespace dxforge::graphics::d3d12::core
 
 		constexpr D3D_FEATURE_LEVEL minimum_feature_level{ D3D_FEATURE_LEVEL_11_0 };	// 最低限必要な機能レベル
 
+		bool unattended_mode{ false };													// 無人実行(デバッグレイヤーでブレークしない)
+		char main_adapter_name[256]{};													// 使っているアダプタの名前(UTF-8)
+
 		// ====== 関数 ======
 		/// @brief 初期化に失敗した場合の処理
 		/// @return bool 初期化に失敗した場合はfalseを返す
@@ -273,6 +279,31 @@ namespace dxforge::graphics::d3d12::core
 				release(adapter);
 			}
 			return nullptr;
+		}
+
+		/// @brief WARP(ソフトウェアのラスタライザ)のアダプターを入手する。
+		/// @return IDXGIAdapter4* WARPのアダプター(使えなければnullptr)
+		IDXGIAdapter4* determine_warp_adapter(void)
+		{
+			IDXGIAdapter4* adapter{ nullptr };
+			if (FAILED(dxgi_factory->EnumWarpAdapter(IID_PPV_ARGS(&adapter)))) return nullptr;
+			if (SUCCEEDED(D3D12CreateDevice(adapter, minimum_feature_level, __uuidof(ID3D12Device), nullptr)))
+			{
+				return adapter;
+			}
+			release(adapter);
+			return nullptr;
+		}
+
+		/// @brief アダプターの名前をUTF-8でmain_adapter_nameに保存する
+		void store_adapter_name(IDXGIAdapter4* adapter)
+		{
+			main_adapter_name[0] = '\0';
+			DXGI_ADAPTER_DESC1 desc{};
+			if (SUCCEEDED(adapter->GetDesc1(&desc)))
+			{
+				WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, main_adapter_name, (int)sizeof(main_adapter_name), nullptr, nullptr);
+			}
 		}
 
 		/// @brief アダプターがサポートする最大の機能レベルを取得する
@@ -373,13 +404,15 @@ namespace dxforge::graphics::d3d12::core
 	// ====== 関数 ======
 	/// @brief Direct3D12の初期化の処理
 	/// @return bool 初期化に成功した場合はtrueを返す
-	bool initialize(void)
+	bool initialize(const graphics_init_info& init_info)
 	{
 		// サポーターの最大機能レベルを決める
 		// ID3D12Device（仮想アダプタ）を作成する。
 
 		// 既に初期化されている場合は先にあるものを破棄する
 		if (main_device) shutdown();
+
+		unattended_mode = init_info.unattended;
 
 		u32 dxgi_factory_flag{ 0 };
 #if _DEBUG
@@ -389,12 +422,18 @@ namespace dxforge::graphics::d3d12::core
 			if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug_interface))))
 			{
 				debug_interface->EnableDebugLayer();
+				dxgi_factory_flag |= DXGI_CREATE_FACTORY_DEBUG;
 			}
 			else
 			{
+				// NOTE: Graphics Toolsがないと、DXGI_CREATE_FACTORY_DEBUGを付けたCreateDXGIFactory2()も失敗するので付けない(#127)。
 				OutputDebugStringW(L"Warning: D3D12 デバッグインターフェイスは使用できません。 このデバイスにGraphics Toolsオプション機能がインストールされているか確認してください。\n");
 			}
-			dxgi_factory_flag |= DXGI_CREATE_FACTORY_DEBUG;
+			// 無人実行では、デバッグレイヤーで確かめたかどうかがログで分かるようにする
+			if (unattended_mode)
+			{
+				std::fprintf(stderr, "[D3D12] debug layer: %s\n", debug_interface ? "enabled" : "unavailable (Graphics Tools is not installed)");
+			}
 		}
 #endif // _DEBUG
 
@@ -405,8 +444,9 @@ namespace dxforge::graphics::d3d12::core
 
 		// 使用するアダプター（グラフィックカード）を決定する。
 		ComPtr<IDXGIAdapter4> main_adapter;
-		main_adapter.Attach(determine_main_adapter());
+		main_adapter.Attach(init_info.adapter == adapter_type::warp ? determine_warp_adapter() : determine_main_adapter());
 		if (!main_adapter) return failed_init();
+		store_adapter_name(main_adapter.Get());
 
 		D3D_FEATURE_LEVEL max_feature_level{ get_max_feature_level(main_adapter.Get()) };
 		assert(max_feature_level >= minimum_feature_level);
@@ -418,6 +458,8 @@ namespace dxforge::graphics::d3d12::core
 
 		// デバイスのデバッグ情報を設定
 #ifdef _DEBUG
+		// NOTE: 無人実行ではブレークしない(デバッガがないとクラッシュするだけ)。メッセージはflush_debug_messages()で出す。
+		if (!unattended_mode)
 		{
 			ComPtr<ID3D12InfoQueue> info_queue;
 			DXCall(main_device->QueryInterface(IID_PPV_ARGS(&info_queue)));
@@ -514,7 +556,12 @@ namespace dxforge::graphics::d3d12::core
 
 		// デバッグモードでは、リークされたオブジェクトを報告する
 #ifdef _DEBUG
-		if (main_device)
+		// NOTE: 無人実行では、デバッグレイヤーがない(Graphics Toolsがない)とID3D12InfoQueueが取れず、DXCallでブレークしてしまうので飛ばす。
+		const bool report_live_objects{ main_device && (!unattended_mode || [] {
+			ComPtr<ID3D12InfoQueue> info_queue;
+			return SUCCEEDED(main_device->QueryInterface(IID_PPV_ARGS(&info_queue)));
+		}()) };
+		if (report_live_objects)
 		{
 			{
 				// デバッグレイヤーを無効にする
@@ -537,6 +584,46 @@ namespace dxforge::graphics::d3d12::core
 
 		// メインデバイスの解放
 		release(main_device);
+		main_adapter_name[0] = '\0';
+	}
+
+	u32 flush_debug_messages(void)
+	{
+		u32 error_count{ 0 };
+#ifdef _DEBUG
+		if (!main_device) return 0;
+		ComPtr<ID3D12InfoQueue> info_queue;
+		// デバッグレイヤーがなければ(Graphics Toolsがない)取れない
+		if (FAILED(main_device->QueryInterface(IID_PPV_ARGS(&info_queue)))) return 0;
+
+		const u64 message_count{ info_queue->GetNumStoredMessages() };
+		for (u64 i{ 0 }; i < message_count; ++i)
+		{
+			SIZE_T length{ 0 };
+			if (FAILED(info_queue->GetMessage(i, nullptr, &length)) || !length) continue;
+			std::unique_ptr<u8[]> buffer{ std::make_unique<u8[]>(length) };
+			D3D12_MESSAGE* const message{ (D3D12_MESSAGE*)buffer.get() };
+			if (FAILED(info_queue->GetMessage(i, message, &length))) continue;
+
+			const char* severity{ nullptr };
+			switch (message->Severity)
+			{
+			case D3D12_MESSAGE_SEVERITY_CORRUPTION: severity = "CORRUPTION"; ++error_count; break;
+			case D3D12_MESSAGE_SEVERITY_ERROR: severity = "ERROR"; ++error_count; break;
+			case D3D12_MESSAGE_SEVERITY_WARNING: severity = "WARNING"; break;
+			default: break;
+			}
+			if (severity) std::fprintf(stderr, "[D3D12 %s] %s\n", severity, message->pDescription);
+		}
+		info_queue->ClearStoredMessages();
+		std::fflush(stderr);
+#endif // _DEBUG
+		return error_count;
+	}
+
+	const char* adapter_name(void)
+	{
+		return main_adapter_name;
 	}
 
 	id3d12_device* const device()
@@ -584,6 +671,90 @@ namespace dxforge::graphics::d3d12::core
 		surface_id id{ surfaces.add(window) };
 		surfaces[id].create_swap_chain(dxgi_factory, gfx_command.command_queue());
 		return surface{ id };
+	}
+
+	surface create_offscreen_surface(u32 width, u32 height)
+	{
+		surface_id id{ surfaces.add(width, height) };
+		surfaces[id].create_offscreen_target();
+		return surface{ id };
+	}
+
+	bool read_back_surface(surface_id id, utl::vector<math::v4>& linear_rgba)
+	{
+		const d3d12_surface& surface{ surfaces[id] };
+		ID3D12Resource* const texture{ surface.back_buffer() };
+		// NOTE: スワップチェインのバックバッファは表示したあと内容が残らない(FLIP_DISCARD)ので、画面外のサーフェスだけを読み戻す。
+		if (!surface.is_offscreen() || !texture) return false;
+
+		const D3D12_RESOURCE_DESC desc{ texture->GetDesc() };
+		D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
+		u32 row_count{ 0 };
+		u64 row_size{ 0 };
+		u64 total_size{ 0 };
+		main_device->GetCopyableFootprints(&desc, 0, 1, 0, &footprint, &row_count, &row_size, &total_size);
+
+		const D3D12_HEAP_PROPERTIES readback_heap{ D3D12_HEAP_TYPE_READBACK, D3D12_CPU_PAGE_PROPERTY_UNKNOWN, D3D12_MEMORY_POOL_UNKNOWN, 0, 0 };
+		D3D12_RESOURCE_DESC buffer_desc{};
+		buffer_desc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+		buffer_desc.Width = total_size;
+		buffer_desc.Height = 1;
+		buffer_desc.DepthOrArraySize = 1;
+		buffer_desc.MipLevels = 1;
+		buffer_desc.Format = DXGI_FORMAT_UNKNOWN;
+		buffer_desc.SampleDesc = { 1, 0 };
+		buffer_desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+		buffer_desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+
+		ComPtr<ID3D12Resource> readback;
+		HRESULT hr{ S_OK };
+		DXCall(hr = main_device->CreateCommittedResource(&readback_heap, D3D12_HEAP_FLAG_NONE, &buffer_desc,
+			D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback)));
+		if (FAILED(hr)) return false;
+		NAME_D3D12_OBJECT(readback.Get(), L"Offscreen Readback Buffer");
+
+		// 描画先をreadbackバッファにコピーする。描画の終わった状態(PRESENT)から読み、同じ状態に戻す。
+		gfx_command.begin_frame();
+		id3d12_graphics_command_list* const cmd_list{ gfx_command.command_list() };
+		d3dx::transition_resource(cmd_list, texture, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_SOURCE);
+		D3D12_TEXTURE_COPY_LOCATION dst{};
+		dst.pResource = readback.Get();
+		dst.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+		dst.PlacedFootprint = footprint;
+		D3D12_TEXTURE_COPY_LOCATION src{};
+		src.pResource = texture;
+		src.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+		src.SubresourceIndex = 0;
+		cmd_list->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+		d3dx::transition_resource(cmd_list, texture, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_PRESENT);
+		gfx_command.end_frame(surface);
+		gfx_command.flush();
+
+		void* data{ nullptr };
+		const D3D12_RANGE read_range{ 0, (SIZE_T)total_size };
+		DXCall(hr = readback->Map(0, &read_range, &data));
+		if (FAILED(hr) || !data) return false;
+
+		// R16G16B16A16_FLOAT(default_back_buffer_format)をfloatのRGBAに変換する
+		static_assert(d3d12_surface::default_back_buffer_format == DXGI_FORMAT_R16G16B16A16_FLOAT);
+		const u32 width{ (u32)desc.Width };
+		const u32 height{ desc.Height };
+		linear_rgba.resize((size_t)width * height);
+		for (u32 y{ 0 }; y < height; ++y)
+		{
+			const DirectX::PackedVector::HALF* const row{ (const DirectX::PackedVector::HALF*)((const u8*)data + footprint.Offset + (u64)y * footprint.Footprint.RowPitch) };
+			for (u32 x{ 0 }; x < width; ++x)
+			{
+				math::v4& pixel{ linear_rgba[(size_t)y * width + x] };
+				pixel.x = DirectX::PackedVector::XMConvertHalfToFloat(row[x * 4 + 0]);
+				pixel.y = DirectX::PackedVector::XMConvertHalfToFloat(row[x * 4 + 1]);
+				pixel.z = DirectX::PackedVector::XMConvertHalfToFloat(row[x * 4 + 2]);
+				pixel.w = DirectX::PackedVector::XMConvertHalfToFloat(row[x * 4 + 3]);
+			}
+		}
+		const D3D12_RANGE written_range{ 0, 0 };
+		readback->Unmap(0, &written_range);
+		return true;
 	}
 
 	void remove_surface(surface_id id)

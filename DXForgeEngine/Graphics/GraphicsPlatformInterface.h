@@ -10,6 +10,7 @@
 // 2025/01/12 マテリアル関連の構造体を追加
 // 2025/01/14 render_item関連の処理をresources構造体に追加
 // 2025/01/18 light構造体を追加
+// 2026/10/29 画面外のサーフェスと読み戻し、初期化情報を追加 (#127)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -20,8 +21,10 @@ namespace dxforge::graphics
 {
 	struct platform_interface
 	{
-		bool(*initialize)(void);
+		bool(*initialize)(const graphics_init_info&);
 		void(*shutdown)(void);
+		u32(*flush_debug_messages)(void);
+		const char* (*adapter_name)(void);
 
 		struct
 		{
@@ -31,6 +34,8 @@ namespace dxforge::graphics
 			u32(*width)(surface_id);
 			u32(*height)(surface_id);
 			void(*render)(surface_id, frame_info);
+			surface(*create_offscreen)(u32, u32);
+			bool(*read_back)(surface_id, utl::vector<math::v4>&);
 		} surface;
 
 		struct
