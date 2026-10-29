@@ -41,6 +41,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# gh の出力(日本語の PR 本文)を UTF-8 として受け取る。Windows PowerShell 5.1 の既定(CP932)だと文字化けしたまま保存し直してしまう。
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 $startMarker = "<!-- gui-check:start -->"
 $endMarker = "<!-- gui-check:end -->"
 $utf8 = [System.Text.UTF8Encoding]::new($false)
@@ -48,7 +51,9 @@ $utf8 = [System.Text.UTF8Encoding]::new($false)
 $pngs = @(Get-ChildItem -LiteralPath $Dir -Filter *.png | Sort-Object Name)
 if ($pngs.Count -eq 0) { throw "PNG がありません: $Dir" }
 $repo = (git rev-parse --show-toplevel).Trim()
-$prHead = (gh pr view $Pr --json headRefOid --jq .headRefOid).Trim()
+$prHead = gh pr view $Pr --json headRefOid --jq .headRefOid
+if ($LASTEXITCODE -ne 0 -or -not $prHead) { throw "PR #$Pr を取得できませんでした" }
+$prHead = $prHead.Trim()
 $folder = "pr-$Pr/gui-check"
 
 # ---- pr-assets にコミットする(作業中のインデックスとブランチには触らない)----
@@ -89,7 +94,8 @@ if (-not $DryRun)
 
 function Get-ImageUrl([string]$Name)
 {
-	return "https://github.com/nel2116/DXForgeEX/blob/$commit/$folder/$Name`?raw=true"
+	# 空白などを含むファイル名でも Markdown の画像リンクとして有効になるよう、パス要素としてエンコードする
+	return "https://github.com/nel2116/DXForgeEX/blob/$commit/$folder/$([System.Uri]::EscapeDataString($Name))`?raw=true"
 }
 
 # ---- 節を組み立てる ----
@@ -148,7 +154,10 @@ foreach ($png in $pngs)
 }
 
 # ---- PR の本文の節を置き換える(なければ Refs/Closes の行の前に足す)----
-$body = (gh pr view $Pr --json body --jq .body) -join "`n"
+$bodyLines = gh pr view $Pr --json body --jq .body
+# 取得に失敗したまま進むと、既存の本文をこの節だけで上書きしてしまう
+if ($LASTEXITCODE -ne 0) { throw "PR #$Pr の本文を取得できませんでした(本文は変更していません)" }
+$body = $bodyLines -join "`n"
 $start = $body.IndexOf($startMarker)
 $end = $body.IndexOf($endMarker)
 if ($start -ge 0 -and $end -gt $start)
