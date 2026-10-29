@@ -41,6 +41,9 @@ public static class GuiCheckWindow {
 	[DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
 	[DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
 	[DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+	[DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+	[DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+	[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int command);
 	public static List<IntPtr> Find(uint target) {
 		var list = new List<IntPtr>();
 		EnumWindows((h, l) => { uint p; GetWindowThreadProcessId(h, out p); if (p == target && IsWindowVisible(h)) list.Add(h); return true; }, IntPtr.Zero);
@@ -51,7 +54,9 @@ public static class GuiCheckWindow {
 }
 "@
 
-[GuiCheckWindow]::SetProcessDPIAware() | Out-Null
+# per-monitor DPI aware(v2)にして、GetWindowRect と CopyFromScreen を物理座標でそろえる。
+# system DPI aware(SetProcessDPIAware)だと、DPI の違う画面にあるウィンドウで撮る範囲がずれる。
+if ([GuiCheckWindow]::SetThreadDpiAwarenessContext([IntPtr](-4)) -eq [IntPtr]::Zero) { [GuiCheckWindow]::SetProcessDPIAware() | Out-Null }
 $windows = @([GuiCheckWindow]::Find([uint32]$ProcId) | Where-Object { -not $Title -or [GuiCheckWindow]::Text($_) -like "*$Title*" })
 
 function Get-Rect([IntPtr]$Handle)
@@ -78,6 +83,12 @@ switch ($Action)
 		$OutFile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutFile)
 		$target = $windows | Sort-Object { $r = Get-Rect $_; ($r.R - $r.L) * ($r.B - $r.T) } -Descending | Select-Object -First 1
 		if (-not $target) { throw "ウィンドウが見つかりません(PID $ProcId, Title '$Title')" }
+		# 最小化されていると、前面に出しても画面外の矩形を撮ってしまうので、先に元に戻す(SW_RESTORE)
+		if ([GuiCheckWindow]::IsIconic($target))
+		{
+			[GuiCheckWindow]::ShowWindow($target, 9) | Out-Null
+			Start-Sleep -Milliseconds 500
+		}
 		[GuiCheckWindow]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero)
 		[GuiCheckWindow]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
 		[GuiCheckWindow]::SetForegroundWindow($target) | Out-Null
