@@ -48,10 +48,17 @@ $startMarker = "<!-- gui-check:start -->"
 $endMarker = "<!-- gui-check:end -->"
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 
+# .NET の API はプロセスの作業フォルダを基準にするので、PowerShell の現在位置を基準に絶対パスにしておく。
+# 本文は push の前に読む(読めないときに pr-assets だけ更新されないように)。
+$Dir = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Dir)
+$Summary = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Summary)
+$summaryText = [System.IO.File]::ReadAllText($Summary, $utf8).TrimEnd()
 $pngs = @(Get-ChildItem -LiteralPath $Dir -Filter *.png | Sort-Object Name)
 if ($pngs.Count -eq 0) { throw "PNG がありません: $Dir" }
-$repo = (git rev-parse --show-toplevel).Trim()
-$prHead = gh pr view $Pr --json headRefOid --jq .headRefOid
+# 現在位置がリポジトリの外でも動くように、スクリプトの置き場所からリポジトリを決め、gh にもリポジトリを明示する
+$repo = (git -C $PSScriptRoot rev-parse --show-toplevel).Trim()
+$ghRepo = "nel2116/DXForgeEX"
+$prHead = gh pr view $Pr --repo $ghRepo --json headRefOid --jq .headRefOid
 if ($LASTEXITCODE -ne 0 -or -not $prHead) { throw "PR #$Pr を取得できませんでした" }
 $prHead = $prHead.Trim()
 $folder = "pr-$Pr/gui-check"
@@ -101,7 +108,7 @@ function Get-ImageUrl([string]$Name)
 # ---- 節を組み立てる ----
 $lines = [System.Collections.Generic.List[string]]::new()
 $lines.Add($startMarker)
-$lines.Add([System.IO.File]::ReadAllText($Summary, $utf8).TrimEnd())
+$lines.Add($summaryText)
 $lines.Add("")
 $lines.Add("スクリーンショット(PR の $($prHead.Substring(0, 7)) で撮影、pr-assets の ``$folder/``):")
 $lines.Add("")
@@ -154,7 +161,7 @@ foreach ($png in $pngs)
 }
 
 # ---- PR の本文の節を置き換える(なければ Refs/Closes の行の前に足す)----
-$bodyLines = gh pr view $Pr --json body --jq .body
+$bodyLines = gh pr view $Pr --repo $ghRepo --json body --jq .body
 # 取得に失敗したまま進むと、既存の本文をこの節だけで上書きしてしまう
 if ($LASTEXITCODE -ne 0) { throw "PR #$Pr の本文を取得できませんでした(本文は変更していません)" }
 $body = $bodyLines -join "`n"
@@ -174,7 +181,7 @@ $bodyFile = Join-Path $env:TEMP "pr-$Pr-body-$PID.md"
 try
 {
 	[System.IO.File]::WriteAllText($bodyFile, $body, $utf8)
-	gh pr edit $Pr --body-file $bodyFile | Out-Null
+	gh pr edit $Pr --repo $ghRepo --body-file $bodyFile | Out-Null
 	if ($LASTEXITCODE -ne 0) { throw "PR の本文を更新できませんでした" }
 }
 finally

@@ -74,6 +74,8 @@ switch ($Action)
 	"shot"
 	{
 		if (-not $OutFile) { throw "-OutFile を指定してください" }
+		# Bitmap.Save はプロセスの作業フォルダを基準にするので、PowerShell の現在位置を基準に絶対パスにする
+		$OutFile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutFile)
 		$target = $windows | Sort-Object { $r = Get-Rect $_; ($r.R - $r.L) * ($r.B - $r.T) } -Descending | Select-Object -First 1
 		if (-not $target) { throw "ウィンドウが見つかりません(PID $ProcId, Title '$Title')" }
 		[GuiCheckWindow]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero)

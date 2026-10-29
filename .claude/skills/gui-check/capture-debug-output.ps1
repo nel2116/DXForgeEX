@@ -61,5 +61,7 @@ public static class GuiCheckDbWin {
 }
 "@
 
+# StreamWriter はプロセスの作業フォルダを基準にするので、PowerShell の現在位置を基準に絶対パスにする
+$OutFile = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutFile)
 New-Item -ItemType Directory -Force (Split-Path -Parent $OutFile) | Out-Null
 [GuiCheckDbWin]::Run($OutFile, $Seconds)
