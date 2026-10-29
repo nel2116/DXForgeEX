@@ -129,7 +129,8 @@ def check_file(rel, data):
         elif not has_bom and wants_bom(rel, data):
             violations.append(("bom-hlsl", 1, f"非ASCII文字を含むエンジン側の HLSL に BOM がありません。{fix}"))
     if ext in CPP_EXTS:
-        text = data.decode("utf-8-sig", errors="replace")
+        # CRLF を LF にそろえる(CRLF のままだと "abc\ の行継続で \ が CR だけを飛ばし、文字列の終わりと誤認する)
+        text = data.decode("utf-8-sig", errors="replace").replace("\r\n", "\n")
         for ln, lit in find_narrow_non_ascii(text):
             violations.append(("narrow", ln, f"ナローリテラルに非ASCII文字があります: {lit} "
                                              "(CI のコードページ1252で C4566 → /WX で失敗する)。"

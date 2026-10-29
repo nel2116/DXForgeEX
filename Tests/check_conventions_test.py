@@ -58,6 +58,8 @@ class CheckFileTest(unittest.TestCase):
         self.assertEqual(rules("DXForgeEngine/A.cpp", (HEADER + "int x;\n").encode("utf-8")), [("bom", 1)])
         self.assertEqual(rules("DXForgeEngine/A.h", cc.BOM + b"#pragma once\n"), [("header", 1)])
         self.assertEqual(rules("DXForgeEngine/A.cpp", cpp('\nauto s = "あ";\n')), [("narrow", 5)])
+        # CRLF のファイルで、行継続した文字列の次の行にある日本語
+        self.assertEqual(rules("DXForgeEngine/A.cpp", cpp('auto s = "abc\\\r\n日本語";\r\n')), [("narrow", 4)])
 
     def test_header_exemptions(self):
         self.assertEqual(rules("DXForgeEngineDLL/pch.h", cc.BOM + b"#pragma once\n"), [])
@@ -167,6 +169,7 @@ class BlockPython3HookTest(unittest.TestCase):
                         '$v = @"\n$(python3 -V)\n"@',
                         'result="$(python3 "Tests/check_conventions.py")"', "x=$(echo 'a' && python3 -V)",
                         "nohup env A=1 python3 x.py &",
+                        "cat <<'EOF' && python3 x.py\nmessage\nEOF", "'python3' x.py", "& 'python3.exe' x.py",
                         # 迷ったら止める側: 二重引用符の中の文章も止める(単一引用符か <<'EOF' で書けば通る)
                         'git commit -m "python3 は使わない"', 'echo "it\'s python3"'):
             self.assertEqual(self.exit_code(command), 2, command)

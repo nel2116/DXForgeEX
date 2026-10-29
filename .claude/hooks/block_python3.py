@@ -11,8 +11,9 @@ import json
 import re
 import sys
 
-# 引用符付きのヒアドキュメント(<<'EOF' / <<"EOF")と PowerShell の @'...'@ は展開されない
-QUOTED_HEREDOC = re.compile(r"<<-?\s*(['\"])(\w+)\1[^\n]*\n.*?^\s*\2\s*$", re.DOTALL | re.MULTILINE)
+# 引用符付きのヒアドキュメント(<<'EOF' / <<"EOF")の本文と PowerShell の @'...'@ は展開されない。
+# ヒアドキュメントを始める行の残り(cat <<'EOF' && python3 x.py の && 以降)は実行されるので残す
+QUOTED_HEREDOC = re.compile(r"<<-?\s*(['\"])(\w+)\1([^\n]*)\n.*?^\s*\2\s*$", re.DOTALL | re.MULTILINE)
 PS_LITERAL_HERESTRING = re.compile(r"@'\r?\n.*?^'@", re.DOTALL | re.MULTILINE)
 WORD = re.compile(r"(?<![\w.-])python3(?:\.exe)?(?![\w.-])")
 
@@ -32,8 +33,10 @@ def strip_single_quoted(command):
             i += 1
         elif c == "'" and not in_double:
             j = command.find("'", i + 1)
-            i = n if j < 0 else j + 1
-            out.append(" ")
+            end = n if j < 0 else j
+            # 'python3' や & 'python3.exe' のように、引用符で囲んでもコマンド名としては実行される
+            out.append(" " + command[i + 1:end] + " " if WORD.fullmatch(command[i + 1:end]) else " ")
+            i = end + 1
         else:
             out.append(c)
             i += 1
@@ -41,7 +44,7 @@ def strip_single_quoted(command):
 
 
 def runs_python3(command):
-    command = QUOTED_HEREDOC.sub(" ", command)
+    command = QUOTED_HEREDOC.sub(lambda m: " " + m.group(3) + "\n", command)
     command = PS_LITERAL_HERESTRING.sub(" ", command)
     return WORD.search(strip_single_quoted(command)) is not None
 
