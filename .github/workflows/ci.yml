@@ -134,3 +134,9 @@ jobs:
         shell: pwsh
         # 使い捨てのフォルダと偽の MSBuild で、NuGetの復元が要るかの判定を確かめる(Issue #116)。
         run: ./Tests/Restore.Tests.ps1
+
+      - name: build.ps1 configuration tests
+        shell: pwsh
+        # build.ps1 から構成を決める関数だけを取り出して呼び、-Project EngineUnitTests などが *Editor 構成のときに
+        # Debug/Release へ読み替えられることを確かめる(Issue #129)。MSBuild もビルドも呼ばない。
+        run: ./Tests/BuildConfiguration.Tests.ps1
