@@ -23,11 +23,13 @@
 .PARAMETER Project
     -Target native のときのみ有効。DXForge.sln内の特定プロジェクトのみビルドする
     (例: EngineUnitTests, DXForgeEngine, EngineTest, ContentTools)。省略時はソリューション全体。
+    EngineTest/EngineUnitTestsは*Editor構成にマッピングされていないため、それらだけを指定したときは
+    -Configuration が *Editor(既定値の DebugEditor を含む)でも、対応するDebug/Release構成でビルドする(#129)。
 
 .PARAMETER RunTests
     ネイティブビルド成功後にEngineUnitTests.exeを実行し、失敗したテストケースがあれば
     このスクリプトも非ゼロの終了コードを返す。EngineUnitTestsはDebug/Release構成にしか
-    マッピングされていないため、*Editor構成や -Target editor、別の -Project を指定したときは、
+    マッピングされていないため、*Editor構成のソリューション全体や -Target editor、別の -Project を指定したときは、
     対応するDebug/Release構成でEngineUnitTestsを追加でビルドしてから実行する(以前のビルドで
     残った古い実行ファイルを黙って実行しないため。#60)。ビルドに失敗したときはテストを実行しない。
     続けて EngineUnitTests/Tests/headless_run_test.py(python)で、ヘッドレス実行(--game-bin)の
@@ -176,6 +178,30 @@ function Get-NativeOutputConfiguration([string]$Config)
 	return $Config
 }
 
+# -Projectが*Editor構成のソリューションに含まれないプロジェクト(EngineTest/EngineUnitTests)
+# だけのとき、*Editor構成のまま /t: に渡すとMSB4057で失敗するため、ネイティブのビルドは
+# 対応するDebug/Release構成で行う(#129)。それ以外のプロジェクトが混ざるとき、-Projectを省略した
+# とき(ソリューション全体)、Debug/Release構成のときは、指定どおりの構成を返す。
+function Get-NativeBuildConfiguration([string]$Config, [string]$TargetProject)
+{
+	if (-not $TargetProject -or $Config -notlike "*Editor") { return $Config }
+	# Restore.ps1と同じく、/t: の「EngineTest:Rebuild」のようなターゲット名の前だけを見る
+	$projects = @($TargetProject -split ';' | ForEach-Object { ($_ -split ':')[0].Trim() } | Where-Object { $_ })
+	$unmapped = @($projects | Where-Object { @("EngineTest", "EngineUnitTests") -contains $_ })
+	if ($projects.Count -gt 0 -and $unmapped.Count -eq $projects.Count) { return Get-NativeOutputConfiguration $Config }
+	return $Config
+}
+
+# ネイティブのビルド(構成は$NativeConfig)がEngineUnitTestsを今のソースからビルドしたかどうか。
+# していなければ(*Editor構成のソリューション全体・-Target editor・別の -Project)、出力先に残っている
+# 実行ファイルは古い可能性があるため、-RunTestsではDebug/Release構成でEngineUnitTestsだけを追加で
+# ビルドする(#60)。
+function Test-EngineUnitTestsBuiltByNative([string]$BuildTarget, [string]$NativeConfig, [string]$TargetProject)
+{
+	return ($BuildTarget -ne "editor") -and ($NativeConfig -eq (Get-NativeOutputConfiguration $NativeConfig)) -and
+		(-not $TargetProject -or $TargetProject -eq "EngineUnitTests")
+}
+
 # ネイティブ側のMSBuild呼び出し。ソリューションのビルドと、-RunTestsのためのEngineUnitTestsの
 # 追加ビルド(#60)で共有する。
 function Invoke-NativeBuild([string]$MSBuild, [string]$Config, [string]$TargetProject)
@@ -211,16 +237,22 @@ $summary = [ordered]@{
 	exitCode      = 0
 }
 $exitCode = 0
+$nativeConfiguration = Get-NativeBuildConfiguration $Configuration $Project
 
 if ($Target -eq "native" -or $Target -eq "all")
 {
 	$msbuild = Resolve-MSBuildPath
+	if ($nativeConfiguration -ne $Configuration)
+	{
+		Write-Host "== -Project $Project は $Configuration 構成にマッピングされていないため、$nativeConfiguration 構成でビルドします =="
+	}
 	if (-not $NoRestore)
 	{
-		Write-Host "== Restore packages [$Configuration] =="
-		& "$RepoRoot\Restore.ps1" -Configuration $Configuration -Project $Project -MSBuildPath $msbuild
+		# 実際にビルドする構成を渡す(EngineUnitTestsだけなら、DXCもNuGetのパッケージも取得しない。#61)
+		Write-Host "== Restore packages [$nativeConfiguration] =="
+		& "$RepoRoot\Restore.ps1" -Configuration $nativeConfiguration -Project $Project -MSBuildPath $msbuild
 	}
-	$nativeExit = Invoke-NativeBuild $msbuild $Configuration $Project
+	$nativeExit = Invoke-NativeBuild $msbuild $nativeConfiguration $Project
 	$summary.native = [ordered]@{ exitCode = $nativeExit; project = $Project; warningsAsErrors = [bool]$WarningsAsErrors }
 	if ($nativeExit -ne 0) { $exitCode = $nativeExit }
 }
@@ -250,12 +282,7 @@ if ($RunTests)
 	$nativeOutputConfiguration = Get-NativeOutputConfiguration $Configuration
 	$testExe = "$RepoRoot\$Platform\$nativeOutputConfiguration\EngineUnitTests.exe"
 
-	# 上のネイティブのビルドがEngineUnitTestsを今のソースからビルドしたかどうか。していなければ
-	# (*Editor構成・-Target editor・別の -Project)、出力先に残っている実行ファイルは古い可能性が
-	# あるため、Debug/Release構成でEngineUnitTestsだけを追加でビルドする(#60)。
-	$testsBuiltByNative = ($Target -ne "editor") -and ($Configuration -eq $nativeOutputConfiguration) -and
-		(-not $Project -or $Project -eq "EngineUnitTests")
-	if ($testsBuiltByNative)
+	if (Test-EngineUnitTestsBuiltByNative $Target $nativeConfiguration $Project)
 	{
 		$testsBuildExit = $nativeExit
 	}
