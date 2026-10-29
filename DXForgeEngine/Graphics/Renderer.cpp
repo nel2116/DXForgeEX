@@ -11,6 +11,7 @@
 // 2025/01/13 add_material()、remove_material()の追加
 // 2025/01/18 light関連の処理の追加
 // 2026/10/18 カメラの上方向のsetterを削除 (#62)
+// 2026/10/29 画面外のサーフェス、読み戻し、初期化情報の転送を追加 (#127)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Renderer.h"
@@ -54,14 +55,24 @@ namespace dxforge::graphics
 		}
 	}	// 匿名名前空間
 
-	bool initialize(graphics_platform platform)
+	bool initialize(graphics_platform platform, const graphics_init_info& info)
 	{
-		return set_platform_interface(platform) && gfx.initialize();
+		return set_platform_interface(platform) && gfx.initialize(info);
 	}
 
 	void shutdown()
 	{
 		if (gfx.platform != (graphics_platform)-1) gfx.shutdown();
+	}
+
+	u32 flush_debug_messages()
+	{
+		return gfx.flush_debug_messages ? gfx.flush_debug_messages() : 0;
+	}
+
+	const char* adapter_name()
+	{
+		return gfx.adapter_name ? gfx.adapter_name() : "";
 	}
 
 	const char* get_engine_shaders_path()
@@ -77,6 +88,12 @@ namespace dxforge::graphics
 	surface create_surface(platform::window window)
 	{
 		return gfx.surface.create(window);
+	}
+
+	surface create_offscreen_surface(u32 width, u32 height)
+	{
+		// NOTE: Vulkan・OpenGLのスタブは画面外のサーフェスを持たない
+		return gfx.surface.create_offscreen ? gfx.surface.create_offscreen(width, height) : surface{};
 	}
 
 	void remove_surface(surface_id id)
@@ -107,6 +124,12 @@ namespace dxforge::graphics
 	{
 		assert(is_valid());
 		gfx.surface.render(_id, info);
+	}
+
+	bool surface::read_back(utl::vector<math::v4>& linear_rgba) const
+	{
+		assert(is_valid());
+		return gfx.surface.read_back ? gfx.surface.read_back(_id, linear_rgba) : false;
 	}
 
 	void create_light_set(u64 light_set_key)

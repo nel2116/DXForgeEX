@@ -6,13 +6,14 @@
 // 　Vulkanのコア
 // 更新履歴
 // 2024/12/27 新規作成
+// 2026/10/29 initialize()に初期化情報を渡すようにした (#127)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "VulkanCore.h"
 
 namespace dxforge::graphics::vulkan::core
 {
-	bool initialize(void)
+	bool initialize(const graphics_init_info&)
 	{
 		return false;
 	}

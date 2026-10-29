@@ -8,6 +8,7 @@
 // 2024/12/27 新規作成
 // 2025/01/13 マテリアルの追加と削除の関数を追加
 // 2025/01/14 レンダーアイテムの追加と削除の関数を追加
+// 2026/10/29 画面外のサーフェスと読み戻しの関数を登録 (#127)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "CommonHeaders.h"
@@ -24,6 +25,8 @@ namespace dxforge::graphics::d3d12
 	{
 		pi.initialize = core::initialize;
 		pi.shutdown = core::shutdown;
+		pi.flush_debug_messages = core::flush_debug_messages;
+		pi.adapter_name = core::adapter_name;
 
 		pi.surface.create = core::create_surface;
 		pi.surface.remove = core::remove_surface;
@@ -31,6 +34,8 @@ namespace dxforge::graphics::d3d12
 		pi.surface.width = core::surface_width;
 		pi.surface.height = core::surface_height;
 		pi.surface.render = core::render_surface;
+		pi.surface.create_offscreen = core::create_offscreen_surface;
+		pi.surface.read_back = core::read_back_surface;
 
 		pi.light.create_light_set = light::create_light_set;
 		pi.light.remove_light_set = light::remove_light_set;

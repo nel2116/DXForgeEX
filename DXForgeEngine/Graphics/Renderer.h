@@ -12,6 +12,8 @@
 // 2025/01/18 light関連の構造体、関数を追加
 // 2026/10/18 camera_init_infoから上方向を削除し、up_vectorを取得専用にした (#62)
 // 2026/10/19 環境光(IBL)のライトの初期化情報 ambient_params を追加 (Primal Day 075)
+// 2026/10/29 画面外のサーフェス、読み戻し、アダプタの選択(graphics_init_info)を追加 (#127)
+// 2026/10/29 画面外のサーフェスの最小の大きさを追加 (#128 のレビュー)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -49,6 +51,10 @@ namespace dxforge::graphics
 		u32 width() const;
 		u32 height() const;
 		void render(frame_info info) const;
+		/// @brief 描画結果をCPUに読み戻す(画面外のサーフェスのみ。create_offscreen_surface()で作ったもの)
+		/// @param linear_rgba 読み戻した画素(リニアのRGBA、左上から行ごと、width() * height() 個)
+		/// @return 読み戻せたらtrue。ウィンドウのサーフェスではfalse
+		bool read_back(utl::vector<math::v4>& linear_rgba) const;
 
 	private:
 		surface_id _id{ id::invalid_id };
@@ -275,8 +281,33 @@ namespace dxforge::graphics
 		opengl,
 	};
 
-	bool initialize(graphics_platform platform);
+	/// @brief 使うアダプタ(GPU)の選び方
+	struct adapter_type
+	{
+		enum type : u32
+		{
+			default_adapter,	// 性能の高い順に、最低限の機能レベルを満たす最初のアダプタ(これまでどおり)
+			warp,				// ソフトウェアのラスタライザ(WARP)。GPUやドライバーに依らないので、描画結果の比較に使う
+		};
+	};
+
+	struct graphics_init_info
+	{
+		adapter_type::type adapter{ adapter_type::default_adapter };
+		// 無人実行(ヘッドレス)のときtrue。Debugビルドでも、デバッグレイヤーのメッセージでブレークしない
+		// (デバッガがないと、ただのクラッシュになるため)。メッセージは flush_debug_messages() で標準エラーに出す。
+		bool unattended{ false };
+	};
+
+	bool initialize(graphics_platform platform, const graphics_init_info& info = {});
 	void shutdown();
+
+	/// @brief 無人実行のとき、溜まったデバッグレイヤーのメッセージ(WARNING以上)を標準エラーに出して消す
+	/// @return ERROR・CORRUPTIONのメッセージの数(Debugビルドでない、またはデバッグレイヤーがなければ0)
+	u32 flush_debug_messages();
+
+	/// @brief 使っているアダプタの名前(UTF-8)。初期化前は空
+	const char* adapter_name();
 
 	// コンパイルされたエンジンシェーダーの場所を、実行ファイルのパスから相対的に取得する。
 	// このパスは、現在使用されているグラフィックスAPIのものです。
@@ -287,6 +318,11 @@ namespace dxforge::graphics
 	const char* get_engine_shaders_path(graphics_platform platform);
 
 	surface create_surface(platform::window window);
+	/// @brief 画面外のサーフェスの最小の幅・高さ(D3D12のライトカリングのタイルの大きさ。これより小さいと描けない)
+	constexpr u32 min_offscreen_surface_size{ 16 };
+	/// @brief ウィンドウ・スワップチェーンを持たない、画面外のサーフェスを作る(ヘッドレスの描画用)。remove_surface()で消す
+	/// @return 作れなかったとき(大きさがmin_offscreen_surface_size未満、テクスチャを確保できないなど)は無効なサーフェス
+	surface create_offscreen_surface(u32 width, u32 height);
 	void remove_surface(surface_id id);
 
 	void create_light_set(u64 light_set_key);

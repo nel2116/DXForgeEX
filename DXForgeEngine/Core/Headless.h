@@ -6,6 +6,7 @@
 //	ウィンドウもGPUも使わずに、game.binを読み込んでスクリプトの更新を指定フレーム数だけ回す実行経路
 // 更新履歴
 // 2026/10/27 新規作成 (#11)
+// 2026/10/29 描画のヘッドレス実行(--render)の終了コードを追加 (#127)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -26,6 +27,11 @@ namespace dxforge::headless
 		unknown_component = 13,
 		script_not_found = 14,
 		entity_creation_failed = 15,
+		// 描画のヘッドレス実行(EngineUnitTests --render、#127)
+		graphics_init_failed = 20,		// グラフィックスの初期化に失敗した(アダプタ・WARPが使えないなど)
+		shaders_unavailable = 21,		// シェーダーを用意できない(DXCが見つからない、ソースがない、コンパイルに失敗した)
+		render_failed = 22,				// 描画・読み戻しに失敗した(DebugビルドのデバッグレイヤーのERROR・CORRUPTIONを含む)
+		screenshot_write_failed = 23,	// PNGを書き出せなかった
 	};
 
 	/// @brief 引数にヘッドレス実行の指定(--game-bin)が含まれているか

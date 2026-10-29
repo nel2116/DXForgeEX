@@ -6,6 +6,8 @@
 // 　Direct3D12サーフェス
 // 更新履歴
 // 2024/12/30 新規作成
+// 2026/10/29 画面外のサーフェス(スワップチェインなしの描画先)を追加 (#127)
+// 2026/10/29 画面外のサーフェスの作成の失敗を返すようにした (#128 のレビュー)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -24,6 +26,14 @@ namespace dxforge::graphics::d3d12
 			: _window{ window }
 		{
 			assert(_window.handle());
+		}
+
+		/// @brief 画面外のサーフェス(ウィンドウ・スワップチェーンを持たない)。create_offscreen_target()で描画先を作る
+		explicit d3d12_surface(u32 width, u32 height)
+		{
+			assert(width && height);
+			_viewport = { 0.0f, 0.0f, (f32)width, (f32)height, 0.0f, 1.0f };
+			_scissor_rect = { 0, 0, (s32)width, (s32)height };
 		}
 
 #if USE_STL_VECTOR
@@ -60,6 +70,12 @@ namespace dxforge::graphics::d3d12
 		/// @brief スワップチェインの作成
 		void create_swap_chain(IDXGIFactory7* factory, ID3D12CommandQueue* cmd_queue);
 
+		/// @brief 画面外の描画先(テクスチャ1枚)の作成
+		/// @details スワップチェインのバックバッファの代わりに使う。初期状態はCOMMON(= PRESENT)なので、
+		///			 render_surface()のPRESENT <-> RENDER_TARGETの遷移をそのまま使える。
+		/// @return 作れたらtrue(失敗したときは何も持たない状態に戻す)
+		bool create_offscreen_target();
+
 		/// @brief サーフェスの表示
 		void present() const;
 
@@ -74,6 +90,7 @@ namespace dxforge::graphics::d3d12
 		[[nodiscard]] constexpr const D3D12_VIEWPORT& viewport() const { return _viewport; }
 		[[nodiscard]] constexpr const D3D12_RECT& scissor_rect() const { return _scissor_rect; }
 		[[nodiscard]] constexpr id::id_type light_culling_id() const { return _light_culling_id; }
+		[[nodiscard]] constexpr bool is_offscreen() const { return !_window.is_valid(); }
 
 	private:
 

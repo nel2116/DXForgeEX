@@ -31,7 +31,9 @@
     対応するDebug/Release構成でEngineUnitTestsを追加でビルドしてから実行する(以前のビルドで
     残った古い実行ファイルを黙って実行しないため。#60)。ビルドに失敗したときはテストを実行しない。
     続けて EngineUnitTests/Tests/headless_run_test.py(python)で、ヘッドレス実行(--game-bin)の
-    終了コードと --json の出力を確かめる(#11)。
+    終了コードと --json の出力を確かめる(#11)。さらに EngineUnitTests/Tests/render_run_test.py で、
+    描画のヘッドレス実行(--render、WARPでPNGを書き出す)を確かめる(#127)。DXC(dxcompiler.dll)が
+    実行ファイルの隣にないときは描画のテストをスキップする(環境変数 DXFORGE_REQUIRE_RENDER_TEST=1 なら失敗にする)。
 
 .PARAMETER WarningsAsErrors
     警告をエラーとして扱う。ネイティブ側は Directory.Build.props 経由で /WX を付与し、
@@ -298,6 +300,22 @@ if ($RunTests)
 		}
 		$summary.headlessTests = [ordered]@{ exitCode = $headlessExit; path = $headlessTest }
 		if ($headlessExit -ne 0 -and $exitCode -eq 0) { $exitCode = $headlessExit }
+
+		# 描画のヘッドレス実行(--render)は、WARPでPNGを書き出して終了コードと画素を確かめる(#127)
+		$renderTest = "$RepoRoot\EngineUnitTests\Tests\render_run_test.py"
+		Write-Host "== Running render tests: $renderTest =="
+		if (Get-Command python -ErrorAction SilentlyContinue)
+		{
+			& python $renderTest --exe $testExe
+			$renderExit = $LASTEXITCODE
+		}
+		else
+		{
+			Write-Host "  python が見つからないため、描画のテストを実行できません"
+			$renderExit = 1
+		}
+		$summary.renderTests = [ordered]@{ exitCode = $renderExit; path = $renderTest }
+		if ($renderExit -ne 0 -and $exitCode -eq 0) { $exitCode = $renderExit }
 	}
 }
 

@@ -6,6 +6,8 @@
 // 　Direct3D12サーフェス
 // 更新履歴
 // 2024/12/30 新規作成
+// 2026/10/29 画面外のサーフェス(スワップチェインなしの描画先)を追加 (#127)
+// 2026/10/29 画面外のサーフェスの作成の失敗を返すようにした (#128 のレビュー)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Surface.h"
@@ -67,8 +69,53 @@ namespace dxforge::graphics::d3d12
 		_light_culling_id = delight::add_culler();
 	}
 
+	bool d3d12_surface::create_offscreen_target()
+	{
+		assert(is_offscreen() && !_render_target_data[0].resource);
+
+		D3D12_RESOURCE_DESC desc{};
+		desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		desc.Alignment = 0;
+		desc.Width = width();
+		desc.Height = height();
+		desc.DepthOrArraySize = 1;
+		desc.MipLevels = 1;
+		desc.Format = default_back_buffer_format;
+		desc.SampleDesc = { 1, 0 };
+		desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+		desc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+		// NOTE: 画面外では、バックバッファの1枚目だけを使う(_current_bb_indexは0のまま)。
+		// NOTE: 画面外のサーフェスは無人実行で使うので、失敗してもDXCallでブレークせずにfalseを返す(呼び出し側が失敗として報告する)。
+		render_target_data& data{ _render_target_data[0] };
+		if (FAILED(core::device()->CreateCommittedResource(&d3dx::heap_properties.default_heap, D3D12_HEAP_FLAG_NONE, &desc,
+			D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&data.resource))) || !data.resource)
+		{
+			data.resource = nullptr;
+			return false;
+		}
+		NAME_D3D12_OBJECT(data.resource, L"Offscreen Render Target");
+
+		data.rtv = core::rtv_heap().allocate();
+		if (!data.rtv.is_valid())
+		{
+			core::release(data.resource);
+			return false;
+		}
+		D3D12_RENDER_TARGET_VIEW_DESC rtv_desc{};
+		rtv_desc.Format = default_back_buffer_format;
+		rtv_desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		core::device()->CreateRenderTargetView(data.resource, &rtv_desc, data.rtv.cpu);
+
+		assert(!id::is_valid(_light_culling_id));
+		_light_culling_id = delight::add_culler();
+		return true;
+	}
+
 	void d3d12_surface::present() const
 	{
+		// 画面外のサーフェスには表示するものがない
+		if (is_offscreen()) return;
 		assert(_swap_chain);
 		DXCall(_swap_chain->Present(0, _present_flags));
 		_current_bb_index = _swap_chain->GetCurrentBackBufferIndex();
