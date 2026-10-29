@@ -38,7 +38,7 @@ Reference for agents and contributors. The commands to run are in the root `AGEN
   - **Updating the baselines** after an intended rendering change: build the configuration, then `python EngineUnitTests/Tests/render_run_test.py --update-baselines --config Debug` (and `--config Release`), check the new PNGs and commit them. It renders twice with WARP and writes only when both runs agree; it needs an explicit `--config` (or `--exe`), runs no tests, and refuses to run when `CI` is set.
 - **Shader compilation**: `python DXForgeEngineDLL/Tests/shader_compilation_test.py` (C ABI via ctypes) and `pwsh -STA -File DXForgeEngineDLL/Tests/editor_shader_compilation_test.ps1` (the editor's own `DllWrappers` via reflection, including the Logger output).
 - **Editor engine path**: `pwsh -NoProfile -File DXForgeEditor/Tests/engine_path_test.ps1`.
-- **Scripts**: `pwsh -NoProfile -File Tests/CleanupMerged.Tests.ps1`, `pwsh -NoProfile -File Tests/Restore.Tests.ps1`.
+- **Scripts**: `pwsh -NoProfile -File Tests/CleanupMerged.Tests.ps1`, `pwsh -NoProfile -File Tests/Restore.Tests.ps1`, `pwsh -NoProfile -File Tests/BuildConfiguration.Tests.ps1` (`build.ps1` configuration remapping, #129).
 - **File conventions**: `python Tests/check_conventions.py` (whole repo) and its own test `python Tests/check_conventions_test.py`.
 - Rendering/GPU code (`Graphics/Direct3D12/*`) is covered by the WARP baseline comparison above for the fixed test scene only (no IBL, no `game.bin`). A change that alters that scene's pixels fails it; if intended, update the baselines. Verify anything else visual by running `EngineTest` or the editor (`docs/ManualVerification.md` for the editor flow).
 
