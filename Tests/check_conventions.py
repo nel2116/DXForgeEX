@@ -47,14 +47,23 @@ def ext_of(rel):
     return name.rsplit(".", 1)[-1].lower() if "." in name else ""
 
 
+# Windows のパスは大文字・小文字を区別しないので、規則の選択も区別しない(contenttools/... でも fxc 扱い)
+def under(rel, prefixes):
+    return rel.casefold().startswith(tuple(p.casefold() for p in prefixes))
+
+
+def is_fxc(rel):
+    return ext_of(rel) in HLSL_EXTS and under(rel, FXC_DIRS)
+
+
 def is_target(rel):
-    return not rel.startswith(SKIP_DIRS) and ext_of(rel) in (BOM_EXTS | HLSL_EXTS)
+    return not under(rel, SKIP_DIRS) and ext_of(rel) in (BOM_EXTS | HLSL_EXTS)
 
 
 def wants_bom(rel, data):
     ext = ext_of(rel)
     if ext in HLSL_EXTS:
-        return not rel.startswith(FXC_DIRS) and any(b > 127 for b in data)
+        return not is_fxc(rel) and any(b > 127 for b in data)
     return ext in BOM_EXTS
 
 
@@ -114,7 +123,7 @@ def check_file(rel, data):
     if ext in BOM_EXTS and not has_bom:
         violations.append(("bom", 1, f"UTF-8 BOM がありません(MSVC などが Shift-JIS と誤認する)。{fix}"))
     if ext in HLSL_EXTS:
-        if rel.startswith(FXC_DIRS):
+        if is_fxc(rel):
             if has_bom:
                 violations.append(("no-bom", 1, f"fxc でコンパイルする HLSL に BOM があります(fxc が X3000 で拒否する)。{fix}"))
         elif not has_bom and wants_bom(rel, data):
@@ -125,7 +134,7 @@ def check_file(rel, data):
             violations.append(("narrow", ln, f"ナローリテラルに非ASCII文字があります: {lit} "
                                              "(CI のコードページ1252で C4566 → /WX で失敗する)。"
                                              "L\"...\" とワイド版のAPI(例: OutputDebugStringW)を使ってください。"))
-        if rel not in HEADER_EXEMPT and not text.lstrip().startswith("// _/_/"):
+        if rel.casefold() not in {p.casefold() for p in HEADER_EXEMPT} and not text.lstrip().startswith("// _/_/"):
             violations.append(("header", 1, "日本語のヘッダーコメント(// _/_/_/... [ファイル名] 作成日/作成者/概要/更新履歴)"
                                             "で始まっていません。既存の .cpp/.h の先頭をまねてください。"))
     return violations
@@ -139,7 +148,7 @@ def fix_bom(rel, path):
         with open(path, "wb") as f:
             f.write(BOM + data)
         return "BOM を付けました"
-    if ext_of(rel) in HLSL_EXTS and rel.startswith(FXC_DIRS) and has_bom:
+    if is_fxc(rel) and has_bom:
         with open(path, "wb") as f:
             f.write(data[len(BOM):])
         return "BOM を外しました"
@@ -169,7 +178,8 @@ def read(path):
 
 def run_hook():
     try:
-        payload = json.load(sys.stdin)
+        # Claude Code は UTF-8 で渡す。コンソールのコードページ(CP932)で読むと日本語のパスが化けるのでバイトで読む
+        payload = json.loads(sys.stdin.buffer.read())
     except ValueError:
         return 0
     path = (payload.get("tool_input") or {}).get("file_path")

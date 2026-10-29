@@ -80,6 +80,12 @@ class CheckFileTest(unittest.TestCase):
         self.assertFalse(cc.is_target("packages/X/a.h"))
         self.assertFalse(cc.is_target("README.md"))
 
+    def test_paths_are_case_insensitive(self):
+        # Windows では contenttools/... でも同じファイルを指すので、同じ規則を選ぶ
+        self.assertEqual(rules("contenttools/A.hlsl", cc.BOM + b"x"), [("no-bom", 1)])
+        self.assertEqual(rules("dxforgeenginedll/PCH.h", cc.BOM + b"#pragma once\n"), [])
+        self.assertFalse(cc.is_target("Packages/X/a.h"))
+
 
 class ProcessTest(unittest.TestCase):
     # フックと --fix を別プロセスで確かめる。相対パスの判定に使うので、フォルダはリポジトリの中に作る
@@ -96,7 +102,8 @@ class ProcessTest(unittest.TestCase):
         return path
 
     def hook(self, path):
-        payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": path}})
+        # Claude Code(Node の JSON.stringify)と同じく、非ASCII文字をエスケープせず UTF-8 で渡す
+        payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": path}}, ensure_ascii=False)
         return subprocess.run([sys.executable, SCRIPT, "--hook"], input=payload.encode("utf-8"),
                               capture_output=True)
 
@@ -122,12 +129,44 @@ class ProcessTest(unittest.TestCase):
             shutil.rmtree(outside, ignore_errors=True)
         self.assertEqual(subprocess.run([sys.executable, SCRIPT, "--hook"], input=b"not json").returncode, 0)
 
+    def test_hook_reads_utf8_json_with_japanese_path(self):
+        # Claude Code は UTF-8 の JSON を渡す。コンソールのコードページ(CP932/1252)で読むとパスが化けて見逃す
+        sub = os.path.join(self.dir, "作業")
+        os.mkdir(sub)
+        path = os.path.join(sub, "A.cpp")
+        with open(path, "wb") as f:
+            f.write((HEADER + "int x;\n").encode("utf-8"))
+        r = self.hook(path)
+        self.assertEqual(r.returncode, 2, r.stderr.decode("utf-8", errors="replace"))
+        self.assertIn("[bom]", r.stderr.decode("utf-8"))
+
     def test_fix_adds_bom(self):
         path = self.write("A.cpp", (HEADER + "int x;\n").encode("utf-8"))
         r = subprocess.run([sys.executable, SCRIPT, "--fix", path], capture_output=True)
         self.assertEqual(r.returncode, 0, r.stdout.decode("utf-8") + r.stderr.decode("utf-8"))
         with open(path, "rb") as f:
             self.assertTrue(f.read().startswith(cc.BOM))
+
+
+class BlockPython3HookTest(unittest.TestCase):
+    # .claude/hooks/block_python3.py(PreToolUse)。実行する python3 だけを止め、引数や本文の中の python3 は止めない
+    HOOK = os.path.join(os.path.dirname(SCRIPT), "..", ".claude", "hooks", "block_python3.py")
+
+    def exit_code(self, command):
+        payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}}, ensure_ascii=False)
+        return subprocess.run([sys.executable, self.HOOK], input=payload.encode("utf-8"),
+                              capture_output=True).returncode
+
+    def test_blocks_running_python3(self):
+        for command in ("python3 x.py", "cd a && python3 -c 1", "echo $(python3 -V)", "python3.exe -V",
+                        "cat <<'EOF'\nx\nEOF\npython3 y.py"):
+            self.assertEqual(self.exit_code(command), 2, command)
+
+    def test_allows_python_and_quoted_mentions(self):
+        for command in ("python x.py", "git grep -n -E '(python3|python)'", 'git commit -m "(python3 は使わない)"',
+                        "git commit -F - <<'EOF'\npython3 は使わない\nEOF", "$m = @'\npython3 -V\n'@",
+                        "echo 日本語 && python -V"):
+            self.assertEqual(self.exit_code(command), 0, command)
 
 
 if __name__ == "__main__":
