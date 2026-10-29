@@ -59,6 +59,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # ファイル規約(BOM、ナローリテラルの日本語、ヘッダーコメント)の検査。Claude Code では同じスクリプトが
+      # 編集のたびに PostToolUse フックで動く(.claude/settings.json)。ビルドより速いので先に実行する。
+      # 必須のチェックを増やさずに済むよう、別のジョブにせずこのジョブに入れる。
+      - name: Check file conventions
+        shell: pwsh
+        run: |
+          python Tests/check_conventions_test.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python Tests/check_conventions.py
+
       # DXForgeEditor は net8.0-windows を対象にしている。ランナーに必要なバージョンの
       # SDKが同梱されているとは限らないため、SDKを明示的に用意する。
       - name: Setup .NET
