@@ -53,13 +53,27 @@ jobs:
         #
         # DXFORGE_REQUIRE_RENDER_TEST=1: render_run_test.py は DXC(dxcompiler.dll)が EngineUnitTests.exe の隣にないと
         # 描画のテストをスキップするが、CIではソリューション全体をビルドして DXC があるはずなので、スキップを失敗にする(#127)。
+        #
+        # DXFORGE_RENDER_DIFF_DIR: WARPの描画が基準画像(EngineUnitTests/Tests/baselines/)と違ったときに、
+        # render_run_test.py が expected/actual/diff の PNG を書くフォルダ。下の手順で成果物にする(#127)。
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DXFORGE_REQUIRE_RENDER_TEST: '1'
+          DXFORGE_RENDER_DIFF_DIR: ${{ runner.temp }}/render-diff-${{ matrix.configuration }}
         run: ./build.ps1 -Target native -Configuration ${{ matrix.configuration }} -RunTests -WarningsAsErrors
 
+      # 基準画像との比較が失敗したときだけ、差分の画像が書かれる。比較以外の理由で失敗したときは
+      # ファイルがないので、この手順は何もしない(ignore)
+      - name: Upload the render diff
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-diff-${{ matrix.configuration }}
+          path: ${{ runner.temp }}/render-diff-${{ matrix.configuration }}
+          if-no-files-found: ignore
+
       # WARPで描画したPNGを、ランナーでWARPが使えたことの証拠として残す(#127)。ログにはアダプタ名と
-      # デバッグレイヤーの有無(Debug)が出る。比較のテストはまだない(#127 の段階5〜6)。
+      # デバッグレイヤーの有無(Debug)が出る。基準画像との比較は render_run_test.py が行う。
       - name: Render a screenshot with WARP
         if: success() || failure()
         shell: pwsh

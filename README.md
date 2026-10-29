@@ -257,13 +257,24 @@ python EngineUnitTests/Tests/headless_run_test.py --config Release
 - 出力は`R16G16B16A16_FLOAT`の描画先を[0, 1]に収めてsRGBにした8ビットのPNGです(トーンマッピングなし。ウィンドウでの見た目と同じ)。
 - 背景はGパスのクリア色なので、Debugでは灰色、Releaseでは黒です。シェーダーの最適化も違うため、DebugとReleaseで画素は一致しません。WARPとGPU(`--adapter hardware`)でも、見た目は同じでも画素は少し違います。
 - Debugビルドでは、無人実行のためデバッグレイヤーのメッセージでブレークせず、WARNING以上を標準エラーに出します。デバッグレイヤー(Graphics Tools)の有無もログに出ます。
-- 基準画像との比較はまだありません(#127の段階5〜6)。描画するのは固定のテストシーンだけで、`game.bin`やエディタのシーンは描けません。
+- 描画するのは固定のテストシーンだけで、`game.bin`やエディタのシーンは描けません。
 
-回帰テストは、別プロセスで実行して終了コード・`--json`・PNG(WARPでの2回の一致を含む)を確かめます(`build.ps1 -RunTests`とCIからも実行されます。DXCが実行ファイルの隣にないときは描画のテストをスキップし、環境変数`DXFORGE_REQUIRE_RENDER_TEST=1`のときは失敗にします。CIはこれを設定しています)。
+回帰テストは、別プロセスで実行して終了コード・`--json`・PNG(WARPでの2回の一致と、基準画像との比較を含む)を確かめます(`build.ps1 -RunTests`とCIからも実行されます。DXCが実行ファイルの隣にないときは描画のテストをスキップし、環境変数`DXFORGE_REQUIRE_RENDER_TEST=1`のときは失敗にします。CIはこれを設定しています)。
 
 ```powershell
 python EngineUnitTests/Tests/render_run_test.py                  # x64/Debug/EngineUnitTests.exe
 python EngineUnitTests/Tests/render_run_test.py --config Release
+```
+
+#### 基準画像との比較
+
+WARPで描いた画像を、構成ごとの基準画像(`EngineUnitTests/Tests/baselines/render_warp_320x240_<Debug|Release>.png`)と比べます。構成は`--config`か、実行ファイルのフォルダ名(`x64/<構成>/`)から決めます。チャンネルの差が1階調を超えた画素が1つでもあれば失敗にし、違った画素の数と最大の差を表示して、`%TEMP%\dxforge_render_diff\<構成>\`に`expected.png`・`actual.png`・`diff.png`(基準|実際|差分。赤は許容値を超えた画素、黄は1階調の差)を書きます。CIでは成果物`render-diff-<構成>`として残ります。`--adapter hardware`の結果はGPUで変わるため比べません(差を表示するだけです)。
+
+描画を意図して変えたときは、その構成をビルドしてから基準画像を更新し、新しいPNGを確かめてコミットします(WARPで2回描いて一致したときだけ書きます。構成の指定が必要で、CIでは実行できません):
+
+```powershell
+python EngineUnitTests/Tests/render_run_test.py --update-baselines --config Debug
+python EngineUnitTests/Tests/render_run_test.py --update-baselines --config Release
 ```
 
 エディタの基本操作(プロジェクトの作成 → スクリプトの追加 → ゲームコードDLLの読み込み → ゲームの実行)の確認手順は [docs/ManualVerification.md](docs/ManualVerification.md) にまとめています。
@@ -302,7 +313,7 @@ CIの対象範囲は意図的に絞っています:
 - `ContentTools`はFBX SDKが必要なためランナーではビルドできません(ソリューション構成`Debug`/`Release`ではビルド対象外なので問題になりません)。
   ローカルでは既定でFBX SDK 2020.3.7の標準インストール先を参照します。別の場所にある場合は、環境変数または`/p:FbxSdkDir=<SDKのルート>`で指定してください(`ContentTools/FbxSdk.props`)。SDKが見つからない場合はビルド開始時に分かりやすいエラーで停止します。
 - `EngineTest`はビルドのみ(実行にはウィンドウとGPUが必要)。
-- `EngineUnitTests`はGPU・ウィンドウ不要なので、CIで実際に実行されます。ヘッドレス実行(`--game-bin`)のテスト(`EngineUnitTests/Tests/headless_run_test.py`)と、WARPでの描画のテスト(`render_run_test.py`、`--render`)も`Debug`/`Release`の両方で実行されます。WARPで描いたPNGはCIの成果物(`render-warp-<構成>`)として残ります。
+- `EngineUnitTests`はGPU・ウィンドウ不要なので、CIで実際に実行されます。ヘッドレス実行(`--game-bin`)のテスト(`EngineUnitTests/Tests/headless_run_test.py`)と、WARPでの描画のテスト(`render_run_test.py`、`--render`)も`Debug`/`Release`の両方で実行されます。描画のテストは基準画像との比較も含み、違ったときの差分の画像は成果物`render-diff-<構成>`に、WARPで描いたPNGは成果物`render-warp-<構成>`に残ります。
 - `DXForgeImport`の実際のインポートは`ContentTools.dll`(FBX SDK)が必要なのでローカルで確かめます(`import_cli_test.ps1`)。CIでは、それなしで確かめられる引数の解析と異常系(`ContentTools.dll`がないときの終了コード7を含む)だけを実行します。
 
 ### ビルド出力の要約

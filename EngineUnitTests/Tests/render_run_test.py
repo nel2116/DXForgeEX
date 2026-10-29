@@ -5,6 +5,7 @@
 #   python EngineUnitTests/Tests/render_run_test.py                   # x64/Debug/EngineUnitTests.exe
 #   python EngineUnitTests/Tests/render_run_test.py --config Release
 #   python EngineUnitTests/Tests/render_run_test.py --exe <EngineUnitTests.exeのパス>
+#   python EngineUnitTests/Tests/render_run_test.py --update-baselines --config Release   # 基準画像を更新する(テストは実行しない)
 # すべて合格すれば終了コード0、不合格があれば1。
 #
 # 確かめること:
@@ -16,6 +17,12 @@
 #      グラフィックスの初期化に失敗したとき(shaders.binが空)は20、シェーダーのコンパイル中に例外が出たとき
 #      (実行ファイルの隣に shaders という通常のファイルがある)は21になる。
 #      assertのダイアログやabort(終了コード3)、クラッシュにならない。
+#   5. WARPで描いた画素が、構成ごとの基準画像(baselines/render_warp_320x240_<構成>.png)と一致する(段階5〜6)。
+#      チャンネルごとの差が BASELINE_TOLERANCE 階調を超えた画素が1つでもあれば失敗にし、
+#      %TEMP%\dxforge_render_diff\<構成>\(環境変数 DXFORGE_RENDER_DIFF_DIR で変更できる。CIで使う)に
+#      expected.png / actual.png / diff.png(基準|実際|差分を横に並べた画像)を書く。合格したときは何も残さない。
+#      --adapter hardware の結果は基準画像と比べない(GPUやドライバーで変わるため)。差を表示するだけにする。
+#   構成は --config か、--exe のフォルダ名(x64/<構成>/、build.ps1 -RunTests の渡し方)から決める。
 #
 # DXC(dxcompiler.dll)が実行ファイルの隣にないとき(packages/DirectXShaderCompiler なしで EngineUnitTests だけをビルドした場合、#61)は、
 # 描画が要るテストをスキップする(理由を表示する)。環境変数 DXFORGE_REQUIRE_RENDER_TEST=1 のとき(CI)は、スキップせずに失敗にする。
@@ -35,6 +42,10 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 TIMEOUT_SECONDS = 300
 WIDTH = 320
 HEIGHT = 240
+BASELINE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "baselines")
+# NOTE: WARPでは同じ実行ファイルならビット単位で一致するが、ランナーのイメージの更新などによる
+#       1階調の揺れでは落とさない。1階調の差の画素の数は表示する
+BASELINE_TOLERANCE = 1
 
 # 終了コード(DXForgeEngine/Core/Headless.h の exit_code)
 EXIT_SUCCESS = 0
@@ -98,6 +109,98 @@ def read_png(path):
     if channels == 4:
         pixels = bytearray(b for i, b in enumerate(pixels) if i % 4 != 3)
     return width, height, bytes(pixels)
+
+
+def write_png(path, width, height, rgb):
+    """8ビットのRGB(フィルタなし、インターレースなし)でPNGを書く"""
+    def chunk(chunk_type, body):
+        return struct.pack(">I", len(body)) + chunk_type + body + struct.pack(">I", zlib.crc32(chunk_type + body))
+    stride = width * 3
+    raw = b"".join(b"\x00" + rgb[y * stride:(y + 1) * stride] for y in range(height))
+    with open(path, "wb") as f:
+        f.write(b"\x89PNG\r\n\x1a\n")
+        f.write(chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)))
+        f.write(chunk(b"IDAT", zlib.compress(raw, 9)))
+        f.write(chunk(b"IEND", b""))
+
+
+def compare_pixels(expected, actual, width, tolerance):
+    """RGB8の画素を比べる。チャンネルごとの差の最大が tolerance を超えた画素を数える
+
+    @return dict(over: 超えた画素の数, within: 差が1..toleranceの画素の数, max_diff: 最大の差,
+                 bbox: 超えた画素の範囲 (x0, y0, x1, y1) かNone, mask: 画素ごとの最大の差のbytes)
+    """
+    over = within = max_diff = 0
+    x0 = y0 = x1 = y1 = None
+    mask = bytearray(len(expected) // 3)
+    for i in range(len(mask)):
+        j = i * 3
+        d = max(abs(expected[j] - actual[j]), abs(expected[j + 1] - actual[j + 1]), abs(expected[j + 2] - actual[j + 2]))
+        if d == 0:
+            continue
+        mask[i] = d
+        max_diff = max(max_diff, d)
+        if d <= tolerance:
+            within += 1
+            continue
+        over += 1
+        x, y = i % width, i // width
+        x0 = x if x0 is None else min(x0, x)
+        y0 = y if y0 is None else min(y0, y)
+        x1 = x if x1 is None else max(x1, x)
+        y1 = y if y1 is None else max(y1, y)
+    return {"over": over, "within": within, "max_diff": max_diff,
+            "bbox": None if x0 is None else (x0, y0, x1, y1), "mask": bytes(mask)}
+
+
+def make_diff_image(expected, actual, mask, width, height, tolerance):
+    """基準|実際|差分 を横に並べたRGB8の画素を作る。差分は基準を暗いグレーにし、
+    許容値を超えた画素を赤、許容値以内の差を黄で塗る"""
+    diff = bytearray()
+    for i in range(width * height):
+        j = i * 3
+        if mask[i] > tolerance:
+            diff += b"\xff\x00\x00"
+        elif mask[i] > 0:
+            diff += b"\xff\xff\x00"
+        else:
+            gray = (expected[j] + expected[j + 1] + expected[j + 2]) // 12
+            diff += bytes((gray, gray, gray))
+    stride = width * 3
+    out = bytearray()
+    for y in range(height):
+        row = slice(y * stride, (y + 1) * stride)
+        out += expected[row] + actual[row] + diff[row]
+    return bytes(out)
+
+
+def baseline_path(config):
+    return os.path.join(BASELINE_DIR, f"render_warp_{WIDTH}x{HEIGHT}_{config}.png")
+
+
+def diff_dir(config):
+    return os.environ.get("DXFORGE_RENDER_DIFF_DIR") or os.path.join(tempfile.gettempdir(), "dxforge_render_diff", config)
+
+
+DIFF_FILES = ("expected.png", "actual.png", "diff.png")
+
+
+def clear_diff_dir(out_dir):
+    """前回の失敗の差分を消す(CIで古い差分を成果物にしないため)
+
+    DXFORGE_RENDER_DIFF_DIR は既存のフォルダを指せるので、このスクリプトが書くファイルだけを消し、
+    フォルダは空になったときだけ消す(Codexの指摘、#131)
+    """
+    for file_name in DIFF_FILES:
+        try:
+            os.remove(os.path.join(out_dir, file_name))
+        except FileNotFoundError:
+            pass
+    try:
+        os.rmdir(out_dir)
+    except OSError:
+        # 存在しない、または空でない
+        pass
 
 
 def pixel(rgb, width, x, y):
@@ -219,16 +322,92 @@ def test_warp_render_and_determinism(r):
     second = os.path.join(r.work_dir, "warp_2.png")
     again = render_ok(r, name, second)
     if again is None:
-        return
+        return rgb
     r.check(f"{name}: pixel_hash", again.get("pixel_hash") == result.get("pixel_hash"), (result.get("pixel_hash"), again.get("pixel_hash")))
     _, _, rgb_again = read_png(second)
     r.check(f"{name}: pixels", rgb_again == rgb, "decoded pixels differ")
     with open(first, "rb") as a, open(second, "rb") as b:
         r.check(f"{name}: png file", hashlib.sha256(a.read()).digest() == hashlib.sha256(b.read()).digest(), "PNG files differ")
     r.report(name)
+    return rgb
 
 
-def test_hardware_render(r):
+def read_baseline(config):
+    """基準画像を読む。@return (RGB8の画素, エラーの説明) のどちらかがNone"""
+    path = baseline_path(config)
+    hint = f"run: python EngineUnitTests/Tests/render_run_test.py --update-baselines --config {config}"
+    try:
+        width, height, rgb = read_png(path)
+    except FileNotFoundError:
+        return None, f"baseline not found: {path} ({hint})"
+    except (OSError, ValueError, zlib.error) as e:
+        return None, f"cannot read {path}: {e!r}"
+    if (width, height) != (WIDTH, HEIGHT):
+        return None, f"{path} is {width}x{height}, expected {WIDTH}x{HEIGHT} ({hint})"
+    return rgb, None
+
+
+def test_baseline_comparison(r, rgb, config, require_render):
+    """WARPで描いた画素を、構成ごとの基準画像と比べる。違えば差分の画像を diff_dir(config) に書く"""
+    name = "warp render matches the baseline"
+    if config is None:
+        reason = (f"cannot tell the configuration from {r.exe} (expected x64/Debug or x64/Release); "
+                  "pass --config Debug|Release")
+        if require_render:
+            r.check(name, False, f"DXFORGE_REQUIRE_RENDER_TEST=1 but {reason}")
+        else:
+            r.skipped.append(reason)
+            print(f"[SKIP] {name}: {reason}")
+        return
+    out_dir = diff_dir(config)
+    clear_diff_dir(out_dir)
+    expected, error = read_baseline(config)
+    if expected is None:
+        r.check(f"{name}: baseline", False, error)
+        return
+    if len(rgb) != len(expected):
+        r.check(f"{name}: size", False, f"rendered {len(rgb) // 3} pixels, baseline has {len(expected) // 3}")
+        return
+    result = compare_pixels(expected, rgb, WIDTH, BASELINE_TOLERANCE)
+    print(f"  {name} ({os.path.basename(baseline_path(config))}): {result['over']} pixels over {BASELINE_TOLERANCE} level(s), "
+          f"{result['within']} pixels within, max diff {result['max_diff']}")
+    if result["over"] > 0:
+        os.makedirs(out_dir, exist_ok=True)
+        write_png(os.path.join(out_dir, "expected.png"), WIDTH, HEIGHT, expected)
+        write_png(os.path.join(out_dir, "actual.png"), WIDTH, HEIGHT, rgb)
+        write_png(os.path.join(out_dir, "diff.png"), WIDTH * 3, HEIGHT,
+                  make_diff_image(expected, rgb, result["mask"], WIDTH, HEIGHT, BASELINE_TOLERANCE))
+    r.check(f"{name}: pixels", result["over"] == 0,
+            f"{result['over']} of {WIDTH * HEIGHT} pixels differ by more than {BASELINE_TOLERANCE} level(s) "
+            f"(max diff {result['max_diff']}, bbox {result['bbox']}); expected|actual|diff written to {out_dir}")
+    r.report(name)
+
+
+def test_clear_diff_dir(r):
+    """差分のフォルダ(DXFORGE_RENDER_DIFF_DIR で既存のフォルダを指せる)の、このスクリプトが書いたファイルだけを消す
+    (Codexの指摘、#131)。描画は要らない"""
+    name = "clearing the diff folder keeps unrelated files"
+    folder = os.path.join(r.work_dir, "existing_diff_dir")
+    os.makedirs(os.path.join(folder, "subfolder"))
+    for file_name in DIFF_FILES + ("unrelated.txt", os.path.join("subfolder", "keep.png")):
+        open(os.path.join(folder, file_name), "wb").close()
+    clear_diff_dir(folder)
+    r.check(f"{name}: unrelated file", os.path.isfile(os.path.join(folder, "unrelated.txt")), folder)
+    r.check(f"{name}: subfolder", os.path.isfile(os.path.join(folder, "subfolder", "keep.png")), folder)
+    r.check(f"{name}: diff files removed", not any(os.path.exists(os.path.join(folder, f)) for f in DIFF_FILES), folder)
+
+    # このスクリプトの差分だけが入っていたフォルダは、空になったら消す
+    folder = os.path.join(r.work_dir, "own_diff_dir")
+    os.makedirs(folder)
+    for file_name in DIFF_FILES:
+        open(os.path.join(folder, file_name), "wb").close()
+    clear_diff_dir(folder)
+    r.check(f"{name}: empty folder removed", not os.path.exists(folder), folder)
+    clear_diff_dir(os.path.join(r.work_dir, "no_such_diff_dir"))
+    r.report(name)
+
+
+def test_hardware_render(r, config):
     name = "hardware render"
     png = os.path.join(r.work_dir, "hardware.png")
     result = render_ok(r, name, png, adapter="hardware")
@@ -236,6 +415,11 @@ def test_hardware_render(r):
         width, height, rgb = read_png(png)
         r.check(f"{name}: png size", (width, height) == (WIDTH, HEIGHT), (width, height))
         r.check(f"{name}: pixel_hash matches the PNG", result.get("pixel_hash") == fnv1a64(rgb), result.get("pixel_hash"))
+        # GPUやドライバーで画素が変わるので、基準画像(WARP)とは比べずに差を表示するだけにする
+        expected = read_baseline(config)[0] if config else None
+        if expected is not None and len(expected) == len(rgb):
+            diff = compare_pixels(expected, rgb, WIDTH, 0)
+            print(f"  {name} vs the WARP baseline (not checked): {diff['over']} pixels differ, max diff {diff['max_diff']}")
     r.report(name)
 
 
@@ -361,29 +545,77 @@ def test_shader_compilation_throws(r):
     r.check(f"{name}: nothing written", not os.path.exists(png), png)
 
 
+def update_baselines(exe, args, config, has_dxc):
+    """WARPで2回描き、画素が一致したら baselines/ の基準画像を書き換える。@return 終了コード"""
+    # 意図しない更新を防ぐ: 構成を明示させ、CIでは更新しない
+    if args.config is None and args.exe is None:
+        print("--update-baselines needs --config Debug|Release (or --exe x64/<config>/EngineUnitTests.exe)", file=sys.stderr)
+        return 2
+    if config is None:
+        print(f"cannot tell the configuration from {exe}; pass --config Debug|Release", file=sys.stderr)
+        return 2
+    if os.environ.get("CI"):
+        print("--update-baselines is refused in CI (CI is set); update the baselines locally and commit them", file=sys.stderr)
+        return 2
+    if not has_dxc:
+        print(f"dxcompiler.dll/dxil.dll are not next to {exe}; build EngineTest or run Restore.ps1", file=sys.stderr)
+        return 1
+    work_dir = tempfile.mkdtemp(prefix="dxforge_render_baseline_")
+    try:
+        r = Runner(exe, work_dir)
+        pngs = [os.path.join(work_dir, f"warp_{i}.png") for i in (1, 2)]
+        results = [render_ok(r, f"baseline render {i + 1}", png) for i, png in enumerate(pngs)]
+        if r.failures or None in results:
+            print("rendering failed; baselines were not changed", file=sys.stderr)
+            return 1
+        rgbs = [read_png(png) for png in pngs]
+        if rgbs[0] != rgbs[1] or rgbs[0][:2] != (WIDTH, HEIGHT):
+            print("two WARP renders differ (or the size is wrong); baselines were not changed", file=sys.stderr)
+            return 1
+        path = baseline_path(config)
+        os.makedirs(BASELINE_DIR, exist_ok=True)
+        shutil.copyfile(pngs[0], path)
+        print(f"updated {path} (pixel_hash {results[0].get('pixel_hash')}, adapter {results[0].get('adapter_name')!r}, {exe})")
+        return 0
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", default="Debug", choices=["Debug", "Release"])
+    parser.add_argument("--config", choices=["Debug", "Release"],
+                        help="構成(省略時は --exe のフォルダ名から決め、--exe もなければ Debug)")
     parser.add_argument("--exe", help="EngineUnitTests.exe のパス(省略時は x64/<config>/EngineUnitTests.exe)")
+    parser.add_argument("--update-baselines", action="store_true",
+                        help="WARPで描いた画像で baselines/ の基準画像を書き換える(--config か --exe が必要。テストは実行しない)")
     args = parser.parse_args()
-    exe = os.path.abspath(args.exe or os.path.join(REPO_ROOT, "x64", args.config, "EngineUnitTests.exe"))
+    exe = os.path.abspath(args.exe or os.path.join(REPO_ROOT, "x64", args.config or "Debug", "EngineUnitTests.exe"))
     if not os.path.isfile(exe):
         print(f"EngineUnitTests.exe not found: {exe}", file=sys.stderr)
         return 1
+    # 基準画像は構成ごとにある。build.ps1 -RunTests は --exe x64/<構成>/EngineUnitTests.exe だけを渡す
+    folder = os.path.basename(os.path.dirname(exe))
+    config = args.config or (folder if folder in ("Debug", "Release") else None)
 
     require_render = os.environ.get("DXFORGE_REQUIRE_RENDER_TEST") == "1"
     has_dxc = all(os.path.isfile(os.path.join(os.path.dirname(exe), dll)) for dll in ("dxcompiler.dll", "dxil.dll"))
 
+    if args.update_baselines:
+        return update_baselines(exe, args, config, has_dxc)
+
     work_dir = tempfile.mkdtemp(prefix="dxforge_render_test_")
     try:
         r = Runner(exe, work_dir)
+        test_clear_diff_dir(r)
         test_usage_errors(r)
         test_shaders_unavailable(r, has_dxc)
         if has_dxc:
             test_graphics_init_failed(r)
             test_shader_compilation_throws(r)
-            test_warp_render_and_determinism(r)
-            test_hardware_render(r)
+            rgb = test_warp_render_and_determinism(r)
+            if rgb is not None:
+                test_baseline_comparison(r, rgb, config, require_render)
+            test_hardware_render(r, config)
             test_human_readable_and_unicode_path(r)
             test_screenshot_errors(r)
         else:
