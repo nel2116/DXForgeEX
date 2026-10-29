@@ -255,6 +255,7 @@ DXFORGE_TEST_CASE(my_new_test)
 `.github/workflows/ci.yml` が、`main`/`develop`へのpushとすべてのPRで以下を実行します。
 
 - **ネイティブビルド + 自動テスト** — `Debug`と`Release`の両構成(`Release`では`NDEBUG`で`assert`が無効化され挙動が変わるため、両方を検証)。警告をエラーとして扱います。
+- **ファイル規約の検査** — `Tests/check_conventions.py`(下の「コーディング規約の自動化」)と、そのテスト。
 - **エディタビルド** — `dotnet build`で`DXForgeEditor`と`DXForgeImport`をビルドし、`DXForgeImport`の引数・異常系のテスト(`import_cli_test.ps1 -ArgumentsOnly`)を実行。
 
 CIの対象範囲は意図的に絞っています:
@@ -290,6 +291,20 @@ CIの対象範囲は意図的に絞っています:
 ### コーディング規約の自動化
 
 `.editorconfig`に、実測に基づいた文字コードとインデントの規約を定義しています。とくに**C/C++のUTF-8 BOM必須**(`charset = utf-8-bom`)は、BOM無しだとMSVCがShift-JISと誤認してコンパイルエラーになる問題を、エディタ側で自動的に防ぐためのものです。
+
+`.editorconfig`はエディタの設定にすぎないので、守られているかは`Tests/check_conventions.py`で検査します。CIが毎回実行するほか、Claude Codeでは`.claude/settings.json`のフックが、ファイルを編集するたびに同じ検査を実行します。
+
+```powershell
+python Tests/check_conventions.py                 # git で管理しているファイルすべて
+python Tests/check_conventions.py --fix <file>    # BOM の付け外しだけ自動で直す
+python Tests/check_conventions_test.py            # 検査スクリプト自体のテスト
+```
+
+検査する規約: C/C++・C#・XAML・PowerShellのUTF-8 BOM、日本語を含むエンジン側HLSLのBOM、fxcでコンパイルするHLSL(`ContentTools/`・`DXForgeEditor/`)にBOMを付けないこと、C/C++のナロー文字列リテラルに日本語を入れないこと、C/C++のヘッダーコメント。
+
+### AIエージェント向けの指示
+
+エージェント向けの指示は、ルートの`AGENTS.md`(Claude CodeとCodexの共通。Claude Codeは`CLAUDE.md`から取り込む)に短くまとめ、詳細は`docs/dev/`に置いています。`AGENTS.md`は詳細の在りかを示す地図として短く保ち、例外のない規則は文章ではなく検査スクリプトやフックで強制します。
 
 ### Codexによるレビュー (`CodexReview.ps1`)
 

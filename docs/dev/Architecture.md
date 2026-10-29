@@ -1,0 +1,38 @@
+# Architecture
+
+Reference for agents and contributors. The short version is in the root `AGENTS.md`; this file is the detail it points to.
+
+## Renderer status
+
+Current implementation has PBR direct lighting (GGX/Smith/Schlick BRDF in `Shaders/BRDF.hlsli`) plus Image-Based Lighting (Primal Day 075, issues #35–#37). The IBL maps are baked offline by `ContentTools` (`EnvMapProcessing.*`/`EnvMapProcessing.hlsl`: equirectangular → cubemap, diffuse irradiance prefilter, specular prefilter with one mip per roughness step, BRDF integration LUT; exposed to the editor as `PrefilterDiffuseIBL`/`PrefilterSpecularIBL`/`ComputeBrdfIntegrationLut`). At run time they are bound through an `ambient` light (`graphics::light::ambient`, `ambient_params` in `Renderer.h`, one per light set, carried to shaders as `GlobalData.AmbientLight`); the material pixel shaders (`EngineTest/TestShader.hlsl`, the editor's `Resources/MaterialEditor/DefaultMaterialShaders.hlsl`) evaluate it, and `PostProcess.hlsl` draws the specular cubemap as the sky. `EngineTest` loads the maps from `x64/ibl/*.texture` and falls back to direct light only when they are missing. For "what comes next" on the renderer, follow Primal's history rather than assuming a fixed milestone.
+
+## Projects
+
+`DXForge.sln` has 4 solution configurations, all `x64`: `Debug`, `DebugEditor`, `Release`, `ReleaseEditor`. The `*Editor` configs build the engine as the `DXForgeEngineDLL` dynamic library for use by the editor; the plain `Debug`/`Release` configs build `EngineTest` as a standalone native executable that exercises the engine without the editor.
+
+- **DXForgeEngine** (`StaticLibrary`) — the engine core. Linked into both `EngineTest` and `DXForgeEngineDLL`.
+- **DXForgeEngineDLL** (`DynamicLibrary`) — thin C-ABI wrapper (`dllmain.cpp`, `EngineAPI.cpp`, `EntityAPI.cpp`) exposing `DXForgeEngine` to the C# editor via `DllWrappers`; also hosts `ShaderCompilation.cpp` (DXC), which `EngineTest` compiles in as well (Primal Day 076).
+- **EngineTest** (`Application`) — standalone native test harness (`Main.cpp`, `TestRenderer.cpp`, `Lights.cpp`, `Scripts.cpp`, `RenderItem.cpp`) for driving/visually testing the engine without the editor or a game project. Interactive: requires a window and a GPU, and gates on keyboard input — not suitable for CLI/CI.
+- **EngineUnitTests** (`Application`) — headless automated test runner and headless mode. See `docs/dev/BuildAndTest.md`.
+- **ContentTools** (`DynamicLibrary`) — offline asset pipeline: FBX import (`FbxImporter.*`, Autodesk FBX SDK), texture import (`TextureImpoter.cpp`, DirectXTex), procedural primitive meshes (`PrimitiveMesh.*`), tangent generation (MikkTSpace), normal-map detection. Consumed by the editor, not linked into the runtime engine.
+- **DXForgeEditor** (C#/.NET WPF, `ConfigurationType` mapped to the Editor configs) — project browser/creation, scene & game-entity editing (undo/redo commands), content browser, texture/geometry editors, Visual Studio automation for generating and building per-game-project C++ solutions (`ProjectTemplates/*`, `GameDev/VisualStudio.cs`).
+- **DXForgeImport** (C#/.NET console app, `DebugEditor`/`ReleaseEditor` only) — headless asset importer. See `docs/dev/DXForgeImport.md`.
+
+## Engine
+
+- **Platform abstraction**: `Platform/Platform.h` + `PlatformWin32.cpp` wrap OS window handling behind a platform-independent interface; `Window.h` is the cross-platform window handle type.
+- **Graphics abstraction**: `Graphics/GraphicsPlatformInterface.h` defines a `platform_interface` struct of function pointers (surface, light, camera, submesh/texture/material, render) that each graphics backend fills in. `Graphics/Renderer.cpp` selects a backend (`graphics_platform::direct3d12/vulkan/opengl`) and forwards calls to it. **Only Direct3D12 (`Graphics/Direct3D12/`) is actually implemented**; the Vulkan/OpenGL folders exist as stubs for future backends — do not assume they work.
+- **D3D12 backend** (`Graphics/Direct3D12/`): `D3D12Core` (device/queues/sync), `D3D12Surface` (swap chain per window), `D3D12Resource`/`D3D12Helpers` (descriptor heaps, deferred resource release, free-list-backed id allocation), `D3D12Upload` (copy-queue GPU uploader), `D3D12Content` (GPU-side submesh/texture/material storage), `D3D12GPass` (depth prepass + geometry/lighting pass, draw-indirect), `D3D12Light`/`D3D12LightCulling` (tiled light culling via compute shader — frustum grid build + culling, see `Shaders/GridFrustums.hlsl`/`CullLights.hlsl`), `D3D12PostProcess` (fullscreen post pass). Engine HLSL shaders live under `Graphics/Direct3D12/Shaders/` and are precompiled offline into a `shaders.bin` blob referenced by `Renderer.cpp`'s `engine_shader_paths`.
+- **ECS**: `Components/Entity.*` is the game-entity container; `Transform`, `Script`, `Geometry` are components attached via generational IDs (`Common/Id.h`). `EngineAPI/*.h` are the public structs/handles (camera, light, game entity, transform/script/geometry component, input) exposed across the DLL boundary — these mirror internal types but are kept ABI-stable for the editor and game code. Transforms store a local frame (`right()`/`up()`/`front()`/`local_frame()`) derived from the rotation quaternion; there is no separate orientation setter (removed with Primal Day 086, issue #4) — change a direction by setting a rotation.
+- **Content pipeline (runtime side)**: `Content/ContentToEngine.*` converts compiled asset blobs (meshes, textures, materials, shaders — see `asset_type`/`texture_flags` enums) into GPU resources via the active graphics backend; `Content/ContentLoader.*` handles loading the game DLL and engine shader blob (editor/dev builds only, guarded by `!defined(SHIPPING)`).
+- **Content pipeline (offline side, `ContentTools`)**: separate from the runtime; produces the asset files `ContentToEngine` consumes. FBX scenes are traversed/packed into submesh+LOD hierarchies; textures go through DirectXTex import/compression; tangents are generated with MikkTSpace for normal mapping.
+- **Game code**: each game project gets its own generated Visual Studio solution/project (from `DXForgeEditor/ProjectTemplates/*`), built via editor-driven VS automation (`GameDev/VisualStudio.cs`) and loaded as a DLL at runtime (`ContentLoader::load_game`).
+
+## Editor (DXForgeEditor, C#/WPF)
+
+- `GameProject/` — project creation/open (`NewProject.cs`, `OpenProject.cs`), the `Project`/`Scene` models, and the undo/redo command system backing entity/component edits.
+- `Components/` — editor-side mirrors of engine components (transform, script, geometry) with multi-selection support, bound to WPF views.
+- `DllWrappers/` — P/Invoke boundary calling into `DXForgeEngineDLL`.
+- `Content/ContentBrowser/`, `Editors/TextureEditor/`, `Editors/GeometryEditor/`, `Editors/WorldEditor/` — asset browsing and per-asset-type editors (texture detail/RGBA channel view, geometry/primitive preview, scene/world viewport with its own render surface).
+- `GameDev/EnginePath.cs` — decides the engine path written into each game solution's `Directory.Build.props` (issue #117): the repo the running editor exe lives in (`x64\<config>\` two levels up, with `DXForgeEngine\EngineAPI`) wins, so a worktree's editor builds games against that worktree; otherwise the user env var `DXFORGE_ENGINE` (never rewritten, except by the existing `EnginePathDialog` when neither is valid). The choice is logged at startup and on every game build, as a Warning when it differs from `DXFORGE_ENGINE`. Headless check: `pwsh -NoProfile -File DXForgeEditor/Tests/engine_path_test.ps1` (CI runs it in the `Editor build` job).
+- `Utilities/RenderSurface/` — hosts a Win32 D3D12 render surface inside WPF (HwndHost-style interop) for viewport rendering.
