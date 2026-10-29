@@ -164,16 +164,20 @@ class BlockPython3HookTest(unittest.TestCase):
                         "PYTHONUTF8=1 python3 x.py", "A=1 B=2 python3 x.py", "env PYTHONUTF8=1 python3 x.py",
                         "time python3 x.py",
                         'output="$(python3 x.py 2>&1)"', 'echo "`python3 -V`"', "cat <<EOF\n$(python3 -V)\nEOF",
-                        '$v = @"\n$(python3 -V)\n"@'):
+                        '$v = @"\n$(python3 -V)\n"@',
+                        'result="$(python3 "Tests/check_conventions.py")"', "x=$(echo 'a' && python3 -V)",
+                        "nohup env A=1 python3 x.py &",
+                        # 迷ったら止める側: 二重引用符の中の文章も止める(単一引用符か <<'EOF' で書けば通る)
+                        'git commit -m "python3 は使わない"', 'echo "it\'s python3"'):
             self.assertEqual(self.exit_code(command), 2, command)
 
     def test_allows_python_and_quoted_mentions(self):
-        for command in ("python x.py", "git grep -n -E '(python3|python)'", 'git commit -m "(python3 は使わない)"',
+        for command in ("python x.py", "git grep -n -E '(python3|python)'", "git commit -m 'python3 は使わない'",
                         "git commit -F - <<'EOF'\npython3 は使わない\nEOF", "$m = @'\npython3 -V\n'@",
-                        "cat <<\"EOF\"\n$(python3 -V)\nEOF", "echo '$(python3 -V)'", 'echo "python3 は使わない"',
-                        # エスケープされたコマンド置換は実行されない(PR コメントの本文などに書いたもの)
-                        'gh pr comment 1 --body "例: \\"\\$(python3 x.py)\\" や \\`python3\\`"',
-                        "echo 日本語 && python -V", "PYTHONUTF8=1 python x.py", "pip show python3-foo"):
+                        "cat <<\"EOF\"\n$(python3 -V)\nEOF", "echo '$(python3 -V)'",
+                        "gh pr comment 1 --body 'it uses \"python3\" and $(python3 x)'",
+                        "echo 日本語 && python -V", "PYTHONUTF8=1 python x.py", "pip show python3-foo",
+                        "python Tests/python3_notes.py", "ls python3.12"):
             self.assertEqual(self.exit_code(command), 0, command)
 
 
