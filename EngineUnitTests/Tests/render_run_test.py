@@ -267,6 +267,11 @@ def test_usage_errors(r):
     r.expect_error("zero frames", base[:2] + ["0"] + base[3:], EXIT_USAGE_ERROR, "usage_error")
     r.expect_error("zero width", base[:4] + ["0"] + base[5:], EXIT_USAGE_ERROR, "usage_error")
     r.expect_error("too large height", base[:6] + ["16385"] + base[7:], EXIT_USAGE_ERROR, "usage_error")
+    # ライトカリングのタイル(16ピクセル)より小さいと、D3D12LightCulling.cpp の assert に当たる(Codexの指摘、#128)
+    r.expect_error("width below the light culling tile size", base[:4] + ["8"] + base[5:], EXIT_USAGE_ERROR, "usage_error",
+                   message_part="--width")
+    r.expect_error("height below the light culling tile size", base[:6] + ["15"] + base[7:], EXIT_USAGE_ERROR, "usage_error",
+                   message_part="--height")
     r.expect_error("invalid --frames", base[:2] + ["abc"] + base[3:], EXIT_USAGE_ERROR, "usage_error")
     r.expect_error("unknown adapter", base + ["--adapter", "gpu"], EXIT_USAGE_ERROR, "usage_error", message_part="--adapter")
     r.expect_error("unknown argument", base + ["--bogus"], EXIT_USAGE_ERROR, "usage_error", message_part="--bogus")
@@ -276,7 +281,7 @@ def test_usage_errors(r):
     name = "--help lists --render and exit codes"
     code, stdout, stderr = r.run(["--help"])
     r.check(f"{name}: exit code", code == EXIT_SUCCESS, code)
-    r.check(f"{name}: text", all(s in stdout for s in ("--render", "--screenshot", "--adapter", "21 shaders unavailable")), stdout)
+    r.check(f"{name}: text", all(s in stdout for s in ("--render", "--screenshot", "--adapter", "16..16384", "21 shaders unavailable")), stdout)
     r.report(name)
 
 

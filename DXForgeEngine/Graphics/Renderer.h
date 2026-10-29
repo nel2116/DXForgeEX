@@ -13,6 +13,7 @@
 // 2026/10/18 camera_init_infoから上方向を削除し、up_vectorを取得専用にした (#62)
 // 2026/10/19 環境光(IBL)のライトの初期化情報 ambient_params を追加 (Primal Day 075)
 // 2026/10/29 画面外のサーフェス、読み戻し、アダプタの選択(graphics_init_info)を追加 (#127)
+// 2026/10/29 画面外のサーフェスの最小の大きさを追加 (#128 のレビュー)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -317,7 +318,10 @@ namespace dxforge::graphics
 	const char* get_engine_shaders_path(graphics_platform platform);
 
 	surface create_surface(platform::window window);
+	/// @brief 画面外のサーフェスの最小の幅・高さ(D3D12のライトカリングのタイルの大きさ。これより小さいと描けない)
+	constexpr u32 min_offscreen_surface_size{ 16 };
 	/// @brief ウィンドウ・スワップチェーンを持たない、画面外のサーフェスを作る(ヘッドレスの描画用)。remove_surface()で消す
+	/// @return 作れなかったとき(大きさがmin_offscreen_surface_size未満、テクスチャを確保できないなど)は無効なサーフェス
 	surface create_offscreen_surface(u32 width, u32 height);
 	void remove_surface(surface_id id);
 

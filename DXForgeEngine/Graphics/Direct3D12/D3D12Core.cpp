@@ -10,6 +10,7 @@
 // 2026/10/18 日本語のデバッグ出力をワイド文字版APIに変更(C4566対応)
 // 2026/10/19 シェーダのグローバルデータに環境光(IBL)を追加 (Primal Day 075)
 // 2026/10/29 画面外のサーフェスと読み戻し、WARPの選択、無人実行のデバッグレイヤーの扱いを追加 (#127)
+// 2026/10/29 画面外のサーフェスの作成の失敗を返すようにした (#128 のレビュー)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Core.h"
@@ -675,8 +676,17 @@ namespace dxforge::graphics::d3d12::core
 
 	surface create_offscreen_surface(u32 width, u32 height)
 	{
+		// NOTE: ライトカリングはタイルより小さい描画先を扱えない(delight::cull_lights()のassert)
+		static_assert(min_offscreen_surface_size == delight::light_culling_tile_size);
+		if (width < min_offscreen_surface_size || height < min_offscreen_surface_size) return surface{};
+
 		surface_id id{ surfaces.add(width, height) };
-		surfaces[id].create_offscreen_target();
+		if (!surfaces[id].create_offscreen_target())
+		{
+			// NOTE: まだ一度も描画していないので、GPUを待たずに取り除いてよい
+			surfaces.remove(id);
+			return surface{};
+		}
 		return surface{ id };
 	}
 
@@ -707,9 +717,10 @@ namespace dxforge::graphics::d3d12::core
 		buffer_desc.Flags = D3D12_RESOURCE_FLAG_NONE;
 
 		ComPtr<ID3D12Resource> readback;
+		// NOTE: 無人実行で使うので、失敗してもDXCallでブレークせずにfalseを返す
 		HRESULT hr{ S_OK };
-		DXCall(hr = main_device->CreateCommittedResource(&readback_heap, D3D12_HEAP_FLAG_NONE, &buffer_desc,
-			D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback)));
+		hr = main_device->CreateCommittedResource(&readback_heap, D3D12_HEAP_FLAG_NONE, &buffer_desc,
+			D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&readback));
 		if (FAILED(hr)) return false;
 		NAME_D3D12_OBJECT(readback.Get(), L"Offscreen Readback Buffer");
 
@@ -732,7 +743,7 @@ namespace dxforge::graphics::d3d12::core
 
 		void* data{ nullptr };
 		const D3D12_RANGE read_range{ 0, (SIZE_T)total_size };
-		DXCall(hr = readback->Map(0, &read_range, &data));
+		hr = readback->Map(0, &read_range, &data);
 		if (FAILED(hr) || !data) return false;
 
 		// R16G16B16A16_FLOAT(default_back_buffer_format)をfloatのRGBAに変換する

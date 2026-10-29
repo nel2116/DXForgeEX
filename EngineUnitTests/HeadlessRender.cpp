@@ -7,6 +7,7 @@
 //	シーン(球と床、平行光源と点光源、カメラ)はすべてコードで組み立てるので、リポジトリの外のデータを使わない。
 // 更新履歴
 // 2026/10/29 新規作成 (#127)
+// 2026/10/29 幅・高さの最小をライトカリングのタイルの大きさにした (#128 のレビュー)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -41,6 +42,7 @@ namespace dxforge::headless::render
 {
 	namespace
 	{
+		constexpr u32 min_surface_size{ graphics::min_offscreen_surface_size };	// ライトカリングのタイルの大きさ(16)
 		constexpr u32 max_surface_size{ 16384 };	// D3D12のテクスチャの最大の幅・高さ
 
 		// 頂点の要素の種類(ContentTools/Geometry.h の elements::elements_type::static_normal と同じ値)
@@ -163,7 +165,10 @@ namespace dxforge::headless::render
 					}
 					else
 					{
-						if (value == 0 || value > max_surface_size) return to_utf8(arg) + " must be between 1 and 16384";
+						if (value < min_surface_size || value > max_surface_size)
+						{
+							return to_utf8(arg) + " must be between " + std::to_string(min_surface_size) + " and " + std::to_string(max_surface_size);
+						}
 						(arg == L"--width" ? opt.width : opt.height) = value;
 						(arg == L"--width" ? opt.has_width : opt.has_height) = true;
 					}
@@ -761,8 +766,8 @@ namespace dxforge::headless::render
 			"Headless render (no window; draws a fixed test scene into an offscreen texture and writes a PNG):\n"
 			"  --render             select this mode\n"
 			"  --frames <N>         number of frames to render before the screenshot (required, N >= 1)\n"
-			"  --width <w>          width in pixels (required, 1..16384)\n"
-			"  --height <h>         height in pixels (required, 1..16384)\n"
+			"  --width <w>          width in pixels (required, 16..16384; 16 is the light culling tile size)\n"
+			"  --height <h>         height in pixels (required, 16..16384)\n"
 			"  --screenshot <png>   PNG file to write (required; 8-bit sRGB, no tone mapping)\n"
 			"  --adapter <a>        warp (default; software rasterizer, deterministic) or hardware (default GPU selection)\n"
 			"  --json               print a machine-readable result to stdout (logs go to stderr)\n"

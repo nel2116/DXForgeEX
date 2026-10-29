@@ -7,6 +7,7 @@
 // 更新履歴
 // 2024/12/30 新規作成
 // 2026/10/29 画面外のサーフェス(スワップチェインなしの描画先)を追加 (#127)
+// 2026/10/29 画面外のサーフェスの作成の失敗を返すようにした (#128 のレビュー)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -72,7 +73,8 @@ namespace dxforge::graphics::d3d12
 		/// @brief 画面外の描画先(テクスチャ1枚)の作成
 		/// @details スワップチェインのバックバッファの代わりに使う。初期状態はCOMMON(= PRESENT)なので、
 		///			 render_surface()のPRESENT <-> RENDER_TARGETの遷移をそのまま使える。
-		void create_offscreen_target();
+		/// @return 作れたらtrue(失敗したときは何も持たない状態に戻す)
+		bool create_offscreen_target();
 
 		/// @brief サーフェスの表示
 		void present() const;

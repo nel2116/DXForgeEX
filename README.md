@@ -245,7 +245,7 @@ python EngineUnitTests/Tests/headless_run_test.py --config Release
 | 終了コード | 意味 |
 |---|---|
 | `0` | 成功 |
-| `2` | 引数の誤り(`--frames`/`--width`/`--height`/`--screenshot`がない、範囲外、`--game-bin`との併用など) |
+| `2` | 引数の誤り(`--frames`/`--width`/`--height`/`--screenshot`がない、範囲外(幅・高さは16〜16384。16はライトカリングのタイルの大きさ)、`--game-bin`との併用など) |
 | `3` | `abort()`(assertの失敗など) |
 | `20` | グラフィックスの初期化に失敗した(アダプタ・WARPが使えない) |
 | `21` | シェーダーを用意できない(`dxcompiler.dll`やシェーダーのソースが見つからない、コンパイルに失敗した) |
