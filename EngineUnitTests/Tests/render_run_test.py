@@ -182,6 +182,27 @@ def diff_dir(config):
     return os.environ.get("DXFORGE_RENDER_DIFF_DIR") or os.path.join(tempfile.gettempdir(), "dxforge_render_diff", config)
 
 
+DIFF_FILES = ("expected.png", "actual.png", "diff.png")
+
+
+def clear_diff_dir(out_dir):
+    """前回の失敗の差分を消す(CIで古い差分を成果物にしないため)
+
+    DXFORGE_RENDER_DIFF_DIR は既存のフォルダを指せるので、このスクリプトが書くファイルだけを消し、
+    フォルダは空になったときだけ消す(Codexの指摘、#131)
+    """
+    for file_name in DIFF_FILES:
+        try:
+            os.remove(os.path.join(out_dir, file_name))
+        except FileNotFoundError:
+            pass
+    try:
+        os.rmdir(out_dir)
+    except OSError:
+        # 存在しない、または空でない
+        pass
+
+
 def pixel(rgb, width, x, y):
     i = (y * width + x) * 3
     return rgb[i], rgb[i + 1], rgb[i + 2]
@@ -339,8 +360,7 @@ def test_baseline_comparison(r, rgb, config, require_render):
             print(f"[SKIP] {name}: {reason}")
         return
     out_dir = diff_dir(config)
-    # 前回の失敗の差分を残さない(CIで古い差分を成果物にしないため)
-    shutil.rmtree(out_dir, ignore_errors=True)
+    clear_diff_dir(out_dir)
     expected, error = read_baseline(config)
     if expected is None:
         r.check(f"{name}: baseline", False, error)
@@ -360,6 +380,30 @@ def test_baseline_comparison(r, rgb, config, require_render):
     r.check(f"{name}: pixels", result["over"] == 0,
             f"{result['over']} of {WIDTH * HEIGHT} pixels differ by more than {BASELINE_TOLERANCE} level(s) "
             f"(max diff {result['max_diff']}, bbox {result['bbox']}); expected|actual|diff written to {out_dir}")
+    r.report(name)
+
+
+def test_clear_diff_dir(r):
+    """差分のフォルダ(DXFORGE_RENDER_DIFF_DIR で既存のフォルダを指せる)の、このスクリプトが書いたファイルだけを消す
+    (Codexの指摘、#131)。描画は要らない"""
+    name = "clearing the diff folder keeps unrelated files"
+    folder = os.path.join(r.work_dir, "existing_diff_dir")
+    os.makedirs(os.path.join(folder, "subfolder"))
+    for file_name in DIFF_FILES + ("unrelated.txt", os.path.join("subfolder", "keep.png")):
+        open(os.path.join(folder, file_name), "wb").close()
+    clear_diff_dir(folder)
+    r.check(f"{name}: unrelated file", os.path.isfile(os.path.join(folder, "unrelated.txt")), folder)
+    r.check(f"{name}: subfolder", os.path.isfile(os.path.join(folder, "subfolder", "keep.png")), folder)
+    r.check(f"{name}: diff files removed", not any(os.path.exists(os.path.join(folder, f)) for f in DIFF_FILES), folder)
+
+    # このスクリプトの差分だけが入っていたフォルダは、空になったら消す
+    folder = os.path.join(r.work_dir, "own_diff_dir")
+    os.makedirs(folder)
+    for file_name in DIFF_FILES:
+        open(os.path.join(folder, file_name), "wb").close()
+    clear_diff_dir(folder)
+    r.check(f"{name}: empty folder removed", not os.path.exists(folder), folder)
+    clear_diff_dir(os.path.join(r.work_dir, "no_such_diff_dir"))
     r.report(name)
 
 
@@ -562,6 +606,7 @@ def main():
     work_dir = tempfile.mkdtemp(prefix="dxforge_render_test_")
     try:
         r = Runner(exe, work_dir)
+        test_clear_diff_dir(r)
         test_usage_errors(r)
         test_shaders_unavailable(r, has_dxc)
         if has_dxc:
