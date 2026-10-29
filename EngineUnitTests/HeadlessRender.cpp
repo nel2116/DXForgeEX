@@ -9,6 +9,7 @@
 // 2026/10/29 新規作成 (#127)
 // 2026/10/29 幅・高さの最小をライトカリングのタイルの大きさにした (#128 のレビュー)
 // 2026/10/29 初期化に失敗したときに graphics::shutdown() を重ねて呼ばないようにした (#128 のレビュー)
+// 2026/10/29 予期しない例外を最上位で捕捉し、段階に応じた終了コードとJSONを返すようにした (#128 のレビュー)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -24,6 +25,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cwchar>
+#include <exception>
 #include <filesystem>
 #include <string>
 #include <vector>
@@ -72,6 +74,21 @@ namespace dxforge::headless::render
 			u32				frames_run{ 0 };
 			std::string		adapter_name{};
 			std::string		pixel_hash{};		// 書き出したRGB(8ビット)のFNV-1a(64ビット)
+		};
+
+		// 実行中の段階。予期しない例外を捕捉したとき、どの終了コードにするかを決めるのに使う
+		enum class run_stage
+		{
+			shaders,		// 引数のあと〜シェーダーの用意(DXC、エンジンとマテリアルのシェーダーのコンパイル) → 21
+			graphics_init,	// graphics::initialize() → 20
+			render,			// テストシーンの作成、描画、読み戻し → 22
+			screenshot,		// 8ビットへの変換とPNGの書き出し → 23
+		};
+
+		struct run_state
+		{
+			run_stage	stage{ run_stage::shaders };
+			bool		graphics_initialized{ false };	// graphics::shutdown()を呼ぶ必要があるか(1回だけ呼ぶため)
 		};
 
 		/// @brief UTF-16の文字列をUTF-8に変換する
@@ -333,13 +350,39 @@ namespace dxforge::headless::render
 			test_scene() = default;
 			~test_scene() { destroy(); }
 
-			/// @brief シェーダー・メッシュ・マテリアル・ライト・カメラ・エンティティを作る
+			/// @brief マテリアルのシェーダー(EngineTest/TestShader.hlsl。EngineTestと同じ)をコンパイルする
+			/// @return 失敗したときはその説明(成功なら空)
+			std::string create_shaders()
+			{
+				constexpr const char* shader_path{ "..\\..\\EngineTest\\" };
+				shader_file_info info{};
+				info.file_name = "TestShader.hlsl";
+				info.function = "TestShaderVS";
+				info.type = graphics::shader_type::vertex;
+				utl::vector<std::wstring> extra_args{};
+				extra_args.emplace_back(L"-D");
+				extra_args.emplace_back(L"ELEMENTS_TYPE=1");
+				const std::unique_ptr<u8[]> vertex_shader{ compile_shader(info, shader_path, extra_args) };
+
+				info.function = "TestShaderPS";
+				info.type = graphics::shader_type::pixel;
+				extra_args.clear();
+				const std::unique_ptr<u8[]> pixel_shader{ compile_shader(info, shader_path, extra_args) };
+				if (!vertex_shader || !pixel_shader) return "failed to compile EngineTest/TestShader.hlsl";
+
+				const u8* vertex_shaders[]{ vertex_shader.get() };
+				const u32 vertex_keys[]{ elements_type_static_normal };
+				_vs_id = content::add_shader_group(vertex_shaders, 1, vertex_keys);
+				const u8* pixel_shaders[]{ pixel_shader.get() };
+				_ps_id = content::add_shader_group(pixel_shaders, 1, &u32_invalid_id);
+				return {};
+			}
+
+			/// @brief メッシュ・マテリアル・ライト・カメラ・エンティティを作る(create_shaders()のあと)
 			/// @return 失敗したときはその説明(成功なら空)
 			std::string create(f32 aspect_ratio)
 			{
-				std::string error{ create_shaders() };
-				if (!error.empty()) return error;
-
+				assert(id::is_valid(_vs_id) && id::is_valid(_ps_id));
 				const std::vector<u8> sphere_blob{ pack_mesh(make_sphere(1.f, 48, 24)) };
 				const std::vector<u8> floor_blob{ pack_mesh(make_floor(4.f)) };
 				_sphere_model_id = content::create_resource(sphere_blob.data(), content::asset_type::mesh);
@@ -424,33 +467,6 @@ namespace dxforge::headless::render
 
 		private:
 			constexpr static u64 light_set_key{ 0 };
-
-			/// @brief マテリアルのシェーダー(EngineTest/TestShader.hlsl。EngineTestと同じ)をコンパイルする
-			std::string create_shaders()
-			{
-				constexpr const char* shader_path{ "..\\..\\EngineTest\\" };
-				shader_file_info info{};
-				info.file_name = "TestShader.hlsl";
-				info.function = "TestShaderVS";
-				info.type = graphics::shader_type::vertex;
-				utl::vector<std::wstring> extra_args{};
-				extra_args.emplace_back(L"-D");
-				extra_args.emplace_back(L"ELEMENTS_TYPE=1");
-				const std::unique_ptr<u8[]> vertex_shader{ compile_shader(info, shader_path, extra_args) };
-
-				info.function = "TestShaderPS";
-				info.type = graphics::shader_type::pixel;
-				extra_args.clear();
-				const std::unique_ptr<u8[]> pixel_shader{ compile_shader(info, shader_path, extra_args) };
-				if (!vertex_shader || !pixel_shader) return "failed to compile EngineTest/TestShader.hlsl";
-
-				const u8* vertex_shaders[]{ vertex_shader.get() };
-				const u32 vertex_keys[]{ elements_type_static_normal };
-				_vs_id = content::add_shader_group(vertex_shaders, 1, vertex_keys);
-				const u8* pixel_shaders[]{ pixel_shader.get() };
-				_ps_id = content::add_shader_group(pixel_shaders, 1, &u32_invalid_id);
-				return {};
-			}
 
 			id::id_type create_material(math::v4 base_color, f32 metallic, f32 roughness)
 			{
@@ -595,20 +611,49 @@ namespace dxforge::headless::render
 			return false;
 		}
 
-		/// @brief 描画して読み戻し、PNGに書き出す(graphics::initialize()のあと)
-		void render_and_capture(const options& opt, run_result& result)
+		/// @brief 画面外のサーフェスを、例外で抜けたときも含めて必ず取り除く
+		class offscreen_surface
 		{
-			test_scene scene{};
-			const std::string scene_error{ scene.create((f32)opt.width / (f32)opt.height) };
-			if (!scene_error.empty())
+		public:
+			DISABLE_COPY_AND_MOVE(offscreen_surface);
+			offscreen_surface(u32 width, u32 height) : _surface{ graphics::create_offscreen_surface(width, height) } {}
+			~offscreen_surface() { remove(); }
+
+			void remove()
 			{
-				fail(result, scene_error.find("compile") != std::string::npos ? exit_code::shaders_unavailable : exit_code::render_failed,
-					scene_error.find("compile") != std::string::npos ? "shaders_unavailable" : "render_failed", scene_error);
+				if (_surface.is_valid()) graphics::remove_surface(_surface.get_id());
+				_surface = {};
+			}
+
+			[[nodiscard]] const graphics::surface& get() const { return _surface; }
+
+		private:
+			graphics::surface _surface{};
+		};
+
+		/// @brief 描画して読み戻し、PNGに書き出す(graphics::initialize()のあと)
+		void render_and_capture(const options& opt, run_result& result, run_state& state)
+		{
+			// NOTE: 例外で抜けたときは、sceneとsurfaceのデストラクタが、graphics::shutdown()より先に後片付けをする
+			test_scene scene{};
+			state.stage = run_stage::shaders;
+			const std::string shader_error{ scene.create_shaders() };
+			if (!shader_error.empty())
+			{
+				fail(result, exit_code::shaders_unavailable, "shaders_unavailable", shader_error);
 				return;
 			}
 
-			graphics::surface surface{ graphics::create_offscreen_surface(opt.width, opt.height) };
-			if (!surface.is_valid())
+			state.stage = run_stage::render;
+			const std::string scene_error{ scene.create((f32)opt.width / (f32)opt.height) };
+			if (!scene_error.empty())
+			{
+				fail(result, exit_code::render_failed, "render_failed", scene_error);
+				return;
+			}
+
+			offscreen_surface surface{ opt.width, opt.height };
+			if (!surface.get().is_valid())
 			{
 				fail(result, exit_code::render_failed, "render_failed", "failed to create the offscreen surface");
 				return;
@@ -616,13 +661,13 @@ namespace dxforge::headless::render
 
 			for (u32 i{ 0 }; i < opt.frames; ++i)
 			{
-				surface.render(scene.frame_info());
+				surface.get().render(scene.frame_info());
 				++result.frames_run;
 			}
 
 			utl::vector<math::v4> pixels{};
-			const bool read{ surface.read_back(pixels) };
-			graphics::remove_surface(surface.get_id());
+			const bool read{ surface.get().read_back(pixels) };
+			surface.remove();
 			if (!check_debug_messages(result, "while rendering")) return;
 			if (!read || pixels.size() != (size_t)opt.width * opt.height)
 			{
@@ -632,6 +677,7 @@ namespace dxforge::headless::render
 			std::fprintf(stderr, "[render] rendered %u frames (%ux%u)\n", result.frames_run, opt.width, opt.height);
 
 			// 8ビットのsRGBに変換する。ハッシュはRGBの順(左上から行ごと)で取る。
+			state.stage = run_stage::screenshot;
 			std::vector<u8> bgr((size_t)opt.width * opt.height * 3);
 			u64 hash{ 0xcbf29ce484222325ull };
 			for (size_t i{ 0 }; i < pixels.size(); ++i)
@@ -659,8 +705,9 @@ namespace dxforge::headless::render
 			std::fprintf(stderr, "[render] wrote %s\n", to_utf8(opt.screenshot).c_str());
 		}
 
-		void run_render(options& opt, run_result& result)
+		void run_render(options& opt, run_result& result, run_state& state)
 		{
+			state.stage = run_stage::shaders;
 			// NOTE: エンジンのシェーダー(shaders.bin、ソース)とTestShader.hlslのパスは、EngineTestと同じく作業フォルダからの相対パスなので、
 			//		 実行ファイルのフォルダ(x64/<構成>/)に移る。その前に、出力先を今の作業フォルダからの絶対パスにしておく。
 			std::error_code error{};
@@ -699,6 +746,7 @@ namespace dxforge::headless::render
 				return;
 			}
 
+			state.stage = run_stage::graphics_init;
 			graphics::graphics_init_info init_info{};
 			init_info.adapter = opt.adapter;
 			init_info.unattended = true;
@@ -710,15 +758,70 @@ namespace dxforge::headless::render
 					std::string{ "failed to initialize Direct3D 12 with the " } + adapter_label(opt.adapter) + " adapter");
 				return;
 			}
+			state.graphics_initialized = true;
 			result.adapter_name = graphics::adapter_name();
 			std::fprintf(stderr, "[render] adapter: %s (%s)\n", result.adapter_name.c_str(), adapter_label(opt.adapter));
 
-			render_and_capture(opt, result);
+			render_and_capture(opt, result, state);
 
 			// 後片付けで出たメッセージも出す(失敗の扱いは描画のときのものを優先する)
+			state.stage = run_stage::render;
 			if (result.exit_code == exit_code::success) check_debug_messages(result, "while cleaning up");
 			else graphics::flush_debug_messages();
+			state.graphics_initialized = false;
 			graphics::shutdown();
+		}
+
+		/// @brief 例外のメッセージ(what())を、JSONに入れられるASCIIにする(ASCII以外のバイトは\xNN)
+		/// @details std::filesystem_errorのwhat()は、パスをシステムのコードページで含むことがあり、UTF-8とは限らない
+		std::string ascii_message(const char* text)
+		{
+			std::string result{};
+			for (const char* c{ text ? text : "" }; *c; ++c)
+			{
+				const unsigned char byte{ (unsigned char)*c };
+				if (byte < 0x80)
+				{
+					result += *c;
+				}
+				else
+				{
+					char buffer[8];
+					std::snprintf(buffer, sizeof(buffer), "\\x%02x", (unsigned)byte);
+					result += buffer;
+				}
+			}
+			return result;
+		}
+
+		/// @brief 予期しない例外を、その段階の終了コードに変換する。初期化済みならgraphics::shutdown()を1回だけ呼ぶ
+		void handle_exception(run_result& result, run_state& state, const char* what)
+		{
+			struct stage_info { int code; const char* error_code; const char* label; };
+			stage_info info{};
+			switch (state.stage)
+			{
+			case run_stage::shaders: info = { exit_code::shaders_unavailable, "shaders_unavailable", "preparing the shaders" }; break;
+			case run_stage::graphics_init: info = { exit_code::graphics_init_failed, "graphics_init_failed", "initializing graphics" }; break;
+			case run_stage::screenshot: info = { exit_code::screenshot_write_failed, "screenshot_write_failed", "writing the screenshot" }; break;
+			case run_stage::render:
+			default: info = { exit_code::render_failed, "render_failed", "rendering" }; break;
+			}
+			fail(result, info.code, info.error_code, std::string{ "unexpected exception while " } + info.label + ": " + ascii_message(what));
+
+			if (state.graphics_initialized)
+			{
+				state.graphics_initialized = false;
+				try
+				{
+					graphics::flush_debug_messages();
+					graphics::shutdown();
+				}
+				catch (...)
+				{
+					std::fprintf(stderr, "[render] another exception while shutting down graphics\n");
+				}
+			}
 		}
 
 		void print_json_result(const options& opt, const run_result& result)
@@ -797,7 +900,20 @@ namespace dxforge::headless::render
 		{
 			// WICはCOMを使う。既に別のモードで初期化されていればそのまま使う。
 			const HRESULT com_result{ CoInitializeEx(nullptr, COINIT_MULTITHREADED) };
-			run_render(opt, result);
+			// NOTE: 失敗の経路でも、決めた終了コードとJSONを返すため、予期しない例外(std::filesystemなど)をここで捕捉する(#128のレビュー)
+			run_state state{};
+			try
+			{
+				run_render(opt, result, state);
+			}
+			catch (const std::exception& e)
+			{
+				handle_exception(result, state, e.what());
+			}
+			catch (...)
+			{
+				handle_exception(result, state, "unknown exception");
+			}
 			if (SUCCEEDED(com_result)) CoUninitialize();
 		}
 

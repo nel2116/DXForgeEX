@@ -13,7 +13,8 @@
 #   2. 同じ引数で2回実行すると、WARPではピクセル(--json の pixel_hash とデコードした画素)とPNGのファイルが一致する。
 #   3. --adapter hardware(既定のアダプタの選び方)でも動く。
 #   4. 引数の誤りは終了コード2、PNGを書けないときは23、DXC(dxcompiler.dll)やシェーダーのソースが見つからないときは21、
-#      グラフィックスの初期化に失敗したとき(shaders.binが空)は20になる。
+#      グラフィックスの初期化に失敗したとき(shaders.binが空)は20、シェーダーのコンパイル中に例外が出たとき
+#      (実行ファイルの隣に shaders という通常のファイルがある)は21になる。
 #      assertのダイアログやabort(終了コード3)、クラッシュにならない。
 #
 # DXC(dxcompiler.dll)が実行ファイルの隣にないとき(packages/DirectXShaderCompiler なしで EngineUnitTests だけをビルドした場合、#61)は、
@@ -308,15 +309,12 @@ def test_shaders_unavailable(r, has_dxc):
                    exe=exe, message_part="shader sources")
 
 
-def test_graphics_init_failed(r):
-    """graphics::initialize()が失敗しても、クラッシュせずに終了コード20を返す(Codexの指摘、#128)
+def make_repo_copy(r, folder_name):
+    """リポジトリと同じ並び(x64/<構成>/ の実行ファイルとDXC、..\\..\\ のシェーダーのソース)を一時フォルダに作る
 
-    リポジトリと同じ並び(x64/<構成>/ と ..\\..\\ のシェーダーのソース)を一時フォルダに作り、ソースより新しい空の
-    shaders.bin を置く。compile_shaders() は最新と見なしてコンパイルせず、エンジンのシェーダーの読み込み
-    (shaders::initialize())が失敗して、D3D12の初期化が failed_init() で終わる。
+    @return (実行ファイルのパス, 実行ファイルのフォルダ)
     """
-    name = "graphics initialization fails (empty shaders.bin)"
-    root = os.path.join(r.work_dir, "init_failure_repo")
+    root = os.path.join(r.work_dir, folder_name)
     exe_folder = os.path.join(root, "x64", "Config")
     os.makedirs(exe_folder)
     exe = shutil.copy2(r.exe, exe_folder)
@@ -326,6 +324,18 @@ def test_graphics_init_failed(r):
                     os.path.join(root, "DXForgeEngine", "Graphics", "Direct3D12", "Shaders"))
     os.makedirs(os.path.join(root, "EngineTest"))
     shutil.copy2(os.path.join(REPO_ROOT, "EngineTest", "TestShader.hlsl"), os.path.join(root, "EngineTest"))
+    return exe, exe_folder
+
+
+def test_graphics_init_failed(r):
+    """graphics::initialize()が失敗しても、クラッシュせずに終了コード20を返す(Codexの指摘、#128)
+
+    リポジトリと同じ並び(x64/<構成>/ と ..\\..\\ のシェーダーのソース)を一時フォルダに作り、ソースより新しい空の
+    shaders.bin を置く。compile_shaders() は最新と見なしてコンパイルせず、エンジンのシェーダーの読み込み
+    (shaders::initialize())が失敗して、D3D12の初期化が failed_init() で終わる。
+    """
+    name = "graphics initialization fails (empty shaders.bin)"
+    exe, exe_folder = make_repo_copy(r, "init_failure_repo")
     shaders_bin = os.path.join(exe_folder, "shaders", "d3d12", "shaders.bin")
     os.makedirs(os.path.dirname(shaders_bin))
     open(shaders_bin, "wb").close()
@@ -333,6 +343,21 @@ def test_graphics_init_failed(r):
     png = os.path.join(r.work_dir, "init_failure.png")
     r.expect_error(name, r.render_args(png), EXIT_GRAPHICS_INIT_FAILED, "graphics_init_failed", exe=exe,
                    message_part="failed to initialize Direct3D 12")
+    r.check(f"{name}: nothing written", not os.path.exists(png), png)
+
+
+def test_shader_compilation_throws(r):
+    """compile_shaders() の中の std::filesystem が例外を投げても、終了コード21とJSONを返す(Codexの指摘、#128)
+
+    実行ファイルの隣に shaders という通常のファイルを置くと、コンパイルしたシェーダーを書き出すときの
+    create_directories(".\\shaders\\d3d12") が filesystem_error を投げる。
+    """
+    name = "shader compilation throws (a file named shaders)"
+    exe, exe_folder = make_repo_copy(r, "shaders_file_repo")
+    open(os.path.join(exe_folder, "shaders"), "wb").close()
+    png = os.path.join(r.work_dir, "shaders_file.png")
+    r.expect_error(name, r.render_args(png), EXIT_SHADERS_UNAVAILABLE, "shaders_unavailable", exe=exe,
+                   message_part="exception")
     r.check(f"{name}: nothing written", not os.path.exists(png), png)
 
 
@@ -356,6 +381,7 @@ def main():
         test_shaders_unavailable(r, has_dxc)
         if has_dxc:
             test_graphics_init_failed(r)
+            test_shader_compilation_throws(r)
             test_warp_render_and_determinism(r)
             test_hardware_render(r)
             test_human_readable_and_unicode_path(r)
