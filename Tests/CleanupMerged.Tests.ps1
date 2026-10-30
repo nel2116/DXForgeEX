@@ -425,7 +425,8 @@ $cases["live-terminal"] = {
 		$done = New-Branch $sb "fix/done" -Worktree -Merge
 		$r = Invoke-Cleanup $sb -Terminals "$live;$($sb.Root -replace '\\', '/')"
 		Check ($r.ExitCode -eq 0) "終了コードが0"
-		Check ($r.Text -match '残す: \S+ \[fix/live\]\(Orcaのターミナルが 1 個開いている') "ターミナルが開いているworktreeを残すと表示する"
+		# TEMPのパスに空白があっても照合できるよう、実際のパスをエスケープして使う
+		Check ($r.Text -match "残す: $([regex]::Escape($live)) \[fix/live\]\(Orcaのターミナルが 1 個開いている") "ターミナルが開いているworktreeを残すと表示する"
 		Check (-not ((Get-OrcaCalls $sb) | Where-Object { $_ -match [regex]::Escape($live) })) "そのworktreeに orca worktree rm を呼ばない"
 		Check ((Test-Registered $sb $live) -and (Test-Path -LiteralPath $live)) "worktreeは残っている"
 		Check (Test-BranchExists $sb "fix/live") "ブランチは残っている"
@@ -441,8 +442,8 @@ $cases["terminal-path-format"] = {
 		# Orcaのパスと git worktree list のパスの、区切り・大文字小文字・末尾の区切りの違いを吸収する
 		$live = New-Branch $sb "fix/case" -Worktree -Merge
 		$r = Invoke-Cleanup $sb -arguments "-DryRun" -Terminals ((($live -replace '/', '\').ToUpperInvariant()) + '\')
-		Check ($r.Text -match '残す: \S+ \[fix/case\]\(Orcaのターミナルが 1 個開いている') "同じworktreeとして残す"
-		Check ($r.Text -notmatch '削除: \S+ \[fix/case\]') "消す対象にしない"
+		Check ($r.Text -match "残す: $([regex]::Escape($live)) \[fix/case\]\(Orcaのターミナルが 1 個開いている") "同じworktreeとして残す"
+		Check ($r.Text -notmatch '削除: .*\[fix/case\]') "消す対象にしない"
 	}
 	finally { Remove-Sandbox $sb }
 }
@@ -454,7 +455,7 @@ $cases["terminal-unknown"] = {
 		$wt = New-Branch $sb "fix/unknown" -Worktree -Merge
 		foreach ($mode in "fail", "truncated") {
 			$r = Invoke-Cleanup $sb -Terminals $mode
-			Check ($r.Text -match '残す: \S+ \[fix/unknown\]\(Orcaのターミナルを確認できない') "$mode : 確認できないので残すと表示する"
+			Check ($r.Text -match "残す: $([regex]::Escape($wt)) \[fix/unknown\]\(Orcaのターミナルを確認できない") "$mode : 確認できないので残すと表示する"
 			Check ((Test-Registered $sb $wt) -and (Test-BranchExists $sb "fix/unknown")) "$mode : worktreeとブランチは残っている"
 		}
 		Check ((Get-OrcaCalls $sb).Count -eq 0) "orca worktree rm は呼ばれない"
