@@ -80,7 +80,7 @@ Start-Process -FilePath "$PWD\x64\DebugEditor\DXForgeEditor.exe"
 2. 「Create Project」を選び、テンプレート`Empty Project`、Nameに`$verifyName`の値(`Verify43`)、Pathに`$verifyRoot\`の値を入力して「Create」。
    - Path欄は、中身を全部選択(Ctrl+A)してから貼り付け(Ctrl+V)ます。上のコマンドで表示した値(例: `C:\Users\<ユーザー名>\AppData\Local\Temp\DXForgeVerify\`)を手で入力してもかまいません。
    - Path欄の環境変数は展開されるので、`%TEMP%\DXForgeVerify\`と入力しても同じ場所に作られます(「Create」を押すと、Path欄の表示も展開済みの絶対パスに変わります)。相対パス(例: `DXForgeVerify\`)は「プロジェクトパスには絶対パスを入力してください」と表示されて作成できません。
-   - 既定のPathは`ドキュメント\DXForgeProjects\`です。後片付けを簡単にするため、専用のフォルダを使うことをおすすめします。
+   - 既定のPathは、ユーザー環境変数`DXFORGE_PROJECTS`があればその値、なければ`%USERPROFILE%\DXForgeProjects\`です(#141。値が使えないときはLoggerViewにWarningが出て、後者になります)。後片付けを簡単にするため、専用のフォルダを使うことをおすすめします。
    - 前回の検証のフォルダ(`$verifyRoot\$verifyName\`)が残っていると「選択したプロジェクトフォルダはすでに存在しています」と出て作成できません。手順7の後片付けを先に行ってください。
 
 テンプレートは、エディタのビルド(`./build.ps1 -Target editor`)で`DXForgeEditor\ProjectTemplates`から`x64\DebugEditor\ProjectTemplates`にコピーされます。テンプレートを編集したら、エディタをビルドし直してください。テンプレートが見つからない場合は、新規プロジェクトの一覧が空になり、LoggerViewに「プロジェクト・テンプレートの読み込みに失敗しました: <パス>」と出ます。

@@ -13,7 +13,7 @@ description: DXForgeEX のエディタやゲームを起動し、GUI で動作�
   - `./build.ps1 -Configuration DebugEditor -Target all`(新しい worktree でも 1 回で通る、#116 で修正済み)
   - ゲームは Debug でリンクするので、`./build.ps1 -Configuration Debug -Target native -Project DXForgeEngine` も先に実行しておく。
 - エディタは、自分の実行ファイルがあるリポジトリ(`x64\<構成>\` の 2 つ上)のエンジンで、ゲームをビルドする(#117)。ユーザー環境変数 `DXFORGE_ENGINE` は切り替えない。食い違うときは LoggerView に Warning が出る。リンクされた lib は、ゲームの `GameCode\x64\Debug\*.tlog` で確かめられる。
-- **確認用のプロジェクトは新しく作る。** 既存のプロジェクトは使わない。Empty Project から `GuiCheck<N>` を作る(場所はエディタの既定の DXForgeProjects フォルダ)。
+- **確認用のプロジェクトは新しく作る。** 既存のプロジェクトは使わない。Empty Project から `GuiCheck<N>` を作る(場所はエディタの既定のフォルダ。ユーザー環境変数 `DXFORGE_PROJECTS` があればその値で、このマシンでは `F:\DXForgeProjects\`。なければ `%USERPROFILE%\DXForgeProjects\`、#141)。
   - ソースファイルがないと、ゲームの exe も DLL も作られない(「ゲームコードDLLファイルのロードに失敗」になる、#118)。まず New Script でスクリプトを足す。
   - スクリプトが動いたかは、`begin_play`/`update` で、`GetModuleFileNameA` の結果を含む目印のファイルを書かせて判定する。パスはスラッシュ区切りにし、Write/Edit ツールで書く(heredoc だと `\` が消える)。
 
