@@ -52,7 +52,8 @@ namespace DXForgeEditor.GameProject
             }
 
         }
-        private string _projectPath = $@"{Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)}\DXForgeProjects\";
+        // 既定値はDXFORGE_PROJECTSか%USERPROFILE%\DXForgeProjects\(コンストラクタでGetDefaultProjectPath()から設定する。#141)
+        private string _projectPath;
 
         public string ProjectPath
         {
@@ -276,9 +277,29 @@ namespace DXForgeEditor.GameProject
             File.WriteAllText(Path.GetFullPath(Path.Combine(projectPath, $@"GameCode\{_0}.vcxproj")), project);
         }
 
+        // ユーザー環境変数DXFORGE_PROJECTSを読むだけで、書き換えない。使えない値ならWarningを出して既定にする
+        private static string GetDefaultProjectPath()
+        {
+            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string? environmentPath = null;
+            try
+            {
+                environmentPath = Environment.GetEnvironmentVariable(ProjectsPath.EnvironmentVariableName, EnvironmentVariableTarget.User);
+            }
+            catch (Exception ex)
+            {
+                // コンストラクタはXAMLから呼ばれるので投げない。読めなければ未設定として扱う
+                Debug.WriteLine(ex.Message);
+            }
+            var resolution = ProjectsPath.Resolve(environmentPath, userProfile);
+            if (resolution.Warning != null) Logger.Log(MessageType.Warning, resolution.Warning);
+            return resolution.Path;
+        }
+
         public NewProject()
         {
             ProjectTemplates = new ReadOnlyObservableCollection<ProjectTemplate>(_projectTemplates);
+            _projectPath = GetDefaultProjectPath();
             try
             {
                 var templatesFiles = Directory.GetFiles(_templatePath, "template.xml", SearchOption.AllDirectories);

@@ -138,6 +138,12 @@ jobs:
         # 3つの場合を、%TEMP% の偽のフォルダで確かめる。GUI・GPU・エンジンのDLLは要らない。
         run: pwsh -NoProfile -File DXForgeEditor/Tests/engine_path_test.ps1 -Configuration DebugEditor
 
+      - name: Test editor default projects path
+        shell: pwsh
+        # ビルドしたエディタの ProjectsPath(#141)をリフレクションで呼び、Create Project の既定のフォルダが
+        # DXFORGE_PROJECTS(あり・なし・使えない値)に応じて決まることを確かめる。ユーザー環境変数は読みも書きもしない。
+        run: pwsh -NoProfile -File DXForgeEditor/Tests/projects_path_test.ps1 -Configuration DebugEditor
+
       - name: Test editor DEBUG define
         shell: pwsh
         # DebugEditor でエディタと DXForgeImport に DEBUG が定義され、ReleaseEditor では定義されないこと(#109)。

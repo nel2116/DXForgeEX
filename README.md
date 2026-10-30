@@ -86,6 +86,15 @@ PowerShell 7+ (`pwsh`) から実行します。
 
 エディタはユーザー環境変数を書き換えません(2.のダイアログを除く)。起動時とゲームのビルド時に、使うパスとその出どころをLoggerViewに出し、1.のパスが`DXFORGE_ENGINE`と違うときはWarningにします。決め方のテストは`pwsh -NoProfile -File DXForgeEditor/Tests/engine_path_test.ps1`です(エディタのビルドだけで動き、GUIもGPUも不要。CIのEditor buildジョブでも実行します)。
 
+### 新しいプロジェクトの既定の場所
+
+Create ProjectのPath欄の既定値は、次の順に決まります(#141)。Path欄の書き換えとBrowseはこれまでどおりできます。
+
+1. ユーザー環境変数`DXFORGE_PROJECTS`(例: `F:\DXForgeProjects`。末尾の`\`はあってもなくてもよく、フォルダがなければ作成時に作られます)。
+2. 設定されていなければ、`%USERPROFILE%\DXForgeProjects\`。ドキュメントフォルダはOneDriveに移されていることがあるので使いません。
+
+`DXFORGE_PROJECTS`が使えない値(絶対パスでない、無効な文字を含む、ドライブがない)のときは、LoggerViewにWarningを出して2.を使います。エディタはこの環境変数を書き換えません。決め方のテストは`pwsh -NoProfile -File DXForgeEditor/Tests/projects_path_test.ps1`です(CIのEditor buildジョブでも実行します)。
+
 ## アセットのインポート (`DXForgeImport`)
 
 `DXForgeImport`は、エディタを開かずに(GUIなしで)FBXと画像をインポートし、エディタのドラッグ&ドロップのインポートと同じ`.asset`ファイルを書き出すコマンドラインツールです(#10)。`.asset`の形式を別に実装するのではなく、エディタ(`DXForgeEditor`)の`Content`のコードをそのまま呼ぶので、エディタとCLIの出力はずれません。プロジェクトを開く必要も、ウィンドウもありません(テクスチャの圧縮はウィンドウなしでGPUを使い、使えなければCPUで行います)。
