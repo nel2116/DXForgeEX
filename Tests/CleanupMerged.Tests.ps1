@@ -11,6 +11,7 @@
 	- 偽の orca: worktree rm で {"ok": true} をすぐに返し、別のプロセスが2秒後にフォルダ(ロックされた
 	  ファイルは残る)とworktreeの登録を消し、さらに2秒後にブランチを消す(本物のOrcaの非同期の削除の再現)。
 	  DXFORGE_TEST_ORCA_MODE=keep なら何も消さない(上限まで待っても登録が残る場合の再現)。
+	  terminal list には、DXFORGE_TEST_ORCA_TERMINALS のパスのターミナルが開いていると答える(#133)。
 
 	ケース:
 	  orca-async    Orcaの削除が遅れても、警告なしにworktree、ブランチ、フォルダが消える
@@ -19,7 +20,10 @@
 	  git-only      orcaがないとき、git worktree remove と git branch -D で消える
 	  from-worktree 消す対象のworktreeの中のスクリプトを実行しても、最後まで動く
 	  keep-unsafe   未マージ、マージ後のコミットあり、未コミットの変更あり、未追跡ファイルありは残る
-	  dry-run       -DryRun では何も消えず、orcaも呼ばれない
+	  dry-run       -DryRun では何も消えず、orca worktree rm も呼ばれない
+	  live-terminal Orcaのターミナルが開いているworktreeは残し、ほかのマージ済みのworktreeは消す(#133)
+	  terminal-path-format  Orcaのパスの区切り・大文字小文字・末尾の区切りが違っても、同じworktreeとして残す
+	  terminal-unknown      terminal list が失敗したときと途中で切れたときは、残す
 
 .PARAMETER ScriptPath
 	テストするスクリプト。既定はリポジトリの CleanupMerged.ps1。修正前のスクリプトで再現を確かめるときは、
@@ -81,7 +85,18 @@ exit 0
 '@
 
 $fakeOrca = @'
-# 偽の orca(テスト用)。worktree rm --worktree path:<パス> にだけ答える
+# 偽の orca(テスト用)。terminal list と worktree rm --worktree path:<パス> にだけ答える
+if ($args[0] -eq "terminal" -and $args[1] -eq "list") {
+	# DXFORGE_TEST_ORCA_TERMINALS: 開いているターミナルのworktreeのパス(;区切り)。fail なら失敗、truncated なら途中で切れた結果
+	$mode = "$env:DXFORGE_TEST_ORCA_TERMINALS"
+	if ($mode -eq "fail") { Write-Output '{"ok": false, "error": {"code": "runtime_unavailable"}}'; exit 1 }
+	$paths = @(if ($mode -ne "truncated") { $mode -split ';' | Where-Object { $_ } })
+	$terminals = @($paths | ForEach-Object { [ordered]@{ handle = "term_test"; worktreePath = $_; connected = $true } })
+	ConvertTo-Json -Depth 5 -InputObject ([ordered]@{
+		ok = $true; result = [ordered]@{ terminals = $terminals; totalCount = $terminals.Count; truncated = ($mode -eq "truncated") }
+	})
+	exit 0
+}
 Add-Content -LiteralPath $env:DXFORGE_TEST_ORCA_LOG -Value "$args"
 $selector = $args[[array]::IndexOf($args, "--worktree") + 1]
 $path = $selector -replace '^path:', ''
@@ -168,7 +183,7 @@ function New-Branch($sb, [string]$branch, [switch]$Worktree, [switch]$Merge) {
 }
 
 # テスト対象を実行する。-NoOrca なら本物も偽物もない PATH にする
-function Invoke-Cleanup($sb, [string[]]$arguments = @(), [switch]$NoOrca, [string]$OrcaMode = "async", [string]$Script, [switch]$InPlace) {
+function Invoke-Cleanup($sb, [string[]]$arguments = @(), [switch]$NoOrca, [string]$OrcaMode = "async", [string]$Script, [switch]$InPlace, [string]$Terminals = "") {
 	$savedPath = $env:PATH
 	try {
 		$dirs = $env:PATH -split ';' | Where-Object { $_ }
@@ -194,6 +209,7 @@ function Invoke-Cleanup($sb, [string[]]$arguments = @(), [switch]$NoOrca, [strin
 
 		$env:DXFORGE_TEST_MERGED_PRS = ($sb.Prs.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ';'
 		$env:DXFORGE_TEST_ORCA_MODE = $OrcaMode
+		$env:DXFORGE_TEST_ORCA_TERMINALS = $Terminals
 		$env:DXFORGE_TEST_ORCA_LOG = $sb.OrcaLog
 		$env:DXFORGE_TEST_PIDS = $sb.Pids
 		# スクリプトは自分のフォルダ($PSScriptRoot)をリポジトリとして扱うので、ルートに置いて実行する
@@ -397,6 +413,51 @@ $cases["dry-run"] = {
 			$b = Invoke-Cleanup $sb -arguments "-DryRun" -Script $BaselineScriptPath
 			Check (($b.Text -replace '\\', '/') -eq ($r.Text -replace '\\', '/')) "-DryRun の出力が $BaselineScriptPath と同じ"
 		}
+	}
+	finally { Remove-Sandbox $sb }
+}
+
+$cases["live-terminal"] = {
+	$sb = New-Sandbox
+	try {
+		# worker_done を送る前のworkerのように、マージ済みのworktreeでターミナルが開いている(#133)
+		$live = New-Branch $sb "fix/live" -Worktree -Merge
+		$done = New-Branch $sb "fix/done" -Worktree -Merge
+		$r = Invoke-Cleanup $sb -Terminals "$live;$($sb.Root -replace '\\', '/')"
+		Check ($r.ExitCode -eq 0) "終了コードが0"
+		Check ($r.Text -match '残す: \S+ \[fix/live\]\(Orcaのターミナルが 1 個開いている') "ターミナルが開いているworktreeを残すと表示する"
+		Check (-not ((Get-OrcaCalls $sb) | Where-Object { $_ -match [regex]::Escape($live) })) "そのworktreeに orca worktree rm を呼ばない"
+		Check ((Test-Registered $sb $live) -and (Test-Path -LiteralPath $live)) "worktreeは残っている"
+		Check (Test-BranchExists $sb "fix/live") "ブランチは残っている"
+		Check (-not (Test-Path -LiteralPath $done)) "ターミナルのないマージ済みのworktreeは消える"
+		Check (-not (Test-BranchExists $sb "fix/done")) "ターミナルのないマージ済みのブランチは消える"
+	}
+	finally { Remove-Sandbox $sb }
+}
+
+$cases["terminal-path-format"] = {
+	$sb = New-Sandbox
+	try {
+		# Orcaのパスと git worktree list のパスの、区切り・大文字小文字・末尾の区切りの違いを吸収する
+		$live = New-Branch $sb "fix/case" -Worktree -Merge
+		$r = Invoke-Cleanup $sb -arguments "-DryRun" -Terminals ((($live -replace '/', '\').ToUpperInvariant()) + '\')
+		Check ($r.Text -match '残す: \S+ \[fix/case\]\(Orcaのターミナルが 1 個開いている') "同じworktreeとして残す"
+		Check ($r.Text -notmatch '削除: \S+ \[fix/case\]') "消す対象にしない"
+	}
+	finally { Remove-Sandbox $sb }
+}
+
+$cases["terminal-unknown"] = {
+	$sb = New-Sandbox
+	try {
+		# ターミナルを確かめられないときは、消しすぎないよう残す
+		$wt = New-Branch $sb "fix/unknown" -Worktree -Merge
+		foreach ($mode in "fail", "truncated") {
+			$r = Invoke-Cleanup $sb -Terminals $mode
+			Check ($r.Text -match '残す: \S+ \[fix/unknown\]\(Orcaのターミナルを確認できない') "$mode : 確認できないので残すと表示する"
+			Check ((Test-Registered $sb $wt) -and (Test-BranchExists $sb "fix/unknown")) "$mode : worktreeとブランチは残っている"
+		}
+		Check ((Get-OrcaCalls $sb).Count -eq 0) "orca worktree rm は呼ばれない"
 	}
 	finally { Remove-Sandbox $sb }
 }

@@ -11,7 +11,11 @@
 	- ブランチに対応するPRがマージ済み(gh pr list --state merged --head <ブランチ>)
 	- ブランチの先端が origin/develop に含まれている(マージ後に足したコミットがない)
 	- worktreeに未コミットの変更や追跡されていないファイルがない(無視されたビルド成果物は除く)
+	- worktreeでOrcaのターミナルが開いていない(orca terminal list。#133)
 	起点にしただけでまだコミットのない作業中のworktreeは、マージ済みのPRがないので消さない。
+	orca worktree rm はそのworktreeのターミナルも閉じるので、PRのマージ後に worker_done を送る前の
+	Orcaのworkerを止めてしまう。workerのworktreeは worker_done と worker-release のあとの実行で消える。
+	Orcaが入っているのにターミナルを確かめられないとき(Orcaが起動していないなど)は、消さずに残す。
 
 	Orcaが管理するworktreeは orca worktree rm で消す(Orcaの記録とブランチも一緒に消える)。
 	それ以外、またはOrcaで消せなかったときは git worktree remove と git branch -D を使う。
@@ -111,6 +115,31 @@ try {
 			$dirty = git -C $path status --porcelain --untracked-files=all
 			if ($LASTEXITCODE -ne 0) { return "worktreeの状態を確認できない" }
 			if ($dirty) { return "未コミットの変更か追跡されていないファイルがある" }
+			$terminals = Get-OrcaTerminalReason $path
+			if ($terminals) { return $terminals }
+		}
+		return $null
+	}
+
+	function Get-NormalizedPath([string]$path) {
+		return [IO.Path]::GetFullPath($path.Replace('/', '\')).TrimEnd('\')
+	}
+
+	# worktreeでOrcaのターミナルが開いていれば、残す理由を返す(#133)。orca orchestration worker-list は
+	# Runを指定しないと呼び出したターミナルのRunしか返さないので、すべてのターミナルを返す terminal list で調べる。
+	# 確かめられないときも残す(消し損ねても次の実行で消えるが、消しすぎるとworkerを止めてしまう)
+	function Get-OrcaTerminalReason([string]$path) {
+		if (-not $hasOrca) { return $null }
+		$unknown = "Orcaのターミナルを確認できない(Orcaを起動してから実行し直す)"
+		$json = orca terminal list --limit 100000 --json 2>$null | Out-String
+		if ($LASTEXITCODE -ne 0) { return $unknown }
+		try { $list = $json | ConvertFrom-Json }
+		catch { return $unknown }
+		if (-not $list.ok -or $null -eq $list.result.terminals -or $list.result.truncated) { return $unknown }
+		$target = Get-NormalizedPath $path
+		$open = @($list.result.terminals | Where-Object { $_.worktreePath -and (Get-NormalizedPath $_.worktreePath) -eq $target })
+		if ($open.Count) {
+			return "Orcaのターミナルが $($open.Count) 個開いている。workerなら worker_done と worker-release のあとに消す"
 		}
 		return $null
 	}
