@@ -18,6 +18,8 @@
     2. インポート(ContentTools.dll と FBX SDK のサンプルが必要。ローカルで実行する)
        - テクスチャ(DXForgeEditor\Resources\TextureEditor\Checker64.png)と FBX(既定は FBX SDK のサンプル box.fbx)を
          インポートし、終了コード0と、出力した .asset の一覧が返る。設定ファイルと --set が .asset に反映される。
+       - ミップ数の最大値(#138): 8192x4 の画像を Compress=false, MipLevels=14 でインポートでき、エディタの Texture.Load で
+         14段として読める。MipLevels=15 は14に抑えられる。
        - 壊れた PNG / FBX で終了コード1と --json のエラーが返り、.asset を書かない(assert のダイアログやクラッシュにならない)。
        - 保存の失敗(出力先の .asset が読み取り専用)で終了コード1になる。-MultiLodFbxFile を指定すると、LODグループが2つ以上ある
          FBXの2つ目以降の .asset を読み取り専用にして、一部だけ保存できた場合も終了コード1になり、書けたファイルが files に残ることを確かめる。
@@ -243,6 +245,21 @@ namespace DXForgeImportTest
 		Check ($r.ExitCode -eq 0 -and $r.Json.settings.Compress -eq $false -and $r.Json.settings.MipLevels -eq 2) "設定: 設定ファイル(Compress=false)と --set(MipLevels=2、設定ファイルの3を上書き)が反映される"
 		$settingsTexture = Join-Path $settingsDir "checker64.asset"
 
+		# ミップ数の最大値(Texture.MaxMipLevels = 14)のテクスチャ: 8192 = 2^13 なので、8192x4 の画像はミップを14段まで作れる(#138)。
+		# DEBUG を定義したビルドでは、SlicesFromBinary の assert が 14 を拒むと CLI が FailFast で終わる。
+		$maxMipImage = Join-Path $WorkDir "maxmip.png"
+		$pixels = [byte[]]::new(8192 * 4 * 4)
+		[Array]::Fill($pixels, [byte]255)
+		$encoder = [System.Windows.Media.Imaging.PngBitmapEncoder]::new()
+		$encoder.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create([System.Windows.Media.Imaging.BitmapSource]::Create(8192, 4, 96, 96, [System.Windows.Media.PixelFormats]::Bgra32, $null, $pixels, 8192 * 4)))
+		$stream = [System.IO.File]::Create($maxMipImage)
+		try { $encoder.Save($stream) } finally { $stream.Dispose() }
+		$maxMipDir = Join-Path $WorkDir "maxmip"
+		$maxMipTexture = Join-Path $maxMipDir "maxmip.asset"
+		$r = Invoke-Import @("--input", $maxMipImage, "--output", $maxMipDir, "--set", "Compress=false", "--set", "MipLevels=14")
+		Check ($r.ExitCode -eq 0 -and $r.Json.success -and $r.Json.settings.MipLevels -eq 14 -and (Test-Path $maxMipTexture)) "ミップ数14: 8192x4 の画像を MipLevels=14 でインポートでき、終了コード0 (実際: $($r.ExitCode))"
+		$r = Invoke-Import @("--input", $maxMipImage, "--output", (Join-Path $WorkDir "maxmip15"), "--set", "Compress=false", "--set", "MipLevels=15")
+		Check ($r.ExitCode -eq 0 -and $r.Json.settings.MipLevels -eq 14) "ミップ数15: 設定が最大値の14に抑えられる (実際: 終了コード $($r.ExitCode)、MipLevels $($r.Json.settings.MipLevels))"
 
 		# FBX
 		$cliGeometry = $null
@@ -384,6 +401,11 @@ namespace DXForgeImportTest
 		Check ($loaded -and $texture.Width -eq 64 -and $texture.Height -eq 64 -and $texture.ImportSettings.Sources[0] -eq $TextureFile) "互換: CLI のテクスチャを Texture.Load で読め、64x64 で Sources が入力のパス"
 		$loaded, $texture = Load-Asset $textureType $settingsTexture
 		Check ($loaded -and $texture.ImportSettings.Compress -eq $false -and $texture.ImportSettings.MipLevels -eq 2 -and $texture.MipLevels -eq 2) "互換: 設定を変えた CLI のテクスチャを読め、設定(Compress=false, MipLevels=2)とミップ数が反映されている"
+		if (Test-Path $maxMipTexture)
+		{
+			$loaded, $texture = Load-Asset $textureType $maxMipTexture
+			Check ($loaded -and $texture.Width -eq 8192 -and $texture.Height -eq 4 -and $texture.MipLevels -eq 14) "互換: ミップ数14の CLI のテクスチャを Texture.Load で読め、8192x4 で14段 (実際: $($texture.MipLevels))"
+		}
 		if ($cliGeometry)
 		{
 			$loaded, $geometry = Load-Asset $geometryType $cliGeometry
