@@ -461,12 +461,16 @@ namespace DXForgeEditor.Content
             bool result = false;
             try
             {
-                ContentToolsAPI.ImportFbx(tempFile, this);
-                result = true;
+                // 失敗は例外ではなく戻り値で返る(ログには一時ファイルのパスで出るので、下で元のファイルのパスでも出す)。
+                result = ContentToolsAPI.ImportFbx(tempFile, this);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine(ex.Message);
+            }
+
+            if (!result)
+            {
                 var msg = $"FBXファイルのインポートに失敗しました: {file}";
                 Debug.WriteLine(msg);
                 Logger.Log(MessageType.Error, msg);
