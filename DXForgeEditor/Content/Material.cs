@@ -259,12 +259,30 @@ namespace DXForgeEditor.Content
         private Material _material => _loadedMaterial.Material;
         private readonly ObservableCollection<AppliedMaterialInput> _inputs = [];
         public ReadOnlyObservableCollection<AppliedMaterialInput> Inputs { get; }
-        private readonly List<int> _shaderIds = [];
         public MaterialSurface MaterialSurface { get; init; }
-        public UploadedAsset? UploadedAsset { get; private set; }
 
-        private byte[] _packedData = [];
-        private byte[] _previousPackedData = [];
+        // ---- アップロードの状態 ----
+        // このインスタンスが持ち続けるもの(アップロードしている間だけ。外すと全部戻す):
+        //   UploadedAsset      アップロードしたマテリアル。その参照を1つ持つ(マテリアルは入力のアセットの参照を持つ)
+        //   シェーダーの参照   _loadedMaterial.ReferenceCount のうちの1つ
+        //   _shaderIds         そのとき登録していたシェーダーのID(PackForEngine() が書く)
+        //   _uploadedData      アップロードしたデータ(PackForEngine() の結果)。変わったかどうかを比べる
+        // UploadToEngine() の中で一時的に増やして、抜けるときに必ず戻すもの:
+        //   入力のアセットの参照(PackForEngine() がそのIDを書くため)、シェーダーの参照(登録したままパックするため)
+        //
+        // | 操作                                   | 成功したあと                               | 失敗したあと                 |
+        // |----------------------------------------|--------------------------------------------|------------------------------|
+        // | アップロードしていないときに Upload    | 新しいマテリアル(同じ内容があれば共有)を持つ | 何も持たない(呼ぶ前のまま)   |
+        // | 同じ内容で Upload                      | 変わらない(true を返す)                    | -(失敗しない)              |
+        // | 内容を変えて Upload                    | 新しいマテリアルを持ち、前のものを戻す     | 前のものを持ったまま         |
+        // | Unload                                 | 何も持たない                               | -                            |
+        // | アップロードしていないときに Unload    | 何もしない                                 | -                            |
+        // 同じ内容(データが同じ)の適用マテリアルは、エンジンのマテリアルを共有し、それぞれが参照を1つ持つ。
+        // シェーダーは Material ごとに参照数を数え、0 から 1 で登録し、1 から 0 で外す。
+        // material_asset_test.ps1 の 8 節が、この表の操作を組み合わせて確かめる。
+        public UploadedAsset? UploadedAsset { get; private set; }
+        private List<int> _shaderIds = [];
+        private byte[] _uploadedData = [];
 
         public override List<AssetInfo> GetReferencedAssets() =>
             Inputs.Where(x => x.Asset != null && x.Asset.Guid != Guid.Empty).Select(x => x.Asset!).ToList();
@@ -295,8 +313,12 @@ namespace DXForgeEditor.Content
         //       0 から 1 になったときに登録し、1 から 0 になったときに外す。
         //       シェーダーグループを1つでも登録できなければ、登録できたものを外して失敗にする
         //       (Primal は失敗を無視し、そのシェーダーのない(IDが無効な)マテリアルをアップロードする。Codexの指摘, #145)。
-        private bool UploadShaders()
+        /// <summary>
+        /// マテリアルのシェーダーの参照を1つ増やし(0 から 1 なら登録し)、そのIDを返す。失敗したら参照を増やさない。
+        /// </summary>
+        private bool AcquireShaders(out List<int> shaderIds)
         {
+            shaderIds = [];
             var loadedMaterial = _loadedMaterial;
             if (loadedMaterial.ReferenceCount == 0)
             {
@@ -320,20 +342,15 @@ namespace DXForgeEditor.Content
             }
 
             ++loadedMaterial.ReferenceCount;
-
-            _shaderIds.Clear();
-            foreach (var shaderType in Enum.GetValues<ShaderType>())
-            {
-                _shaderIds.Add(_material.GetShaderGroup(shaderType)?.ContentId ?? ID.INVALID_ID);
-            }
-
+            shaderIds = Enum.GetValues<ShaderType>().Select(x => _material.GetShaderGroup(x)?.ContentId ?? ID.INVALID_ID).ToList();
             return true;
         }
 
-        private void UnloadShaders()
+        /// <summary>
+        /// AcquireShaders() で増やした参照を1つ戻す(1 から 0 なら外す)。
+        /// </summary>
+        private void ReleaseShaders()
         {
-            _shaderIds.Clear();
-
             var loadedMaterial = _loadedMaterial;
             Debug.Assert(loadedMaterial.ReferenceCount > 0);
             if (loadedMaterial.ReferenceCount <= 0) return;
@@ -356,29 +373,49 @@ namespace DXForgeEditor.Content
         }
 
         /// <summary>
+        /// アップロードしたマテリアルの参照を1つ戻す。参照数が0になったら、同じ内容を探す表からも外す。
+        /// </summary>
+        private static void ReleaseUploadedMaterial(UploadedAsset uploadedAsset)
+        {
+            // NOTE: RemoveFromScene() は参照数が0になると ContentId を無効にするので、先に取っておく
+            //       (Primal はそのあとの ContentId で _packedMaterialIds から外すため、外れずに残る)
+            var contentId = uploadedAsset.ContentId;
+            UploadedAsset.RemoveFromScene(uploadedAsset);
+            if (uploadedAsset.ReferenceCount == 0 && _packedMaterialIds.Remove(contentId, out var dataString))
+            {
+                _packedMaterials.Remove(dataString);
+            }
+        }
+
+        /// <summary>
         /// 適用マテリアルをエンジンにアップロードする。前にアップロードしてから変わっていなければ何もしない。
+        /// 失敗したときは、呼ぶ前の状態のまま(上の状態の表)。
         /// NOTE: エンジンの初期化(Primal Day 078, #31)がまだないので、エディタからは呼ばれない。
         /// </summary>
         public bool UploadToEngine()
         {
-            // 入力のアセット(テクスチャなど)を先にアップロードする(PackForEngine() がそのIDを書くため)。
-            // マテリアルのアップロード(UploadedAsset.AddToScene)でマテリアルが入力の参照を持つので、ここで増やした参照は最後に戻す。
+            // 一時的な参照: 入力のアセット(PackForEngine() がそのIDを書くため)。最後に必ず戻す。
             // NOTE: Primal は先にアップロードしないので、入力のアセットがまだアップロードされていないと失敗する(Codexの指摘, #145)
             var inputs = new List<UploadedAsset>();
-            foreach (var assetInfo in GetReferencedAssets())
-            {
-                var input = UploadedAsset.AddToScene(assetInfo);
-                if (input == null)
-                {
-                    inputs.ForEach(UploadedAsset.RemoveFromScene);
-                    return false;
-                }
-                inputs.Add(input);
-            }
-
             try
             {
-                return UploadMaterialToEngine();
+                foreach (var assetInfo in GetReferencedAssets())
+                {
+                    var input = UploadedAsset.AddToScene(assetInfo);
+                    if (input == null) return false;
+                    inputs.Add(input);
+                }
+
+                // 一時的な参照: シェーダー(登録したままパックするため)。最後に必ず戻す
+                if (!AcquireShaders(out var shaderIds)) return false;
+                try
+                {
+                    return UploadMaterialToEngine(shaderIds);
+                }
+                finally
+                {
+                    ReleaseShaders();
+                }
             }
             finally
             {
@@ -386,35 +423,24 @@ namespace DXForgeEditor.Content
             }
         }
 
-        // 状態: UploadedAsset が null でなければ、この適用マテリアルは UploadedAsset の参照を1つと、マテリアルのシェーダーの
-        //       参照を1つ持ち、_previousPackedData はそのときのデータ。null なら何も持たない(アップロードしていないか、外した)。
-        //       どの経路で失敗しても、この状態は呼ぶ前のまま変えない。
         // NOTE: Primal は、内容が変わったときに「前の内容をアップロード済み」であることを Debug.Assert で前提にして GUID を
         //       作り直すが、同じ内容を共有していた別の適用マテリアルが残っていて、自分は外し済みのときに外れる(Codexの指摘, #145)。
         //       ここでは、新しい内容は常に新しいGUIDでアップロードし、同じ内容のものがあればそのGUIDを使う。
-        private bool UploadMaterialToEngine()
+        //       また、同じ内容でアップロードし直したときに、持ち続けるもの(_shaderIds など)を変えない(Codexの指摘3回目, #145)。
+        private bool UploadMaterialToEngine(List<int> shaderIds)
         {
-            if (!UploadShaders()) return false;
+            var packedData = Pack(shaderIds);
+            if (packedData.Length == 0) return false;
 
-            var packedData = PackForEngine();
-            if (packedData.Length == 0)
-            {
-                UnloadShaders();
-                return false;
-            }
-
-            // 前にアップロードしてから変わっていなければ、アップロードし直さない(参照は前のものを持ち続ける)
+            // 同じ内容なら何も変えない
             // NOTE: SequenceEqual() は遅いが、データは小さく、頻繁には行わない
-            if (UploadedAsset != null && packedData.SequenceEqual(_previousPackedData))
-            {
-                UnloadShaders();
-                return true;
-            }
+            if (UploadedAsset != null && packedData.SequenceEqual(_uploadedData)) return true;
 
-            // 同じ内容のマテリアルがアップロードされていれば、それを使う(参照数が増える)
+            // 同じ内容のマテリアルがアップロードされていれば、それを使う(参照数が増える)。なければ新しいGUIDでアップロードする。
+            // NOTE: AddToScene() は this.PackForEngine() と GetMetadata() を呼ぶので、その間だけ新しい値にし、失敗したら戻す
             var dataString = Convert.ToBase64String(packedData);
+            var previous = (Guid, _shaderIds, _uploadedData);
             UploadedAsset? uploadedAsset;
-            var previousGuid = Guid;
 
             if (_packedMaterials.TryGetValue(dataString, out var sameAsset))
             {
@@ -423,7 +449,8 @@ namespace DXForgeEditor.Content
             else
             {
                 Guid = Guid.NewGuid();
-                _packedData = packedData;
+                _shaderIds = shaderIds;
+                _uploadedData = packedData;
                 uploadedAsset = UploadedAsset.AddToScene(GetAssetInfo(), this);
                 if (uploadedAsset != null)
                 {
@@ -434,47 +461,45 @@ namespace DXForgeEditor.Content
 
             if (uploadedAsset == null)
             {
-                Guid = previousGuid;
-                _packedData = _previousPackedData;
-                UnloadShaders();
+                (Guid, _shaderIds, _uploadedData) = previous;
                 return false;
             }
 
-            // 前の内容の参照(マテリアルとシェーダー)を戻す
-            UnloadFromEngine();
+            // 持ち続けるシェーダーの参照を増やす(一時的な参照を持っているので、登録はしない)
+            var acquired = AcquireShaders(out _);
+            Debug.Assert(acquired);
 
-            Guid = uploadedAsset.AssetInfo.Guid;
-            _packedData = packedData;
-            _previousPackedData = packedData;
+            // 前のものを戻す
+            if (UploadedAsset != null)
+            {
+                ReleaseUploadedMaterial(UploadedAsset);
+                ReleaseShaders();
+            }
+
             UploadedAsset = uploadedAsset;
+            Guid = uploadedAsset.AssetInfo.Guid;
+            _shaderIds = shaderIds;
+            _uploadedData = packedData;
 
             return true;
         }
 
         /// <summary>
-        /// アップロードした適用マテリアルを外す。アップロードしていなければ何もしない。
+        /// アップロードした適用マテリアルを外し、持っているものを全部戻す。アップロードしていなければ何もしない。
         /// </summary>
         public void UnloadFromEngine()
         {
-            var uploadedAsset = UploadedAsset;
-            if (uploadedAsset == null) return;
+            if (UploadedAsset == null) return;
 
-            // NOTE: RemoveFromScene() は参照数が0になると ContentId を無効にするので、先に取っておく
-            //       (Primal はそのあとの ContentId で _packedMaterialIds から外すため、外れずに残る)
-            var contentId = uploadedAsset.ContentId;
-            UploadedAsset.RemoveFromScene(uploadedAsset);
-            UnloadShaders();
+            ReleaseUploadedMaterial(UploadedAsset);
+            ReleaseShaders();
 
-            if (uploadedAsset.ReferenceCount == 0 && _packedMaterialIds.Remove(contentId, out var dataString))
-            {
-                _packedMaterials.Remove(dataString);
-            }
-
-            _previousPackedData = [];
             UploadedAsset = null;
+            _shaderIds = [];
+            _uploadedData = [];
         }
 
-        public override MaterialMetadata GetMetadata() => new() { PackedData = _packedData };
+        public override MaterialMetadata GetMetadata() => new() { PackedData = _uploadedData };
 
         // NOTE: Primal は以下の3つで NotImplementedException を投げる。適用マテリアルはファイルにしないので、失敗を返す。
         public override bool Import(string file) => false;
@@ -498,10 +523,12 @@ namespace DXForgeEditor.Content
         /// }
         /// NOTE: 並びは DXForgeEngineDLL/ResourceUpload.h と合わせる
         /// </returns>
-        public override byte[] PackForEngine()
+        // NOTE: アップロードしている間(と UploadToEngine() の中)だけデータを返す。アップロードしていなければ空
+        public override byte[] PackForEngine() => Pack(_shaderIds);
+
+        private byte[] Pack(List<int> shaderIds)
         {
-            // NOTE: シェーダーを登録してから(UploadToEngine() の中で)呼ぶ。登録していなければ空
-            if (_shaderIds.Count != Enum.GetValues<ShaderType>().Length) return [];
+            if (shaderIds.Count != Enum.GetValues<ShaderType>().Length) return [];
 
             using var writer = new BinaryWriter(new MemoryStream());
             var referencedAssets = GetReferencedAssets();
@@ -525,7 +552,7 @@ namespace DXForgeEditor.Content
             MaterialSurface.ToBinary(writer);
             writer.Write((int)_material.MaterialType);
             writer.Write(referencedAssets.Count);
-            _shaderIds.ForEach(writer.Write);
+            shaderIds.ForEach(writer.Write);
 
             writer.Flush();
             return ((MemoryStream)writer.BaseStream).ToArray();

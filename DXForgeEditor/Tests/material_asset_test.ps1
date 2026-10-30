@@ -34,6 +34,9 @@
          - 同じ内容の2つの適用マテリアルの1つを外し、内容を変えてアップロードし直せる(もう1つはそのまま)。
            アップロードしていない適用マテリアルを外しても何も起きない。
          - 読み込めないアセット(ファイルがない、壊れている、種類が違う)はアップロードしない(リソースを作らない)。
+      8. AppliedMaterial の状態の遷移(Material.cs の AppliedMaterial の状態の表): 操作を組み合わせて実行し、操作のたびに
+         持っているもの(アップロードしたマテリアルとその参照数、シェーダーの参照数、パックの結果)と、エンジンのリソースを
+         作った・破棄した回数を確かめる。
       DLL が要る項目: 1 の実際のコンパイル、5 の DLL を呼ぶ項目。
 
 .PARAMETER Configuration
@@ -117,8 +120,18 @@ $createShaderGroup = $defaultAssets.GetMethod("CreateShaderGroup", $flags)
 $getEngineShadersPath = $defaultAssets.GetMethod("GetEngineShadersPath", $flags)
 $createDefaultMaterial = $defaultAssets.GetMethod("CreateDefaultMaterial", $flags)
 $tryGetAssetInfo = $assetType.GetMethod("TryGetAssetInfo", $flags)
-$uploadShaders = $appliedMaterialType.GetMethod("UploadShaders", $flags)
-$unloadShaders = $appliedMaterialType.GetMethod("UnloadShaders", $flags)
+$acquireShaders = $appliedMaterialType.GetMethod("AcquireShaders", $flags)
+$releaseShaders = $appliedMaterialType.GetMethod("ReleaseShaders", $flags)
+$packMaterial = $appliedMaterialType.GetMethod("Pack", $flags)
+# AppliedMaterial のシェーダーの参照を1つ増やし、シェーダーのIDの一覧を返す(失敗したら $null)
+function Invoke-AcquireShaders($applied)
+{
+	$arguments = [object[]]@($null)
+	if ($acquireShaders.Invoke($applied, $arguments)) { return , $arguments[0] }
+	return $null
+}
+# そのシェーダーのIDでパックする(PackForEngine() はアップロードしている間だけデータを返すため)
+function Invoke-Pack($applied, $shaderIds) { return , [byte[]]$packMaterial.Invoke($applied, @(, $shaderIds)) }
 $getContentId = $uploadedAssetType.GetMethod("GetContentId", $flags)
 $resourceName = $defaultAssets.GetField("DefaultMaterialShadersResource", $flags).GetValue($null)
 $uploadedShaderIds = $shaderGroupType.GetNestedType("UploadedShaderGroup", $flags).GetField("_uploadedShaderIds", $flags)
@@ -232,10 +245,10 @@ try
 	Write-Host "3. AppliedMaterial.PackForEngine"
 	$materialInfo = $tryGetAssetInfo.Invoke($null, @($file))
 	$applied = [Activator]::CreateInstance($appliedMaterialType, @($materialInfo))
-	[void]$uploadShaders.Invoke($applied, $null)
+	$appliedIds = Invoke-AcquireShaders $applied
 	$appliedSource = $appliedMaterialType.GetProperty("_material", $flags).GetValue($applied)
 	$vsId = (Get-Shader $appliedSource "Vertex").ContentId
-	$data = $applied.PackForEngine()
+	$data = Invoke-Pack $applied $appliedIds
 	# EngineUnitTests の Tests_ResourceUpload.cpp と同じ定数: packed_material_size(0) = 92、material_init_info は 4 バイト目から
 	# (texture_ids +0、surface +8、type +48、texture_count +52、shader_ids +56)
 	Check ($data.Length -eq 92) "92 bytes without textures: $($data.Length)"
@@ -252,28 +265,29 @@ try
 	$applied.Inputs[0].Asset = [Activator]::CreateInstance($materialInfo.GetType())
 	$applied.Inputs[0].Asset.Guid = [Guid]::NewGuid()
 	$applied.Inputs[0].Asset.FullPath = "C:\NotUploaded.asset"
-	Check ($applied.PackForEngine().Length -eq 0) "an input that is not uploaded gives no data"
+	Check ((Invoke-Pack $applied $appliedIds).Length -eq 0) "an input that is not uploaded gives no data"
 	$applied.Inputs[0].Asset = $null
-	$unloadShaders.Invoke($applied, $null)
-	Check ((Get-UploadedShaderCount) -eq 0 -and (Get-Shader $appliedSource "Vertex").ContentId -eq $invalidId) "UnloadShaders removes the shaders: $(Get-UploadedShaderCount) left"
+	Check ($applied.PackForEngine().Length -eq 0) "PackForEngine gives no data while the applied material is not uploaded"
+	$releaseShaders.Invoke($applied, $null)
+	Check ((Get-UploadedShaderCount) -eq 0 -and (Get-Shader $appliedSource "Vertex").ContentId -eq $invalidId) "ReleaseShaders removes the shaders: $(Get-UploadedShaderCount) left"
 
 	Write-Host "4. Two applied materials sharing a material"
 	$a1 = [Activator]::CreateInstance($appliedMaterialType, @($materialInfo))
 	$a2 = [Activator]::CreateInstance($appliedMaterialType, @($materialInfo))
-	[void]$uploadShaders.Invoke($a1, $null)
-	[void]$uploadShaders.Invoke($a2, $null)
+	$ids1 = Invoke-AcquireShaders $a1
+	$ids2 = Invoke-AcquireShaders $a2
 	$count = Get-UploadedShaderCount
-	$p1 = [Convert]::ToBase64String($a1.PackForEngine())
-	$p2 = [Convert]::ToBase64String($a2.PackForEngine())
+	$p1 = [Convert]::ToBase64String((Invoke-Pack $a1 $ids1))
+	$p2 = [Convert]::ToBase64String((Invoke-Pack $a2 $ids2))
 	Check ($count -eq 2 -and $p1 -eq $p2) "both use the same uploaded shaders: $count shader groups"
-	$unloadShaders.Invoke($a1, $null)
+	$releaseShaders.Invoke($a1, $null)
 	$sharedVs = $appliedMaterialType.GetProperty("_material", $flags).GetValue($a2).GetShaderGroup([Enum]::Parse($shaderType, "Vertex"))
-	Check ((Get-UploadedShaderCount) -eq 2 -and $sharedVs.ContentId -ne $invalidId -and [Convert]::ToBase64String($a2.PackForEngine()) -eq $p2) "removing one keeps the shaders of the other: $(Get-UploadedShaderCount) shader groups, vertex id $($sharedVs.ContentId)"
-	$unloadShaders.Invoke($a2, $null)
+	Check ((Get-UploadedShaderCount) -eq 2 -and $sharedVs.ContentId -ne $invalidId -and [Convert]::ToBase64String((Invoke-Pack $a2 $ids2)) -eq $p2) "removing one keeps the shaders of the other: $(Get-UploadedShaderCount) shader groups, vertex id $($sharedVs.ContentId)"
+	$releaseShaders.Invoke($a2, $null)
 	Check ((Get-UploadedShaderCount) -eq 0 -and $sharedVs.ContentId -eq $invalidId) "removing both removes the shaders: $(Get-UploadedShaderCount) left"
-	[void]$uploadShaders.Invoke($a1, $null)
+	[void](Invoke-AcquireShaders $a1)
 	Check ((Get-UploadedShaderCount) -eq 2) "they can be uploaded again: $(Get-UploadedShaderCount) shader groups"
-	$unloadShaders.Invoke($a1, $null)
+	$releaseShaders.Invoke($a1, $null)
 
 	Write-Host "5. EngineAPI.CreateResource / DestroyResource without the engine initialized"
 	$animation = [Enum]::Parse($assetTypeEnum, "Animation")
@@ -312,7 +326,7 @@ try
 
 	# 偽のエンジン: リソースのIDを順に返し、作ったデータと破棄したIDを覚える
 	$script:fake = @{ Next = 100; Created = @{}; Data = @{}; Destroyed = [System.Collections.Generic.List[int]]::new(); Textures = @{} }
-	$createSb = { param([byte[]]$data, $type) $id = $script:fake.Next; $script:fake.Next++; $script:fake.Created[$id] = "$type"; $script:fake.Data[$id] = $data; [int]$id }
+	$createSb = { param([byte[]]$data, $type) if ($script:fake.Fail) { return [int]-1 }; $id = $script:fake.Next; $script:fake.Next++; $script:fake.Created[$id] = "$type"; $script:fake.Data[$id] = $data; [int]$id }
 	$destroySb = { param([int]$id, $type) $script:fake.Destroyed.Add($id) }
 	$loadSb = { param($info) $script:fake.Textures[$info.Guid] }
 	$seams = @{
@@ -448,6 +462,113 @@ try
 			$sharedA.UnloadFromEngine()
 			$sharedB.UnloadFromEngine()
 			Check ($uploadedAssets.Count -eq 0 -and $script:fakeShaders.Live.Count -eq 0 -and -not $loadedMaterials.ContainsKey($materialInfo.Guid)) "unloading twice does nothing, and everything is released: $($uploadedAssets.Count) assets, $($script:fakeShaders.Live.Count) shaders"
+
+			Write-Host "8. AppliedMaterial state transitions"
+			$script:fake.Fail = $false
+			$loadedMaterialField = $appliedMaterialType.GetField("_loadedMaterial", $flags)
+			# 操作のあとの状態: 期待する値と比べる
+			#   Uploaded: アップロードしているか / Refs: そのマテリアルの参照数 / Shaders: このマテリアルのシェーダーの参照数
+			#   Pack: PackForEngine() の長さ / Created, Destroyed: このシナリオでエンジンのマテリアルを作った・破棄した回数
+			function Get-MaterialCounts
+			{
+				$created = @($script:fake.Created.Values | Where-Object { $_ -eq "Material" }).Count
+				$destroyed = @($script:fake.Destroyed | Where-Object { $script:fake.Created[$_] -eq "Material" }).Count
+				@{ Created = $created; Destroyed = $destroyed }
+			}
+			function Assert-State([string]$step, $am, [hashtable]$expected, [hashtable]$start)
+			{
+				$counts = Get-MaterialCounts
+				$actual = [ordered]@{
+					Uploaded = $null -ne $am.UploadedAsset
+					Refs = if ($am.UploadedAsset) { $am.UploadedAsset.ReferenceCount } else { 0 }
+					Shaders = $loadedMaterialField.GetValue($am).ReferenceCount
+					Pack = $am.PackForEngine().Length
+					Created = $counts.Created - $start.Created
+					Destroyed = $counts.Destroyed - $start.Destroyed
+				}
+				$ok = $true
+				foreach ($key in $expected.Keys) { if ("$($actual[$key])" -ne "$($expected[$key])") { $ok = $false } }
+				$text = ($actual.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join " "
+				Check $ok "${step}: $text"
+			}
+			function New-Applied { [Activator]::CreateInstance($appliedMaterialType, @($materialInfo)) }
+
+			# S1: 同じ内容で2回アップロードしてもパックできる(Codexの指摘3回目)
+			$start = Get-MaterialCounts
+			$s1 = New-Applied
+			[void]$s1.UploadToEngine()
+			Assert-State "S1 upload" $s1 @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 92; Created = 1; Destroyed = 0 } $start
+			$again = $s1.UploadToEngine()
+			Assert-State "S1 upload again (same content, returns $again)" $s1 @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 92; Created = 1; Destroyed = 0 } $start
+			$s1.UnloadFromEngine()
+			Assert-State "S1 unload" $s1 @{ Uploaded = $false; Refs = 0; Shaders = 0; Pack = 0; Created = 1; Destroyed = 1 } $start
+			$s1.UnloadFromEngine()
+			Assert-State "S1 unload again (not uploaded)" $s1 @{ Uploaded = $false; Refs = 0; Shaders = 0; Pack = 0; Created = 1; Destroyed = 1 } $start
+
+			# S2: 内容を変えてアップロードし直すと、前のマテリアルは破棄される
+			$start = Get-MaterialCounts
+			$s2 = New-Applied
+			[void]$s2.UploadToEngine()
+			$s2.MaterialSurface.Roughness = 0.2
+			[void]$s2.UploadToEngine()
+			Assert-State "S2 change and upload" $s2 @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 92; Created = 2; Destroyed = 1 } $start
+			$packed = $s2.PackForEngine()
+			$roughness = if ($packed.Length -ge 52) { [BitConverter]::ToSingle($packed, 48) } else { "(no data)" }
+			Check ($roughness -eq [float]0.2) "S2 the packed data has the new roughness: $roughness"
+			$s2.UnloadFromEngine()
+			Assert-State "S2 unload" $s2 @{ Uploaded = $false; Refs = 0; Shaders = 0; Created = 2; Destroyed = 2 } $start
+
+			# S3: 同じ内容の A と B。A を外して変えてアップロードし、B を外す
+			$start = Get-MaterialCounts
+			$a = New-Applied
+			$b = New-Applied
+			[void]$a.UploadToEngine()
+			[void]$b.UploadToEngine()
+			Assert-State "S3 A and B share" $b @{ Uploaded = $true; Refs = 2; Shaders = 2; Pack = 92; Created = 1; Destroyed = 0 } $start
+			$a.UnloadFromEngine()
+			Assert-State "S3 A unloaded (B)" $b @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 92; Created = 1; Destroyed = 0 } $start
+			$a.MaterialSurface.Roughness = 0.3
+			[void]$a.UploadToEngine()
+			Assert-State "S3 A changed and uploaded (A)" $a @{ Uploaded = $true; Refs = 1; Shaders = 2; Pack = 92; Created = 2; Destroyed = 0 } $start
+			$b.UnloadFromEngine()
+			Assert-State "S3 B unloaded (A)" $a @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 92; Created = 2; Destroyed = 1 } $start
+			$a.UnloadFromEngine()
+			Assert-State "S3 A unloaded" $a @{ Uploaded = $false; Refs = 0; Shaders = 0; Created = 2; Destroyed = 2 } $start
+
+			# S4: アップロードに失敗しても何も持たず、あとでアップロードできる
+			$start = Get-MaterialCounts
+			$s4 = New-Applied
+			$script:fake.Fail = $true
+			$failed = $s4.UploadToEngine()
+			$script:fake.Fail = $false
+			Assert-State "S4 failed upload (returns $failed)" $s4 @{ Uploaded = $false; Refs = 0; Shaders = 0; Created = 0; Destroyed = 0 } $start
+			Check ($script:fakeShaders.Live.Count -eq 0) "S4 no shaders are left registered: $($script:fakeShaders.Live.Count)"
+			[void]$s4.UploadToEngine()
+			Assert-State "S4 upload after the failure" $s4 @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 92; Created = 1; Destroyed = 0 } $start
+
+			# S5: 内容を変えたアップロードに失敗しても、前のものを持ち続ける
+			$s4.MaterialSurface.Roughness = 0.4
+			$script:fake.Fail = $true
+			$failed = $s4.UploadToEngine()
+			$script:fake.Fail = $false
+			Assert-State "S5 failed upload of changed content (returns $failed)" $s4 @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 92; Created = 1; Destroyed = 0 } $start
+			# PackForEngine() は今の値でパックする。アップロードしたデータ(GetMetadata().PackedData)は前のまま
+			$packed = $s4.GetMetadata().PackedData
+			$roughness = if ($packed.Length -ge 52) { [BitConverter]::ToSingle($packed, 48) } else { "(no data)" }
+			Check ($packed.Length -eq 92 -and $roughness -ne [float]0.4 -and $getContentId.Invoke($null, @($s4.Guid)) -eq $s4.UploadedAsset.ContentId) "S5 it keeps the previous upload: uploaded roughness $roughness"
+			$s4.UnloadFromEngine()
+			Assert-State "S5 unload" $s4 @{ Uploaded = $false; Refs = 0; Shaders = 0; Created = 1; Destroyed = 1 } $start
+
+			# S6: 入力のテクスチャは、同じ内容で2回アップロードしても1つだけ参照する
+			$uploadedAssetType.GetProperty("LoadAsset", $flags).SetValue($null, [System.Management.Automation.LanguagePrimitives]::ConvertTo($loadSb, $seams.LoadAsset))
+			$s6 = New-Applied
+			$s6.Inputs[0].Asset = $texInfo
+			[void]$s6.UploadToEngine()
+			[void]$s6.UploadToEngine()
+			$texRefs = if ($uploadedAssets.ContainsKey($texInfo.Guid)) { $uploadedAssets[$texInfo.Guid].ReferenceCount } else { 0 }
+			Check ($texRefs -eq 1 -and $s6.PackForEngine().Length -eq 96) "S6 the input texture is referenced once: $texRefs, pack $($s6.PackForEngine().Length)"
+			$s6.UnloadFromEngine()
+			Check (-not $uploadedAssets.ContainsKey($texInfo.Guid) -and $uploadedAssets.Count -eq 0 -and $script:fakeShaders.Live.Count -eq 0) "S6 unloading releases the texture and the shaders: $($uploadedAssets.Count) assets, $($script:fakeShaders.Live.Count) shaders"
 
 			# 読み込めないアセットはアップロードしない(本物の読み込みを使う)
 			$uploadedAssetType.GetProperty("LoadAsset", $flags).SetValue($null, $originals.LoadAsset)
