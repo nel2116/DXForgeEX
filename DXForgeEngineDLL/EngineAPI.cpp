@@ -7,6 +7,7 @@
 // 更新履歴
 // 2024/11/14 新規作成
 // 2026/10/27 シェーダーのコンパイルとシェーダーグループの登録・削除を追加(Primal Day 076)
+// 2026/10/30 エディタからアセットのリソースを作る・破棄する CreateResource / DestroyResource を追加(Primal Day 077, #30)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Common.h"
@@ -18,6 +19,7 @@
 #include "Content/ContentToEngine.h"
 #include "Utilities/IOStream.h"
 #include "ShaderCompilation.h"
+#include "ResourceUpload.h"
 
 #ifdef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -97,6 +99,21 @@ EDITOR_INTERFACE void ResizeRenderSurface(u32 id)
 {
 	assert(id < surfaces.size());
 	surfaces[id].window.resize(0, 0);
+}
+
+// エディタのアセットの PackForEngine() のデータから、エンジンのリソースを作る(Primal Day 077)。
+// type は content::asset_type::type(エディタの AssetType と同じ値)。material、mesh、texture だけを扱う。
+// 作れなければ id::invalid_id。マテリアルのデータの並びは ResourceUpload.h を参照。
+// NOTE: Primal Day 077 は id::invalid_id を返すだけで、content::create_resource を呼ぶのは Day 078 から。
+//       テストで確かめられるよう、ここでは Day 078 の形まで入れる(エンジンの初期化 InitializeEngine は #31)。
+EDITOR_INTERFACE id::id_type CreateResource(const u8* data, u32 type)
+{
+	return editor::create_resource(data, type);
+}
+
+EDITOR_INTERFACE void DestroyResource(id::id_type id, u32 type)
+{
+	editor::destroy_resource(id, type);
 }
 namespace
 {

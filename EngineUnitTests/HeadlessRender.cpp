@@ -10,6 +10,8 @@
 // 2026/10/29 幅・高さの最小をライトカリングのタイルの大きさにした (#128 のレビュー)
 // 2026/10/29 初期化に失敗したときに graphics::shutdown() を重ねて呼ばないようにした (#128 のレビュー)
 // 2026/10/29 予期しない例外を最上位で捕捉し、段階に応じた終了コードとJSONを返すようにした (#128 のレビュー)
+// 2026/10/30 メッシュとマテリアルを、エディタの形のデータからDLLと同じ経路(ResourceUpload)で作るようにし、
+//            テクスチャ・マテリアル・メッシュを作って破棄し、作り直す確認を足した (Primal Day 077, #30)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -21,6 +23,8 @@
 #include "Components/Transform.h"
 #include "Components/Geometry.h"
 #include "../DXForgeEngineDLL/ShaderCompilation.h"
+#include "../DXForgeEngineDLL/ResourceUpload.h"
+#include "EditorAssetPacking.h"
 
 #include <cmath>
 #include <cstdio>
@@ -385,8 +389,12 @@ namespace dxforge::headless::render
 				assert(id::is_valid(_vs_id) && id::is_valid(_ps_id));
 				const std::vector<u8> sphere_blob{ pack_mesh(make_sphere(1.f, 48, 24)) };
 				const std::vector<u8> floor_blob{ pack_mesh(make_floor(4.f)) };
-				_sphere_model_id = content::create_resource(sphere_blob.data(), content::asset_type::mesh);
-				_floor_model_id = content::create_resource(floor_blob.data(), content::asset_type::mesh);
+				const std::string upload_error{ check_resource_round_trip(floor_blob) };
+				if (!upload_error.empty()) return upload_error;
+
+				// NOTE: エディタから作るときと同じ経路(DLLの CreateResource = editor::create_resource)で作る
+				_sphere_model_id = editor::create_resource(sphere_blob.data(), content::asset_type::mesh);
+				_floor_model_id = editor::create_resource(floor_blob.data(), content::asset_type::mesh);
 				if (!id::is_valid(_sphere_model_id) || !id::is_valid(_floor_model_id)) return "failed to create the test meshes";
 
 				_sphere_mtl_id = create_material({ 0.8f, 0.25f, 0.2f, 1.f }, 0.f, 0.4f);
@@ -450,12 +458,12 @@ namespace dxforge::headless::render
 				_has_light_set = false;
 				for (id::id_type* id : { &_sphere_model_id, &_floor_model_id })
 				{
-					if (id::is_valid(*id)) content::destroy_resource(*id, content::asset_type::mesh);
+					editor::destroy_resource(*id, content::asset_type::mesh);
 					*id = id::invalid_id;
 				}
 				for (id::id_type* id : { &_sphere_mtl_id, &_floor_mtl_id })
 				{
-					if (id::is_valid(*id)) content::destroy_resource(*id, content::asset_type::material);
+					editor::destroy_resource(*id, content::asset_type::material);
 					*id = id::invalid_id;
 				}
 				for (id::id_type* id : { &_vs_id, &_ps_id })
@@ -468,16 +476,56 @@ namespace dxforge::headless::render
 		private:
 			constexpr static u64 light_set_key{ 0 };
 
-			id::id_type create_material(math::v4 base_color, f32 metallic, f32 roughness)
+			/// @brief エディタの AppliedMaterial.PackForEngine() の形のデータから、DLLと同じ経路でマテリアルを作る
+			id::id_type create_material(math::v4 base_color, f32 metallic, f32 roughness, const id::id_type* texture_ids = nullptr, u32 texture_count = 0)
 			{
-				graphics::material_init_info info{};
-				info.shader_ids[graphics::shader_type::vertex] = _vs_id;
-				info.shader_ids[graphics::shader_type::pixel] = _ps_id;
-				info.type = graphics::material_type::opaque;
-				info.surface.base_color = base_color;
-				info.surface.metallic = metallic;
-				info.surface.roughness = roughness;
-				return content::create_resource(&info, content::asset_type::material);
+				graphics::material_surface surface{};
+				surface.base_color = base_color;
+				surface.metallic = metallic;
+				surface.roughness = roughness;
+				id::id_type shader_ids[graphics::shader_type::count];
+				for (id::id_type& id : shader_ids) id = id::invalid_id;
+				shader_ids[graphics::shader_type::vertex] = _vs_id;
+				shader_ids[graphics::shader_type::pixel] = _ps_id;
+				const std::vector<u8> data{ test::pack_material(surface, graphics::material_type::opaque, texture_ids, texture_count, shader_ids) };
+				return editor::create_resource(data.data(), content::asset_type::material);
+			}
+
+			/// @brief エディタの形のデータから、テクスチャ・それを使うマテリアル・メッシュをDLLと同じ経路で作って破棄する。
+			///		   これを2回行い、破棄したIDが再利用されても作れることを確かめる(Primal Day 077, #30)
+			/// @return 失敗したときはその説明(成功なら空)
+			std::string check_resource_round_trip(const std::vector<u8>& mesh_blob)
+			{
+				constexpr u32 size{ 4 };
+				constexpr u32 format_r8g8b8a8_unorm{ 28 };	// DXGI_FORMAT_R8G8B8A8_UNORM
+				std::vector<u8> pixels(size * size * 4);
+				for (u32 i{ 0 }; i < (u32)pixels.size(); ++i) pixels[i] = (u8)(i * 13);
+				const std::vector<u8> texture_blob{ test::pack_texture_2d(size, size, format_r8g8b8a8_unorm, size * 4, pixels) };
+
+				id::id_type previous_ids[3]{ id::invalid_id, id::invalid_id, id::invalid_id };
+				u32 reused{ 0 };
+				for (u32 round{ 0 }; round < 2; ++round)
+				{
+					const id::id_type texture_id{ editor::create_resource(texture_blob.data(), content::asset_type::texture) };
+					const id::id_type material_id{ id::is_valid(texture_id) ? create_material({ 1.f, 1.f, 1.f, 1.f }, 0.5f, 0.5f, &texture_id, 1) : id::invalid_id };
+					const id::id_type mesh_id{ editor::create_resource(mesh_blob.data(), content::asset_type::mesh) };
+					const bool created{ id::is_valid(texture_id) && id::is_valid(material_id) && id::is_valid(mesh_id) };
+
+					editor::destroy_resource(material_id, content::asset_type::material);
+					editor::destroy_resource(texture_id, content::asset_type::texture);
+					editor::destroy_resource(mesh_id, content::asset_type::mesh);
+					if (!created) return "failed to create a texture, a material or a mesh from the editor's data (round " + std::to_string(round + 1) + ")";
+
+					const id::id_type ids[3]{ texture_id, material_id, mesh_id };
+					for (u32 i{ 0 }; i < 3; ++i)
+					{
+						if (ids[i] == previous_ids[i]) ++reused;
+						previous_ids[i] = ids[i];
+					}
+				}
+
+				std::fprintf(stderr, "[render] created and destroyed a texture, a material and a mesh from the editor's data twice (%u of 3 ids reused)\n", reused);
+				return {};
 			}
 
 			/// @brief エンティティを作る(model_idが有効ならジオメトリも付ける)

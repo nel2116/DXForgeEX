@@ -14,6 +14,7 @@
 // 2026/10/19 環境光(IBL)のライトの初期化情報 ambient_params を追加 (Primal Day 075)
 // 2026/10/29 画面外のサーフェス、読み戻し、アダプタの選択(graphics_init_info)を追加 (#127)
 // 2026/10/29 画面外のサーフェスの最小の大きさを追加 (#128 のレビュー)
+// 2026/10/30 material_surface から ambient_occlusion を削除(エディタのマテリアルと合わせる。Primal Day 077, #30)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -247,7 +248,6 @@ namespace dxforge::graphics
 		math::v4    base_color{ 1.f, 1.f, 1.f, 1.f };
 		math::v3    emissive{ 0.f, 0.f, 0.f };
 		f32         emissive_intensity{ 1.f };
-		f32         ambient_occlusion{ 1.f };
 		f32         metallic{ 0.f };
 		f32         roughness{ 1.f };
 	};

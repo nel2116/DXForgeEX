@@ -8,6 +8,7 @@
 // 2025/01/12 新規作成
 // 2025/01/13 シェーダーの追加と削除の関数を追加
 // 2025/01/13 マテリアルの追加と削除の関数を追加
+// 2026/10/30 マテリアルのデータの並びのコメントを、material_init_info の並びに合わせて直した(Primal Day 077, #30)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ===
@@ -305,11 +306,13 @@ namespace dxforge::content
 
 		// NOTE: 'data'に以下のことが含まれることを期待する
 		// struct {
+		//  id::id_type*        texture_ids;
+		//  material_surface    surface;
 		//  material_type::type type,
 		//  u32                 texture_count,
 		//  id::id_type         shader_ids[shader_type::count],
-		//  id::id_type*        texture_ids;
 		// } material_init_info
+		// エディタから渡されるデータは、DLLのCreateResource()がこの形に直してから渡す(Primal Day 077)。
 		/// @brief マテリアルのリソースを作成する関数
 		/// @param data データ
 		/// @return 生成されたリソース
