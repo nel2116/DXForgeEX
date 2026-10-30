@@ -121,6 +121,53 @@ namespace DXForgeEditor.DllWrappers
         public static extern void ResizeRenderSurface(int surfaceId);
 
         [DllImport(_engineDll)]
+        private static extern int CreateResource(IntPtr data, int type);
+
+        /// <summary>
+        /// アセットの PackForEngine() のデータから、エンジンのリソースを作る(Primal Day 077)。作れなければ ID.INVALID_ID。
+        /// NOTE: エンジンの初期化(Primal Day 078, #31)がまだないので、エディタからは呼ばれない。
+        /// </summary>
+        public static int CreateResource(byte[] resourceData, AssetType type)
+        {
+            if (resourceData == null || resourceData.Length == 0) return ID.INVALID_ID;
+
+            var data = IntPtr.Zero;
+            try
+            {
+                data = Marshal.AllocCoTaskMem(resourceData.Length);
+                Marshal.Copy(resourceData, 0, data, resourceData.Length);
+                return CreateResource(data, (int)type);
+            }
+            catch (Exception ex)
+            {
+                // NOTE: Primal は例外をそのまま投げる(DXForgeEngineDLL.dll が見つからない場合など)
+                Debug.WriteLine(ex.Message);
+                Logger.Log(MessageType.Error, $"{type} のリソースをエンジンに作れませんでした: {ex.Message}");
+                return ID.INVALID_ID;
+            }
+            finally
+            {
+                Marshal.FreeCoTaskMem(data);
+            }
+        }
+
+        [DllImport(_engineDll)]
+        private static extern void DestroyResource(int id, int type);
+
+        public static void DestroyResource(int id, AssetType type)
+        {
+            try
+            {
+                DestroyResource(id, (int)type);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                Logger.Log(MessageType.Error, $"{type} のリソースをエンジンから破棄できませんでした: {ex.Message}");
+            }
+        }
+
+        [DllImport(_engineDll)]
         private static extern int AddShaderGroup([In] ShaderGroupData data);
 
         /// <summary>

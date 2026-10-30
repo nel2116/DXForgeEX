@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using DXForgeEditor.DllWrappers;
 using DXForgeEditor.Utilities;
 
 namespace DXForgeEditor.Content
@@ -58,6 +59,11 @@ namespace DXForgeEditor.Content
         public byte[]? Hash { get; set; }
     }
 
+    /// <summary>
+    /// エンジンにアップロードしたアセットについて、エディタが覚えておく情報(Primal Day 077)。
+    /// </summary>
+    abstract class AssetMetadata { }
+
     abstract class Asset : ViewModelBase
     {
         public static string AssetFileExtension => ".asset";
@@ -84,10 +90,27 @@ namespace DXForgeEditor.Content
         public DateTime ImportDate { get; protected set; }
         public byte[]? Hash { get; protected set; }
 
+        public abstract AssetMetadata GetMetadata();
         public abstract bool Import(string file);
         public abstract bool Load(string file);
         public abstract IEnumerable<string> Save(string file);
         public abstract byte[] PackForEngine();
+        /// <summary>
+        /// このアセットが使うアセット(マテリアルの入力のテクスチャなど)。エンジンには先にアップロードする。
+        /// </summary>
+        public virtual List<AssetInfo> GetReferencedAssets() => [];
+
+        public AssetInfo GetAssetInfo()
+            => new()
+            {
+                Type = Type,
+                Icon = Icon ?? [],
+                FullPath = FullPath,
+                RegisterTime = AssetRegistry.GetAssetInfo(Guid)?.RegisterTime ?? default,
+                ImportDate = ImportDate,
+                Guid = Guid,
+                Hash = Hash,
+            };
 
         // For Testing. Remove later!
         /// <summary>
@@ -198,6 +221,127 @@ namespace DXForgeEditor.Content
         {
             Debug.Assert(type != AssetType.Unknown);
             Type = type;
+        }
+    }
+
+    /// <summary>
+    /// エンジンにアップロードしたアセット(Primal Day 077)。同じアセット(GUID)は1回だけアップロードし、参照数を数える。
+    /// アセットが使うアセット(GetReferencedAssets())も一緒にアップロードし、参照数を増やす。
+    /// NOTE: エンジンの初期化(Primal Day 078, #31)がまだないので、エディタからは呼ばれない。
+    /// </summary>
+    class UploadedAsset
+    {
+        public int ContentId { get; private set; } = ID.INVALID_ID;
+        public int ReferenceCount { get; private set; }
+        public AssetInfo AssetInfo { get; private set; }
+        public AssetMetadata Metadata { get; private set; }
+        private List<UploadedAsset> _referencedAssets = [];
+
+        private static readonly Dictionary<Guid, UploadedAsset> _uploadedAssets = [];
+
+        private static UploadedAsset? UploadAssetToEngine(AssetInfo assetInfo, Asset? asset = null)
+        {
+            Debug.Assert(assetInfo != null);
+
+            // NOTE: マテリアルは AppliedMaterial を渡す(マテリアルのアセットのファイルからは作らない)
+            asset ??= assetInfo.Type switch
+            {
+                AssetType.Mesh => new Geometry(assetInfo),
+                AssetType.Texture => new Texture(assetInfo),
+                _ => null
+            };
+
+            Debug.Assert(asset != null);
+            if (asset == null) return null;
+
+            Debug.Assert(asset.Guid == assetInfo.Guid);
+            var referencedAssets = new List<UploadedAsset>();
+            foreach (var referencedAsset in asset.GetReferencedAssets())
+            {
+                var uploadedAsset = AddToScene(referencedAsset);
+                if (uploadedAsset == null)
+                {
+                    // NOTE: Primal は null をそのまま入れる。ここでは、ここまでに増やした参照を戻して失敗にする
+                    referencedAssets.ForEach(RemoveFromScene);
+                    return null;
+                }
+                referencedAssets.Add(uploadedAsset);
+            }
+
+            var data = asset.PackForEngine();
+            var contentId = data.Length > 0 ? EngineAPI.CreateResource(data, assetInfo.Type) : ID.INVALID_ID;
+            if (!ID.IsValid(contentId))
+            {
+                referencedAssets.ForEach(RemoveFromScene);
+                return null;
+            }
+
+            return new(assetInfo, asset.GetMetadata())
+            {
+                ContentId = contentId,
+                ReferenceCount = 1,
+                _referencedAssets = referencedAssets,
+            };
+        }
+
+        private static void UnloadAssetFromEngine(UploadedAsset uploadedAsset)
+        {
+            Debug.Assert(uploadedAsset?.AssetInfo != null && ID.IsValid(uploadedAsset.ContentId));
+            EngineAPI.DestroyResource(uploadedAsset.ContentId, uploadedAsset.AssetInfo.Type);
+        }
+
+        /// <summary>
+        /// アセットをエンジンにアップロードする(アップロード済みなら参照数を増やす)。失敗したら null。
+        /// asset を渡さないときは、assetInfo のファイルから読む。
+        /// </summary>
+        public static UploadedAsset? AddToScene(AssetInfo assetInfo, Asset? asset = null)
+        {
+            Debug.Assert(assetInfo != null && assetInfo.Guid != Guid.Empty);
+            var key = assetInfo.Guid;
+
+            if (_uploadedAssets.TryGetValue(key, out var value))
+            {
+                ++value.ReferenceCount;
+                value._referencedAssets.ForEach(x => ++x.ReferenceCount);
+                return value;
+            }
+
+            var uploadedAsset = UploadAssetToEngine(assetInfo, asset);
+            if (uploadedAsset == null)
+            {
+                Logger.Log(MessageType.Error, $"アセット {assetInfo.FullName} をエンジンにアップロードできませんでした。");
+                return null;
+            }
+
+            _uploadedAssets[key] = uploadedAsset;
+            return uploadedAsset;
+        }
+
+        public static void RemoveFromScene(UploadedAsset uploadedAsset)
+        {
+            Debug.Assert(uploadedAsset != null && _uploadedAssets.ContainsKey(uploadedAsset.AssetInfo.Guid));
+
+            uploadedAsset._referencedAssets.ForEach(RemoveFromScene);
+            --uploadedAsset.ReferenceCount;
+            if (uploadedAsset.ReferenceCount == 0)
+            {
+                UnloadAssetFromEngine(uploadedAsset);
+                _uploadedAssets.Remove(uploadedAsset.AssetInfo.Guid);
+                uploadedAsset.ContentId = ID.INVALID_ID;
+            }
+        }
+
+        public static int GetContentId(Guid id)
+        {
+            Debug.Assert(id != Guid.Empty);
+            return _uploadedAssets.TryGetValue(id, out var uploadedAsset) ? uploadedAsset.ContentId : ID.INVALID_ID;
+        }
+
+        // NOTE: UploadedAsset.AddToScene() からだけ作る
+        private UploadedAsset(AssetInfo assetInfo, AssetMetadata metadata)
+        {
+            AssetInfo = assetInfo;
+            Metadata = metadata;
         }
     }
 }
