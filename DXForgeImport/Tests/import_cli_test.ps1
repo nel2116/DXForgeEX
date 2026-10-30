@@ -6,13 +6,20 @@
     ビルド済みの x64\<Configuration>\DXForgeImport.exe を実行して、終了コードと --json の出力を確かめる。
     GUI は使わない(エディタのウィンドウもプロジェクトも開かない)。
 
-    1. 引数・異常系(ContentTools.dll がなくても確かめられるもの。CI ではこれだけを実行する: -ArgumentsOnly)
+    1. 引数・異常系(ContentTools.dll がなくても確かめられるもの。CI ではこれと次の AssetRegistry だけを実行する: -ArgumentsOnly)
        --help、引数の誤り(空白だけの --input/--output を含む)、入力なし、未対応の拡張子、--type と拡張子の不一致、設定の誤り、
        出力先を作れない(パスに使えない文字を含む)。
        ContentTools.dll がない場合は、正しい入力で終了コード7になることも確かめる。
+       AssetRegistry の登録(#137): .asset と、.asset 以外のファイル(.fbm フォルダの画像、中身が .asset と同じ .bak)がある
+       Content フォルダを、エディタのコード(DXForgeEditor.dll の AssetRegistry.Reset と、ファイルの変更の通知)に登録させ、
+       .asset だけが登録されることを確かめる。
+       エディタのコードを呼ぶ間は、Trace.Listeners を失敗を記録するだけのリスナーに置き換え、DEBUG を定義したビルドの
+       Debug.Assert の発火(デバッガがなければ FailFast でこのプロセスが終わる)を、テストの失敗として数える。
     2. インポート(ContentTools.dll と FBX SDK のサンプルが必要。ローカルで実行する)
        - テクスチャ(DXForgeEditor\Resources\TextureEditor\Checker64.png)と FBX(既定は FBX SDK のサンプル box.fbx)を
          インポートし、終了コード0と、出力した .asset の一覧が返る。設定ファイルと --set が .asset に反映される。
+       - ミップ数の最大値(#138): 8192x4 の画像を Compress=false, MipLevels=14 でインポートでき、エディタの Texture.Load で
+         14段として読める。MipLevels=15 は14に抑えられる。
        - 壊れた PNG / FBX で終了コード1と --json のエラーが返り、.asset を書かない(assert のダイアログやクラッシュにならない)。
        - 保存の失敗(出力先の .asset が読み取り専用)で終了コード1になる。-MultiLodFbxFile を指定すると、LODグループが2つ以上ある
          FBXの2つ目以降の .asset を読み取り専用にして、一部だけ保存できた場合も終了コード1になり、書けたファイルが files に残ることを確かめる。
@@ -29,7 +36,7 @@
     DebugEditor(既定)か ReleaseEditor。
 
 .PARAMETER ArgumentsOnly
-    1 だけを実行する(ContentTools.dll と FBX SDK が不要。CI 用)。
+    1 と AssetRegistry の登録だけを実行する(ContentTools.dll と FBX SDK が不要。CI 用)。
 
 .PARAMETER FbxFile
     FBX のテストに使うファイル。既定は FBX SDK 2020.3.7 のサンプル(samples\ConvertScene\box.fbx)。
@@ -143,6 +150,73 @@ try
 		Check-Failure "ContentTools.dll がない" @("--input", $TextureFile, "--output", $outputDir) 7 "ContentToolsUnavailable" | Out-Null
 	}
 
+	# ここからはエディタのコード(DXForgeEditor.dll)をこのプロセスに読み込んで呼ぶ。
+	# DEBUG を定義したビルドの Debug.Assert は、デバッガがなければプロセスを FailFast で終わらせるので、
+	# Trace.Listeners を失敗を記録するだけのリスナーに置き換え、assert の発火をテストの失敗として数える。
+	if ([System.Threading.Thread]::CurrentThread.GetApartmentState() -ne "STA") { throw "Run this script on an STA thread (pwsh -STA)." }
+	Add-Type -AssemblyName PresentationFramework
+	Add-Type -TypeDefinition @'
+using System.Collections.Generic;
+using System.Diagnostics;
+namespace DXForgeImportTest
+{
+	public class AssertRecorder : TraceListener
+	{
+		public readonly List<string> Failures = new List<string>();
+		public override void Write(string message) { }
+		public override void WriteLine(string message) { }
+		public override void Fail(string message, string detailMessage) { Failures.Add(message + " " + detailMessage + " @ " + new StackTrace(true)); }
+	}
+}
+'@
+	$assertRecorder = [DXForgeImportTest.AssertRecorder]::new()
+	[System.Diagnostics.Trace]::Listeners.Clear()
+	[void][System.Diagnostics.Trace]::Listeners.Add($assertRecorder)
+	$editor = [System.Reflection.Assembly]::LoadFrom((Join-Path $OutDir "DXForgeEditor.dll"))
+	$flags = [System.Reflection.BindingFlags]"Public,NonPublic,Static,Instance"
+
+	function Check-NoAssert([string]$name, [int]$before)
+	{
+		$fired = @($assertRecorder.Failures | Select-Object -Skip $before)
+		Check ($fired.Count -eq 0) "${name}: エディタのコードの Debug.Assert が発火しない (実際: $($fired.Count) 件)"
+		foreach ($f in $fired) { Write-Host "    assert:$(($f -split "`n" | Where-Object { $_ -match 'at DXForgeEditor\.' } | Select-Object -First 1))" }
+	}
+
+	# AssetRegistry は Content フォルダの .asset だけを登録する(#137)。ContentTools.dll は要らないので CI でも実行する。
+	Write-Host "== AssetRegistry の登録 [$Configuration] =="
+	$contentDir = Join-Path $WorkDir "registry\Content"
+	$registryAsset = Join-Path $contentDir "registered.asset"
+	$fbmDir = Join-Path $contentDir "model.fbm"
+	New-Item -ItemType Directory -Path $fbmDir | Out-Null
+	# .asset のヘッダ(Asset.WriteAssetFileHeader)だけのファイル: asset type(Texture = 6), GUID の長さと GUID, インポート日時, ハッシュの長さ 0, アイコンの長さ 0
+	$header = [System.IO.MemoryStream]::new()
+	$writer = [System.IO.BinaryWriter]::new($header)
+	$writer.Write([int]6); $writer.Write([int]16); $writer.Write([guid]::NewGuid().ToByteArray()); $writer.Write([DateTime]::Now.ToBinary()); $writer.Write([int]0); $writer.Write([int]0)
+	$writer.Flush()
+	[System.IO.File]::WriteAllBytes($registryAsset, $header.ToArray())
+	# .asset 以外: FBX の埋め込みテクスチャ(.fbm フォルダの画像)と、中身は .asset と同じだが拡張子が違うファイル(バックアップなど)
+	$fbmImage = Join-Path $fbmDir "embedded.png"
+	Copy-Item $TextureFile $fbmImage
+	[System.IO.File]::WriteAllBytes((Join-Path $contentDir "registered.asset.bak"), $header.ToArray())
+	$assetRegistry = $editor.GetType("DXForgeEditor.Content.AssetRegistry", $true)
+	$registered = $assetRegistry.GetProperty("Assets", $flags).GetValue($null)
+	$before = $assertRecorder.Failures.Count
+	$assetRegistry.GetMethod("Reset", $flags).Invoke($null, @([string]$contentDir))
+	$paths = @($registered | ForEach-Object { $_.FullPath })
+	Check ($paths.Count -eq 1 -and $paths[0] -eq $registryAsset) "AssetRegistry: プロジェクトを開いたとき(Reset)、.asset だけが登録される (実際: $($paths -join ', '))"
+	Check-NoAssert "AssetRegistry(Reset)" $before
+	# ファイルの変更の通知(ContentWatcher.ContentModified)でも、.asset 以外は登録しない
+	$onContentModified = $assetRegistry.GetMethod("OnContentModified", $flags)
+	$eventArgs = $editor.GetType("DXForgeEditor.Content.ContentModifiedEventArgs", $true)
+	$before = $assertRecorder.Failures.Count
+	foreach ($modified in @($fbmImage, $fbmDir))
+	{
+		[void]$onContentModified.Invoke($null, @($null, [Activator]::CreateInstance($eventArgs, @([string]$modified))))
+	}
+	$paths = @($registered | ForEach-Object { $_.FullPath })
+	Check ($paths.Count -eq 1 -and $paths[0] -eq $registryAsset) "AssetRegistry: .fbm の画像とフォルダの変更が通知されても、.asset 以外は登録されない (実際: $($paths -join ', '))"
+	Check-NoAssert "AssetRegistry(変更の通知)" $before
+
 	if ($ArgumentsOnly)
 	{
 		Write-Host "(-ArgumentsOnly: インポートのテストは実行しません)"
@@ -170,6 +244,22 @@ try
 		$r = Invoke-Import @("--input", $TextureFile, "--output", $settingsDir, "--settings", $settingsFile, "--set", "mipLevels=2")
 		Check ($r.ExitCode -eq 0 -and $r.Json.settings.Compress -eq $false -and $r.Json.settings.MipLevels -eq 2) "設定: 設定ファイル(Compress=false)と --set(MipLevels=2、設定ファイルの3を上書き)が反映される"
 		$settingsTexture = Join-Path $settingsDir "checker64.asset"
+
+		# ミップ数の最大値(Texture.MaxMipLevels = 14)のテクスチャ: 8192 = 2^13 なので、8192x4 の画像はミップを14段まで作れる(#138)。
+		# DEBUG を定義したビルドでは、SlicesFromBinary の assert が 14 を拒むと CLI が FailFast で終わる。
+		$maxMipImage = Join-Path $WorkDir "maxmip.png"
+		$pixels = [byte[]]::new(8192 * 4 * 4)
+		[Array]::Fill($pixels, [byte]255)
+		$encoder = [System.Windows.Media.Imaging.PngBitmapEncoder]::new()
+		$encoder.Frames.Add([System.Windows.Media.Imaging.BitmapFrame]::Create([System.Windows.Media.Imaging.BitmapSource]::Create(8192, 4, 96, 96, [System.Windows.Media.PixelFormats]::Bgra32, $null, $pixels, 8192 * 4)))
+		$stream = [System.IO.File]::Create($maxMipImage)
+		try { $encoder.Save($stream) } finally { $stream.Dispose() }
+		$maxMipDir = Join-Path $WorkDir "maxmip"
+		$maxMipTexture = Join-Path $maxMipDir "maxmip.asset"
+		$r = Invoke-Import @("--input", $maxMipImage, "--output", $maxMipDir, "--set", "Compress=false", "--set", "MipLevels=14")
+		Check ($r.ExitCode -eq 0 -and $r.Json.success -and $r.Json.settings.MipLevels -eq 14 -and (Test-Path $maxMipTexture)) "ミップ数14: 8192x4 の画像を MipLevels=14 でインポートでき、終了コード0 (実際: $($r.ExitCode))"
+		$r = Invoke-Import @("--input", $maxMipImage, "--output", (Join-Path $WorkDir "maxmip15"), "--set", "Compress=false", "--set", "MipLevels=15")
+		Check ($r.ExitCode -eq 0 -and $r.Json.settings.MipLevels -eq 14) "ミップ数15: 設定が最大値の14に抑えられる (実際: 終了コード $($r.ExitCode)、MipLevels $($r.Json.settings.MipLevels))"
 
 		# FBX
 		$cliGeometry = $null
@@ -275,8 +365,7 @@ try
 
 		# エディタのコードで読み込む・エディタの経路で書き出して比べる(このプロセスにエディタのアセンブリを読み込む)
 		Write-Host "== 3. エディタとの互換 [$Configuration] =="
-		if ([System.Threading.Thread]::CurrentThread.GetApartmentState() -ne "STA") { throw "Run this script on an STA thread (pwsh -STA)." }
-		Add-Type -AssemblyName PresentationFramework
+		$assertsBeforeEditor = $assertRecorder.Failures.Count
 		$app = [System.Windows.Application]::Current
 		if ($null -eq $app) { $app = [System.Windows.Application]::new() }
 		[void][System.Runtime.InteropServices.NativeLibrary]::Load((Join-Path $OutDir "ContentTools.dll"))
@@ -290,10 +379,8 @@ try
 			[void][DXForgeImportTest.Crt]::_set_error_mode(1)
 			[void][DXForgeImportTest.Crt]::_set_abort_behavior(0, 3)
 		}
-		$editor = [System.Reflection.Assembly]::LoadFrom((Join-Path $OutDir "DXForgeEditor.dll"))
 		# ジオメトリのアイコン生成(GeometryView)がエディタのリソースを使うので、DXForgeImport と同じくエディタの EditorColors.xaml をマージする。
 		$app.Resources.MergedDictionaries.Add([System.Windows.ResourceDictionary]@{ Source = [Uri]"pack://application:,,,/DXForgeEditor;component/Dictionaries/EditorColors.xaml" })
-		$flags = [System.Reflection.BindingFlags]"Public,NonPublic,Static,Instance"
 		$textureType = $editor.GetType("DXForgeEditor.Content.Texture", $true)
 		$geometryType = $editor.GetType("DXForgeEditor.Content.Geometry", $true)
 		$textureSettingsType = $editor.GetType("DXForgeEditor.Content.TextureImportSettings", $true)
@@ -314,6 +401,11 @@ try
 		Check ($loaded -and $texture.Width -eq 64 -and $texture.Height -eq 64 -and $texture.ImportSettings.Sources[0] -eq $TextureFile) "互換: CLI のテクスチャを Texture.Load で読め、64x64 で Sources が入力のパス"
 		$loaded, $texture = Load-Asset $textureType $settingsTexture
 		Check ($loaded -and $texture.ImportSettings.Compress -eq $false -and $texture.ImportSettings.MipLevels -eq 2 -and $texture.MipLevels -eq 2) "互換: 設定を変えた CLI のテクスチャを読め、設定(Compress=false, MipLevels=2)とミップ数が反映されている"
+		if (Test-Path $maxMipTexture)
+		{
+			$loaded, $texture = Load-Asset $textureType $maxMipTexture
+			Check ($loaded -and $texture.Width -eq 8192 -and $texture.Height -eq 4 -and $texture.MipLevels -eq 14) "互換: ミップ数14の CLI のテクスチャを Texture.Load で読め、8192x4 で14段 (実際: $($texture.MipLevels))"
+		}
 		if ($cliGeometry)
 		{
 			$loaded, $geometry = Load-Asset $geometryType $cliGeometry
@@ -437,6 +529,8 @@ try
 		Check ($status -eq "Failed") "壊れたFBX(エディタ): ImportingItem.Status が Failed (実際: $status)"
 		Check (@(Get-ChildItem $brokenEditorDir -ErrorAction SilentlyContinue).Count -eq 0) "壊れたFBX(エディタ): .asset を書かない"
 		Check (@($loggedErrors | Where-Object { $_ -like "*FBX*$brokenFbx*" }).Count -gt 0) "壊れたFBX(エディタ): FBX のインポートの失敗がエラーログに出る (実際: $($loggedErrors -join ' / '))"
+
+		Check-NoAssert "エディタとの互換" $assertsBeforeEditor
 
 		$environment.GetProperty("TempFolder").SetValue($null, $null)
 		[void]$contentToolsApi.GetMethod("ShutDownContentTools").Invoke($null, @())

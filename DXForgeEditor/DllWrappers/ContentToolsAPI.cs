@@ -260,7 +260,7 @@ namespace DXForgeEditor.DllWrappers
         public static SliceArray3D SlicesFromBinary(byte[] data, int arraySize, int mipLevels, bool is3D)
         {
             Debug.Assert(data?.Length > 0 && arraySize > 0);
-            Debug.Assert(mipLevels > 0 && mipLevels < Texture.MaxMipLevels);
+            Debug.Assert(mipLevels > 0 && mipLevels <= Texture.MaxMipLevels);
 
             var depthPerMipLevel = Enumerable.Repeat(1, mipLevels).ToList();
 
