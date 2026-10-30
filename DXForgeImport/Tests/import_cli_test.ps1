@@ -13,6 +13,8 @@
        AssetRegistry の登録(#137): .asset と、.asset 以外のファイル(.fbm フォルダの画像、中身が .asset と同じ .bak)がある
        Content フォルダを、エディタのコード(DXForgeEditor.dll の AssetRegistry.Reset と、ファイルの変更の通知)に登録させ、
        .asset だけが登録されることを確かめる。
+       登録済みの .asset の書き換え(#140): .asset を別の GUID で書き直して変更を通知したあと、Assets にそのファイルの AssetInfo が
+       新しい内容のものだけ1つあり、ファイルを消して変更を通知したあと、同じパスの AssetInfo が1つも残らないことを確かめる。
        エディタのコードを呼ぶ間は、Trace.Listeners を失敗を記録するだけのリスナーに置き換え、DEBUG を定義したビルドの
        Debug.Assert の発火(デバッガがなければ FailFast でこのプロセスが終わる)を、テストの失敗として数える。
     2. インポート(ContentTools.dll と FBX SDK のサンプルが必要。ローカルで実行する)
@@ -189,15 +191,21 @@ namespace DXForgeImportTest
 	$fbmDir = Join-Path $contentDir "model.fbm"
 	New-Item -ItemType Directory -Path $fbmDir | Out-Null
 	# .asset のヘッダ(Asset.WriteAssetFileHeader)だけのファイル: asset type(Texture = 6), GUID の長さと GUID, インポート日時, ハッシュの長さ 0, アイコンの長さ 0
-	$header = [System.IO.MemoryStream]::new()
-	$writer = [System.IO.BinaryWriter]::new($header)
-	$writer.Write([int]6); $writer.Write([int]16); $writer.Write([guid]::NewGuid().ToByteArray()); $writer.Write([DateTime]::Now.ToBinary()); $writer.Write([int]0); $writer.Write([int]0)
-	$writer.Flush()
-	[System.IO.File]::WriteAllBytes($registryAsset, $header.ToArray())
+	function New-AssetHeader([guid]$guid)
+	{
+		$stream = [System.IO.MemoryStream]::new()
+		$writer = [System.IO.BinaryWriter]::new($stream)
+		$writer.Write([int]6); $writer.Write([int]16); $writer.Write($guid.ToByteArray()); $writer.Write([DateTime]::Now.ToBinary()); $writer.Write([int]0); $writer.Write([int]0)
+		$writer.Flush()
+		return ,$stream.ToArray()
+	}
+	$oldGuid = [guid]::NewGuid()
+	$header = New-AssetHeader $oldGuid
+	[System.IO.File]::WriteAllBytes($registryAsset, $header)
 	# .asset 以外: FBX の埋め込みテクスチャ(.fbm フォルダの画像)と、中身は .asset と同じだが拡張子が違うファイル(バックアップなど)
 	$fbmImage = Join-Path $fbmDir "embedded.png"
 	Copy-Item $TextureFile $fbmImage
-	[System.IO.File]::WriteAllBytes((Join-Path $contentDir "registered.asset.bak"), $header.ToArray())
+	[System.IO.File]::WriteAllBytes((Join-Path $contentDir "registered.asset.bak"), $header)
 	$assetRegistry = $editor.GetType("DXForgeEditor.Content.AssetRegistry", $true)
 	$registered = $assetRegistry.GetProperty("Assets", $flags).GetValue($null)
 	$before = $assertRecorder.Failures.Count
@@ -216,6 +224,26 @@ namespace DXForgeImportTest
 	$paths = @($registered | ForEach-Object { $_.FullPath })
 	Check ($paths.Count -eq 1 -and $paths[0] -eq $registryAsset) "AssetRegistry: .fbm の画像とフォルダの変更が通知されても、.asset 以外は登録されない (実際: $($paths -join ', '))"
 	Check-NoAssert "AssetRegistry(変更の通知)" $before
+
+	# 登録済みの .asset を書き換えて変更を通知すると、古い AssetInfo は Assets から外れ、新しいものだけが残る(#140)
+	$newGuid = [guid]::NewGuid()
+	[System.IO.File]::WriteAllBytes($registryAsset, (New-AssetHeader $newGuid))
+	# RegisterTime(登録した時刻)より更新日時が新しいときだけ読み直すので、更新日時を確実に後にする
+	[System.IO.File]::SetLastWriteTime($registryAsset, [DateTime]::Now.AddMinutes(1))
+	$before = $assertRecorder.Failures.Count
+	[void]$onContentModified.Invoke($null, @($null, [Activator]::CreateInstance($eventArgs, @([string]$registryAsset))))
+	$infos = @($registered | Where-Object { $_.FullPath -eq $registryAsset })
+	Check ($infos.Count -eq 1 -and $infos[0].Guid -eq $newGuid) "AssetRegistry: 登録済みの .asset を書き換えて通知すると、そのファイルの AssetInfo は新しい内容のものが1つだけある (実際: $($infos.Count) 件, GUID $(($infos | ForEach-Object { if ($_.Guid -eq $newGuid) { 'new' } elseif ($_.Guid -eq $oldGuid) { 'old' } else { $_.Guid } }) -join ', '))"
+	$getByGuid = $assetRegistry.GetMethod("GetAssetInfo", $flags, $null, [type[]]@([guid]), $null)
+	Check ($null -eq $getByGuid.Invoke($null, @($oldGuid))) "AssetRegistry: 書き換えたあと、古い GUID で GetAssetInfo しても見つからない"
+	Check-NoAssert "AssetRegistry(書き換えの通知)" $before
+	# ファイルを消して通知すると、同じパスの AssetInfo は1つも残らない
+	Remove-Item $registryAsset
+	$before = $assertRecorder.Failures.Count
+	[void]$onContentModified.Invoke($null, @($null, [Activator]::CreateInstance($eventArgs, @([string]$registryAsset))))
+	$infos = @($registered | Where-Object { $_.FullPath -eq $registryAsset })
+	Check ($infos.Count -eq 0) "AssetRegistry: .asset を消して通知すると、同じパスの AssetInfo は残らない (実際: $($infos.Count) 件)"
+	Check-NoAssert "AssetRegistry(削除の通知)" $before
 
 	if ($ArgumentsOnly)
 	{

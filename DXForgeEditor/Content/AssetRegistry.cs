@@ -48,9 +48,11 @@ namespace DXForgeEditor.Content
                     var info = Asset.GetAssetInfo(file);
                     Debug.Assert(info != null);
                     info.RegisterTime = DateTime.Now;
+                    // 読み直したときは、古い AssetInfo を同じ位置で置き換える(Add だけだと古いものが Assets に残る)
+                    var index = _assetDictionary.TryGetValue(file, out var oldInfo) ? _assets.IndexOf(oldInfo) : -1;
                     _assetDictionary[file] = info;
-                    Debug.Assert(_assetDictionary.ContainsKey(file));
-                    _assets.Add(_assetDictionary[file]);
+                    if (index >= 0) _assets[index] = info;
+                    else _assets.Add(info);
                 }
             }
             catch (Exception ex) { Debug.WriteLine(ex.Message); }
