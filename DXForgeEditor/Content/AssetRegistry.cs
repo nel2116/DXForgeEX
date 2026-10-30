@@ -34,6 +34,10 @@ namespace DXForgeEditor.Content
 
         private static void RegisterAsset(string file)
         {
+            // Content フォルダには .asset 以外のファイル(FBX の埋め込みテクスチャの .fbm フォルダなど)も置かれる。
+            // Asset.GetAssetInfo は .asset だけを受け取る前提なので、それ以外は登録しない。
+            if (Path.GetExtension(file) != Asset.AssetFileExtension) return;
+
             Debug.Assert(File.Exists(file));
             try
             {
