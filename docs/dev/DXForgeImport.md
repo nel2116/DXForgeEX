@@ -16,6 +16,7 @@ It writes the same `.asset` files as the editor's drag-and-drop import (FBX → 
 - No window, project or GPU window is needed (texture compression creates a windowless D3D11 device and falls back to the CPU).
 - Embedded FBX textures are copied from the temp `.fbm` into `<output>/<fbx asset name>.fbm/` before importing, so the texture `.asset`'s `Sources` (used by the editor's reimport) does not point into the deleted temp folder.
 - A geometry save is checked against `Geometry.LODGroupCount` and against errors logged during `Save()`, because `Geometry.Save()` catches its own exception and returns only the files written so far (partial save → exit 1, written files stay in `files`).
+- A failed FBX import (`ContentToolsAPI.ImportFbx` → `GeometryFromSceneData`) is reported as `false` from `Geometry.Import()`, not as an exception, since the editor reaches it from `async void` commands (#110); the CLI still also treats `LODGroupCount == 0` after `Import()` as a failure, as a safety net.
 - Needs `ContentTools.dll` in the same folder (`x64/<config>/`, so FBX SDK is needed to build it).
 
 Exit codes: 0 ok, 1 import/save failed, 2 bad arguments, 3 input missing, 4 unsupported format/type mismatch, 5 bad settings, 6 output folder error, 7 `ContentTools.dll` not loadable, 10 unexpected.
@@ -26,7 +27,7 @@ Exit codes: 0 ok, 1 import/save failed, 2 bad arguments, 3 input missing, 4 unsu
 
 ## Test
 
-`pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1 [-Configuration ReleaseEditor]` — needs `ContentTools.dll` and the FBX SDK sample `samples/ConvertScene/box.fbx`; also loads the CLI's `.asset` files with the editor's `Texture.Load`/`Geometry.Load` and compares them with the editor's own import path `ContentHelper.Import`. CI runs only `-ArgumentsOnly` (argument/error cases, including exit code 7 since the runner has no `ContentTools.dll`).
+`pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1 [-Configuration ReleaseEditor]` — needs `ContentTools.dll` and the FBX SDK sample `samples/ConvertScene/box.fbx`; also loads the CLI's `.asset` files with the editor's `Texture.Load`/`Geometry.Load` and compares them with the editor's own import path `ContentHelper.Import`. It also imports a broken FBX through `ContentHelper.Import` and checks that the `ImportingItem` ends `Failed`, no `.asset` is written and an error is logged (#110). CI runs only `-ArgumentsOnly` (argument/error cases, including exit code 7 since the runner has no `ContentTools.dll`).
 
 - The test builds an embedded-texture FBX on the fly from the ASCII `box.fbx` (a `Video` object with base64 `Content` **plus** a `Video` entry in `Definitions` — without the latter, or without the `Properties70`/`Path`, the FBX SDK does not extract it to `.fbm`).
 - `-MultiLodFbxFile <fbx>` enables the partial-save test (no multi-LOD-group FBX in the repo or the SDK samples).

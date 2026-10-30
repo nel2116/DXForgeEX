@@ -372,8 +372,7 @@ namespace DXForgeImport
 
             asset.FullPath = ContentHelper.GetAssetFullPath(ContentHelper.GetAssetName(file), destination);
             var imported = asset.Import(file);
-            // FBXのインポートに失敗しても、Geometry.Import() は true を返すことがある(ContentToolsAPI.ImportFbx が失敗を例外にしないため)。
-            // その状態で Save() すると LODグループがなく、保存するものがないので、ここで失敗にする。
+            // FBXのインポートの失敗は Geometry.Import() が false で返す(#110)。念のため、LODグループがない(Save() で保存するものがない)場合も失敗にする。
             if (imported && asset is Geometry geometry && geometry.LODGroupCount == 0)
             {
                 imported = false;

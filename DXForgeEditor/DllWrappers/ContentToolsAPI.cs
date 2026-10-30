@@ -465,7 +465,10 @@ namespace DXForgeEditor.DllWrappers
         #endregion Texture
         #region Geometry
 
-        private static void GeometryFromSceneData(Content.Geometry geometry, Action<SceneData> sceneDataGenerator, string failureMessage)
+        /// <summary>
+        /// 失敗したら(エラーをログに出して) false を返す。async void のコマンドの経路から呼ばれるので、例外では伝えない(#110)。
+        /// </summary>
+        private static bool GeometryFromSceneData(Content.Geometry geometry, Action<SceneData> sceneDataGenerator, string failureMessage)
         {
             Debug.Assert(geometry != null);
             using var sceneData = new SceneData();
@@ -481,29 +484,31 @@ namespace DXForgeEditor.DllWrappers
                 var data = new byte[sceneData.DataSize];
                 Marshal.Copy(sceneData.Data, data, 0, sceneData.DataSize);
                 geometry.FromRawData(data);
+                return true;
             }
             catch (Exception ex)
             {
                 Logger.Log(MessageType.Error, failureMessage);
                 Debug.WriteLine(ex.Message);
+                return false;
             }
         }
 
         [DllImport(_toolsDLL)]
         private static extern void CreatePrimitiveMesh([In, Out] SceneData data, PrimitiveInitInfo info);
-        public static void CreatePrimitiveMesh(Geometry geometry, PrimitiveInitInfo info)
+        public static bool CreatePrimitiveMesh(Geometry geometry, PrimitiveInitInfo info)
         {
-            GeometryFromSceneData(geometry, (sceneData) => CreatePrimitiveMesh(sceneData, info), $"{info.Type}プリミティブ・メッシュの作成に失敗しました。");
+            return GeometryFromSceneData(geometry, (sceneData) => CreatePrimitiveMesh(sceneData, info), $"{info.Type}プリミティブ・メッシュの作成に失敗しました。");
         }
 
         [DllImport(_toolsDLL)]
         private static extern void ImportFbx(string file, [In, Out] SceneData data, ProgressCallback? callback);
 
-        public static void ImportFbx(string file, Geometry geometry)
+        public static bool ImportFbx(string file, Geometry geometry)
         {
             var item = ImportingItemCollection.GetItem(geometry);
             ProgressCallback? callback = item != null ? item.SetProgress : null;
-            GeometryFromSceneData(geometry, (sceneData) => ImportFbx(file, sceneData, callback), $"FBXファイルのインポートに失敗しました： {file}");
+            return GeometryFromSceneData(geometry, (sceneData) => ImportFbx(file, sceneData, callback), $"FBXファイルのインポートに失敗しました： {file}");
         }
         #endregion Geometry
     }

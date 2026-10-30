@@ -414,6 +414,30 @@ try
 			$asset = $editorImport.Invoke($null, @([string]$FbxFile, $settings, [string]$editorDir))
 			Compare-AssetFiles "FBX" $cliGeometry (Join-Path $editorDir ([System.IO.Path]::GetFileName($cliGeometry)))
 		}
+
+		# 壊れたFBXをエディタの経路でインポートすると、ImportingItem が失敗になり、.asset を書かず、エラーログが出る(#110)
+		$brokenEditorDir = Join-Path $WorkDir "editor_broken"
+		New-Item -ItemType Directory -Path $brokenEditorDir | Out-Null
+		# Logger.Log は画面のログ(Messages)へ Dispatcher 経由で積むので、Log() を呼んだスレッドで同期的に通知される MessageLogged で受け取る
+		$messageLogged = $editor.GetType("DXForgeEditor.Utilities.Logger", $true).GetEvent("MessageLogged")
+		$loggedErrors = [System.Collections.Generic.List[string]]::new()
+		$onMessageLogged = [System.Management.Automation.LanguagePrimitives]::ConvertTo({ param($type, $message) if ("$type" -eq "Error") { $loggedErrors.Add($message) } }.GetNewClosure(), $messageLogged.EventHandlerType)
+		$messageLogged.AddEventHandler($null, $onMessageLogged)
+		try
+		{
+			$asset = $editorImport.Invoke($null, @([string]$brokenFbx, [Activator]::CreateInstance($geometrySettingsType), [string]$brokenEditorDir))
+		}
+		finally
+		{
+			$messageLogged.RemoveEventHandler($null, $onMessageLogged)
+		}
+		$importingItems = $editor.GetType("DXForgeEditor.Content.ImportingItemCollection", $true).GetProperty("ImportingItems", $flags).GetValue($null)
+		$item = @($importingItems | Where-Object { [object]::ReferenceEquals($_.Asset, $asset) })
+		$status = if ($item.Count -eq 1) { "$($item[0].Status)" } else { "(ImportingItem が $($item.Count) 個)" }
+		Check ($status -eq "Failed") "壊れたFBX(エディタ): ImportingItem.Status が Failed (実際: $status)"
+		Check (@(Get-ChildItem $brokenEditorDir -ErrorAction SilentlyContinue).Count -eq 0) "壊れたFBX(エディタ): .asset を書かない"
+		Check (@($loggedErrors | Where-Object { $_ -like "*FBX*$brokenFbx*" }).Count -gt 0) "壊れたFBX(エディタ): FBX のインポートの失敗がエラーログに出る (実際: $($loggedErrors -join ' / '))"
+
 		$environment.GetProperty("TempFolder").SetValue($null, $null)
 		[void]$contentToolsApi.GetMethod("ShutDownContentTools").Invoke($null, @())
 	}
