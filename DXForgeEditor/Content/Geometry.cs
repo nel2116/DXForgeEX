@@ -42,6 +42,27 @@ namespace DXForgeEditor.Content
         TriangleStrip,
     }
 
+    class MeshInfo
+    {
+        public string Name { get; init; } = string.Empty;
+        public byte[] Icon { get; init; } = [];
+        public int IndexCount { get; init; }
+        public int VertexCount { get; init; }
+        public int TriangleCount { get; init; }
+    }
+
+    class LodInfo
+    {
+        public string Name { get; init; } = string.Empty;
+        public float Threshold { get; init; }
+        public List<MeshInfo> Meshes { get; init; } = [];
+    }
+
+    class GeometryMetadata : AssetMetadata
+    {
+        public List<LodInfo> LODs { get; init; } = [];
+    }
+
     class Mesh : ViewModelBase
     {
         public static int PositionSize => sizeof(float) * 3;
@@ -728,7 +749,7 @@ namespace DXForgeEditor.Content
             return lod;
         }
 
-        private static byte[] GenerateIcon(MeshLOD lod)
+        private static byte[] GenerateIcon(MeshLOD lod, int index = -1)
         {
             var width = ContentInfo.IconWidth * 4;
             byte[]? icon = null;
@@ -737,12 +758,44 @@ namespace DXForgeEditor.Content
             Application.Current.Dispatcher.Invoke(() =>
             {
                 // 4倍の大きさの画像を作成し、縮小したときにソフトになるようにする。
-                var bmp = Editors.GeometryView.RenderToBitmap(new Editors.MeshRenderer(lod, null), width, width);
+                var bmp = Editors.GeometryView.RenderToBitmap(new Editors.MeshRenderer(lod, null), width, width, index);
                 icon = BitmapHelper.CreateThumbnail(bmp, ContentInfo.IconWidth, ContentInfo.IconWidth);
             });
 
             Debug.Assert(icon != null);
             return icon;
+        }
+
+        /// <summary>
+        /// LODとメッシュごとの情報(メッシュごとのアイコンを含む)。アイコンを描くため、WPFの Application が要る。
+        /// </summary>
+        public override GeometryMetadata GetMetadata()
+        {
+            GeometryMetadata metadata = new();
+
+            var lodGroup = GetLODGroup();
+            if (lodGroup == null) return metadata;
+
+            foreach (var lod in lodGroup.LODs)
+            {
+                LodInfo lodInfo = new() { Name = lod.Name, Threshold = lod.LodThreshold };
+                metadata.LODs.Add(lodInfo);
+
+                for (int i = 0; i < lod.Meshes.Count; ++i)
+                {
+                    var mesh = lod.Meshes[i];
+                    lodInfo.Meshes.Add(new()
+                    {
+                        Name = mesh.Name,
+                        Icon = GenerateIcon(lod, i),
+                        IndexCount = mesh.IndexCount,
+                        TriangleCount = mesh.IndexCount / 3,
+                        VertexCount = mesh.VertexCount
+                    });
+                }
+            }
+
+            return metadata;
         }
 
         public Geometry() : base(AssetType.Mesh) { }
@@ -751,6 +804,18 @@ namespace DXForgeEditor.Content
         {
             Debug.Assert(importSettings is GeometryImportSettings);
             ImportSettings = (GeometryImportSettings)importSettings;
+        }
+
+        /// <summary>
+        /// アセットのファイルから読む(エンジンへのアップロード用。Primal Day 077)。読めなければ null。
+        /// NOTE: Primal はコンストラクタで読み、読めなくても(中身が空のまま)オブジェクトを返す(Codexの指摘, #145)
+        /// </summary>
+        public static Geometry? FromAssetInfo(AssetInfo assetInfo)
+        {
+            if (!CanLoad(assetInfo, AssetType.Mesh)) return null;
+
+            var asset = new Geometry();
+            return asset.Load(assetInfo.FullPath) ? asset : null;
         }
     }
 }

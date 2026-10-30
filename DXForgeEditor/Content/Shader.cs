@@ -98,7 +98,7 @@ namespace DXForgeEditor.Content
                     return identicalShader;
                 }
 
-                var contentId = EngineAPI.AddShaderGroup(shaderGroup);
+                var contentId = AddShaderGroupToEngine(shaderGroup);
                 if (!ID.IsValid(contentId)) return null;
 
                 var newUploadedShader = new UploadedShaderGroup()
@@ -125,7 +125,7 @@ namespace DXForgeEditor.Content
 
                     if (uploadedShader.ReferenceCount == 0)
                     {
-                        EngineAPI.RemoveShaderGroup(uploadedShader.ContentId);
+                        RemoveShaderGroupFromEngine(uploadedShader.ContentId);
                         var hashString = Convert.ToBase64String(uploadedShader.Signature);
                         Debug.Assert(_uploadedShaders.ContainsKey(hashString));
                         _uploadedShaders.Remove(hashString);
@@ -151,6 +151,11 @@ namespace DXForgeEditor.Content
         }
 
         public static readonly int HashSize = 16;
+
+        // NOTE: エンジンを初期化できない(#31 まで)ヘッドレスのテストで、マテリアルのアップロードの流れを確かめるため、
+        //       エンジンへの登録と削除を差し替えられるようにしておく(material_asset_test.ps1)。
+        internal static Func<ShaderGroup, int> AddShaderGroupToEngine { get; set; } = EngineAPI.AddShaderGroup;
+        internal static Action<int> RemoveShaderGroupFromEngine { get; set; } = EngineAPI.RemoveShaderGroup;
 
         public ShaderType Type { get; set; }
         public string Code { get; set; } = string.Empty;

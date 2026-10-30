@@ -150,6 +150,14 @@ jobs:
         # 構成ごとの DefineConstants を評価し、ビルドした DXForgeEditor.dll に Debug.Assert の呼び出しが残っていることを確かめる。
         run: pwsh -NoProfile -File DXForgeEditor/Tests/debug_define_test.ps1 -Configuration DebugEditor
 
+      # エディタのマテリアルのアセット(Material / AppliedMaterial)と既定のマテリアル(Primal Day 077, #30)。
+      # ランナーには ATL(atlsafe.h)がなく DXForgeEngineDLL をビルドできないので、シェーダの登録は偽物を使い、
+      # DLL が要る項目(実際のシェーダのコンパイル、DLL の CreateResource / DestroyResource)は SKIP と表示される。
+      # 全項目はローカルで -RequireEngineDll を付けて実行する。GPU は要らない。
+      - name: Test editor material assets
+        shell: pwsh
+        run: pwsh -STA -NoProfile -File DXForgeEditor/Tests/material_asset_test.ps1 -Configuration DebugEditor
+
       - name: CleanupMerged.ps1 tests
         shell: pwsh
         # 使い捨てのリポジトリと偽の gh / orca で動かし、本物のGitHubやOrcaは呼ばない(Issue #104)。

@@ -392,6 +392,16 @@ namespace DXForgeEditor.Content
         public byte[] RawContent { get; set; } = Array.Empty<byte>();
     }
 
+    class TextureMetadata : AssetMetadata
+    {
+        public int Width { get; init; }
+        public int Height { get; init; }
+        public int DepthOrArraySize { get; init; }
+        public int MipLevels { get; init; }
+        public DXGI_FORMAT Format { get; init; }
+        public TextureDimension Dimension { get; init; }
+    }
+
     class Texture : Asset
     {
         public static int MaxMipLevels => 14;
@@ -1096,12 +1106,37 @@ namespace DXForgeEditor.Content
             Slices = ContentToolsAPI.SlicesFromBinary(decompressed, ArraySize, MipLevels, IsVolumeMap);
         }
 
+        public override TextureMetadata GetMetadata()
+        {
+            return new()
+            {
+                Width = Width,
+                Height = Height,
+                DepthOrArraySize = ArraySize,
+                Format = Format,
+                MipLevels = MipLevels,
+                Dimension = ImportSettings.Dimension,
+            };
+        }
+
         public Texture() : base(AssetType.Texture) { }
 
         public Texture(IAssetImportSettings importSettings) : this()
         {
             Debug.Assert(importSettings is TextureImportSettings);
             ImportSettings = (TextureImportSettings)importSettings;
+        }
+
+        /// <summary>
+        /// アセットのファイルから読む(エンジンへのアップロード用。Primal Day 077)。読めなければ null。
+        /// NOTE: Primal はコンストラクタで読み、読めなくても(中身が空のまま)オブジェクトを返す(Codexの指摘, #145)
+        /// </summary>
+        public static Texture? FromAssetInfo(AssetInfo assetInfo)
+        {
+            if (!CanLoad(assetInfo, AssetType.Texture)) return null;
+
+            var asset = new Texture();
+            return asset.Load(assetInfo.FullPath) ? asset : null;
         }
 
     }
