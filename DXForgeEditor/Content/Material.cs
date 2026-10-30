@@ -195,16 +195,21 @@ namespace DXForgeEditor.Content
             _inputs.RemoveAll(x => x.Name == name);
         }
 
+        // NOTE: Primal は入力の数を書かないので、AddInput() や RemoveInput() のあとに保存すると、読み込みで足りなくなるか
+        //       例外になる(Codexの指摘, #145)。ここでは数を書き、読むときはその数の入力に作り直す。
         public void FromBinary(BinaryReader reader)
         {
-            foreach (var input in _inputs)
+            var count = reader.ReadInt32();
+            _inputs.Clear();
+            for (int i = 0; i < count; ++i)
             {
-                input.Name = reader.ReadString();
+                _inputs.Add(new(reader.ReadString()));
             }
         }
 
         public void ToBinary(BinaryWriter writer)
         {
+            writer.Write(_inputs.Count);
             foreach (var input in _inputs)
             {
                 writer.Write(input.Name);
@@ -237,7 +242,7 @@ namespace DXForgeEditor.Content
     /// </summary>
     class AppliedMaterial : Asset
     {
-        // マテリアルのシェーダーをエンジンに登録している適用マテリアルの数
+        // 読み込んだマテリアルと、そのシェーダーをエンジンに登録している適用マテリアルの数
         private class RefCountedMaterial
         {
             public int ReferenceCount { get; set; }
@@ -248,7 +253,10 @@ namespace DXForgeEditor.Content
         private static readonly Dictionary<int, string> _packedMaterialIds = [];
         private static readonly Dictionary<Guid, RefCountedMaterial> _loadedMaterials = [];
 
-        private readonly Material _material;
+        // NOTE: 同じマテリアルの適用マテリアルは、_loadedMaterials の同じ RefCountedMaterial を共有する。
+        //       表から外れたあと(Material を保存し直したときや、参照数が0になったとき)も、作ったときのものを使い続ける。
+        private readonly RefCountedMaterial _loadedMaterial;
+        private Material _material => _loadedMaterial.Material;
         private readonly ObservableCollection<AppliedMaterialInput> _inputs = [];
         public ReadOnlyObservableCollection<AppliedMaterialInput> Inputs { get; }
         private readonly List<int> _shaderIds = [];
@@ -261,12 +269,24 @@ namespace DXForgeEditor.Content
         public override List<AssetInfo> GetReferencedAssets() =>
             Inputs.Where(x => x.Asset != null && x.Asset.Guid != Guid.Empty).Select(x => x.Asset!).ToList();
 
+        // NOTE: Primal は入力のアセットを複製しない(Codexの指摘, #145)
         public AppliedMaterial Clone()
         {
-            var clone = new AppliedMaterial(_material.GetAssetInfo()) { MaterialSurface = MaterialSurface.Clone() };
+            var clone = new AppliedMaterial(_loadedMaterial) { MaterialSurface = MaterialSurface.Clone() };
+            Debug.Assert(clone._inputs.Count == _inputs.Count);
+            for (int i = 0; i < Math.Min(clone._inputs.Count, _inputs.Count); ++i)
+            {
+                clone._inputs[i].Asset = _inputs[i].Asset;
+            }
             clone.Icon = Icon;
             return clone;
         }
+
+        /// <summary>
+        /// マテリアルを保存したら、そのあとに作る適用マテリアルが新しい内容を読むように、表から外す。
+        /// NOTE: Primal は GUID だけで古い Material を使い続ける(Codexの指摘, #145)
+        /// </summary>
+        public static void OnMaterialSaved(Guid materialGuid) => _loadedMaterials.Remove(materialGuid);
 
         // NOTE: Primalは適用マテリアルごとに ShaderGroup.UploadToEngine() と UnloadFromEngine() を呼ぶ。
         //       DXForgeEXの ShaderGroup は、同じインスタンスで2回登録しても参照数を増やさない(#29)ので、
@@ -275,12 +295,7 @@ namespace DXForgeEditor.Content
         //       0 から 1 になったときに登録し、1 から 0 になったときに外す。
         private void UploadShaders()
         {
-            if (!_loadedMaterials.TryGetValue(_material.Guid, out var loadedMaterial))
-            {
-                loadedMaterial = new() { Material = _material };
-                _loadedMaterials.Add(_material.Guid, loadedMaterial);
-            }
-
+            var loadedMaterial = _loadedMaterial;
             if (loadedMaterial.ReferenceCount == 0)
             {
                 foreach (var shaderType in Enum.GetValues<ShaderType>())
@@ -302,17 +317,22 @@ namespace DXForgeEditor.Content
         {
             _shaderIds.Clear();
 
-            Debug.Assert(_loadedMaterials.ContainsKey(_material.Guid));
-            if (_loadedMaterials.TryGetValue(_material.Guid, out var loadedMaterial))
+            var loadedMaterial = _loadedMaterial;
+            Debug.Assert(loadedMaterial.ReferenceCount > 0);
+            if (loadedMaterial.ReferenceCount <= 0) return;
+
+            --loadedMaterial.ReferenceCount;
+            if (loadedMaterial.ReferenceCount == 0)
             {
-                Debug.Assert(loadedMaterial.ReferenceCount > 0);
-                --loadedMaterial.ReferenceCount;
-                if (loadedMaterial.ReferenceCount == 0)
+                foreach (var shaderType in Enum.GetValues<ShaderType>())
                 {
-                    foreach (var shaderType in Enum.GetValues<ShaderType>())
-                    {
-                        _material.GetShaderGroup(shaderType)?.UnloadFromEngine();
-                    }
+                    _material.GetShaderGroup(shaderType)?.UnloadFromEngine();
+                }
+
+                // 使う適用マテリアルがなくなったら表から外す(次に作るときにファイルから読み直す)
+                if (_loadedMaterials.TryGetValue(_material.Guid, out var current) && current == loadedMaterial)
+                {
+                    _loadedMaterials.Remove(_material.Guid);
                 }
             }
         }
@@ -322,6 +342,33 @@ namespace DXForgeEditor.Content
         /// NOTE: エンジンの初期化(Primal Day 078, #31)がまだないので、エディタからは呼ばれない。
         /// </summary>
         public bool UploadToEngine()
+        {
+            // 入力のアセット(テクスチャなど)を先にアップロードする(PackForEngine() がそのIDを書くため)。
+            // マテリアルのアップロード(UploadedAsset.AddToScene)でマテリアルが入力の参照を持つので、ここで増やした参照は最後に戻す。
+            // NOTE: Primal は先にアップロードしないので、入力のアセットがまだアップロードされていないと失敗する(Codexの指摘, #145)
+            var inputs = new List<UploadedAsset>();
+            foreach (var assetInfo in GetReferencedAssets())
+            {
+                var input = UploadedAsset.AddToScene(assetInfo);
+                if (input == null)
+                {
+                    inputs.ForEach(UploadedAsset.RemoveFromScene);
+                    return false;
+                }
+                inputs.Add(input);
+            }
+
+            try
+            {
+                return UploadMaterialToEngine();
+            }
+            finally
+            {
+                inputs.ForEach(UploadedAsset.RemoveFromScene);
+            }
+        }
+
+        private bool UploadMaterialToEngine()
         {
             UploadShaders();
             var packedData = PackForEngine();
@@ -475,20 +522,22 @@ namespace DXForgeEditor.Content
             return ((MemoryStream)writer.BaseStream).ToArray();
         }
 
-        public AppliedMaterial(AssetInfo materialAssetInfo) : base(AssetType.Material)
+        public AppliedMaterial(AssetInfo materialAssetInfo) : this(GetLoadedMaterial(materialAssetInfo)) { }
+
+        private static RefCountedMaterial GetLoadedMaterial(AssetInfo materialAssetInfo)
         {
             Debug.Assert(materialAssetInfo != null && materialAssetInfo.Guid != Guid.Empty);
-            if (_loadedMaterials.TryGetValue(materialAssetInfo.Guid, out var loadedMaterial))
-            {
-                // NOTE: 参照数は、適用マテリアルをアップロードするときに増やす
-                _material = loadedMaterial.Material;
-            }
-            else
-            {
-                _material = new(materialAssetInfo);
-                _loadedMaterials.Add(_material.Guid, new() { Material = _material });
-            }
+            // NOTE: 参照数は、適用マテリアルをアップロードするときに増やす
+            if (_loadedMaterials.TryGetValue(materialAssetInfo.Guid, out var loadedMaterial)) return loadedMaterial;
 
+            loadedMaterial = new() { Material = new(materialAssetInfo) };
+            _loadedMaterials[loadedMaterial.Material.Guid] = loadedMaterial;
+            return loadedMaterial;
+        }
+
+        private AppliedMaterial(RefCountedMaterial loadedMaterial) : base(AssetType.Material)
+        {
+            _loadedMaterial = loadedMaterial;
             MaterialSurface = _material.MaterialSurface.Clone();
             _material.GetInputs().ForEach(x => _inputs.Add(new(x)));
             Icon = _material.Icon;
@@ -634,6 +683,7 @@ namespace DXForgeEditor.Content
                 DefaultMaterialInputs.ToBinary(writer);
 
                 FullPath = file;
+                AppliedMaterial.OnMaterialSaved(Guid);
                 Logger.Log(MessageType.Info, $"マテリアルを保存しました: {file}");
 
                 return [file];

@@ -19,6 +19,13 @@
       4. 同じ Material を使う2つの AppliedMaterial の1つがシェーダを外しても、もう1つが使うシェーダはエンジンに残る。
       5. EngineAPI.CreateResource / DestroyResource: エンジンを初期化せずに呼べる範囲(扱わない種類・シェーダのないマテリアル・
          空のデータ・無効なID)で、DLL の境界を通って無効なIDが返る(例外もassertも起きない)。
+      6. Codex の指摘(#145): エンジンのリソースの作成・破棄とアセットの読み込みを偽物に差し替え(UploadedAsset の
+         LoadAsset / CreateResource / DestroyResource)、エンジンを初期化せずに次を確かめる。
+         - 入力のテクスチャがまだアップロードされていなくても、AppliedMaterial.UploadToEngine() が先にアップロードし、
+           マテリアルのデータにそのIDが入る。外すとテクスチャも破棄される。
+         - AppliedMaterial.Clone() が入力のアセットを複製する。
+         - 入力を減らしたり増やしたりした Material の Save → Load で、入力の名前が同じになる。
+         - Material を保存し直したら、そのあとに作る AppliedMaterial は新しい内容を使う。参照数が0になったら表から消える。
       DLL が要る項目: 1 の実際のコンパイル、3 のシェーダーのID とシェーダーの解除、4 のすべて、5 の DLL を呼ぶ項目。
 
 .PARAMETER Configuration
@@ -208,7 +215,7 @@ try
 	$materialInfo = $tryGetAssetInfo.Invoke($null, @($file))
 	$applied = [Activator]::CreateInstance($appliedMaterialType, @($materialInfo))
 	$uploadShaders.Invoke($applied, $null)
-	$appliedSource = $appliedMaterialType.GetField("_material", $flags).GetValue($applied)
+	$appliedSource = $appliedMaterialType.GetProperty("_material", $flags).GetValue($applied)
 	$vsId = (Get-Shader $appliedSource "Vertex").ContentId
 	$data = $applied.PackForEngine()
 	# EngineUnitTests の Tests_ResourceUpload.cpp と同じ定数: packed_material_size(0) = 92、material_init_info は 4 バイト目から
@@ -246,7 +253,7 @@ try
 	$p2 = [Convert]::ToBase64String($a2.PackForEngine())
 	Check ($count -eq 2 -and $p1 -eq $p2) "both use the same uploaded shaders: $count shader groups"
 	$unloadShaders.Invoke($a1, $null)
-	$sharedVs = $a2.GetType().GetField("_material", $flags).GetValue($a2).GetShaderGroup([Enum]::Parse($shaderType, "Vertex"))
+	$sharedVs = $appliedMaterialType.GetProperty("_material", $flags).GetValue($a2).GetShaderGroup([Enum]::Parse($shaderType, "Vertex"))
 	Check ((Get-UploadedShaderCount) -eq 2 -and $sharedVs.ContentId -ne $invalidId -and [Convert]::ToBase64String($a2.PackForEngine()) -eq $p2) "removing one keeps the shaders of the other: $(Get-UploadedShaderCount) shader groups, vertex id $($sharedVs.ContentId)"
 	$unloadShaders.Invoke($a2, $null)
 	Check ((Get-UploadedShaderCount) -eq 0 -and $sharedVs.ContentId -eq $invalidId) "removing both removes the shaders: $(Get-UploadedShaderCount) left"
@@ -284,6 +291,108 @@ try
 	}
 	else { Skip "DestroyResource with an invalid id or an unsupported type does nothing" }
 	Check ($getContentId.Invoke($null, @([Guid]::NewGuid())) -eq $invalidId) "UploadedAsset.GetContentId of an asset that is not uploaded"
+
+	Write-Host "6. Codex review (#145)"
+	$assetInfoType = $materialInfo.GetType()
+	$textureType = $editor.GetType("DXForgeEditor.Content.Texture", $true)
+	$sliceType = $editor.GetType("DXForgeEditor.Content.Slice", $true)
+	$materialInputType = $editor.GetType("DXForgeEditor.Content.MaterialInput", $true)
+	$uploadedAssets = $uploadedAssetType.GetField("_uploadedAssets", $flags).GetValue($null)
+	$loadedMaterials = $appliedMaterialType.GetField("_loadedMaterials", $flags).GetValue($null)
+	$textureAsset = [Enum]::Parse($assetTypeEnum, "Texture")
+
+	# 偽のエンジン: リソースのIDを順に返し、作ったデータと破棄したIDを覚える
+	$script:fake = @{ Next = 100; Created = @{}; Data = @{}; Destroyed = [System.Collections.Generic.List[int]]::new(); Textures = @{} }
+	$createSb = { param([byte[]]$data, $type) $id = $script:fake.Next; $script:fake.Next++; $script:fake.Created[$id] = "$type"; $script:fake.Data[$id] = $data; [int]$id }
+	$destroySb = { param([int]$id, $type) $script:fake.Destroyed.Add($id) }
+	$loadSb = { param($info) $script:fake.Textures[$info.Guid] }
+	$seams = @{
+		CreateResource = [System.Func`3].MakeGenericType([byte[]], $assetTypeEnum, [int])
+		DestroyResource = [System.Action`2].MakeGenericType([int], $assetTypeEnum)
+		LoadAsset = [System.Func`2].MakeGenericType($assetInfoType, $assetType)
+	}
+	$originals = @{}
+	foreach ($name in $seams.Keys) { $originals[$name] = $uploadedAssetType.GetProperty($name, $flags).GetValue($null) }
+	$uploadedAssetType.GetProperty("CreateResource", $flags).SetValue($null, [System.Management.Automation.LanguagePrimitives]::ConvertTo($createSb, $seams.CreateResource))
+	$uploadedAssetType.GetProperty("DestroyResource", $flags).SetValue($null, [System.Management.Automation.LanguagePrimitives]::ConvertTo($destroySb, $seams.DestroyResource))
+	$uploadedAssetType.GetProperty("LoadAsset", $flags).SetValue($null, [System.Management.Automation.LanguagePrimitives]::ConvertTo($loadSb, $seams.LoadAsset))
+
+	try
+	{
+		# 4x4 の R8G8B8A8 のテクスチャ(Texture.PackForEngine() で詰める)
+		$texInfo = [Activator]::CreateInstance($assetInfoType)
+		$texInfo.Type = $textureAsset
+		$texInfo.Guid = [Guid]::NewGuid()
+		$texInfo.FullPath = Join-Path $work "Texture.asset"
+		$texture = [Activator]::CreateInstance($textureType)
+		$assetType.GetProperty("Guid", $flags).SetValue($texture, $texInfo.Guid)
+		$texture.Width = 4; $texture.Height = 4; $texture.ArraySize = 1; $texture.MipLevels = 1
+		$texture.Format = [Enum]::ToObject($texture.Format.GetType(), 28)
+		$slice = [Activator]::CreateInstance($sliceType)
+		$slice.Width = 4; $slice.Height = 4; $slice.RowPitch = 16; $slice.SlicePitch = 64; $slice.RawContent = [byte[]]::new(64)
+		$mips = [Activator]::CreateInstance([System.Collections.Generic.List`1].MakeGenericType($sliceType)); $mips.Add($slice)
+		$array = [Activator]::CreateInstance([System.Collections.Generic.List`1].MakeGenericType($mips.GetType())); $array.Add($mips)
+		$slices = [Activator]::CreateInstance([System.Collections.Generic.List`1].MakeGenericType($array.GetType())); $slices.Add($array)
+		$textureType.GetProperty("Slices", $flags).SetValue($texture, $slices)
+		$script:fake.Textures[$texInfo.Guid] = $texture
+
+		# 1. 入力のテクスチャを先にアップロードする
+		$withTexture = [Activator]::CreateInstance($appliedMaterialType, @($materialInfo))
+		$withTexture.Inputs[0].Asset = $texInfo
+		$uploaded = $withTexture.UploadToEngine()
+		$texId = $getContentId.Invoke($null, @($texInfo.Guid))
+		$materialId = if ($withTexture.UploadedAsset) { $withTexture.UploadedAsset.ContentId } else { $invalidId }
+		$materialData = if ($script:fake.Data.ContainsKey($materialId)) { $script:fake.Data[$materialId] } else { [byte[]]@() }
+		Check ($uploaded -and $texId -ne $invalidId -and $script:fake.Created[$texId] -eq "Texture" -and $uploadedAssets[$texInfo.Guid].ReferenceCount -eq 1) "UploadToEngine uploads the input texture first: $uploaded, texture id $texId, references $(if ($uploadedAssets.ContainsKey($texInfo.Guid)) { $uploadedAssets[$texInfo.Guid].ReferenceCount } else { 0 })"
+		Check ($materialData.Length -eq 96 -and [BitConverter]::ToInt32($materialData, 0) -eq 1 -and [BitConverter]::ToInt32($materialData, 4) -eq $texId) "the material data has the texture id: $($materialData.Length) bytes"
+		if ($uploaded)
+		{
+			$withTexture.UnloadFromEngine()
+			Check ($getContentId.Invoke($null, @($texInfo.Guid)) -eq $invalidId -and $script:fake.Destroyed.Contains($texId) -and $script:fake.Destroyed.Contains($materialId) -and $uploadedAssets.Count -eq 0) "UnloadFromEngine destroys the material and the texture: destroyed $($script:fake.Destroyed -join ', ')"
+		}
+		Check ((Get-UploadedShaderCount) -eq 0) "no shaders are left uploaded: $(Get-UploadedShaderCount)"
+
+		# 2. Clone() が入力のアセットを複製する
+		$original = [Activator]::CreateInstance($appliedMaterialType, @($materialInfo))
+		$original.Inputs[1].Asset = $texInfo
+		$clone = $original.Clone()
+		$cloneAssets = @($clone.GetReferencedAssets())
+		Check ($cloneAssets.Count -eq 1 -and $cloneAssets[0].Guid -eq $texInfo.Guid -and $clone.Inputs[1].Asset -eq $texInfo -and -not [object]::ReferenceEquals($clone.Inputs[1], $original.Inputs[1])) "Clone copies the input assets: $($cloneAssets.Count)"
+
+		# 3. 入力の数を保存する
+		$inputs = [Activator]::CreateInstance($materialType)
+		$inputs.MaterialMode = [Enum]::Parse($materialModeEnum, "Default")
+		$inputs.DefaultMaterialInputs.RemoveInput("Normal Map")
+		$inputs.DefaultMaterialInputs.AddInput([Activator]::CreateInstance($materialInputType, @("Custom 1")))
+		$inputs.DefaultMaterialInputs.AddInput([Activator]::CreateInstance($materialInputType, @("Custom 2")))
+		[string]$inputsFile = Join-Path $work "Inputs.asset"
+		[void]$inputs.Save($inputsFile)
+		$read = Read-Material $inputsFile
+		$expected = ($inputs.GetInputs() | ForEach-Object Name) -join ","
+		$actual = if ($read.Loaded) { ($read.Material.GetInputs() | ForEach-Object Name) -join "," } else { "(not loaded)" }
+		Check ($read.Loaded -and $actual -eq $expected) "added and removed inputs round trip: $actual"
+
+		# 4. 保存し直した Material を使う。参照数が0になったら表から消える
+		$cached = [Activator]::CreateInstance($materialType)
+		$cached.MaterialMode = [Enum]::Parse($materialModeEnum, "Default")
+		[void]$cached.AddShaderGroup($vs)
+		[void]$cached.AddShaderGroup($ps)
+		$cached.MaterialSurface.Roughness = 0.75
+		[string]$cachedFile = Join-Path $work "Cached.asset"
+		[void]$cached.Save($cachedFile)
+		$first = [Activator]::CreateInstance($appliedMaterialType, @($tryGetAssetInfo.Invoke($null, @($cachedFile))))
+		$cached.MaterialSurface.Roughness = 0.5
+		[void]$cached.Save($cachedFile)
+		$second = [Activator]::CreateInstance($appliedMaterialType, @($tryGetAssetInfo.Invoke($null, @($cachedFile))))
+		Check ($first.MaterialSurface.Roughness -eq 0.75 -and $second.MaterialSurface.Roughness -eq 0.5) "an applied material made after saving uses the saved material: $($first.MaterialSurface.Roughness) -> $($second.MaterialSurface.Roughness)"
+		$secondUploaded = $second.UploadToEngine()
+		if ($secondUploaded) { $second.UnloadFromEngine() }
+		Check ($secondUploaded -and -not $loadedMaterials.ContainsKey($cached.Guid) -and (Get-UploadedShaderCount) -eq 0) "the loaded material is dropped when no applied material uses it: uploaded $secondUploaded, cached $($loadedMaterials.ContainsKey($cached.Guid))"
+	}
+	finally
+	{
+		foreach ($name in $originals.Keys) { $uploadedAssetType.GetProperty($name, $flags).SetValue($null, $originals[$name]) }
+	}
 }
 finally
 {

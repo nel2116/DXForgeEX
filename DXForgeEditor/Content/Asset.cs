@@ -239,17 +239,23 @@ namespace DXForgeEditor.Content
 
         private static readonly Dictionary<Guid, UploadedAsset> _uploadedAssets = [];
 
+        // NOTE: エンジンを初期化できない(#31 まで)ヘッドレスのテストで、アップロードの流れと参照数を確かめるため、
+        //       アセットの読み込みとエンジンのリソースの作成・破棄を差し替えられるようにしておく(material_asset_test.ps1)。
+        internal static Func<AssetInfo, Asset?> LoadAsset { get; set; } = assetInfo => assetInfo.Type switch
+        {
+            AssetType.Mesh => new Geometry(assetInfo),
+            AssetType.Texture => new Texture(assetInfo),
+            _ => null
+        };
+        internal static Func<byte[], AssetType, int> CreateResource { get; set; } = EngineAPI.CreateResource;
+        internal static Action<int, AssetType> DestroyResource { get; set; } = EngineAPI.DestroyResource;
+
         private static UploadedAsset? UploadAssetToEngine(AssetInfo assetInfo, Asset? asset = null)
         {
             Debug.Assert(assetInfo != null);
 
             // NOTE: マテリアルは AppliedMaterial を渡す(マテリアルのアセットのファイルからは作らない)
-            asset ??= assetInfo.Type switch
-            {
-                AssetType.Mesh => new Geometry(assetInfo),
-                AssetType.Texture => new Texture(assetInfo),
-                _ => null
-            };
+            asset ??= LoadAsset(assetInfo);
 
             Debug.Assert(asset != null);
             if (asset == null) return null;
@@ -269,7 +275,7 @@ namespace DXForgeEditor.Content
             }
 
             var data = asset.PackForEngine();
-            var contentId = data.Length > 0 ? EngineAPI.CreateResource(data, assetInfo.Type) : ID.INVALID_ID;
+            var contentId = data.Length > 0 ? CreateResource(data, assetInfo.Type) : ID.INVALID_ID;
             if (!ID.IsValid(contentId))
             {
                 referencedAssets.ForEach(RemoveFromScene);
@@ -287,7 +293,7 @@ namespace DXForgeEditor.Content
         private static void UnloadAssetFromEngine(UploadedAsset uploadedAsset)
         {
             Debug.Assert(uploadedAsset?.AssetInfo != null && ID.IsValid(uploadedAsset.ContentId));
-            EngineAPI.DestroyResource(uploadedAsset.ContentId, uploadedAsset.AssetInfo.Type);
+            DestroyResource(uploadedAsset.ContentId, uploadedAsset.AssetInfo.Type);
         }
 
         /// <summary>
