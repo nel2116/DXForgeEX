@@ -12,9 +12,12 @@
     <ClCompile Include="HeadlessTestScripts.cpp" />
     <ClCompile Include="HeadlessRender.cpp" />
     <ClCompile Include="..\DXForgeEngineDLL\ShaderCompilation.cpp" />
+    <ClCompile Include="..\DXForgeEngineDLL\ResourceUpload.cpp" />
+    <ClCompile Include="Tests_ResourceUpload.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MicroTest.h" />
     <ClInclude Include="HeadlessRender.h" />
+    <ClInclude Include="EditorAssetPacking.h" />
   </ItemGroup>
 </Project>

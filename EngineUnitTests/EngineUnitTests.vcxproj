@@ -91,10 +91,13 @@
     <ClCompile Include="HeadlessTestScripts.cpp" />
     <ClCompile Include="HeadlessRender.cpp" />
     <ClCompile Include="..\DXForgeEngineDLL\ShaderCompilation.cpp" />
+    <ClCompile Include="..\DXForgeEngineDLL\ResourceUpload.cpp" />
+    <ClCompile Include="Tests_ResourceUpload.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MicroTest.h" />
     <ClInclude Include="HeadlessRender.h" />
+    <ClInclude Include="EditorAssetPacking.h" />
   </ItemGroup>
   <!-- 描画のヘッドレス実行(EngineUnitTests の render モード、#127)は DXC を実行時に exe の隣から読み込む。packages/DirectXShaderCompiler があればコピーするだけで、
        無ければ何もしない(ダウンロードはしない。EngineUnitTests だけのオフラインのビルドを保つ、#61)。 -->

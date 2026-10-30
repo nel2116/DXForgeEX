@@ -292,7 +292,7 @@ Surface GetSurface(VertexOut psIn, float3 V)
     S.PerceptualRoughness = max(PerObjectBuffer.Roughness, 0.045f);
     S.EmissiveColor = PerObjectBuffer.Emissive;
     S.EmissiveIntensity = PerObjectBuffer.EmissiveIntensity;
-    S.AmbientOcclusion = PerObjectBuffer.AmbientOcclusion;
+    S.AmbientOcclusion = 1.f;
 
     S.V = V;
     const float roughness = S.PerceptualRoughness * S.PerceptualRoughness;
