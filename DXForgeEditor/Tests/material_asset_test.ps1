@@ -5,7 +5,9 @@
 .DESCRIPTION
     ビルド済みの DXForgeEditor.dll を読み込み、エディタと同じコードをリフレクションで呼ぶ。エディタのウィンドウは開かず、GPUも使わない。
     シェーダのコンパイルとエンジンへのシェーダの登録には、x64\<Configuration>\ の DXForgeEngineDLL.dll を使う
-    (エンジンの初期化は要らない)。Logger と Material.Save() のアイコンに WPF が要るので、WPF の Application を作ってから呼ぶ。
+    (エンジンの初期化は要らない)。DLL がなければ、コンパイル済みに見せた偽のシェーダーグループを使い、DLL が要る項目は
+    SKIP として名前と件数を出す(CI のランナーには ATL がなく DLL をビルドできないため)。-RequireEngineDll を付けると、
+    DLL がないときは失敗にする(ローカルでは付けて、全項目を実行する)。Logger と Material.Save() のアイコンに WPF が要るので、WPF の Application を作ってから呼ぶ。
     ファイルは %TEMP% の下に作り、最後に消す。
 
     確かめること:
@@ -17,17 +19,22 @@
       4. 同じ Material を使う2つの AppliedMaterial の1つがシェーダを外しても、もう1つが使うシェーダはエンジンに残る。
       5. EngineAPI.CreateResource / DestroyResource: エンジンを初期化せずに呼べる範囲(扱わない種類・シェーダのないマテリアル・
          空のデータ・無効なID)で、DLL の境界を通って無効なIDが返る(例外もassertも起きない)。
+      DLL が要る項目: 1 の実際のコンパイル、3 のシェーダーのID とシェーダーの解除、4 のすべて、5 の DLL を呼ぶ項目。
 
 .PARAMETER Configuration
     DebugEditor(既定)か ReleaseEditor。
 
+.PARAMETER RequireEngineDll
+    DXForgeEngineDLL.dll がなければ失敗にする(DLL が要る項目を SKIP にしない)。
+
 .EXAMPLE
-    pwsh -STA -NoProfile -File DXForgeEditor/Tests/material_asset_test.ps1
+    pwsh -STA -NoProfile -File DXForgeEditor/Tests/material_asset_test.ps1 -RequireEngineDll
 #>
 [CmdletBinding()]
 param(
 	[ValidateSet("DebugEditor", "ReleaseEditor")]
-	[string]$Configuration = "DebugEditor"
+	[string]$Configuration = "DebugEditor",
+	[switch]$RequireEngineDll
 )
 
 $ErrorActionPreference = "Stop"
@@ -41,12 +48,29 @@ function Check([bool]$condition, [string]$message)
 	if (-not $condition) { $failures.Add($message) }
 }
 
+$skipped = [System.Collections.Generic.List[string]]::new()
+function Skip([string]$name)
+{
+	Write-Host "  SKIP $name (DXForgeEngineDLL.dll がない)"
+	$skipped.Add($name)
+}
+
 if ([System.Threading.Thread]::CurrentThread.GetApartmentState() -ne "STA") { throw "Run this script on an STA thread (pwsh -STA)." }
 
 Add-Type -AssemblyName PresentationFramework
 $null = [System.Windows.Application]::new()
-[void][System.Runtime.InteropServices.NativeLibrary]::Load((Join-Path $OutDir "DXForgeEngineDLL.dll"))
-if ($Configuration -eq "DebugEditor")
+$engineDllPath = Join-Path $OutDir "DXForgeEngineDLL.dll"
+$hasEngineDll = Test-Path $engineDllPath
+if (-not $hasEngineDll)
+{
+	if ($RequireEngineDll) { throw "$engineDllPath がありません(./build.ps1 -Target native -Configuration $Configuration -Project DXForgeEngineDLL)。" }
+	Write-Host "NOTE: $engineDllPath がないため、DLL が要る項目は SKIP する。"
+}
+else
+{
+	[void][System.Runtime.InteropServices.NativeLibrary]::Load($engineDllPath)
+}
+if ($hasEngineDll -and $Configuration -eq "DebugEditor")
 {
 	# Debugのassertはモーダルなダイアログを出して止まるため、標準エラーに出してabortするようにする
 	Add-Type -Namespace DXForgeTest -Name Crt -MemberDefinition @'
@@ -90,6 +114,26 @@ function New-ShaderGroup([string]$type, [string]$code, [string]$function, [strin
 	$createShaderGroup.Invoke($null, @([Enum]::Parse($shaderType, $type), $code, $function, $defines, $keys, $getEngineShadersPath.Invoke($null, @($RepoRoot + "\"))))
 }
 
+# DLL がないときに使う、コンパイル済みに見せたシェーダーグループ(バイトコードとハッシュは偽物)
+function Set-FakeCompiled($shaderGroup, [int]$seed)
+{
+	$shaderGroup.ByteCode.Clear(); $shaderGroup.Hash.Clear(); $shaderGroup.Errors.Clear(); $shaderGroup.Assembly.Clear()
+	for ($k = 0; $k -lt $shaderGroup.Keys.Count; $k++)
+	{
+		$shaderGroup.ByteCode.Add([byte[]](1..(16 + $k) | ForEach-Object { [byte](($_ + $seed) % 256) }))
+		$shaderGroup.Hash.Add([byte[]](1..16 | ForEach-Object { [byte](($_ * 7 + $k + $seed) % 256) }))
+		$shaderGroup.Errors.Add("")
+		$shaderGroup.Assembly.Add("fake")
+	}
+}
+
+function Compile-ShaderGroup($shaderGroup, [int]$seed)
+{
+	if ($hasEngineDll) { return [bool]$compileShader.Invoke($null, @($shaderGroup)) }
+	Set-FakeCompiled $shaderGroup $seed
+	return $shaderGroup.IsCompiled
+}
+
 function Get-Packed($shaderGroup) { if ($shaderGroup) { [Convert]::ToBase64String($shaderGroup.PackForEngine()) } else { "" } }
 function Get-Shader($material, [string]$type) { $material.GetShaderGroup([Enum]::Parse($shaderType, $type)) }
 
@@ -110,8 +154,9 @@ try
 	Write-Host "1. Default material (DXForgeEditor $Configuration)"
 	$vs = New-ShaderGroup "Vertex" $code "MainVS" @("ELEMENTS_TYPE=0", "ELEMENTS_TYPE=1", "ELEMENTS_TYPE=3") @(0, 1, 3)
 	$ps = New-ShaderGroup "Pixel" $code "MainPS" @("") @([uint32]::MaxValue)
-	$compiled = $compileShader.Invoke($null, @($vs)) -and $compileShader.Invoke($null, @($ps))
-	Check $compiled "the default material shaders compile"
+	$compiled = (Compile-ShaderGroup $vs 1) -and (Compile-ShaderGroup $ps 2)
+	if ($hasEngineDll) { Check $compiled "the default material shaders compile" }
+	else { Skip "the default material shaders compile"; Check $compiled "fake compiled shader groups" }
 
 	[string]$defaultFile = Join-Path $work "DefaultMaterial.asset"
 	$created = $createDefaultMaterial.Invoke($null, @($defaultFile, $vs, $ps))
@@ -129,7 +174,7 @@ try
 	$again = $createDefaultMaterial.Invoke($null, @($defaultFile, $vs, $ps))
 	Check ($again -and (Get-Item $defaultFile).LastWriteTimeUtc -eq $writeTime) "the same shaders do not rewrite the file"
 	$ps0 = New-ShaderGroup "Pixel" $code "MainPS" @("") @(0)
-	[void]$compileShader.Invoke($null, @($ps0))
+	[void](Compile-ShaderGroup $ps0 2)
 	$recreated = $createDefaultMaterial.Invoke($null, @($defaultFile, $vs, $ps0))
 	$read = Read-Material $defaultFile
 	Check ($recreated -and $read.Material.Guid -eq $info.Guid -and (Get-Shader $read.Material "Pixel").Keys[0] -eq 0) "changed shaders recreate it with the same GUID"
@@ -176,8 +221,9 @@ try
 		(& $f 40) -eq 2.5 -and (& $f 44) -eq 0.25 -and (& $f 48) -eq 0.75) "material_surface at +12: $((12..48 | Where-Object { $_ % 4 -eq 0 } | ForEach-Object { & $f $_ }) -join ', ')"
 	Check ((& $i 52) -eq 0 -and (& $i 56) -eq 0) "type (opaque) at +52 and texture count at +56"
 	$shaderIds = 0..7 | ForEach-Object { & $i (60 + 4 * $_) }
-	Check ($vsId -ne $invalidId -and $shaderIds[0] -eq $vsId -and $shaderIds[4] -ne $invalidId -and $shaderIds[4] -ne $vsId -and
-		($shaderIds[1, 2, 3, 5, 6, 7] | Where-Object { $_ -ne $invalidId }).Count -eq 0) "shader ids at +60 (vertex, ..., pixel, ...): $($shaderIds -join ', ')"
+	if (-not $hasEngineDll) { Skip "shader ids at +60: $($shaderIds -join ', ')" }
+	else { Check ($vsId -ne $invalidId -and $shaderIds[0] -eq $vsId -and $shaderIds[4] -ne $invalidId -and $shaderIds[4] -ne $vsId -and
+		($shaderIds[1, 2, 3, 5, 6, 7] | Where-Object { $_ -ne $invalidId }).Count -eq 0) "shader ids at +60 (vertex, ..., pixel, ...): $($shaderIds -join ', ')" }
 
 	$applied.Inputs[0].Asset = [Activator]::CreateInstance($materialInfo.GetType())
 	$applied.Inputs[0].Asset.Guid = [Guid]::NewGuid()
@@ -185,9 +231,12 @@ try
 	Check ($applied.PackForEngine().Length -eq 0) "an input that is not uploaded gives no data"
 	$applied.Inputs[0].Asset = $null
 	$unloadShaders.Invoke($applied, $null)
-	Check ((Get-UploadedShaderCount) -eq 0 -and (Get-Shader $appliedSource "Vertex").ContentId -eq $invalidId) "UnloadShaders removes the shaders: $(Get-UploadedShaderCount) left"
+	if ($hasEngineDll) { Check ((Get-UploadedShaderCount) -eq 0 -and (Get-Shader $appliedSource "Vertex").ContentId -eq $invalidId) "UnloadShaders removes the shaders: $(Get-UploadedShaderCount) left" }
+	else { Skip "UnloadShaders removes the shaders" }
 
 	Write-Host "4. Two applied materials sharing a material"
+	if ($hasEngineDll)
+	{
 	$a1 = [Activator]::CreateInstance($appliedMaterialType, @($materialInfo))
 	$a2 = [Activator]::CreateInstance($appliedMaterialType, @($materialInfo))
 	$uploadShaders.Invoke($a1, $null)
@@ -204,19 +253,36 @@ try
 	$uploadShaders.Invoke($a1, $null)
 	Check ((Get-UploadedShaderCount) -eq 2) "they can be uploaded again: $(Get-UploadedShaderCount) shader groups"
 	$unloadShaders.Invoke($a1, $null)
+	}
+	else
+	{
+		@("both use the same uploaded shaders", "removing one keeps the shaders of the other", "removing both removes the shaders", "they can be uploaded again") | ForEach-Object { Skip $_ }
+	}
 
 	Write-Host "5. EngineAPI.CreateResource / DestroyResource without the engine initialized"
 	$animation = [Enum]::Parse($assetTypeEnum, "Animation")
 	$materialAsset = [Enum]::Parse($assetTypeEnum, "Material")
 	$mesh = [Enum]::Parse($assetTypeEnum, "Mesh")
-	Check ($createResource.Invoke($null, @([byte[]]@(1, 2, 3, 4), $animation)) -eq $invalidId) "an unsupported type is rejected by the DLL"
-	$noShaders = [byte[]]::new(92)
-	for ($k = 0; $k -lt 8; $k++) { [Array]::Copy([BitConverter]::GetBytes(-1), 0, $noShaders, 60 + 4 * $k, 4) }
-	Check ($createResource.Invoke($null, @($noShaders, $materialAsset)) -eq $invalidId) "a material without shaders is rejected by the DLL"
+	if ($hasEngineDll)
+	{
+		Check ($createResource.Invoke($null, @([byte[]]@(1, 2, 3, 4), $animation)) -eq $invalidId) "an unsupported type is rejected by the DLL"
+		$noShaders = [byte[]]::new(92)
+		for ($k = 0; $k -lt 8; $k++) { [Array]::Copy([BitConverter]::GetBytes(-1), 0, $noShaders, 60 + 4 * $k, 4) }
+		Check ($createResource.Invoke($null, @($noShaders, $materialAsset)) -eq $invalidId) "a material without shaders is rejected by the DLL"
+	}
+	else
+	{
+		Skip "an unsupported type is rejected by the DLL"
+		Skip "a material without shaders is rejected by the DLL"
+	}
 	Check ($createResource.Invoke($null, @([byte[]]@(), $mesh)) -eq $invalidId) "empty data is not passed to the DLL"
-	$destroyResource.Invoke($null, @($invalidId, $mesh))
-	$destroyResource.Invoke($null, @(0, $animation))
-	Check $true "DestroyResource with an invalid id or an unsupported type does nothing"
+	if ($hasEngineDll)
+	{
+		$destroyResource.Invoke($null, @($invalidId, $mesh))
+		$destroyResource.Invoke($null, @(0, $animation))
+		Check $true "DestroyResource with an invalid id or an unsupported type does nothing"
+	}
+	else { Skip "DestroyResource with an invalid id or an unsupported type does nothing" }
 	Check ($getContentId.Invoke($null, @([Guid]::NewGuid())) -eq $invalidId) "UploadedAsset.GetContentId of an asset that is not uploaded"
 }
 finally
@@ -225,6 +291,7 @@ finally
 }
 
 Write-Host ""
+if ($skipped.Count -gt 0) { Write-Host "SKIPPED ($($skipped.Count)): DXForgeEngineDLL.dll がない(-RequireEngineDll で必須にできる)" }
 if ($failures.Count -gt 0)
 {
 	Write-Host "FAILED ($($failures.Count))"
