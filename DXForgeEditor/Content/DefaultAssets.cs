@@ -99,9 +99,9 @@ namespace DXForgeEditor.Content
         {
             try
             {
-                if (File.Exists(file) && Asset.TryGetAssetInfo(file) is AssetInfo info && info.Type == AssetType.Material)
+                // NOTE: すべて読めたときだけ使う(途中で失敗しても、読めたシェーダーが同じなら使ってしまわないように。Codexの指摘, #145)
+                if (File.Exists(file) && Asset.TryGetAssetInfo(file) is AssetInfo info && Material.FromAssetInfo(info) is Material existing)
                 {
-                    var existing = new Material(info);
                     if (HasSameShaders(existing.GetShaderGroup(ShaderType.Vertex), vertexShaders) &&
                         HasSameShaders(existing.GetShaderGroup(ShaderType.Pixel), pixelShaders))
                     {

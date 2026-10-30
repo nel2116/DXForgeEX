@@ -293,14 +293,29 @@ namespace DXForgeEditor.Content
         //       同じ Material を共有する適用マテリアルの1つを外すと、ほかの適用マテリアルが使うシェーダーまで
         //       エンジンから外れてしまう。そこで、シェーダーの登録は Material ごとに参照数を数え、
         //       0 から 1 になったときに登録し、1 から 0 になったときに外す。
-        private void UploadShaders()
+        //       シェーダーグループを1つでも登録できなければ、登録できたものを外して失敗にする
+        //       (Primal は失敗を無視し、そのシェーダーのない(IDが無効な)マテリアルをアップロードする。Codexの指摘, #145)。
+        private bool UploadShaders()
         {
             var loadedMaterial = _loadedMaterial;
             if (loadedMaterial.ReferenceCount == 0)
             {
-                foreach (var shaderType in Enum.GetValues<ShaderType>())
+                var shaderGroups = Enum.GetValues<ShaderType>().Select(_material.GetShaderGroup).OfType<ShaderGroup>().ToList();
+                if (shaderGroups.Count == 0)
                 {
-                    _material.GetShaderGroup(shaderType)?.UploadToEngine();
+                    Logger.Log(MessageType.Error, $"マテリアル {_material.FileName} にシェーダーがないため、エンジンにアップロードできません。");
+                    return false;
+                }
+
+                var uploaded = new List<ShaderGroup>();
+                foreach (var shaderGroup in shaderGroups)
+                {
+                    if (!ID.IsValid(shaderGroup.UploadToEngine()))
+                    {
+                        uploaded.ForEach(x => x.UnloadFromEngine());
+                        return false;
+                    }
+                    uploaded.Add(shaderGroup);
                 }
             }
 
@@ -311,6 +326,8 @@ namespace DXForgeEditor.Content
             {
                 _shaderIds.Add(_material.GetShaderGroup(shaderType)?.ContentId ?? ID.INVALID_ID);
             }
+
+            return true;
         }
 
         private void UnloadShaders()
@@ -330,9 +347,10 @@ namespace DXForgeEditor.Content
                 }
 
                 // 使う適用マテリアルがなくなったら表から外す(次に作るときにファイルから読み直す)
-                if (_loadedMaterials.TryGetValue(_material.Guid, out var current) && current == loadedMaterial)
+                var key = _loadedMaterials.FirstOrDefault(x => x.Value == loadedMaterial).Key;
+                if (key != Guid.Empty)
                 {
-                    _loadedMaterials.Remove(_material.Guid);
+                    _loadedMaterials.Remove(key);
                 }
             }
         }
@@ -368,97 +386,88 @@ namespace DXForgeEditor.Content
             }
         }
 
+        // 状態: UploadedAsset が null でなければ、この適用マテリアルは UploadedAsset の参照を1つと、マテリアルのシェーダーの
+        //       参照を1つ持ち、_previousPackedData はそのときのデータ。null なら何も持たない(アップロードしていないか、外した)。
+        //       どの経路で失敗しても、この状態は呼ぶ前のまま変えない。
+        // NOTE: Primal は、内容が変わったときに「前の内容をアップロード済み」であることを Debug.Assert で前提にして GUID を
+        //       作り直すが、同じ内容を共有していた別の適用マテリアルが残っていて、自分は外し済みのときに外れる(Codexの指摘, #145)。
+        //       ここでは、新しい内容は常に新しいGUIDでアップロードし、同じ内容のものがあればそのGUIDを使う。
         private bool UploadMaterialToEngine()
         {
-            UploadShaders();
-            var packedData = PackForEngine();
+            if (!UploadShaders()) return false;
 
+            var packedData = PackForEngine();
             if (packedData.Length == 0)
             {
                 UnloadShaders();
                 return false;
             }
 
-            _packedData = packedData;
-
-            // 前にアップロードしてから変わっていなければ、アップロードし直さない
+            // 前にアップロードしてから変わっていなければ、アップロードし直さない(参照は前のものを持ち続ける)
             // NOTE: SequenceEqual() は遅いが、データは小さく、頻繁には行わない
-            if (UploadedAsset != null && _packedData.SequenceEqual(_previousPackedData))
+            if (UploadedAsset != null && packedData.SequenceEqual(_previousPackedData))
             {
-                Debug.Assert(UploadedAsset.GetContentId(Guid) == UploadedAsset.ContentId);
                 UnloadShaders();
                 return true;
             }
 
-            // 変わったか、まだアップロードしていない。同じ内容のマテリアルがアップロードされていれば、それを使う
-            var dataString = Convert.ToBase64String(_packedData);
+            // 同じ内容のマテリアルがアップロードされていれば、それを使う(参照数が増える)
+            var dataString = Convert.ToBase64String(packedData);
             UploadedAsset? uploadedAsset;
+            var previousGuid = Guid;
 
             if (_packedMaterials.TryGetValue(dataString, out var sameAsset))
             {
-                Debug.Assert(_packedMaterialIds.ContainsKey(sameAsset.ContentId));
-                Guid = sameAsset.AssetInfo.Guid;
-                // 参照数が増える
-                uploadedAsset = UploadedAsset.AddToScene(GetAssetInfo(), this);
-                Debug.Assert(uploadedAsset == sameAsset);
+                uploadedAsset = UploadedAsset.AddToScene(sameAsset.AssetInfo);
             }
             else
             {
-                // 前の内容をアップロード済みなら、新しい内容には別のGUIDを使う
-                if (ID.IsValid(UploadedAsset.GetContentId(Guid)))
-                {
-                    Debug.Assert(_previousPackedData.Length > 0 && UploadedAsset != null);
-                    Guid = Guid.NewGuid();
-                }
-
+                Guid = Guid.NewGuid();
+                _packedData = packedData;
                 uploadedAsset = UploadedAsset.AddToScene(GetAssetInfo(), this);
                 if (uploadedAsset != null)
                 {
-                    Debug.Assert(!_packedMaterialIds.ContainsKey(uploadedAsset.ContentId));
-                    _packedMaterials.Add(dataString, uploadedAsset);
-                    _packedMaterialIds.Add(uploadedAsset.ContentId, dataString);
+                    _packedMaterials[dataString] = uploadedAsset;
+                    _packedMaterialIds[uploadedAsset.ContentId] = dataString;
                 }
             }
 
             if (uploadedAsset == null)
             {
+                Guid = previousGuid;
+                _packedData = _previousPackedData;
                 UnloadShaders();
                 return false;
             }
 
-            // 前の内容をアンロードする
-            if (UploadedAsset != null)
-            {
-                Debug.Assert(UploadedAsset.ContentId != uploadedAsset.ContentId);
-                UnloadFromEngine();
-            }
+            // 前の内容の参照(マテリアルとシェーダー)を戻す
+            UnloadFromEngine();
 
-            _previousPackedData = _packedData;
+            Guid = uploadedAsset.AssetInfo.Guid;
+            _packedData = packedData;
+            _previousPackedData = packedData;
             UploadedAsset = uploadedAsset;
 
             return true;
         }
 
+        /// <summary>
+        /// アップロードした適用マテリアルを外す。アップロードしていなければ何もしない。
+        /// </summary>
         public void UnloadFromEngine()
         {
-            Debug.Assert(UploadedAsset != null && _packedMaterialIds.ContainsKey(UploadedAsset.ContentId));
-            if (UploadedAsset == null) return;
+            var uploadedAsset = UploadedAsset;
+            if (uploadedAsset == null) return;
 
             // NOTE: RemoveFromScene() は参照数が0になると ContentId を無効にするので、先に取っておく
             //       (Primal はそのあとの ContentId で _packedMaterialIds から外すため、外れずに残る)
-            var contentId = UploadedAsset.ContentId;
-            if (_packedMaterialIds.TryGetValue(contentId, out var dataString) &&
-                _packedMaterials.TryGetValue(dataString, out var uploadedAsset))
-            {
-                Debug.Assert(UploadedAsset == uploadedAsset);
-                UploadedAsset.RemoveFromScene(uploadedAsset);
-                UnloadShaders();
+            var contentId = uploadedAsset.ContentId;
+            UploadedAsset.RemoveFromScene(uploadedAsset);
+            UnloadShaders();
 
-                if (uploadedAsset.ReferenceCount == 0)
-                {
-                    _packedMaterialIds.Remove(contentId);
-                    _packedMaterials.Remove(dataString);
-                }
+            if (uploadedAsset.ReferenceCount == 0 && _packedMaterialIds.Remove(contentId, out var dataString))
+            {
+                _packedMaterials.Remove(dataString);
             }
 
             _previousPackedData = [];
@@ -491,7 +500,7 @@ namespace DXForgeEditor.Content
         /// </returns>
         public override byte[] PackForEngine()
         {
-            Debug.Assert(_shaderIds.Count == Enum.GetValues<ShaderType>().Length, "UploadShaders() must be called first.");
+            // NOTE: シェーダーを登録してから(UploadToEngine() の中で)呼ぶ。登録していなければ空
             if (_shaderIds.Count != Enum.GetValues<ShaderType>().Length) return [];
 
             using var writer = new BinaryWriter(new MemoryStream());
@@ -530,8 +539,12 @@ namespace DXForgeEditor.Content
             // NOTE: 参照数は、適用マテリアルをアップロードするときに増やす
             if (_loadedMaterials.TryGetValue(materialAssetInfo.Guid, out var loadedMaterial)) return loadedMaterial;
 
-            loadedMaterial = new() { Material = new(materialAssetInfo) };
-            _loadedMaterials[loadedMaterial.Material.Guid] = loadedMaterial;
+            // 読めなければ空のマテリアル(シェーダーがないのでアップロードできない)を使い、表には入れない
+            var material = Material.FromAssetInfo(materialAssetInfo);
+            if (material == null) return new() { Material = new() };
+
+            loadedMaterial = new() { Material = material };
+            _loadedMaterials[materialAssetInfo.Guid] = loadedMaterial;
             return loadedMaterial;
         }
 
@@ -602,10 +615,12 @@ namespace DXForgeEditor.Content
 
         public override bool Load(string file)
         {
-            Debug.Assert(File.Exists(file));
-            Debug.Assert(Path.GetExtension(file).ToLower() == AssetFileExtension);
-
-            if (!File.Exists(file)) return false;
+            // NOTE: ファイルがない・種類が違うときは失敗にする(ファイルが消えたり置き換えられたりすると実際に起こる)
+            if (!File.Exists(file) || Path.GetExtension(file).ToLower() != AssetFileExtension || GetAssetInfo(file)?.Type != Type)
+            {
+                Logger.Log(MessageType.Error, $"マテリアルを読み込めませんでした: {file}");
+                return false;
+            }
 
             try
             {
@@ -621,7 +636,7 @@ namespace DXForgeEditor.Content
                 {
                     var shaderGroup = new ShaderGroup();
                     shaderGroup.FromBinary(reader);
-                    Debug.Assert(!_shaders.ContainsKey(shaderGroup.Type));
+                    if (_shaders.ContainsKey(shaderGroup.Type)) throw new InvalidDataException($"duplicate {shaderGroup.Type} shader group");
                     _shaders[shaderGroup.Type] = shaderGroup;
                 }
 
@@ -713,11 +728,16 @@ namespace DXForgeEditor.Content
 
         public Material() : base(AssetType.Material) { }
 
-        public Material(AssetInfo assetInfo) : this()
+        /// <summary>
+        /// マテリアルのアセットのファイルから読む。すべて読めたときだけ返し、読めなければ null。
+        /// NOTE: Primal はコンストラクタで読み、途中で失敗しても(読めたところまでの)オブジェクトを返す(Codexの指摘, #145)
+        /// </summary>
+        public static Material? FromAssetInfo(AssetInfo assetInfo)
         {
-            Debug.Assert(assetInfo != null && assetInfo.Guid != Guid.Empty);
-            Debug.Assert(File.Exists(assetInfo.FullPath) && assetInfo.Type == Type);
-            Load(assetInfo.FullPath);
+            if (!CanLoad(assetInfo, AssetType.Material)) return null;
+
+            var material = new Material();
+            return material.Load(assetInfo.FullPath) ? material : null;
         }
     }
 }

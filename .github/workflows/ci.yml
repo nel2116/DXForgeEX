@@ -151,9 +151,9 @@ jobs:
         run: pwsh -NoProfile -File DXForgeEditor/Tests/debug_define_test.ps1 -Configuration DebugEditor
 
       # エディタのマテリアルのアセット(Material / AppliedMaterial)と既定のマテリアル(Primal Day 077, #30)。
-      # ランナーには ATL(atlsafe.h)がなく DXForgeEngineDLL をビルドできないので、DLL が要る項目(実際のシェーダの
-      # コンパイル、シェーダの登録の参照数、DLL の CreateResource)は SKIP と表示される。全項目はローカルで
-      # -RequireEngineDll を付けて実行する。GPU は要らない。
+      # ランナーには ATL(atlsafe.h)がなく DXForgeEngineDLL をビルドできないので、シェーダの登録は偽物を使い、
+      # DLL が要る項目(実際のシェーダのコンパイル、DLL の CreateResource / DestroyResource)は SKIP と表示される。
+      # 全項目はローカルで -RequireEngineDll を付けて実行する。GPU は要らない。
       - name: Test editor material assets
         shell: pwsh
         run: pwsh -STA -NoProfile -File DXForgeEditor/Tests/material_asset_test.ps1 -Configuration DebugEditor

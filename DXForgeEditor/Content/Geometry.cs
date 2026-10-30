@@ -807,13 +807,15 @@ namespace DXForgeEditor.Content
         }
 
         /// <summary>
-        /// アセットのファイルから読む(エンジンへのアップロード用。Primal Day 077)。
+        /// アセットのファイルから読む(エンジンへのアップロード用。Primal Day 077)。読めなければ null。
+        /// NOTE: Primal はコンストラクタで読み、読めなくても(中身が空のまま)オブジェクトを返す(Codexの指摘, #145)
         /// </summary>
-        public Geometry(AssetInfo assetInfo) : this()
+        public static Geometry? FromAssetInfo(AssetInfo assetInfo)
         {
-            Debug.Assert(assetInfo != null && assetInfo.Guid != Guid.Empty);
-            Debug.Assert(File.Exists(assetInfo.FullPath) && assetInfo.Type == Type);
-            Load(assetInfo.FullPath);
+            if (!CanLoad(assetInfo, AssetType.Mesh)) return null;
+
+            var asset = new Geometry();
+            return asset.Load(assetInfo.FullPath) ? asset : null;
         }
     }
 }

@@ -178,6 +178,32 @@ namespace DXForgeEditor.Content
             return null;
         }
 
+        /// <summary>
+        /// assetInfo のファイルが、type のアセットとして読めそうか(ファイルがあり、ヘッダーの種類が合う)。
+        /// AssetInfo からアセットを読むファクトリ(Texture.FromAssetInfo など)が、Load() の前に確かめる。
+        /// NOTE: Load() と ReadAssetFileHeader() は、ファイルがあることと種類が合うことを Debug.Assert で前提にしているが、
+        ///       ファイルが消えたり置き換えられたりすると実際に起こる(Codexの指摘, #145)。
+        /// </summary>
+        protected static bool CanLoad(AssetInfo? assetInfo, AssetType type)
+        {
+            if (assetInfo == null || assetInfo.Guid == Guid.Empty || assetInfo.Type != type) return false;
+
+            var file = assetInfo.FullPath;
+            if (!File.Exists(file) || Path.GetExtension(file) != AssetFileExtension)
+            {
+                Logger.Log(MessageType.Error, $"アセットのファイルがありません: {file}");
+                return false;
+            }
+
+            if (GetAssetInfo(file)?.Type != type)
+            {
+                Logger.Log(MessageType.Error, $"{type} のアセットとして読めないファイルです: {file}");
+                return false;
+            }
+
+            return true;
+        }
+
         protected void WriteAssetFileHeader(BinaryWriter writer)
         {
             var id = Guid.ToByteArray();
@@ -241,53 +267,69 @@ namespace DXForgeEditor.Content
 
         // NOTE: エンジンを初期化できない(#31 まで)ヘッドレスのテストで、アップロードの流れと参照数を確かめるため、
         //       アセットの読み込みとエンジンのリソースの作成・破棄を差し替えられるようにしておく(material_asset_test.ps1)。
+        //       読み込みは、読めたときだけアセットを返す(読めなければ null で、アップロードの失敗として扱う)。
         internal static Func<AssetInfo, Asset?> LoadAsset { get; set; } = assetInfo => assetInfo.Type switch
         {
-            AssetType.Mesh => new Geometry(assetInfo),
-            AssetType.Texture => new Texture(assetInfo),
+            AssetType.Mesh => Geometry.FromAssetInfo(assetInfo),
+            AssetType.Texture => Texture.FromAssetInfo(assetInfo),
             _ => null
         };
         internal static Func<byte[], AssetType, int> CreateResource { get; set; } = EngineAPI.CreateResource;
         internal static Action<int, AssetType> DestroyResource { get; set; } = EngineAPI.DestroyResource;
 
+        // NOTE: 失敗したときは、ここで増やした参照(使うアセット)を必ず戻し、エンジンのリソースは作らない。
+        //       読み込みやパックの例外(ファイルの破損、WPF がないときのアイコンの生成など)も失敗として扱う。
         private static UploadedAsset? UploadAssetToEngine(AssetInfo assetInfo, Asset? asset = null)
         {
-            Debug.Assert(assetInfo != null);
-
-            // NOTE: マテリアルは AppliedMaterial を渡す(マテリアルのアセットのファイルからは作らない)
-            asset ??= LoadAsset(assetInfo);
-
-            Debug.Assert(asset != null);
-            if (asset == null) return null;
-
-            Debug.Assert(asset.Guid == assetInfo.Guid);
             var referencedAssets = new List<UploadedAsset>();
-            foreach (var referencedAsset in asset.GetReferencedAssets())
+            try
             {
-                var uploadedAsset = AddToScene(referencedAsset);
-                if (uploadedAsset == null)
+                // NOTE: マテリアルは AppliedMaterial を渡す(マテリアルのアセットのファイルからは作らない)
+                asset ??= LoadAsset(assetInfo);
+                if (asset == null) return null;
+
+                if (asset.Guid != assetInfo.Guid)
                 {
-                    // NOTE: Primal は null をそのまま入れる。ここでは、ここまでに増やした参照を戻して失敗にする
-                    referencedAssets.ForEach(RemoveFromScene);
+                    Logger.Log(MessageType.Error, $"アセット {assetInfo.FullName} のGUIDがファイルと合いません。");
                     return null;
                 }
-                referencedAssets.Add(uploadedAsset);
-            }
 
-            var data = asset.PackForEngine();
-            var contentId = data.Length > 0 ? CreateResource(data, assetInfo.Type) : ID.INVALID_ID;
-            if (!ID.IsValid(contentId))
+                foreach (var referencedAsset in asset.GetReferencedAssets())
+                {
+                    // NOTE: Primal は失敗(null)をそのまま入れる
+                    var uploadedAsset = AddToScene(referencedAsset);
+                    if (uploadedAsset == null) return null;
+                    referencedAssets.Add(uploadedAsset);
+                }
+
+                var data = asset.PackForEngine();
+                if (data.Length == 0) return null;
+
+                // NOTE: メタデータはリソースを作る前に作る(例外で抜けたときにリソースが残らないように)
+                var metadata = asset.GetMetadata();
+                var contentId = CreateResource(data, assetInfo.Type);
+                if (!ID.IsValid(contentId)) return null;
+
+                var result = new UploadedAsset(assetInfo, metadata)
+                {
+                    ContentId = contentId,
+                    ReferenceCount = 1,
+                    _referencedAssets = referencedAssets,
+                };
+                referencedAssets = [];
+                return result;
+            }
+            catch (Exception ex)
             {
-                referencedAssets.ForEach(RemoveFromScene);
+                Debug.WriteLine(ex.Message);
+                Logger.Log(MessageType.Error, $"アセット {assetInfo.FullName} を読み込めないか、エンジンの形式にできませんでした: {ex.Message}");
                 return null;
             }
-
-            return new(assetInfo, asset.GetMetadata())
+            finally
             {
-                ContentId = contentId,
-                ReferenceCount = 1,
-                _referencedAssets = referencedAssets,
-            };
+                // 失敗したときだけ残っている(成功したときは結果に移して空にしている)
+                referencedAssets.ForEach(RemoveFromScene);
+            }
         }
 
         private static void UnloadAssetFromEngine(UploadedAsset uploadedAsset)
@@ -303,6 +345,7 @@ namespace DXForgeEditor.Content
         public static UploadedAsset? AddToScene(AssetInfo assetInfo, Asset? asset = null)
         {
             Debug.Assert(assetInfo != null && assetInfo.Guid != Guid.Empty);
+            if (assetInfo == null || assetInfo.Guid == Guid.Empty) return null;
             var key = assetInfo.Guid;
 
             if (_uploadedAssets.TryGetValue(key, out var value))
@@ -325,7 +368,9 @@ namespace DXForgeEditor.Content
 
         public static void RemoveFromScene(UploadedAsset uploadedAsset)
         {
-            Debug.Assert(uploadedAsset != null && _uploadedAssets.ContainsKey(uploadedAsset.AssetInfo.Guid));
+            // NOTE: 外したものをもう一度外すのは呼び出し側の誤り(参照数が合わなくなる)
+            Debug.Assert(uploadedAsset != null && uploadedAsset.ReferenceCount > 0 && _uploadedAssets.ContainsKey(uploadedAsset.AssetInfo.Guid));
+            if (uploadedAsset == null || uploadedAsset.ReferenceCount <= 0) return;
 
             uploadedAsset._referencedAssets.ForEach(RemoveFromScene);
             --uploadedAsset.ReferenceCount;

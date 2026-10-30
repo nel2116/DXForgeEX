@@ -5,7 +5,8 @@
 .DESCRIPTION
     ビルド済みの DXForgeEditor.dll を読み込み、エディタと同じコードをリフレクションで呼ぶ。エディタのウィンドウは開かず、GPUも使わない。
     シェーダのコンパイルとエンジンへのシェーダの登録には、x64\<Configuration>\ の DXForgeEngineDLL.dll を使う
-    (エンジンの初期化は要らない)。DLL がなければ、コンパイル済みに見せた偽のシェーダーグループを使い、DLL が要る項目は
+    (エンジンの初期化は要らない)。DLL がなければ、コンパイル済みに見せた偽のシェーダーグループと、偽のシェーダーの登録
+    (ShaderGroup.AddShaderGroupToEngine / RemoveShaderGroupFromEngine)を使い、DLL が要る項目は
     SKIP として名前と件数を出す(CI のランナーには ATL がなく DLL をビルドできないため)。-RequireEngineDll を付けると、
     DLL がないときは失敗にする(ローカルでは付けて、全項目を実行する)。Logger と Material.Save() のアイコンに WPF が要るので、WPF の Application を作ってから呼ぶ。
     ファイルは %TEMP% の下に作り、最後に消す。
@@ -26,7 +27,14 @@
          - AppliedMaterial.Clone() が入力のアセットを複製する。
          - 入力を減らしたり増やしたりした Material の Save → Load で、入力の名前が同じになる。
          - Material を保存し直したら、そのあとに作る AppliedMaterial は新しい内容を使う。参照数が0になったら表から消える。
-      DLL が要る項目: 1 の実際のコンパイル、3 のシェーダーのID とシェーダーの解除、4 のすべて、5 の DLL を呼ぶ項目。
+      7. Codex の2回目の指摘(#145)と、アップロード・読み込みの経路の失敗の扱い: シェーダーの登録も偽物に差し替え
+         (ShaderGroup の AddShaderGroupToEngine / RemoveShaderGroupFromEngine)、次を確かめる。
+         - シェーダーグループの登録に失敗したら、マテリアルのアップロードも失敗し、登録できたシェーダーは外れる。
+         - 途中までしか読めない既定のマテリアルは、シェーダーが同じでも作り直す。
+         - 同じ内容の2つの適用マテリアルの1つを外し、内容を変えてアップロードし直せる(もう1つはそのまま)。
+           アップロードしていない適用マテリアルを外しても何も起きない。
+         - 読み込めないアセット(ファイルがない、壊れている、種類が違う)はアップロードしない(リソースを作らない)。
+      DLL が要る項目: 1 の実際のコンパイル、5 の DLL を呼ぶ項目。
 
 .PARAMETER Configuration
     DebugEditor(既定)か ReleaseEditor。
@@ -141,6 +149,16 @@ function Compile-ShaderGroup($shaderGroup, [int]$seed)
 	return $shaderGroup.IsCompiled
 }
 
+# DLL がないときは、シェーダーの登録を偽物にする(IDを順に返す)
+if (-not $hasEngineDll)
+{
+	$script:noDllShaderId = 0
+	$shaderGroupType.GetProperty("AddShaderGroupToEngine", $flags).SetValue($null, [System.Management.Automation.LanguagePrimitives]::ConvertTo(
+		{ param($g) $id = $script:noDllShaderId; $script:noDllShaderId++; [int]$id }, [System.Func`2].MakeGenericType($shaderGroupType, [int])))
+	$shaderGroupType.GetProperty("RemoveShaderGroupFromEngine", $flags).SetValue($null, [System.Management.Automation.LanguagePrimitives]::ConvertTo(
+		{ param([int]$id) }, [System.Action`1].MakeGenericType([int])))
+}
+
 function Get-Packed($shaderGroup) { if ($shaderGroup) { [Convert]::ToBase64String($shaderGroup.PackForEngine()) } else { "" } }
 function Get-Shader($material, [string]$type) { $material.GetShaderGroup([Enum]::Parse($shaderType, $type)) }
 
@@ -214,7 +232,7 @@ try
 	Write-Host "3. AppliedMaterial.PackForEngine"
 	$materialInfo = $tryGetAssetInfo.Invoke($null, @($file))
 	$applied = [Activator]::CreateInstance($appliedMaterialType, @($materialInfo))
-	$uploadShaders.Invoke($applied, $null)
+	[void]$uploadShaders.Invoke($applied, $null)
 	$appliedSource = $appliedMaterialType.GetProperty("_material", $flags).GetValue($applied)
 	$vsId = (Get-Shader $appliedSource "Vertex").ContentId
 	$data = $applied.PackForEngine()
@@ -228,9 +246,8 @@ try
 		(& $f 40) -eq 2.5 -and (& $f 44) -eq 0.25 -and (& $f 48) -eq 0.75) "material_surface at +12: $((12..48 | Where-Object { $_ % 4 -eq 0 } | ForEach-Object { & $f $_ }) -join ', ')"
 	Check ((& $i 52) -eq 0 -and (& $i 56) -eq 0) "type (opaque) at +52 and texture count at +56"
 	$shaderIds = 0..7 | ForEach-Object { & $i (60 + 4 * $_) }
-	if (-not $hasEngineDll) { Skip "shader ids at +60: $($shaderIds -join ', ')" }
-	else { Check ($vsId -ne $invalidId -and $shaderIds[0] -eq $vsId -and $shaderIds[4] -ne $invalidId -and $shaderIds[4] -ne $vsId -and
-		($shaderIds[1, 2, 3, 5, 6, 7] | Where-Object { $_ -ne $invalidId }).Count -eq 0) "shader ids at +60 (vertex, ..., pixel, ...): $($shaderIds -join ', ')" }
+	Check ($vsId -ne $invalidId -and $shaderIds[0] -eq $vsId -and $shaderIds[4] -ne $invalidId -and $shaderIds[4] -ne $vsId -and
+		($shaderIds[1, 2, 3, 5, 6, 7] | Where-Object { $_ -ne $invalidId }).Count -eq 0) "shader ids at +60 (vertex, ..., pixel, ...): $($shaderIds -join ', ')"
 
 	$applied.Inputs[0].Asset = [Activator]::CreateInstance($materialInfo.GetType())
 	$applied.Inputs[0].Asset.Guid = [Guid]::NewGuid()
@@ -238,16 +255,13 @@ try
 	Check ($applied.PackForEngine().Length -eq 0) "an input that is not uploaded gives no data"
 	$applied.Inputs[0].Asset = $null
 	$unloadShaders.Invoke($applied, $null)
-	if ($hasEngineDll) { Check ((Get-UploadedShaderCount) -eq 0 -and (Get-Shader $appliedSource "Vertex").ContentId -eq $invalidId) "UnloadShaders removes the shaders: $(Get-UploadedShaderCount) left" }
-	else { Skip "UnloadShaders removes the shaders" }
+	Check ((Get-UploadedShaderCount) -eq 0 -and (Get-Shader $appliedSource "Vertex").ContentId -eq $invalidId) "UnloadShaders removes the shaders: $(Get-UploadedShaderCount) left"
 
 	Write-Host "4. Two applied materials sharing a material"
-	if ($hasEngineDll)
-	{
 	$a1 = [Activator]::CreateInstance($appliedMaterialType, @($materialInfo))
 	$a2 = [Activator]::CreateInstance($appliedMaterialType, @($materialInfo))
-	$uploadShaders.Invoke($a1, $null)
-	$uploadShaders.Invoke($a2, $null)
+	[void]$uploadShaders.Invoke($a1, $null)
+	[void]$uploadShaders.Invoke($a2, $null)
 	$count = Get-UploadedShaderCount
 	$p1 = [Convert]::ToBase64String($a1.PackForEngine())
 	$p2 = [Convert]::ToBase64String($a2.PackForEngine())
@@ -257,14 +271,9 @@ try
 	Check ((Get-UploadedShaderCount) -eq 2 -and $sharedVs.ContentId -ne $invalidId -and [Convert]::ToBase64String($a2.PackForEngine()) -eq $p2) "removing one keeps the shaders of the other: $(Get-UploadedShaderCount) shader groups, vertex id $($sharedVs.ContentId)"
 	$unloadShaders.Invoke($a2, $null)
 	Check ((Get-UploadedShaderCount) -eq 0 -and $sharedVs.ContentId -eq $invalidId) "removing both removes the shaders: $(Get-UploadedShaderCount) left"
-	$uploadShaders.Invoke($a1, $null)
+	[void]$uploadShaders.Invoke($a1, $null)
 	Check ((Get-UploadedShaderCount) -eq 2) "they can be uploaded again: $(Get-UploadedShaderCount) shader groups"
 	$unloadShaders.Invoke($a1, $null)
-	}
-	else
-	{
-		@("both use the same uploaded shaders", "removing one keeps the shaders of the other", "removing both removes the shaders", "they can be uploaded again") | ForEach-Object { Skip $_ }
-	}
 
 	Write-Host "5. EngineAPI.CreateResource / DestroyResource without the engine initialized"
 	$animation = [Enum]::Parse($assetTypeEnum, "Animation")
@@ -388,6 +397,80 @@ try
 		$secondUploaded = $second.UploadToEngine()
 		if ($secondUploaded) { $second.UnloadFromEngine() }
 		Check ($secondUploaded -and -not $loadedMaterials.ContainsKey($cached.Guid) -and (Get-UploadedShaderCount) -eq 0) "the loaded material is dropped when no applied material uses it: uploaded $secondUploaded, cached $($loadedMaterials.ContainsKey($cached.Guid))"
+
+		Write-Host "7. Failures on the upload and load paths (#145)"
+		$script:fakeShaders = @{ Next = 500; Live = [System.Collections.Generic.HashSet[int]]::new(); FailType = "" }
+		$addShaderSb = { param($g) if ("$($g.Type)" -eq $script:fakeShaders.FailType) { return [int]-1 }; $id = $script:fakeShaders.Next; $script:fakeShaders.Next++; [void]$script:fakeShaders.Live.Add($id); [int]$id }
+		$removeShaderSb = { param([int]$id) [void]$script:fakeShaders.Live.Remove($id) }
+		$shaderSeams = @{
+			AddShaderGroupToEngine = [System.Func`2].MakeGenericType($shaderGroupType, [int])
+			RemoveShaderGroupFromEngine = [System.Action`1].MakeGenericType([int])
+		}
+		$shaderOriginals = @{}
+		foreach ($name in $shaderSeams.Keys) { $shaderOriginals[$name] = $shaderGroupType.GetProperty($name, $flags).GetValue($null) }
+		$shaderGroupType.GetProperty("AddShaderGroupToEngine", $flags).SetValue($null, [System.Management.Automation.LanguagePrimitives]::ConvertTo($addShaderSb, $shaderSeams.AddShaderGroupToEngine))
+		$shaderGroupType.GetProperty("RemoveShaderGroupFromEngine", $flags).SetValue($null, [System.Management.Automation.LanguagePrimitives]::ConvertTo($removeShaderSb, $shaderSeams.RemoveShaderGroupFromEngine))
+		$addToScene = $uploadedAssetType.GetMethod("AddToScene", $flags)
+		try
+		{
+			# シェーダーグループの登録に失敗したら、マテリアルのアップロードも失敗する
+			$script:fakeShaders.FailType = "Pixel"
+			$failing = [Activator]::CreateInstance($appliedMaterialType, @($materialInfo))
+			$createdBefore = $script:fake.Created.Count
+			$failedUpload = $failing.UploadToEngine()
+			Check (-not $failedUpload -and $script:fake.Created.Count -eq $createdBefore -and $script:fakeShaders.Live.Count -eq 0 -and (Get-UploadedShaderCount) -eq 0) "a failed shader upload fails the material upload and releases the other shaders: uploaded $failedUpload, shaders left $($script:fakeShaders.Live.Count)"
+			if ($failedUpload) { $failing.UnloadFromEngine() }
+			$script:fakeShaders.FailType = ""
+
+			# 途中までしか読めない既定のマテリアルは作り直す
+			[string]$partialFile = Join-Path $work "Partial.asset"
+			[void]$createDefaultMaterial.Invoke($null, @($partialFile, $vs, $ps))
+			$bytes = [System.IO.File]::ReadAllBytes($partialFile)
+			[System.IO.File]::WriteAllBytes($partialFile, $bytes[0..($bytes.Length - 9)])
+			$broken = Read-Material $partialFile
+			$recreatedPartial = $createDefaultMaterial.Invoke($null, @($partialFile, $vs, $ps))
+			$read = Read-Material $partialFile
+			Check (-not $broken.Loaded -and $recreatedPartial -and $read.Loaded) "a default material that only partly loads is recreated: broken loads $($broken.Loaded), recreated $recreatedPartial, loads $($read.Loaded)"
+
+			# 同じ内容の適用マテリアルの1つを外して、変えてアップロードし直す
+			$sharedA = [Activator]::CreateInstance($appliedMaterialType, @($materialInfo))
+			$sharedB = [Activator]::CreateInstance($appliedMaterialType, @($materialInfo))
+			$uploadedA = $sharedA.UploadToEngine()
+			$uploadedB = $sharedB.UploadToEngine()
+			Check ($uploadedA -and $uploadedB -and [object]::ReferenceEquals($sharedA.UploadedAsset, $sharedB.UploadedAsset) -and $sharedA.UploadedAsset.ReferenceCount -eq 2) "two applied materials with the same content share one engine material"
+			$sharedA.UnloadFromEngine()
+			$sharedA.MaterialSurface.Roughness = 0.3
+			$reuploadedA = $sharedA.UploadToEngine()
+			$idA = $getContentId.Invoke($null, @($sharedA.Guid))
+			$idB = $getContentId.Invoke($null, @($sharedB.Guid))
+			Check ($reuploadedA -and -not [object]::ReferenceEquals($sharedA.UploadedAsset, $sharedB.UploadedAsset) -and $idA -ne $invalidId -and $idB -ne $invalidId -and $idA -ne $idB) "the one that was unloaded can be changed and uploaded again: ids $idA, $idB"
+			$sharedA.UnloadFromEngine()
+			$sharedA.UnloadFromEngine()
+			$sharedB.UnloadFromEngine()
+			Check ($uploadedAssets.Count -eq 0 -and $script:fakeShaders.Live.Count -eq 0 -and -not $loadedMaterials.ContainsKey($materialInfo.Guid)) "unloading twice does nothing, and everything is released: $($uploadedAssets.Count) assets, $($script:fakeShaders.Live.Count) shaders"
+
+			# 読み込めないアセットはアップロードしない(本物の読み込みを使う)
+			$uploadedAssetType.GetProperty("LoadAsset", $flags).SetValue($null, $originals.LoadAsset)
+			function New-Info([string]$type, [string]$path) { $info = [Activator]::CreateInstance($assetInfoType); $info.Type = [Enum]::Parse($assetTypeEnum, $type); $info.Guid = [Guid]::NewGuid(); $info.FullPath = $path; $info }
+			[string]$garbageFile = Join-Path $work "Garbage.asset"
+			[System.IO.File]::WriteAllBytes($garbageFile, [byte[]](@(6, 0, 0, 0) + (1..20)))
+			$createdBefore = $script:fake.Created.Count
+			$cases = [ordered]@{
+				"a texture that does not exist" = New-Info "Texture" (Join-Path $work "Missing.asset")
+				"a broken texture" = New-Info "Texture" $garbageFile
+				"a material file as a texture" = New-Info "Texture" $file
+				"a mesh that does not exist" = New-Info "Mesh" (Join-Path $work "MissingMesh.asset")
+			}
+			foreach ($case in $cases.GetEnumerator())
+			{
+				$result = $addToScene.Invoke($null, @($case.Value, $null))
+				Check ($null -eq $result -and $script:fake.Created.Count -eq $createdBefore -and $uploadedAssets.Count -eq 0) "$($case.Key) is not uploaded"
+			}
+		}
+		finally
+		{
+			foreach ($name in $shaderOriginals.Keys) { $shaderGroupType.GetProperty($name, $flags).SetValue($null, $shaderOriginals[$name]) }
+		}
 	}
 	finally
 	{
