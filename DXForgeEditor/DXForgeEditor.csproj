@@ -16,6 +16,8 @@
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugEditor|x64'">
 		<Optimize>False</Optimize>
+		<!-- SDK が DEBUG を自動で定義するのは構成の名前が Debug のときだけなので、DebugEditor では明示する(#109) -->
+		<DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
 	</PropertyGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseEditor|x64'">
