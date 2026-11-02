@@ -13,6 +13,7 @@
 // 2026/10/18 update()/begin_play()の中で削除されたスクリプトのデストラクタからTransformを読めることのテストを追加 (#54)
 // 2026/10/19 update()の中でset_position()したエンティティを削除するテストと、同じフレームでIDを再利用したエンティティのTransformが上書きされないことのテストを追加 (#78)
 // 2026/10/27 未登録のタグでget_script_creator()がnullptrを返すことのテストを追加 (#113)
+// 2026/11/02 エディタ向けのスクリプト名のSAFEARRAY(make_script_names_safe_array())の要素数・中身・解放のテストを追加 (#146)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
@@ -22,6 +23,14 @@
 #include "Components/Script.h"
 #include <functional>
 #include <unordered_map>
+#include <string>
+#include <vector>
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif // !WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include <oleauto.h>
 
 using namespace dxforge;
 
@@ -800,4 +809,104 @@ DXFORGE_TEST_CASE(script_stale_transform_cache_does_not_overwrite_entity_reusing
 	{
 		game_entity::remove(entity_id);
 	}
+}
+
+// #146: エディタのGetScriptNames()に渡すスクリプト名のSAFEARRAYを、ATLを使わずに作る。
+// get_script_names()(USE_WITH_EDITORのときだけ公開)は、この関数にscript_names()を渡すだけである。
+namespace
+{
+	/// REQUIRE で中断してもSAFEARRAYを解放するためのガード
+	struct safe_array_guard
+	{
+		SAFEARRAY* array{ nullptr };
+		HRESULT destroy()
+		{
+			const HRESULT hr{ array ? SafeArrayDestroy(array) : S_OK };
+			array = nullptr;
+			return hr;
+		}
+		~safe_array_guard() { destroy(); }
+	};
+
+	/// 1次元・下限0のBSTRのSAFEARRAYを、wstringの配列として読む
+	std::vector<std::wstring> read_bstr_array(SAFEARRAY* array)
+	{
+		std::vector<std::wstring> result;
+		LONG lower{ -1 };
+		LONG upper{ -2 };
+		REQUIRE(SUCCEEDED(SafeArrayGetLBound(array, 1, &lower)));
+		REQUIRE(SUCCEEDED(SafeArrayGetUBound(array, 1, &upper)));
+		REQUIRE(lower == 0);
+
+		BSTR* data{ nullptr };
+		REQUIRE(SUCCEEDED(SafeArrayAccessData(array, (void**)&data)));
+		for (LONG i{ lower }; i <= upper; ++i)
+		{
+			const BSTR bstr{ data[i] };
+			result.emplace_back(bstr ? std::wstring{ bstr, SysStringLen(bstr) } : std::wstring{});
+		}
+		REQUIRE(SUCCEEDED(SafeArrayUnaccessData(array)));
+		return result;
+	}
+}
+
+DXFORGE_TEST_CASE(script_names_safe_array_has_bstr_elements_matching_names)
+{
+	// NOTE: 狭い文字列リテラルにASCII以外の文字を書かない(C4566)ので、UTF-8はバイト列で書く
+	const std::string names[]{
+		"script_test_counter",
+		"\xE3\x82\xB9\xE3\x82\xAF\xE3\x83\xAA\xE3\x83\x97\xE3\x83\x88_mover",	// UTF-8の「スクリプト_mover」
+		"pad_\xF0\x9F\x8E\xAE",													// UTF-8のU+1F3AE(UTF-16ではサロゲートペア)
+		"",
+	};
+	const std::wstring expected[]{
+		L"script_test_counter",
+		L"スクリプト_mover",
+		L"pad_\U0001F3AE",
+		L"",
+	};
+	constexpr u32 count{ (u32)_countof(names) };
+
+	safe_array_guard guard{ script::detail::make_script_names_safe_array(names, count) };
+	REQUIRE(guard.array != nullptr);
+	CHECK(SafeArrayGetDim(guard.array) == 1);
+	VARTYPE vt{ VT_EMPTY };
+	CHECK(SUCCEEDED(SafeArrayGetVartype(guard.array, &vt)));
+	CHECK(vt == VT_BSTR);
+
+	const std::vector<std::wstring> actual{ read_bstr_array(guard.array) };
+	REQUIRE(actual.size() == count);
+	for (u32 i{ 0 }; i < count; ++i)
+	{
+		CHECK(actual[i] == expected[i]);
+	}
+	// 呼び出し側(エディタのマーシャラー)と同じく SafeArrayDestroy で解放できる
+	CHECK(guard.destroy() == S_OK);
+}
+
+DXFORGE_TEST_CASE(script_names_safe_array_is_null_for_no_names)
+{
+	const std::string names[]{ "script_test_counter" };
+	CHECK(script::detail::make_script_names_safe_array(names, 0) == nullptr);
+	CHECK(script::detail::make_script_names_safe_array(nullptr, 0) == nullptr);
+	CHECK(script::detail::make_script_names_safe_array(nullptr, 1) == nullptr);
+}
+
+// UTF-8として不正なバイト列は、ATLのA2BSTR_EXと同じくANSIコードページとして読む
+// (/utf-8 なしでビルドしたゲームのコードでは、REGISTER_SCRIPT の #TYPE がANSIコードページになるため)
+DXFORGE_TEST_CASE(script_names_safe_array_falls_back_to_ansi_code_page_for_invalid_utf8)
+{
+	const std::string names[]{ "ansi_\x82\xA0" };	// CP932の「あ」。UTF-8としては不正
+	const std::string& name{ names[0] };
+
+	const int length{ MultiByteToWideChar(CP_ACP, 0, name.data(), (int)name.size(), nullptr, 0) };
+	REQUIRE(length > 0);
+	std::wstring expected((size_t)length, L'\0');
+	REQUIRE(MultiByteToWideChar(CP_ACP, 0, name.data(), (int)name.size(), expected.data(), length) == length);
+
+	safe_array_guard guard{ script::detail::make_script_names_safe_array(names, 1) };
+	REQUIRE(guard.array != nullptr);
+	const std::vector<std::wstring> actual{ read_bstr_array(guard.array) };
+	REQUIRE(actual.size() == 1);
+	CHECK(actual[0] == expected);
 }
