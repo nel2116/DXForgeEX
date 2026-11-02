@@ -14,6 +14,8 @@
     <ClCompile Include="..\DXForgeEngineDLL\ShaderCompilation.cpp" />
     <ClCompile Include="..\DXForgeEngineDLL\ResourceUpload.cpp" />
     <ClCompile Include="Tests_ResourceUpload.cpp" />
+    <ClCompile Include="..\DXForgeEngineDLL\EngineInit.cpp" />
+    <ClCompile Include="Tests_EngineInit.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MicroTest.h" />

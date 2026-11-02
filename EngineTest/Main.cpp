@@ -6,6 +6,7 @@
 // エンジンをテストするためのプログラム
 // 更新履歴
 // 2024/11/11 新規作成
+// 2026/11/02 メモリリークの場所でブレークする方法のコメントを追加 (Primal Day 078, #31)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Test.h"
@@ -46,6 +47,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	// デバッグ時にメモリリーク検出
 #if _DEBUG
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+	// リークが見つかったら、その番号 N で _CrtSetBreakAlloc(N) を呼ぶと、リークしたメモリを確保した場所でブレークする。
 #endif // _DEBUG
 
 	// 作業ディレクトリを実行パスに設定

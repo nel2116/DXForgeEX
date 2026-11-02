@@ -8,6 +8,7 @@
 // 2024/11/14 新規作成
 // 2026/10/27 シェーダーのコンパイルとシェーダーグループの登録・削除を追加(Primal Day 076)
 // 2026/10/30 エディタからアセットのリソースを作る・破棄する CreateResource / DestroyResource を追加(Primal Day 077, #30)
+// 2026/11/02 エディタからエンジンを初期化・終了する InitializeEngine / ShutdownEngine を追加(Primal Day 078, #31)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Common.h"
@@ -20,6 +21,7 @@
 #include "Utilities/IOStream.h"
 #include "ShaderCompilation.h"
 #include "ResourceUpload.h"
+#include "EngineInit.h"
 
 #ifdef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -40,6 +42,25 @@ namespace
 	_get_script_names get_script_names{ nullptr };
 	utl::vector<graphics::render_surface> surfaces;
 } // 匿名名前空間
+
+// エンジンのシェーダーをコンパイルし、グラフィックスを初期化する(Primal Day 078)。返す値は editor::engine_init_error。
+// NOTE: Primal はシェーダーのコンパイルに失敗すると、ここで MessageBox(MB_RETRYCANCEL)を出して再試行する。
+//       ヘッドレスのテストで止まらないよう、ここでは UI を出さず、再試行はエディタ(MainWindow)が聞く。
+// NOTE: D3D12 のデバッグレイヤーは、デバッガがつながっているときだけブレークさせる(Primal は常にブレーク)。
+//       デバッガなしで DebugEditor を起動したとき、警告1つでエディタが落ちないようにするため。
+//       メッセージはどちらでもデバッグレイヤーが OutputDebugString に出す。
+EDITOR_INTERFACE u32 InitializeEngine()
+{
+	graphics::graphics_init_info info{};
+	info.unattended = !IsDebuggerPresent();
+	return editor::initialize_engine(info);
+}
+
+// InitializeEngine で初期化したグラフィックスを終了する。初期化していないとき、2回目は何もしない。
+EDITOR_INTERFACE void ShutdownEngine()
+{
+	editor::shutdown_engine();
+}
 
 EDITOR_INTERFACE u32 LoadGameCodeDll(const char* dll_path)
 {
@@ -105,7 +126,7 @@ EDITOR_INTERFACE void ResizeRenderSurface(u32 id)
 // type は content::asset_type::type(エディタの AssetType と同じ値)。material、mesh、texture だけを扱う。
 // 作れなければ id::invalid_id。マテリアルのデータの並びは ResourceUpload.h を参照。
 // NOTE: Primal Day 077 は id::invalid_id を返すだけで、content::create_resource を呼ぶのは Day 078 から。
-//       テストで確かめられるよう、ここでは Day 078 の形まで入れる(エンジンの初期化 InitializeEngine は #31)。
+//       テストで確かめられるよう、#30 で Day 078 の形まで入れた。InitializeEngine のあとで呼ぶ。
 EDITOR_INTERFACE id::id_type CreateResource(const u8* data, u32 type)
 {
 	return editor::create_resource(data, type);

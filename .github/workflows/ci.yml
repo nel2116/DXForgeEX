@@ -158,6 +158,14 @@ jobs:
         shell: pwsh
         run: pwsh -STA -NoProfile -File DXForgeEditor/Tests/material_asset_test.ps1 -Configuration DebugEditor
 
+      # エディタからのエンジンの初期化(Primal Day 078, #31): EngineInitError と C++ の engine_init_error の値、
+      # 失敗したときの文言が例外を投げないこと。ランナーには DXForgeEngineDLL がないので、DLL がないときに
+      # InitializeEngine が Unknown を返すことを確かめる(DLL を呼ぶ項目はローカルで -RequireEngineDll を付けて実行する)。
+      # 初期化に成功する経路は、build.ps1 -RunTests の render_run_test.py(WARP)で確かめている。
+      - name: Test editor engine initialization
+        shell: pwsh
+        run: pwsh -STA -NoProfile -File DXForgeEditor/Tests/engine_init_test.ps1 -Configuration DebugEditor
+
       - name: CleanupMerged.ps1 tests
         shell: pwsh
         # 使い捨てのリポジトリと偽の gh / orca で動かし、本物のGitHubやOrcaは呼ばない(Issue #104)。

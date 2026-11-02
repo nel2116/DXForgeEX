@@ -526,7 +526,7 @@ def test_graphics_init_failed(r):
     # NOTE: copy2 はソースの更新日時を保つので、今作った shaders.bin のほうが新しい
     png = os.path.join(r.work_dir, "init_failure.png")
     r.expect_error(name, r.render_args(png), EXIT_GRAPHICS_INIT_FAILED, "graphics_init_failed", exe=exe,
-                   message_part="failed to initialize Direct3D 12")
+                   message_part="adapter (engine_init_error 3)")
     r.check(f"{name}: nothing written", not os.path.exists(png), png)
 
 
@@ -535,13 +535,14 @@ def test_shader_compilation_throws(r):
 
     実行ファイルの隣に shaders という通常のファイルを置くと、コンパイルしたシェーダーを書き出すときの
     create_directories(".\\shaders\\d3d12") が filesystem_error を投げる。
+    例外は、DLL の InitializeEngine と同じ editor::initialize_engine() が受け止めて shader_compilation にする(#31)。
     """
     name = "shader compilation throws (a file named shaders)"
     exe, exe_folder = make_repo_copy(r, "shaders_file_repo")
     open(os.path.join(exe_folder, "shaders"), "wb").close()
     png = os.path.join(r.work_dir, "shaders_file.png")
     r.expect_error(name, r.render_args(png), EXIT_SHADERS_UNAVAILABLE, "shaders_unavailable", exe=exe,
-                   message_part="exception")
+                   message_part="failed to compile the engine shaders")
     r.check(f"{name}: nothing written", not os.path.exists(png), png)
 
 

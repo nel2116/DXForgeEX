@@ -92,11 +92,13 @@
     <ClCompile Include="EntityAPI.cpp" />
     <ClCompile Include="ShaderCompilation.cpp" />
     <ClCompile Include="ResourceUpload.cpp" />
+    <ClCompile Include="EngineInit.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Common.h" />
     <ClInclude Include="ShaderCompilation.h" />
     <ClInclude Include="ResourceUpload.h" />
+    <ClInclude Include="EngineInit.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

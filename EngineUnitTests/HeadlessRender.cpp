@@ -12,6 +12,8 @@
 // 2026/10/29 予期しない例外を最上位で捕捉し、段階に応じた終了コードとJSONを返すようにした (#128 のレビュー)
 // 2026/10/30 メッシュとマテリアルを、エディタの形のデータからDLLと同じ経路(ResourceUpload)で作るようにし、
 //            テクスチャ・マテリアル・メッシュを作って破棄し、作り直す確認を足した (Primal Day 077, #30)
+// 2026/11/02 シェーダーのコンパイルとグラフィックスの初期化・終了を、DLLの InitializeEngine / ShutdownEngine と
+//            同じ経路(EngineInit)で行うようにした (Primal Day 078, #31)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -24,6 +26,7 @@
 #include "Components/Geometry.h"
 #include "../DXForgeEngineDLL/ShaderCompilation.h"
 #include "../DXForgeEngineDLL/ResourceUpload.h"
+#include "../DXForgeEngineDLL/EngineInit.h"
 #include "EditorAssetPacking.h"
 
 #include <cmath>
@@ -788,25 +791,40 @@ namespace dxforge::headless::render
 					"shader sources were not found (EngineUnitTests.exe must stay in x64\\<configuration>\\ of the repository)");
 				return;
 			}
-			if (!compile_shaders())
-			{
-				fail(result, exit_code::shaders_unavailable, "shaders_unavailable", "failed to compile the engine shaders");
-				return;
-			}
-
-			state.stage = run_stage::graphics_init;
+			// NOTE: エディタから初期化するときと同じ経路(DLLの InitializeEngine = editor::initialize_engine)で、
+			//		 シェーダーをコンパイルしてからグラフィックスを初期化する(Primal Day 078)。
+			//		 初期化に失敗したときは、D3D12の側(failed_init())でデバッグレイヤーのメッセージを出してから後片付けまで
+			//		 済ませている。editor::shutdown_engine() は、そのときに graphics::shutdown() を重ねて呼ばない(#128のレビュー)。
 			graphics::graphics_init_info init_info{};
 			init_info.adapter = opt.adapter;
 			init_info.unattended = true;
-			// NOTE: 初期化に失敗したときは、D3D12の側(failed_init())でデバッグレイヤーのメッセージを出してから後片付けまで
-			//		 済ませている。ここでもう一度 graphics::shutdown() を呼ぶと、解放済みのフェンスを待ってクラッシュする(#128のレビュー)。
-			if (!graphics::initialize(graphics::graphics_platform::direct3d12, init_info))
+			const editor::engine_init_error::error_code init_result{ editor::initialize_engine(init_info) };
+			if (init_result != editor::engine_init_error::succeeded)
 			{
-				fail(result, exit_code::graphics_init_failed, "graphics_init_failed",
-					std::string{ "failed to initialize Direct3D 12 with the " } + adapter_label(opt.adapter) + " adapter");
+				// 失敗したあとの ShutdownEngine は何もしない(エディタは失敗しても終了時に呼ぶ)
+				editor::shutdown_engine();
+				if (init_result == editor::engine_init_error::shader_compilation)
+				{
+					fail(result, exit_code::shaders_unavailable, "shaders_unavailable", "failed to compile the engine shaders");
+				}
+				else
+				{
+					fail(result, exit_code::graphics_init_failed, "graphics_init_failed",
+						std::string{ "failed to initialize Direct3D 12 with the " } + adapter_label(opt.adapter) + " adapter (engine_init_error " +
+						std::to_string((u32)init_result) + ")");
+				}
 				return;
 			}
+			state.stage = run_stage::graphics_init;
 			state.graphics_initialized = true;
+			// 初期化済みのときの InitializeEngine は、初期化し直さずに成功を返す
+			if (editor::initialize_engine(init_info) != editor::engine_init_error::succeeded || !editor::is_engine_initialized())
+			{
+				fail(result, exit_code::graphics_init_failed, "graphics_init_failed", "initialize_engine() did not succeed when already initialized");
+				state.graphics_initialized = false;
+				editor::shutdown_engine();
+				return;
+			}
 			result.adapter_name = graphics::adapter_name();
 			std::fprintf(stderr, "[render] adapter: %s (%s)\n", result.adapter_name.c_str(), adapter_label(opt.adapter));
 
@@ -817,7 +835,13 @@ namespace dxforge::headless::render
 			if (result.exit_code == exit_code::success) check_debug_messages(result, "while cleaning up");
 			else graphics::flush_debug_messages();
 			state.graphics_initialized = false;
-			graphics::shutdown();
+			editor::shutdown_engine();
+			// 2回目の ShutdownEngine は何もしない(エディタはウィンドウを閉じるときとキャンセルのときに呼ぶ)
+			editor::shutdown_engine();
+			if (editor::is_engine_initialized() && result.exit_code == exit_code::success)
+			{
+				fail(result, exit_code::render_failed, "render_failed", "the engine is still initialized after shutdown_engine()");
+			}
 		}
 
 		/// @brief 例外のメッセージ(what())を、JSONに入れられるASCIIにする(ASCII以外のバイトは\xNN)
@@ -863,7 +887,7 @@ namespace dxforge::headless::render
 				try
 				{
 					graphics::flush_debug_messages();
-					graphics::shutdown();
+					editor::shutdown_engine();
 				}
 				catch (...)
 				{
