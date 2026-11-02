@@ -8,6 +8,9 @@
 #             (fxc は "error X3000: Illegal character in shader file" で拒否する)。
 #   narrow    C/C++ のナロー文字列/文字リテラルに非ASCII文字を入れない。CI ランナーのコードページは 1252 で、
 #             1文字ごとに C4566 が出て /WX のビルドが落ちる。L"..."(ワイド)を使う。コメントは対象外。
+#   stringize CHECK(x)/REQUIRE(x) など #x で引数を文字列化するマクロの引数に、非ASCII文字を含むリテラルを
+#             (L"..." でも)書かない。文字列化の結果はナロー文字列なので、narrow と同じく C4566 になる(#149)。
+#             リテラルはマクロの外の定数に移す。
 #   header    C/C++ ファイルは日本語のヘッダーコメント(// _/_/_/...)で始める。外部コードと VS の生成物は除外。
 #
 # 使い方:
@@ -19,6 +22,7 @@
 # 終了コード: 0 違反なし / 1 違反あり / 2 フックで違反あり(Claude Code はこれを Claude に返す)
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -40,6 +44,17 @@ HEADER_EXEMPT = {
 SKIP_DIRS = ("packages/", "x64/", "DebugEditor/", "ReleaseEditor/")
 # このプレフィックスが付いたリテラルはコードページに依存しない(L/u/U は UTF-16/32、u8 は UTF-8)
 WIDE_PREFIXES = {"L", "u", "U", "u8", "LR", "uR", "UR", "u8R"}
+# #x で引数を文字列化するマクロ。フックは編集したファイルしか読まないので、ほかのファイルで定義されたものは
+# ここに持つ(check_conventions_test.py がリポジトリの定義と一致することを確かめる)。
+# 同じファイルで定義されたマクロは stringizing_macros_defined() で見つける。
+STRINGIZING_MACROS = {
+    "CHECK", "REQUIRE", "DXFORGE_TEST_CASE",  # EngineUnitTests/MicroTest.h
+    "DXCall",                 # DXForgeEngine/Graphics/Direct3D12/D3D12CommonHeaders.h
+    "DXC_CALL",               # DXForgeEngineDLL/ShaderCompilation.cpp
+    "REGISTER_SCRIPT",        # DXForgeEngine/EngineAPI/GameEntity.h
+}
+DEFINE_RE = re.compile(r"^[ \t]*#[ \t]*define[ \t]+([A-Za-z_]\w*)\(([^)]*)\)((?:[^\n]*\\\r?\n)*[^\n]*)", re.M)
+IDENT_RE = re.compile(r"(?<![\w.])([A-Za-z_]\w*)\s*\(")
 
 
 def ext_of(rel):
@@ -67,9 +82,18 @@ def wants_bom(rel, data):
     return ext in BOM_EXTS
 
 
-def find_narrow_non_ascii(text):
-    # C/C++ のソースから、非ASCII文字を含むナロー文字列/文字リテラルの (行番号, リテラルの先頭) を返す
-    results = []
+def scan_literals(text):
+    # C/C++ のソースを字句に分け、(リテラルのリスト, コード) を返す。
+    # リテラルは (開始位置, 終了位置, 行番号, プレフィックス, 本体)。コードはコメントとリテラルを空白に置き換えた
+    # 同じ長さの文字列(改行は残す)で、マクロ名やかっこを探すのに使う。
+    literals = []
+    code = list(text)
+
+    def blank(a, b):
+        for k in range(a, b):
+            if code[k] != "\n":
+                code[k] = " "
+
     i, n, line = 0, len(text), 1
     while i < n:
         c = text[i]
@@ -78,10 +102,13 @@ def find_narrow_non_ascii(text):
             i += 1
         elif text.startswith("//", i):
             j = text.find("\n", i)
-            i = n if j < 0 else j
+            j = n if j < 0 else j
+            blank(i, j)
+            i = j
         elif text.startswith("/*", i):
             j = text.find("*/", i + 2)
             j = n if j < 0 else j + 2
+            blank(i, j)
             line += text.count("\n", i, j)
             i = j
         elif c in "\"'":
@@ -105,13 +132,63 @@ def find_narrow_non_ascii(text):
                     j += 2 if text[j] == "\\" else 1
                 end = min(j + 1, n)
             body = text[i:end]
-            if prefix not in WIDE_PREFIXES and any(ord(ch) > 127 for ch in body):
-                results.append((line, (prefix + body)[:40]))
+            literals.append((k, end, line, prefix, body))
+            blank(k, end)
             line += body.count("\n")
             i = end
         else:
             i += 1
-    return results
+    return literals, "".join(code)
+
+
+def has_non_ascii(s):
+    return any(ord(ch) > 127 for ch in s)
+
+
+def find_narrow_non_ascii(text, literals=None):
+    # 非ASCII文字を含むナロー文字列/文字リテラルの (行番号, リテラルの先頭) を返す
+    if literals is None:
+        literals, _ = scan_literals(text)
+    return [(line, (prefix + body)[:40]) for _, _, line, prefix, body in literals
+            if prefix not in WIDE_PREFIXES and has_non_ascii(body)]
+
+
+def stringizing_macros_defined(text, code=None):
+    # このソースで #define され、引数を #x で文字列化するマクロの名前(## の連結は除く)
+    if code is None:
+        _, code = scan_literals(text)
+    names = set()
+    for m in DEFINE_RE.finditer(code):
+        params = {p.strip() for p in m.group(2).split(",")}
+        body = m.group(3).replace("##", "  ")
+        if any(t in params for t in re.findall(r"#\s*([A-Za-z_]\w*)", body)):
+            names.add(m.group(1))
+    return names
+
+
+def find_stringized_non_ascii(text, scanned=None):
+    # 文字列化するマクロの引数の中にある、非ASCII文字を含むリテラル(プレフィックスを問わない)の
+    # (行番号, リテラルの先頭) を返す
+    literals, code = scanned or scan_literals(text)
+    if not any(has_non_ascii(body) for _, _, _, _, body in literals):
+        return []  # フックの速さのため、たいていのファイルはここで終わる
+    macros = STRINGIZING_MACROS | stringizing_macros_defined(text, code)
+    spans = []
+    for m in IDENT_RE.finditer(code):
+        if m.group(1) not in macros:
+            continue
+        depth, j = 0, m.end() - 1
+        while j < len(code):
+            if code[j] == "(":
+                depth += 1
+            elif code[j] == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            j += 1
+        spans.append((m.end(), j))
+    return [(line, (prefix + body)[:40]) for start, end, line, prefix, body in literals
+            if has_non_ascii(body) and any(a <= start and end <= b for a, b in spans)]
 
 
 def check_file(rel, data):
@@ -131,7 +208,16 @@ def check_file(rel, data):
     if ext in CPP_EXTS:
         # CRLF を LF にそろえる(CRLF のままだと "abc\ の行継続で \ が CR だけを飛ばし、文字列の終わりと誤認する)
         text = data.decode("utf-8-sig", errors="replace").replace("\r\n", "\n")
-        for ln, lit in find_narrow_non_ascii(text):
+        scanned = scan_literals(text)
+        stringized = find_stringized_non_ascii(text, scanned)
+        for ln, lit in stringized:
+            violations.append(("stringize", ln, f"文字列化するマクロ(CHECK/REQUIRE など)の引数に非ASCII文字のリテラルがあります: "
+                                                f"{lit} (#x の結果はナロー文字列なので L\"...\" でも CI で C4566 → /WX で失敗する)。"
+                                                "リテラルをマクロの外の定数に移してください"
+                                                "(例: const std::wstring expected = L\"...\"; CHECK(name == expected);)。"))
+        for ln, lit in find_narrow_non_ascii(text, scanned[0]):
+            if (ln, lit) in stringized:
+                continue
             violations.append(("narrow", ln, f"ナローリテラルに非ASCII文字があります: {lit} "
                                              "(CI のコードページ1252で C4566 → /WX で失敗する)。"
                                              "L\"...\" とワイド版のAPI(例: OutputDebugStringW)を使ってください。"))
