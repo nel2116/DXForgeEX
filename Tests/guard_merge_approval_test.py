@@ -36,6 +36,10 @@ class AddsMergeOk(unittest.TestCase):
             "gh --repo nel2116/DXForgeEX pr edit 161 --add-label merge-ok",
             "gh pr edit 161 \\\n  --add-label merge-ok",
             "gh pr edit 161 `\n  --add-label merge-ok",
+            # PR #161 の Codex の指摘: Windows ではコマンド名の大文字と小文字を区別しない。ラベル名も GitHub では同じ
+            "GH.EXE pr edit 161 --add-label merge-ok",
+            "Gh pr edit 161 --add-label merge-ok",
+            "gh pr edit 161 --add-label MERGE-OK",
             # 構文を解析しないので、読み取りや本文の中の文字列でも止める(意図した割り切り)
             "gh pr view 158 --json labels | grep merge-ok",
             "gh pr edit 161 --body '承認は --add-label merge-ok で行う'",

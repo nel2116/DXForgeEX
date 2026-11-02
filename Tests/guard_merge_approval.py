@@ -18,12 +18,13 @@ LABEL = "merge-ok"
 # 見落としと誤検出の指摘が続く(#124、PR #161 の Codex レビュー)。そのため、gh と merge-ok が同じコマンドに
 # あれば、読み取りのコマンドも含めて止める。ラベルの確認は --json labels で行い、本文は --body-file で渡せば、
 # コマンドに merge-ok を書かずに済む。
-_GH = re.compile(r"(?<![\w.-])gh(?:\.exe)?(?![\w.-])")
+# Windows はコマンド名(GH.EXE)の、GitHub はラベル名(MERGE-OK)の大文字と小文字を区別しない
+_GH = re.compile(r"(?<![\w.-])gh(?:\.exe)?(?![\w.-])", re.IGNORECASE)
 
 
 def adds_merge_ok(command: str) -> bool:
     """gh を呼ぶコマンドに merge-ok が含まれていれば True(付けるかどうかは区別しない)。"""
-    return LABEL in command and _GH.search(command) is not None
+    return LABEL in command.lower() and _GH.search(command) is not None
 
 
 MESSAGE = (
