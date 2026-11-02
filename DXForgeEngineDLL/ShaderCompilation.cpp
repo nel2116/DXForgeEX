@@ -11,10 +11,12 @@
 // 2026/10/27 EngineTestからDXForgeEngineDLLへ移動し、エディタからメモリ上のソースをコンパイルできるようにした(Primal Day 076)。
 //            DXCは実行時に読み込み、エラーと逆アセンブルも返せるようにした
 // 2026/10/27 TILE_SIZEを定義する条件が常に真だったのを修正し、ライトカリングの2つのコンピュートシェーダだけに渡すようにした(#101)
+// 2026/11/02 エンジンのシェーダーのソースのフォルダを compile_shaders() に渡せるようにし、DXCの読み込みの失敗をキャッシュしないようにした(#31)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include <fstream>
 #include <filesystem>
+#include <mutex>
 
 #include "ShaderCompilation.h"
 #include "Graphics\Direct3D12\D3D12Shaders.h"
@@ -78,9 +80,16 @@ namespace
 	// DxcCreateInstance を返す。読み込めなければ nullptr。
 	// NOTE: dxcompiler.lib をリンクすると、dxcompiler.dll が無いだけで DXForgeEngineDLL.dll 自体を読み込めなくなり、
 	//       エディタのエンジンの機能がすべて使えなくなる。実行時に読み込めば、失敗するのはシェーダーのコンパイルだけになる。
+	// NOTE: 読み込めたときだけ覚えておく。失敗を覚えると、dxcompiler.dll を置いてからエディタで「再試行」しても
+	//       読み込み直さず、コンパイルが失敗し続ける(#31)。エディタはスレッドプールからもコンパイルするので、mutex で守る。
 	DxcCreateInstanceProc get_dxc_create_instance()
 	{
-		static const DxcCreateInstanceProc create_instance{ []() -> DxcCreateInstanceProc
+		static std::mutex mutex{};
+		static DxcCreateInstanceProc create_instance{ nullptr };
+		std::lock_guard lock{ mutex };
+		if (create_instance) return create_instance;
+
+		create_instance = []() -> DxcCreateInstanceProc
 		{
 			HMODULE self{ nullptr };
 			if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
@@ -114,7 +123,7 @@ namespace
 			}
 
 			return reinterpret_cast<DxcCreateInstanceProc>(GetProcAddress(dxc, "DxcCreateInstance"));
-		}() };
+		}();
 
 		return create_instance;
 	}
@@ -163,7 +172,9 @@ namespace
 			return compile(source_blob.Get(), get_args(info, extra_args), DXC_CP_UTF8);
 		}
 
-		dxc_compiled_shader compile(shader_file_info info, std::filesystem::path full_path, dxforge::utl::vector<std::wstring>& extra_args)
+		// include_folder: -I に渡すフォルダ。空なら shaders_source_path(作業フォルダからの相対パス)
+		dxc_compiled_shader compile(shader_file_info info, std::filesystem::path full_path, dxforge::utl::vector<std::wstring>& extra_args,
+			const std::filesystem::path& include_folder = {})
 		{
 			if (!is_valid()) return {};
 			HRESULT hr{ S_OK };
@@ -179,7 +190,7 @@ namespace
 			OutputDebugStringA(" : ");
 			OutputDebugStringA(info.function);
 			OutputDebugStringA("\n");
-			return compile(source_blob.Get(), get_args(info, extra_args), DXC_CP_ACP);
+			return compile(source_blob.Get(), get_args(info, extra_args, include_folder), DXC_CP_ACP);
 		}
 
 		// コンパイルに失敗したときは、byte_code が空で errors だけを持つ結果を返す。
@@ -260,7 +271,8 @@ namespace
 		}
 
 	private:	// プライベート関数
-		utl::vector<std::wstring> get_args(const shader_file_info& info, utl::vector<std::wstring>& extra_args)
+		utl::vector<std::wstring> get_args(const shader_file_info& info, utl::vector<std::wstring>& extra_args,
+			const std::filesystem::path& include_folder = {})
 		{
 			utl::vector<std::wstring> args{};
 
@@ -271,7 +283,7 @@ namespace
 			args.emplace_back(L"-T");
 			args.emplace_back(to_wstring(_profile_string[(u32)info.type]));
 			args.emplace_back(L"-I");
-			args.emplace_back(to_wstring(shaders_source_path));
+			args.emplace_back(include_folder.empty() ? to_wstring(shaders_source_path) : include_folder.wstring());
 			args.emplace_back(L"-enable-16bit-types");
 			args.emplace_back(DXC_ARG_ALL_RESOURCES_BOUND);
 #if _DEBUG
@@ -310,13 +322,13 @@ namespace
 		return std::filesystem::path{ graphics::get_engine_shaders_path(graphics::graphics_platform::direct3d12) };
 	}
 
-	bool compiled_shaders_are_up_to_date()
+	bool compiled_shaders_are_up_to_date(const std::filesystem::path& source_folder)
 	{
 		auto engine_shaders_path = get_engine_shaders_path();
 		if (!std::filesystem::exists(engine_shaders_path)) return false;
 		auto shaders_compilation_time = std::filesystem::last_write_time(engine_shaders_path);
 
-		for (const auto& entry : std::filesystem::directory_iterator{ shaders_source_path })
+		for (const auto& entry : std::filesystem::directory_iterator{ source_folder })
 		{
 			if (entry.last_write_time() > shaders_compilation_time)
 			{
@@ -429,9 +441,10 @@ std::unique_ptr<u8[]> compile_shader(shader_file_info info, const char* file_pat
 }
 
 
-bool compile_shaders()
+bool compile_shaders(const std::filesystem::path& source_folder/*={}*/)
 {
-	if (compiled_shaders_are_up_to_date()) return true;
+	const std::filesystem::path folder{ source_folder.empty() ? std::filesystem::path{ shaders_source_path } : source_folder };
+	if (compiled_shaders_are_up_to_date(folder)) return true;
 
 	shader_compiler compiler{};
 	utl::vector<dxc_compiled_shader> shaders{};
@@ -442,8 +455,7 @@ bool compile_shaders()
 	{
 		auto& file = engine_shader_files[i];
 
-		full_path = shaders_source_path;
-		full_path += file.info.file_name;
+		full_path = folder / file.info.file_name;
 		if (!std::filesystem::exists(full_path)) return false;
 		utl::vector<std::wstring> extra_args{};
 
@@ -454,7 +466,7 @@ bool compile_shaders()
 			extra_args.emplace_back(L"TILE_SIZE=16");
 		}
 
-		dxc_compiled_shader compiled_shader{ compiler.compile(file.info,full_path,extra_args) };
+		dxc_compiled_shader compiled_shader{ compiler.compile(file.info, full_path, extra_args, folder) };
 		if (compiled_shader.byte_code && compiled_shader.byte_code->GetBufferPointer() && compiled_shader.byte_code->GetBufferSize())
 		{
 			shaders.emplace_back(std::move(compiled_shader));

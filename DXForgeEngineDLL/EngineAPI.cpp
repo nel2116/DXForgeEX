@@ -44,16 +44,20 @@ namespace
 } // 匿名名前空間
 
 // エンジンのシェーダーをコンパイルし、グラフィックスを初期化する(Primal Day 078)。返す値は editor::engine_init_error。
+// engine_path: エンジン(リポジトリ)のルートのフォルダ(UTF-16)。シェーダーのソースはその DXForgeEngine\Graphics\Direct3D12\Shaders から
+//              探す。nullptr か空なら、作業フォルダの ..\..\ をルートとみなす。shaders.bin は作業フォルダの shaders\d3d12\ に置く。
+// NOTE: Primal の InitializeEngine() は引数を取らず、作業フォルダからの相対パスでソースを探す。DXForgeEX のエディタは
+//       リポジトリの外に置いて DXFORGE_ENGINE などでエンジンのパスを決めて起動できる(#117)ので、そのパスを渡す(#31)。
 // NOTE: Primal はシェーダーのコンパイルに失敗すると、ここで MessageBox(MB_RETRYCANCEL)を出して再試行する。
 //       ヘッドレスのテストで止まらないよう、ここでは UI を出さず、再試行はエディタ(MainWindow)が聞く。
 // NOTE: D3D12 のデバッグレイヤーは、デバッガがつながっているときだけブレークさせる(Primal は常にブレーク)。
 //       デバッガなしで DebugEditor を起動したとき、警告1つでエディタが落ちないようにするため。
 //       メッセージはどちらでもデバッグレイヤーが OutputDebugString に出す。
-EDITOR_INTERFACE u32 InitializeEngine()
+EDITOR_INTERFACE u32 InitializeEngine(const wchar_t* engine_path)
 {
 	graphics::graphics_init_info info{};
 	info.unattended = !IsDebuggerPresent();
-	return editor::initialize_engine(info);
+	return editor::initialize_engine(info, (engine_path && *engine_path) ? std::filesystem::path{ engine_path } : std::filesystem::path{});
 }
 
 // InitializeEngine で初期化したグラフィックスを終了する。初期化していないとき、2回目は何もしない。

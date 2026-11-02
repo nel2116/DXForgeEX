@@ -111,21 +111,24 @@ namespace DXForgeEditor.DllWrappers
     {
         private const string _engineDll = "DXForgeEngineDLL.dll";
 
-        [DllImport(_engineDll, EntryPoint = "InitializeEngine")]
-        private static extern EngineInitError InitializeEngineNative();
+        [DllImport(_engineDll, EntryPoint = "InitializeEngine", CharSet = CharSet.Unicode)]
+        private static extern EngineInitError InitializeEngineNative(string? enginePath);
 
         /// <summary>
         /// エンジンのシェーダーをコンパイルし、グラフィックスを初期化する(Primal Day 078)。
-        /// シェーダーのソースと shaders.bin は作業フォルダからの相対パスで探すので、作業フォルダをエディタの実行ファイルの
-        /// フォルダ(x64\&lt;構成&gt;)にしてから呼ぶ。
+        /// enginePath はエンジン(リポジトリ)のルートのフォルダ(MainWindow.DXForgePath)で、シェーダーのソースはその
+        /// DXForgeEngine\Graphics\Direct3D12\Shaders から探す。shaders.bin は作業フォルダからの相対パス(shaders\d3d12\)なので、
+        /// 作業フォルダをエディタの実行ファイルのフォルダ(x64\&lt;構成&gt;)にしてから呼ぶ。
+        /// NOTE: Primal の InitializeEngine は引数を取らず、作業フォルダからの相対パスでソースを探す。エディタをリポジトリの外に置き、
+        ///       DXFORGE_ENGINE などでエンジンのパスを決めて起動したときも初期化できるよう、パスを渡す(#117、#31)。
         /// NOTE: Primal は DllImport をそのまま公開するが、OnMainWindowLoaded から呼ぶので、DLL を読み込めないときなども
         ///       例外を投げずに Unknown を返す。
         /// </summary>
-        public static EngineInitError InitializeEngine()
+        public static EngineInitError InitializeEngine(string? enginePath)
         {
             try
             {
-                return InitializeEngineNative();
+                return InitializeEngineNative(enginePath);
             }
             catch (Exception ex)
             {
@@ -157,7 +160,7 @@ namespace DXForgeEditor.DllWrappers
         /// <summary>
         /// InitializeEngine が失敗したときにエディタが出す文言(理由と、確かめること)。例外は投げない。
         /// </summary>
-        internal static string GetInitializeEngineErrorMessage(EngineInitError error)
+        internal static string GetInitializeEngineErrorMessage(EngineInitError error, string? enginePath)
         {
             try
             {
@@ -165,7 +168,7 @@ namespace DXForgeEditor.DllWrappers
                 var hint = error switch
                 {
                     EngineInitError.ShaderCompilation =>
-                        @"エンジンのシェーダー(DXForgeEngine\Graphics\Direct3D12\Shaders)を、作業フォルダから ..\..\ の位置に見つけられないか、" +
+                        @"エンジンのシェーダー(エンジンのパスの DXForgeEngine\Graphics\Direct3D12\Shaders)が見つからないか、" +
                         "コンパイルできませんでした。dxcompiler.dll がエディタの隣にあるか、シェーダーにエラーがないか(デバッグ出力)を確かめてください。",
                     EngineInitError.Graphics =>
                         @"Direct3D 12 を初期化できませんでした。shaders\d3d12\shaders.bin を読めるか、" +
@@ -182,7 +185,8 @@ namespace DXForgeEditor.DllWrappers
                 {
                     workingDirectory = $"(取得できません: {ex.Message})";
                 }
-                return string.IsNullOrEmpty(hint) ? reason : $"{reason}。\n{hint}\n作業フォルダ: {workingDirectory}";
+                return string.IsNullOrEmpty(hint) ? reason :
+                    $"{reason}。\n{hint}\nエンジンのパス: {(string.IsNullOrEmpty(enginePath) ? "(なし)" : enginePath)}\n作業フォルダ: {workingDirectory}";
             }
             catch (Exception ex)
             {

@@ -33,7 +33,13 @@ namespace dxforge::editor
 		}
 	} // 匿名名前空間
 
-	engine_init_error::error_code initialize_engine(const graphics::graphics_init_info& info)
+	std::filesystem::path engine_shaders_source_folder(const std::filesystem::path& engine_path)
+	{
+		if (engine_path.empty()) return {};
+		return engine_path / L"DXForgeEngine" / L"Graphics" / L"Direct3D12" / L"Shaders";
+	}
+
+	engine_init_error::error_code initialize_engine(const graphics::graphics_init_info& info, const std::filesystem::path& engine_path)
 	{
 		if (engine_initialized) return engine_init_error::succeeded;
 
@@ -41,7 +47,7 @@ namespace dxforge::editor
 		//		 などで例外を投げることがある。エディタ(P/Invoke)に C++ の例外を出さないよう、ここで失敗のコードにする。
 		try
 		{
-			if (!compile_shaders())
+			if (!compile_shaders(engine_shaders_source_folder(engine_path)))
 			{
 				OutputDebugStringW(L"[DXForgeEngineDLL] failed to compile the engine shaders\n");
 				return engine_init_error::shader_compilation;

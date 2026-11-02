@@ -546,6 +546,35 @@ def test_shader_compilation_throws(r):
     r.check(f"{name}: nothing written", not os.path.exists(png), png)
 
 
+def test_engine_path_outside_repo(r):
+    """実行ファイルがリポジトリの外にあっても、--engine-path のエンジンのシェーダーで初期化して描画できる(#31 の Codex の指摘)
+
+    エディタは、DXFORGE_ENGINE などで決めたエンジンのパスを DLL の InitializeEngine に渡す(EnginePath.Resolve、#117)。
+    --render も同じ editor::initialize_engine(info, エンジンのパス)を使う。実行ファイルとDXCだけを一時フォルダにコピーし、
+    ..\\..\\ にシェーダーのソースがない状態で、エンジンのパスにこのリポジトリを渡す。shaders.bin は実行ファイルの隣に作られる。
+    """
+    name = "engine path outside the repository"
+    folder = os.path.join(r.work_dir, "outside_repo", "x64", "Config")
+    os.makedirs(folder)
+    exe = shutil.copy2(r.exe, folder)
+    for dll in ("dxcompiler.dll", "dxil.dll"):
+        shutil.copy2(os.path.join(os.path.dirname(r.exe), dll), folder)
+    png = os.path.join(r.work_dir, "outside_repo.png")
+    args = r.render_args(png) + ["--engine-path", REPO_ROOT + os.sep]
+    code, result, stderr = r.run_json(args, exe)
+    r.check_no_crash(name, code, stderr)
+    r.check(f"{name}: exit code", code == EXIT_SUCCESS, f"got {code}; stderr: {stderr.strip()}")
+    r.check(f"{name}: success", result is not None and result.get("success") is True, result)
+    r.check(f"{name}: png", os.path.isfile(png), png)
+    r.check(f"{name}: shaders.bin next to the exe", os.path.isfile(os.path.join(folder, "shaders", "d3d12", "shaders.bin")), folder)
+    # エンジンのパスにシェーダーのソースがなければ、シェーダーを用意できない(終了コード21)
+    empty_engine = os.path.join(r.work_dir, "empty_engine")
+    os.makedirs(empty_engine)
+    r.expect_error(f"{name}: no sources under --engine-path", r.render_args(png) + ["--engine-path", empty_engine], EXIT_SHADERS_UNAVAILABLE,
+                   "shaders_unavailable", exe=exe, message_part="shader sources")
+    r.report(name)
+
+
 def update_baselines(exe, args, config, has_dxc):
     """WARPで2回描き、画素が一致したら baselines/ の基準画像を書き換える。@return 終了コード"""
     # 意図しない更新を防ぐ: 構成を明示させ、CIでは更新しない
@@ -613,6 +642,7 @@ def main():
         if has_dxc:
             test_graphics_init_failed(r)
             test_shader_compilation_throws(r)
+            test_engine_path_outside_repo(r)
             rgb = test_warp_render_and_determinism(r)
             if rgb is not None:
                 test_baseline_comparison(r, rgb, config, require_render)

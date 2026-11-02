@@ -13,8 +13,10 @@
          理由(Description)と作業フォルダを含む文字列を返す。
       3. DXForgeEngineDLL.dll があるとき: エディタのラッパーから DLL の関数を呼ぶ。
          - 初期化していないときの ShutdownEngine と、その2回目で落ちない。
-         - 作業フォルダを %TEMP% の下の空のフォルダにすると、エンジンのシェーダーのソースが見つからず ShaderCompilation が返る
-           (グラフィックスは初期化しないので GPU は要らない)。そのあとの ShutdownEngine も落ちない。
+         - 作業フォルダを %TEMP% の下の空のフォルダにし、シェーダーのソースのないエンジンのパス(または null)を渡すと
+           ShaderCompilation が返る(グラフィックスは初期化しない)。そのあとの ShutdownEngine も落ちない。
+         - 同じ作業フォルダで、エンジンのパスにこのリポジトリを渡すと、エンジンのシェーダーをコンパイルして作業フォルダに
+           shaders.bin を書き、グラフィックスを初期化する(GPU がなければ Graphics)。ShutdownEngine を2回呼んで終える。
          DLL がないとき(CI のランナーには ATL がなく DLL をビルドできない): InitializeEngine が例外を投げずに Unknown を返し、
          ShutdownEngine も例外を投げない。-RequireEngineDll を付けると、DLL がないときは失敗にする(ローカルでは付ける)。
       初期化に成功する経路(シェーダーのコンパイル → Direct3D 12 の初期化 → リソースの作成・破棄 → 終了)は、DLL と同じ
@@ -78,7 +80,10 @@ $flags = [System.Reflection.BindingFlags]"Public,NonPublic,Static"
 $engineApi = $editor.GetType("DXForgeEditor.DllWrappers.EngineAPI", $true)
 $initError = $editor.GetType("DXForgeEditor.EngineAPIStructs.EngineInitError", $true)
 $getMessage = $engineApi.GetMethod("GetInitializeEngineErrorMessage", $flags)
-$initialize = $engineApi.GetMethod("InitializeEngine", $flags, [Type[]]@())
+# エディタは解決済みのエンジンのパス(MainWindow.DXForgePath)を渡す(#31 の Codex の指摘)
+$initialize = $engineApi.GetMethod("InitializeEngine", $flags, [Type[]]@([string]))
+Check ($null -ne $initialize) "EngineAPI.InitializeEngine takes the engine path (string)"
+$messageEnginePath = "C:\Engine\Path\"
 $shutdown = $engineApi.GetMethod("ShutdownEngine", $flags, [Type[]]@())
 
 function ConvertTo-PascalCase([string]$name)
@@ -113,14 +118,14 @@ foreach ($name in $csNames)
 	$description = ($initError.GetField($name).GetCustomAttributes([System.ComponentModel.DescriptionAttribute], $false) | Select-Object -First 1).Description
 	try
 	{
-		$message = $getMessage.Invoke($null, @($value))
+		$message = $getMessage.Invoke($null, @($value, $messageEnginePath))
 		if ($name -eq "Succeeded")
 		{
 			Check ($message -eq $description) "${name}: the description only: $message"
 		}
 		else
 		{
-			Check (-not [string]::IsNullOrEmpty($description) -and $message.StartsWith($description) -and $message.Contains("作業フォルダ: ")) "${name}: reason and working folder: $($message -replace "`n", ' / ')"
+			Check (-not [string]::IsNullOrEmpty($description) -and $message.StartsWith($description) -and $message.Contains("作業フォルダ: ") -and $message.Contains("エンジンのパス: $messageEnginePath")) "${name}: reason, engine path and working folder: $($message -replace "`n", ' / ')"
 		}
 	}
 	catch
@@ -128,11 +133,20 @@ foreach ($name in $csNames)
 		Check $false "${name}: threw $($_.Exception.InnerException.Message)"
 	}
 }
+try
+{
+	$message = $getMessage.Invoke($null, @([Enum]::Parse($initError, "Graphics"), $null))
+	Check (-not [string]::IsNullOrEmpty($message) -and $message.Contains("作業フォルダ: ")) "null engine path: $($message -replace "`n", ' / ')"
+}
+catch
+{
+	Check $false "null engine path: threw $($_.Exception.InnerException.Message)"
+}
 foreach ($raw in @(99, -1))
 {
 	try
 	{
-		$message = $getMessage.Invoke($null, @([Enum]::ToObject($initError, $raw)))
+		$message = $getMessage.Invoke($null, @([Enum]::ToObject($initError, $raw), $messageEnginePath))
 		Check (-not [string]::IsNullOrEmpty($message) -and $message.Contains("$raw") -and $message.Contains("作業フォルダ: ")) "undefined value ${raw}: $($message -replace "`n", ' / ')"
 	}
 	catch
@@ -159,12 +173,16 @@ try
 			Check $false "ShutdownEngine before InitializeEngine threw $($_.Exception.InnerException.Message)"
 		}
 
-		# ..\..\DXForgeEngine\Graphics\Direct3D12\Shaders がない作業フォルダ
+		# リポジトリの外の作業フォルダ(..\..\DXForgeEngine\Graphics\Direct3D12\Shaders がない)
 		$cwd = Join-Path $work "a\b"
 		$null = New-Item -ItemType Directory -Force $cwd
 		[System.IO.Directory]::SetCurrentDirectory($cwd)
-		$result = $initialize.Invoke($null, @())
-		Check ("$result" -eq "ShaderCompilation") "InitializeEngine without the shader sources returns ShaderCompilation: $result"
+		$emptyEngine = Join-Path $work "empty_engine"
+		$null = New-Item -ItemType Directory -Force $emptyEngine
+		$result = $initialize.Invoke($null, @([string]$emptyEngine))
+		Check ("$result" -eq "ShaderCompilation") "InitializeEngine with an engine path without the shader sources returns ShaderCompilation: $result"
+		$result = $initialize.Invoke($null, @([string]$null))
+		Check ("$result" -eq "ShaderCompilation") "InitializeEngine without an engine path looks in ..\..\ of the working folder (none here): $result"
 		Check (-not (Test-Path (Join-Path $cwd "shaders\d3d12\shaders.bin"))) "shaders.bin is not written"
 		try
 		{
@@ -176,12 +194,28 @@ try
 		{
 			Check $false "ShutdownEngine after the failed InitializeEngine threw $($_.Exception.InnerException.Message)"
 		}
+
+		# エンジンのパスにこのリポジトリを渡すと、作業フォルダがリポジトリの外でも、エンジンのシェーダーをコンパイルできる
+		# (#31 の Codex の指摘)。そのあとのグラフィックスの初期化には GPU が要るので、GPU がなければ Graphics でもよい。
+		$result = $initialize.Invoke($null, @([string]($RepoRoot + "\")))
+		Check ("$result" -eq "Succeeded" -or "$result" -eq "Graphics") "InitializeEngine with this repository as the engine path compiles the engine shaders: $result"
+		Check (Test-Path (Join-Path $cwd "shaders\d3d12\shaders.bin")) "shaders.bin is written in the working folder"
+		try
+		{
+			$shutdown.Invoke($null, @())
+			$shutdown.Invoke($null, @())
+			Check $true "ShutdownEngine after InitializeEngine ($result), and again"
+		}
+		catch
+		{
+			Check $false "ShutdownEngine after InitializeEngine threw $($_.Exception.InnerException.Message)"
+		}
 	}
 	else
 	{
 		try
 		{
-			$result = $initialize.Invoke($null, @())
+			$result = $initialize.Invoke($null, @([string]($RepoRoot + "\")))
 			Check ("$result" -eq "Unknown") "without DXForgeEngineDLL.dll, InitializeEngine returns Unknown: $result"
 			$shutdown.Invoke($null, @())
 			Check $true "without DXForgeEngineDLL.dll, ShutdownEngine does not throw"

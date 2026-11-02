@@ -9,6 +9,7 @@
 // 2026/10/19 assert/abort()でダイアログを出さずに標準エラーへ出して終了するように変更(#89)。--interactiveを追加
 // 2026/10/27 --game-binでヘッドレス実行(game.binを読み込んでスクリプトの更新を回す)を行うモードと、--helpを追加 (#11)
 // 2026/10/29 描画のヘッドレス実行(--render)を追加 (#127)
+// 2026/11/02 --render の使い方に --engine-path を追加 (#31)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
@@ -161,7 +162,7 @@ int main(int argc, char** argv)
 			"  EngineUnitTests [--json] [--interactive]\n"
 			"      run the unit tests (exit code 0: all passed, 1: a test failed, 3: abort())\n"
 			"  EngineUnitTests --game-bin <path> --frames <N> [--dt <seconds>] [--json] [--interactive]\n"
-			"  EngineUnitTests --render --frames <N> --width <w> --height <h> --screenshot <png> [--adapter warp|hardware] [--json] [--interactive]\n");
+			"  EngineUnitTests --render --frames <N> --width <w> --height <h> --screenshot <png> [--adapter warp|hardware] [--engine-path <dir>] [--json] [--interactive]\n");
 		dxforge::headless::print_usage();
 		dxforge::headless::render::print_usage();
 		return 0;

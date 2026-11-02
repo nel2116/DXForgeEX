@@ -57,13 +57,14 @@ namespace DXForgeEditor
         }
 
         /// <summary>
-        /// エンジンを初期化する。シェーダーのコンパイルに失敗したときは、再試行するかを聞く。
+        /// エンジンを初期化する。シェーダーのソースは、解決済みのエンジンのパス(DXForgePath)から探す。
+        /// シェーダーのコンパイルに失敗したときは、再試行するかを聞く。
         /// 失敗したときは理由を MessageBox とログに出して false を返す。例外は投げない。
         /// </summary>
         private static bool InitializeEngine()
         {
-            // NOTE: エンジンはシェーダーのソース(..\..\DXForgeEngine\...)と shaders.bin(.\shaders\d3d12\)を作業フォルダからの
-            //       相対パスで探すので、エディタの実行ファイルのフォルダ(x64\<構成>)に移す。エディタの C# の側は作業フォルダに
+            // NOTE: エンジンは shaders.bin(.\shaders\d3d12\)を作業フォルダからの相対パスで読み書きするので、
+            //       エディタの実行ファイルのフォルダ(x64\<構成>)に移す。エディタの C# の側は作業フォルダに
             //       依らない(相対パスを使っていない)。
             try
             {
@@ -77,7 +78,7 @@ namespace DXForgeEditor
 
             while (true)
             {
-                var result = EngineAPI.InitializeEngine();
+                var result = EngineAPI.InitializeEngine(DXForgePath);
                 if (result == EngineAPIStructs.EngineInitError.Succeeded)
                 {
                     Debug.WriteLine("[DXForgeEditor] エンジンを初期化しました");
@@ -85,7 +86,7 @@ namespace DXForgeEditor
                     return true;
                 }
 
-                var message = EngineAPI.GetInitializeEngineErrorMessage(result);
+                var message = EngineAPI.GetInitializeEngineErrorMessage(result, DXForgePath);
                 Debug.WriteLine($"[DXForgeEditor] {message}");
                 Logger.Log(MessageType.Error, message);
                 // NOTE: Primal は DLL の中で MessageBox(MB_RETRYCANCEL)を出す。ヘッドレスのテストで止まらないよう、エディタで聞く。

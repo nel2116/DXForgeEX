@@ -16,14 +16,20 @@
 #   3. 不正な引数(関数名やソースが無い、シェーダの種類が範囲外)では、FALSEが返り、バッファは返らない。
 #   4. コンパイルしたシェーダをエディタと同じ形式(keys[count], {u64 長さ, ハッシュ, バイトコード}[count])に詰めて
 #      AddShaderGroup() に渡すと有効なIDが返り、RemoveShaderGroup() で消せる。壊れたデータでは無効なIDが返る。
+#   5. dxcompiler.dll を読み込めずにコンパイルが失敗しても、あとで dxcompiler.dll / dxil.dll を置けば、同じプロセスで
+#      次のコンパイルが成功する(失敗をキャッシュしない。エディタの「再試行」のため。#31 の Codex の指摘)。
+#      DLL を一時フォルダにコピーし、別のプロセス(--dxc-retry-child)で確かめる。
 #
 # NOTE: Debug(DebugEditor)のDLLのassertはモーダルなダイアログを出して止まるため、assertを標準エラーに出して
 #       abortするようにしてから呼ぶ(ucrtbasedの_set_error_mode / _set_abort_behavior)。
 import argparse
 import ctypes
 import os
+import shutil
 import struct
+import subprocess
 import sys
+import tempfile
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DEFAULT_SHADERS = os.path.join(REPO_ROOT, "DXForgeEditor", "Resources", "MaterialEditor", "DefaultMaterialShaders.hlsl")
@@ -137,11 +143,46 @@ def add_shader_group(dll, shader_type, count, packed):
 	return dll.AddShaderGroup(ctypes.byref(data))
 
 
+DXC_DLLS = ("dxcompiler.dll", "dxil.dll")
+
+
+def dxc_retry_child(folder, dxc_source_folder):
+	"""folder の DXForgeEngineDLL.dll(隣に DXC がない)でコンパイルし、DXC を置いてからもう一度コンパイルする"""
+	dll = load_dll(os.path.join(folder, "DXForgeEngineDLL.dll"))
+	code = open(DEFAULT_SHADERS, encoding="utf-8").read()
+	include = ["-I", ENGINE_SHADERS_DIR]
+	r = compile_shader(dll, code, "MainPS", SHADER_TYPE_PIXEL, include)
+	check(not r.ok and not r.byte_code, "without dxcompiler.dll next to the DLL: the compilation fails")
+	for name in DXC_DLLS:
+		shutil.copy2(os.path.join(dxc_source_folder, name), folder)
+	r = compile_shader(dll, code, "MainPS", SHADER_TYPE_PIXEL, include)
+	check(r.ok and r.byte_code[:4] == b"DXBC" and not r.errors,
+		f"after putting dxcompiler.dll / dxil.dll next to the DLL: the next compilation succeeds: {len(r.byte_code)} bytes, errors={r.errors!r}")
+	return 1 if failures else 0
+
+
+def test_dxc_retry(dll_path):
+	folder = tempfile.mkdtemp(prefix="dxforge_dxc_retry_")
+	try:
+		shutil.copy2(dll_path, folder)
+		proc = subprocess.run([sys.executable, os.path.abspath(__file__), "--dxc-retry-child", folder, os.path.dirname(dll_path)],
+			capture_output=True, timeout=300)
+		output = (proc.stdout + proc.stderr).decode("utf-8", "replace").rstrip()
+		if output:
+			print(output)
+		check(proc.returncode == 0, f"the retry runs in another process without assert/crash: exit code {proc.returncode}")
+	finally:
+		shutil.rmtree(folder, ignore_errors=True)
+
+
 def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--config", default="DebugEditor", choices=["DebugEditor", "ReleaseEditor"])
 	parser.add_argument("--dll")
+	parser.add_argument("--dxc-retry-child", nargs=2, metavar=("FOLDER", "DXC_FOLDER"), help=argparse.SUPPRESS)
 	args = parser.parse_args()
+	if args.dxc_retry_child:
+		return dxc_retry_child(*args.dxc_retry_child)
 	dll_path = args.dll or os.path.join(REPO_ROOT, "x64", args.config, "DXForgeEngineDLL.dll")
 	print(f"DLL: {dll_path}")
 	dll = load_dll(dll_path)
@@ -210,6 +251,9 @@ def main():
 	again_id = add_shader_group(dll, SHADER_TYPE_PIXEL, 1, pack_for_engine([INVALID_ID], [pixel_shader]))
 	check(again_id != INVALID_ID, f"AddShaderGroup after RemoveShaderGroup = {again_id:#x}")
 	dll.RemoveShaderGroup(again_id)
+
+	print("5. Loading DXC again after a failure")
+	test_dxc_retry(dll_path)
 
 	print()
 	if failures:
