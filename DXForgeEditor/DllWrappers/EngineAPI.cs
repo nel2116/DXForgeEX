@@ -5,6 +5,7 @@ using DXForgeEditor.GameProject;
 using DXForgeEditor.Utilities;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
@@ -14,6 +15,20 @@ using System.Threading.Tasks;
 
 namespace DXForgeEditor.EngineAPIStructs
 {
+    // DXForgeEngineDLL の editor::engine_init_error(EngineInit.h)と同じ値(Primal Day 078)。
+    // DXForgeEditor/Tests/engine_init_test.ps1 が、C++ の値と一致することを確かめる。
+    enum EngineInitError : int
+    {
+        [Description("エンジンの初期化に成功しました")]
+        Succeeded = 0,
+        [Description("エンジンの初期化中に不明なエラーが起きました")]
+        Unknown,
+        [Description("エンジンの組み込みシェーダーのコンパイルに失敗しました")]
+        ShaderCompilation,
+        [Description("グラフィックスモジュールの初期化に失敗しました")]
+        Graphics,
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     class TransformComponent
     {
@@ -95,6 +110,90 @@ namespace DXForgeEditor.DllWrappers
     static class EngineAPI
     {
         private const string _engineDll = "DXForgeEngineDLL.dll";
+
+        [DllImport(_engineDll, EntryPoint = "InitializeEngine", CharSet = CharSet.Unicode)]
+        private static extern EngineInitError InitializeEngineNative(string? enginePath);
+
+        /// <summary>
+        /// エンジンのシェーダーをコンパイルし、グラフィックスを初期化する(Primal Day 078)。
+        /// enginePath はエンジン(リポジトリ)のルートのフォルダ(MainWindow.DXForgePath)で、シェーダーのソースはその
+        /// DXForgeEngine\Graphics\Direct3D12\Shaders から探す。shaders.bin は作業フォルダからの相対パス(shaders\d3d12\)なので、
+        /// 作業フォルダをエディタの実行ファイルのフォルダ(x64\&lt;構成&gt;)にしてから呼ぶ。
+        /// NOTE: Primal の InitializeEngine は引数を取らず、作業フォルダからの相対パスでソースを探す。エディタをリポジトリの外に置き、
+        ///       DXFORGE_ENGINE などでエンジンのパスを決めて起動したときも初期化できるよう、パスを渡す(#117、#31)。
+        /// NOTE: Primal は DllImport をそのまま公開するが、OnMainWindowLoaded から呼ぶので、DLL を読み込めないときなども
+        ///       例外を投げずに Unknown を返す。
+        /// </summary>
+        public static EngineInitError InitializeEngine(string? enginePath)
+        {
+            try
+            {
+                return InitializeEngineNative(enginePath);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                Logger.Log(MessageType.Error, $"エンジンを初期化できませんでした: {ex.Message}");
+                return EngineInitError.Unknown;
+            }
+        }
+
+        [DllImport(_engineDll, EntryPoint = "ShutdownEngine")]
+        private static extern void ShutdownEngineNative();
+
+        /// <summary>
+        /// InitializeEngine で初期化したグラフィックスを終了する。初期化していないとき、2回目は何もしない(DLL の側で確かめる)。
+        /// </summary>
+        public static void ShutdownEngine()
+        {
+            try
+            {
+                ShutdownEngineNative();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                Logger.Log(MessageType.Error, $"エンジンを終了できませんでした: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// InitializeEngine が失敗したときにエディタが出す文言(理由と、確かめること)。例外は投げない。
+        /// </summary>
+        internal static string GetInitializeEngineErrorMessage(EngineInitError error, string? enginePath)
+        {
+            try
+            {
+                var reason = Enum.IsDefined(error) ? error.GetDescription() : $"エンジンの初期化に失敗しました(不明なエラーのコード {(int)error})";
+                var hint = error switch
+                {
+                    EngineInitError.ShaderCompilation =>
+                        @"エンジンのシェーダー(エンジンのパスの DXForgeEngine\Graphics\Direct3D12\Shaders)が見つからないか、" +
+                        "コンパイルできませんでした。dxcompiler.dll がエディタの隣にあるか、シェーダーにエラーがないか(デバッグ出力)を確かめてください。",
+                    EngineInitError.Graphics =>
+                        @"Direct3D 12 を初期化できませんでした。shaders\d3d12\shaders.bin を読めるか、" +
+                        "GPU とドライバーが Direct3D 12(機能レベル 11_0 以上)に対応しているかを確かめてください。",
+                    EngineInitError.Succeeded => string.Empty,
+                    _ => "DXForgeEngineDLL.dll を読み込めないか、初期化の途中で予期しないエラーが起きました(ログとデバッグ出力を確かめてください)。",
+                };
+                string workingDirectory;
+                try
+                {
+                    workingDirectory = Environment.CurrentDirectory;
+                }
+                catch (Exception ex)
+                {
+                    workingDirectory = $"(取得できません: {ex.Message})";
+                }
+                return string.IsNullOrEmpty(hint) ? reason :
+                    $"{reason}。\n{hint}\nエンジンのパス: {(string.IsNullOrEmpty(enginePath) ? "(なし)" : enginePath)}\n作業フォルダ: {workingDirectory}";
+            }
+            catch (Exception ex)
+            {
+                return $"エンジンの初期化に失敗しました(コード {(int)error}): {ex.Message}";
+            }
+        }
+
         [DllImport(_engineDll, CharSet = CharSet.Ansi)]
         public static extern int LoadGameCodeDll(string dllPath);
 
@@ -125,7 +224,7 @@ namespace DXForgeEditor.DllWrappers
 
         /// <summary>
         /// アセットの PackForEngine() のデータから、エンジンのリソースを作る(Primal Day 077)。作れなければ ID.INVALID_ID。
-        /// NOTE: エンジンの初期化(Primal Day 078, #31)がまだないので、エディタからは呼ばれない。
+        /// InitializeEngine のあとで呼ぶ。NOTE: エディタの画面から呼ぶのは Geometry コンポーネント(Primal Day 079〜, #32)から。
         /// </summary>
         public static int CreateResource(byte[] resourceData, AssetType type)
         {

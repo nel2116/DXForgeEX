@@ -8,11 +8,15 @@
 // 2025/01/07 新規作成
 // 2025/01/13 ユーザー定義のシェーダーをコンパイルする処理を追加
 // 2026/10/27 EngineTestからDXForgeEngineDLLへ移動し、メモリ上のソースをコンパイルする関数を追加(Primal Day 076)
+// 2026/11/02 compile_shaders() にエンジンのシェーダーのソースのフォルダを渡せるようにした(#31)
+// 2026/11/02 compile_shader() のフォルダを std::filesystem::path で受け、ANSI に変換しないようにした(#31)
+// 2026/11/02 compile_shader() にインクルードのフォルダを渡せるようにし、指定があるときは既定のフォルダを -I に付けないようにした(#150)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
 #include "CommonHeaders.h"
 #include "Graphics/Renderer.h"
+#include <filesystem>
 
 struct shader_file_info
 {
@@ -25,11 +29,21 @@ struct shader_file_info
 // include_errors_and_disassembly が true のときは、その後ろに u64 エラーのサイズ, u64 逆アセンブルのサイズ,
 // エラー, 逆アセンブルを続ける。このときは、コンパイルに失敗してもエラーを返すため、バイトコードのサイズが0の
 // バッファを返すことがある。失敗の理由がわからない場合(DXCを読み込めないなど)は nullptr を返す。
+// include_folder: インクルードを探すフォルダ(エンジンのシェーダーのフォルダ)。-I の順は次のとおり(#150)。
+//   - include_folder があれば、それだけを最初に付ける。
+//   - なければ、extra_args に -I があるときは、それ(呼び出し側の指定)だけを使う。
+//   - どちらもなければ、作業フォルダからの相対パス ..\..\DXForgeEngine\Graphics\Direct3D12\Shaders\ を付ける(EngineTest)。
+//   既定のフォルダを指定したフォルダより先に付けると、そこにある同名のヘッダーが優先され、別のツリーのソースが混ざる。
 std::unique_ptr<u8[]> compile_shader(shader_file_info info, const u8* code, u32 code_size, dxforge::utl::vector<std::wstring>& extra_args,
-	bool include_errors_and_disassembly = false);
-std::unique_ptr<u8[]> compile_shader(shader_file_info info, const char* file_path, dxforge::utl::vector<std::wstring>& extra_args,
-	bool include_errors_and_disassembly = false);
-bool compile_shaders();
+	bool include_errors_and_disassembly = false, const std::filesystem::path& include_folder = {});
+// file_path: ソースのあるフォルダ(末尾に区切りを付ける)。ファイル名は info.file_name。
+// NOTE: パスは ANSI に変換せずに使う(ACP で表せない文字を含むフォルダでもコンパイルできるように。#31)。
+std::unique_ptr<u8[]> compile_shader(shader_file_info info, const std::filesystem::path& file_path, dxforge::utl::vector<std::wstring>& extra_args,
+	bool include_errors_and_disassembly = false, const std::filesystem::path& include_folder = {});
+// エンジンのシェーダーをコンパイルして shaders.bin(.\shaders\d3d12\、作業フォルダからの相対パス)に書く。最新なら何もしない。
+// source_folder: エンジンのシェーダーのソースのフォルダ(DXForgeEngine\Graphics\Direct3D12\Shaders\)。
+//                空なら作業フォルダからの相対パス ..\..\DXForgeEngine\Graphics\Direct3D12\Shaders\(EngineTest など)。
+bool compile_shaders(const std::filesystem::path& source_folder = {});
 
 // UTF-8 の文字列をワイド文字列に変換する。
 std::wstring to_wstring(const char* c);

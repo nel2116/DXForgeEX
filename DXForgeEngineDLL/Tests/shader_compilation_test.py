@@ -16,14 +16,24 @@
 #   3. 不正な引数(関数名やソースが無い、シェーダの種類が範囲外)では、FALSEが返り、バッファは返らない。
 #   4. コンパイルしたシェーダをエディタと同じ形式(keys[count], {u64 長さ, ハッシュ, バイトコード}[count])に詰めて
 #      AddShaderGroup() に渡すと有効なIDが返り、RemoveShaderGroup() で消せる。壊れたデータでは無効なIDが返る。
+#   1b. エンジンのシェーダーのフォルダ(-I)のパスに ACP(1252、932)で表せない文字が入っていても、同じようにコンパイルできる
+#      (引数は UTF-8 で渡し、DLL の中で UTF-16 にする。ANSI には変換しない。#31 の Codex の指摘)。
+#   1c. 作業フォルダの ..\..\DXForgeEngine\Graphics\Direct3D12\Shaders(既定の -I)に、内容の違う同名のヘッダーがあっても、
+#      -I で指定したフォルダのヘッダーでコンパイルされる(指定があるときは既定のフォルダを -I に付けない。#150)。
+#   5. dxcompiler.dll を読み込めずにコンパイルが失敗しても、あとで dxcompiler.dll / dxil.dll を置けば、同じプロセスで
+#      次のコンパイルが成功する(失敗をキャッシュしない。エディタの「再試行」のため。#31 の Codex の指摘)。
+#      DLL を一時フォルダにコピーし、別のプロセス(--dxc-retry-child)で確かめる。
 #
 # NOTE: Debug(DebugEditor)のDLLのassertはモーダルなダイアログを出して止まるため、assertを標準エラーに出して
 #       abortするようにしてから呼ぶ(ucrtbasedの_set_error_mode / _set_abort_behavior)。
 import argparse
 import ctypes
 import os
+import shutil
 import struct
+import subprocess
 import sys
+import tempfile
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DEFAULT_SHADERS = os.path.join(REPO_ROOT, "DXForgeEditor", "Resources", "MaterialEditor", "DefaultMaterialShaders.hlsl")
@@ -137,11 +147,48 @@ def add_shader_group(dll, shader_type, count, packed):
 	return dll.AddShaderGroup(ctypes.byref(data))
 
 
+DXC_DLLS = ("dxcompiler.dll", "dxil.dll")
+# 既定の -I のフォルダに置く、使われたらコンパイルが失敗するヘッダーの中身(#150)
+DEFAULT_INCLUDE_POISON = "#error the default include folder (../../DXForgeEngine/Graphics/Direct3D12/Shaders/ of the working folder) was used\n"
+
+
+def dxc_retry_child(folder, dxc_source_folder):
+	"""folder の DXForgeEngineDLL.dll(隣に DXC がない)でコンパイルし、DXC を置いてからもう一度コンパイルする"""
+	dll = load_dll(os.path.join(folder, "DXForgeEngineDLL.dll"))
+	code = open(DEFAULT_SHADERS, encoding="utf-8").read()
+	include = ["-I", ENGINE_SHADERS_DIR]
+	r = compile_shader(dll, code, "MainPS", SHADER_TYPE_PIXEL, include)
+	check(not r.ok and not r.byte_code, "without dxcompiler.dll next to the DLL: the compilation fails")
+	for name in DXC_DLLS:
+		shutil.copy2(os.path.join(dxc_source_folder, name), folder)
+	r = compile_shader(dll, code, "MainPS", SHADER_TYPE_PIXEL, include)
+	check(r.ok and r.byte_code[:4] == b"DXBC" and not r.errors,
+		f"after putting dxcompiler.dll / dxil.dll next to the DLL: the next compilation succeeds: {len(r.byte_code)} bytes, errors={r.errors!r}")
+	return 1 if failures else 0
+
+
+def test_dxc_retry(dll_path):
+	folder = tempfile.mkdtemp(prefix="dxforge_dxc_retry_")
+	try:
+		shutil.copy2(dll_path, folder)
+		proc = subprocess.run([sys.executable, os.path.abspath(__file__), "--dxc-retry-child", folder, os.path.dirname(dll_path)],
+			capture_output=True, timeout=300)
+		output = (proc.stdout + proc.stderr).decode("utf-8", "replace").rstrip()
+		if output:
+			print(output)
+		check(proc.returncode == 0, f"the retry runs in another process without assert/crash: exit code {proc.returncode}")
+	finally:
+		shutil.rmtree(folder, ignore_errors=True)
+
+
 def main():
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--config", default="DebugEditor", choices=["DebugEditor", "ReleaseEditor"])
 	parser.add_argument("--dll")
+	parser.add_argument("--dxc-retry-child", nargs=2, metavar=("FOLDER", "DXC_FOLDER"), help=argparse.SUPPRESS)
 	args = parser.parse_args()
+	if args.dxc_retry_child:
+		return dxc_retry_child(*args.dxc_retry_child)
 	dll_path = args.dll or os.path.join(REPO_ROOT, "x64", args.config, "DXForgeEngineDLL.dll")
 	print(f"DLL: {dll_path}")
 	dll = load_dll(dll_path)
@@ -164,6 +211,38 @@ def main():
 	check(len({r.hash for r in vertex_shaders}) == len(vertex_shaders), "each MainVS variant has its own hash")
 	again = compile_shader(dll, code, "MainPS", SHADER_TYPE_PIXEL, include)
 	check(again.ok and again.hash == pixel_shader.hash and again.byte_code == pixel_shader.byte_code, "compiling twice gives the same byte code")
+
+	print("1b. Include folder with characters outside the ANSI code page")
+	non_acp_root = tempfile.mkdtemp(prefix="dxforge_non_acp_")
+	try:
+		non_acp_shaders = os.path.join(non_acp_root, "開発_한글_ő", "Shaders")
+		shutil.copytree(ENGINE_SHADERS_DIR, non_acp_shaders)
+		r = compile_shader(dll, code, "MainPS", SHADER_TYPE_PIXEL, ["-I", non_acp_shaders])
+		check(r.ok and r.byte_code == pixel_shader.byte_code and not r.errors,
+			f"MainPS with -I {non_acp_shaders!a}: {len(r.byte_code)} bytes, errors={r.errors!a}")
+	finally:
+		shutil.rmtree(non_acp_root, ignore_errors=True)
+
+	print("1c. The specified include folder wins over the default one (#150)")
+	poison_root = tempfile.mkdtemp(prefix="dxforge_default_include_")
+	previous_cwd = os.getcwd()
+	try:
+		# 作業フォルダ <root>\a\b の ..\..\DXForgeEngine\Graphics\Direct3D12\Shaders に、#error だけの同名のヘッダーを置く
+		default_shaders = os.path.join(poison_root, "DXForgeEngine", "Graphics", "Direct3D12", "Shaders")
+		os.makedirs(default_shaders)
+		for header in os.listdir(ENGINE_SHADERS_DIR):
+			if header.endswith(".hlsli"):
+				with open(os.path.join(default_shaders, header), "w", encoding="utf-8") as f:
+					f.write(DEFAULT_INCLUDE_POISON)
+		work = os.path.join(poison_root, "a", "b")
+		os.makedirs(work)
+		os.chdir(work)
+		r = compile_shader(dll, code, "MainPS", SHADER_TYPE_PIXEL, include)
+		check(r.ok and r.byte_code == pixel_shader.byte_code and not r.errors,
+			f"MainPS with -I <engine shaders> while the default folder has other headers: {len(r.byte_code)} bytes, errors={r.errors!a}")
+	finally:
+		os.chdir(previous_cwd)
+		shutil.rmtree(poison_root, ignore_errors=True)
 
 	print("2. Broken shaders")
 	broken = code.replace("PixelOut psOut;", "PixelOut psOut = ;", 1)
@@ -210,6 +289,9 @@ def main():
 	again_id = add_shader_group(dll, SHADER_TYPE_PIXEL, 1, pack_for_engine([INVALID_ID], [pixel_shader]))
 	check(again_id != INVALID_ID, f"AddShaderGroup after RemoveShaderGroup = {again_id:#x}")
 	dll.RemoveShaderGroup(again_id)
+
+	print("5. Loading DXC again after a failure")
+	test_dxc_retry(dll_path)
 
 	print()
 	if failures:

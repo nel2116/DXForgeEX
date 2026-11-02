@@ -170,6 +170,15 @@ jobs:
         shell: pwsh
         run: pwsh -STA -NoProfile -File DXForgeEngineDLL/Tests/editor_shader_compilation_test.ps1 -Configuration DebugEditor
 
+      # エディタからのエンジンの初期化(Primal Day 078, #31): EngineInitError と C++ の engine_init_error の値、
+      # 失敗したときの文言が例外を投げないこと。上でビルドした DXForgeEngineDLL の InitializeEngine / ShutdownEngine を
+      # エディタのラッパーから呼び、リポジトリの外の作業フォルダでもエンジンのパス(日本語・ハングルを含むものも)から
+      # シェーダーをコンパイルして初期化できることを確かめる(ランナーの既定のアダプタは Basic Render Driver。GPU がなければ
+      # Graphics でもよい)。-RequireEngineDll で、DLL がないときは失敗にする。
+      - name: Test editor engine initialization
+        shell: pwsh
+        run: pwsh -STA -NoProfile -File DXForgeEditor/Tests/engine_init_test.ps1 -Configuration DebugEditor -RequireEngineDll
+
       - name: CleanupMerged.ps1 tests
         shell: pwsh
         # 使い捨てのリポジトリと偽の gh / orca で動かし、本物のGitHubやOrcaは呼ばない(Issue #104)。

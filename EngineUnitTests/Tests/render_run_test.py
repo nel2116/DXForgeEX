@@ -27,14 +27,17 @@
 # DXC(dxcompiler.dll)が実行ファイルの隣にないとき(packages/DirectXShaderCompiler なしで EngineUnitTests だけをビルドした場合、#61)は、
 # 描画が要るテストをスキップする(理由を表示する)。環境変数 DXFORGE_REQUIRE_RENDER_TEST=1 のとき(CI)は、スキップせずに失敗にする。
 import argparse
+import ctypes
 import hashlib
 import json
 import os
 import shutil
+import stat
 import struct
 import subprocess
 import sys
 import tempfile
+import time
 import zlib
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -517,16 +520,20 @@ def test_graphics_init_failed(r):
     リポジトリと同じ並び(x64/<構成>/ と ..\\..\\ のシェーダーのソース)を一時フォルダに作り、ソースより新しい空の
     shaders.bin を置く。compile_shaders() は最新と見なしてコンパイルせず、エンジンのシェーダーの読み込み
     (shaders::initialize())が失敗して、D3D12の初期化が failed_init() で終わる。
+    shaders.bin を作ったソースのフォルダの記録(shaders.bin.source)も置く。記録がない・違うと作り直す(#152)。
     """
     name = "graphics initialization fails (empty shaders.bin)"
     exe, exe_folder = make_repo_copy(r, "init_failure_repo")
     shaders_bin = os.path.join(exe_folder, "shaders", "d3d12", "shaders.bin")
     os.makedirs(os.path.dirname(shaders_bin))
     open(shaders_bin, "wb").close()
+    source_folder = os.path.normpath(os.path.join(exe_folder, "..", "..", "DXForgeEngine", "Graphics", "Direct3D12", "Shaders"))
+    with open(shaders_bin + ".source", "wb") as f:
+        f.write(source_folder.encode("utf-8"))
     # NOTE: copy2 はソースの更新日時を保つので、今作った shaders.bin のほうが新しい
     png = os.path.join(r.work_dir, "init_failure.png")
     r.expect_error(name, r.render_args(png), EXIT_GRAPHICS_INIT_FAILED, "graphics_init_failed", exe=exe,
-                   message_part="failed to initialize Direct3D 12")
+                   message_part="adapter (engine_init_error 3)")
     r.check(f"{name}: nothing written", not os.path.exists(png), png)
 
 
@@ -535,14 +542,229 @@ def test_shader_compilation_throws(r):
 
     実行ファイルの隣に shaders という通常のファイルを置くと、コンパイルしたシェーダーを書き出すときの
     create_directories(".\\shaders\\d3d12") が filesystem_error を投げる。
+    例外は、DLL の InitializeEngine と同じ editor::initialize_engine() が受け止めて shader_compilation にする(#31)。
     """
     name = "shader compilation throws (a file named shaders)"
     exe, exe_folder = make_repo_copy(r, "shaders_file_repo")
     open(os.path.join(exe_folder, "shaders"), "wb").close()
     png = os.path.join(r.work_dir, "shaders_file.png")
     r.expect_error(name, r.render_args(png), EXIT_SHADERS_UNAVAILABLE, "shaders_unavailable", exe=exe,
-                   message_part="exception")
+                   message_part="failed to compile the engine shaders")
     r.check(f"{name}: nothing written", not os.path.exists(png), png)
+
+
+def test_engine_path_outside_repo(r):
+    """実行ファイルがリポジトリの外にあっても、--engine-path のエンジンのシェーダーで初期化して描画できる(#31 の Codex の指摘)
+
+    エディタは、DXFORGE_ENGINE などで決めたエンジンのパスを DLL の InitializeEngine に渡す(EnginePath.Resolve、#117)。
+    --render も同じ editor::initialize_engine(info, エンジンのパス)を使う。実行ファイルとDXCだけを一時フォルダにコピーし、
+    ..\\..\\ にシェーダーのソースがない状態で、エンジンのパスにこのリポジトリを渡す。shaders.bin は実行ファイルの隣に作られる。
+    """
+    name = "engine path outside the repository"
+    folder = os.path.join(r.work_dir, "outside_repo", "x64", "Config")
+    os.makedirs(folder)
+    exe = shutil.copy2(r.exe, folder)
+    for dll in ("dxcompiler.dll", "dxil.dll"):
+        shutil.copy2(os.path.join(os.path.dirname(r.exe), dll), folder)
+    png = os.path.join(r.work_dir, "outside_repo.png")
+    args = r.render_args(png) + ["--engine-path", REPO_ROOT + os.sep]
+    code, result, stderr = r.run_json(args, exe)
+    r.check_no_crash(name, code, stderr)
+    r.check(f"{name}: exit code", code == EXIT_SUCCESS, f"got {code}; stderr: {stderr.strip()}")
+    r.check(f"{name}: success", result is not None and result.get("success") is True, result)
+    r.check(f"{name}: png", os.path.isfile(png), png)
+    r.check(f"{name}: shaders.bin next to the exe", os.path.isfile(os.path.join(folder, "shaders", "d3d12", "shaders.bin")), folder)
+    # エンジンのパスにシェーダーのソースがなければ、シェーダーを用意できない(終了コード21)
+    empty_engine = os.path.join(r.work_dir, "empty_engine")
+    os.makedirs(empty_engine)
+    r.expect_error(f"{name}: no sources under --engine-path", r.render_args(png) + ["--engine-path", empty_engine], EXIT_SHADERS_UNAVAILABLE,
+                   "shaders_unavailable", exe=exe, message_part="shader sources")
+    r.report(name)
+
+
+# ACP(CI の 1252、日本語の Windows の 932)のどちらでも表せない文字を含むフォルダ名(日本語・ハングル・ő)
+NON_ACP_FOLDER_NAME = "開発_한글_ő"
+
+
+def copy_engine_sources(root):
+    """エンジンのシェーダーのソースと EngineTest/TestShader.hlsl を、root の下にリポジトリと同じ並びでコピーする"""
+    shutil.copytree(os.path.join(REPO_ROOT, "DXForgeEngine", "Graphics", "Direct3D12", "Shaders"),
+                    os.path.join(root, "DXForgeEngine", "Graphics", "Direct3D12", "Shaders"))
+    os.makedirs(os.path.join(root, "EngineTest"))
+    shutil.copy2(os.path.join(REPO_ROOT, "EngineTest", "TestShader.hlsl"), os.path.join(root, "EngineTest"))
+
+
+def test_engine_path_with_non_acp_characters(r):
+    """--engine-path に ACP で表せない文字が入っていても、シェーダーをコンパイルして描画できる(#31 の Codex の指摘)
+
+    エンジンのシェーダー(compile_shaders)も EngineTest/TestShader.hlsl(compile_shader)も、パスを ANSI に変換せずに渡す。
+    """
+    name = "engine path with characters outside the ANSI code page"
+    engine_root = os.path.join(r.work_dir, NON_ACP_FOLDER_NAME, "engine")
+    copy_engine_sources(engine_root)
+    folder = os.path.join(r.work_dir, "non_acp_exe", "x64", "Config")
+    os.makedirs(folder)
+    exe = shutil.copy2(r.exe, folder)
+    for dll in ("dxcompiler.dll", "dxil.dll"):
+        shutil.copy2(os.path.join(os.path.dirname(r.exe), dll), folder)
+    png = os.path.join(r.work_dir, "non_acp.png")
+    code, result, stderr = r.run_json(r.render_args(png) + ["--engine-path", engine_root], exe)
+    r.check_no_crash(name, code, stderr)
+    r.check(f"{name}: exit code", code == EXIT_SUCCESS, f"got {code}; result: {result}; stderr: {stderr.strip()}")
+    r.check(f"{name}: png", os.path.isfile(png), png)
+    r.report(name)
+
+
+def test_engine_path_wins_over_default_include(r):
+    """--engine-path を渡したら、実行ファイルの ..\\..\\ にある別のエンジンのヘッダーを使わない(#150)
+
+    実行ファイルの ..\\..\\DXForgeEngine\\Graphics\\Direct3D12\\Shaders(既定の -I)に、#error だけの同名のヘッダーを置き、
+    --engine-path にはこのリポジトリを渡す。エンジンのシェーダーも EngineTest/TestShader.hlsl も、指定したほうでコンパイルされる。
+    """
+    name = "engine path wins over the default include folder"
+    root = os.path.join(r.work_dir, "default_include_repo")
+    folder = os.path.join(root, "x64", "Config")
+    os.makedirs(folder)
+    exe = shutil.copy2(r.exe, folder)
+    for dll in ("dxcompiler.dll", "dxil.dll"):
+        shutil.copy2(os.path.join(os.path.dirname(r.exe), dll), folder)
+    default_shaders = os.path.join(root, "DXForgeEngine", "Graphics", "Direct3D12", "Shaders")
+    os.makedirs(default_shaders)
+    engine_shaders = os.path.join(REPO_ROOT, "DXForgeEngine", "Graphics", "Direct3D12", "Shaders")
+    for header in os.listdir(engine_shaders):
+        if header.endswith(".hlsli"):
+            with open(os.path.join(default_shaders, header), "w", encoding="utf-8") as f:
+                f.write("#error the default include folder (..\\..\\ of the exe) was used\n")
+    png = os.path.join(r.work_dir, "default_include.png")
+    code, result, stderr = r.run_json(r.render_args(png) + ["--engine-path", REPO_ROOT + os.sep], exe)
+    r.check_no_crash(name, code, stderr)
+    r.check(f"{name}: exit code", code == EXIT_SUCCESS, f"got {code}; result: {result}; stderr: {stderr.strip()}")
+    r.check(f"{name}: png", os.path.isfile(png), png)
+    r.report(name)
+
+
+def test_shader_cache_follows_engine_path(r):
+    """エンジンのフォルダを切り替えたら、ソースが shaders.bin より古くても shaders.bin を作り直す(#152)
+
+    エンジン A でコンパイルしたあと、ソースの更新日時が古い(2000 年)エンジン B を --engine-path に渡すと作り直す。
+    同じ B でもう一度実行したときは作り直さない。作り直したかどうかは shaders.bin の更新日時で見る。
+    """
+    name = "shader cache follows the engine path"
+    folder = os.path.join(r.work_dir, "shader_cache_exe", "x64", "Config")
+    os.makedirs(folder)
+    exe = shutil.copy2(r.exe, folder)
+    for dll in ("dxcompiler.dll", "dxil.dll"):
+        shutil.copy2(os.path.join(os.path.dirname(r.exe), dll), folder)
+    engine_a = os.path.join(r.work_dir, "shader_cache_engines", "A")
+    engine_b = os.path.join(r.work_dir, "shader_cache_engines", "B")
+    copy_engine_sources(engine_a)
+    copy_engine_sources(engine_b)
+    old = 946684800  # 2000-01-01
+    for dirpath, _, filenames in os.walk(engine_b):
+        for filename in filenames:
+            os.utime(os.path.join(dirpath, filename), (old, old))
+    shaders_bin = os.path.join(folder, "shaders", "d3d12", "shaders.bin")
+    png = os.path.join(r.work_dir, "shader_cache.png")
+
+    def render(engine, label):
+        code, result, stderr = r.run_json(r.render_args(png) + ["--engine-path", engine], exe)
+        r.check_no_crash(f"{name}: {label}", code, stderr)
+        r.check(f"{name}: {label}: exit code", code == EXIT_SUCCESS, f"got {code}; result: {result}; stderr: {stderr.strip()}")
+        return os.stat(shaders_bin).st_mtime_ns if os.path.isfile(shaders_bin) else None
+
+    first = render(engine_a, "engine A")
+    r.check(f"{name}: shaders.bin is written for engine A", first is not None, shaders_bin)
+    time.sleep(1.1)  # 更新日時の分解能より長く待つ
+    second = render(engine_b, "engine B (older sources)")
+    r.check(f"{name}: switching to engine B rebuilds shaders.bin", first is not None and second is not None and second > first,
+            f"mtime {first} -> {second}")
+    time.sleep(1.1)
+    third = render(engine_b, "engine B again")
+    r.check(f"{name}: the same engine B does not rebuild shaders.bin", second is not None and third == second, f"mtime {second} -> {third}")
+    r.report(name)
+
+
+class LockedFile:
+    """ファイルを共有モード READ だけで開いたままにする(ほかのプロセスは上書きも削除もできない)"""
+
+    def __init__(self, path):
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateFileW.restype = ctypes.c_void_p
+        kernel32.CreateFileW.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p,
+                                         ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p]
+        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+        self._kernel32 = kernel32
+        GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING = 0x80000000, 0x1, 3
+        self._handle = kernel32.CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, None, OPEN_EXISTING, 0, None)
+        if self._handle in (None, ctypes.c_void_p(-1).value):
+            raise OSError(ctypes.get_last_error(), f"CreateFileW failed: {path}")
+
+    def close(self):
+        if self._handle:
+            self._kernel32.CloseHandle(self._handle)
+            self._handle = None
+
+
+def test_shader_cache_record_cannot_be_removed(r):
+    """前の記録(shaders.bin.source)を消せないときは、shaders.bin を書き換えずに失敗する(#152 の Codex の指摘)
+
+    エンジン A でコンパイルしたあと、記録をほかのプロセス(このテスト)が共有モード READ だけで開いたままにして、
+    エンジン B を渡す。記録を消せないまま shaders.bin を B のものにすると、A に戻したときに B のバイナリを
+    A のものとして使ってしまうので、B は終了コード 21 で失敗し、shaders.bin と記録は A のまま変わらない。
+    NOTE: 読み取り専用の属性だけでは、MSVC の std::filesystem::remove が消せる(POSIX の削除)ので、この状態にならない。
+          読み取り専用のときは、記録を消して B の記録に置き換えることを確かめる。属性は最後に必ず外す。
+    """
+    name = "shader cache record cannot be removed"
+    folder = os.path.join(r.work_dir, "shader_record_exe", "x64", "Config")
+    os.makedirs(folder)
+    exe = shutil.copy2(r.exe, folder)
+    for dll in ("dxcompiler.dll", "dxil.dll"):
+        shutil.copy2(os.path.join(os.path.dirname(r.exe), dll), folder)
+    engine_a = os.path.join(r.work_dir, "shader_record_engines", "A")
+    engine_b = os.path.join(r.work_dir, "shader_record_engines", "B")
+    copy_engine_sources(engine_a)
+    copy_engine_sources(engine_b)
+    shaders_bin = os.path.join(folder, "shaders", "d3d12", "shaders.bin")
+    record = shaders_bin + ".source"
+    png = os.path.join(r.work_dir, "shader_record.png")
+
+    def read(path):
+        with open(path, "rb") as f:
+            return f.read()
+
+    code, result, stderr = r.run_json(r.render_args(png) + ["--engine-path", engine_a], exe)
+    r.check(f"{name}: engine A: exit code", code == EXIT_SUCCESS, f"got {code}; result: {result}; stderr: {stderr.strip()}")
+    if not os.path.isfile(shaders_bin) or not os.path.isfile(record):
+        r.check(f"{name}: shaders.bin and its record are written for engine A", False, folder)
+        return
+    bin_a = read(shaders_bin)
+    record_a = read(record)
+    mtime_a = os.stat(shaders_bin).st_mtime_ns
+    time.sleep(1.1)
+
+    # 記録を上書きも削除もできない: B は失敗し、shaders.bin と記録は A のまま
+    lock = LockedFile(record)
+    try:
+        r.expect_error(f"{name}: engine B while the record is locked", r.render_args(png) + ["--engine-path", engine_b],
+                       EXIT_SHADERS_UNAVAILABLE, "shaders_unavailable", exe=exe, message_part="failed to compile the engine shaders")
+    finally:
+        lock.close()
+    r.check(f"{name}: shaders.bin stays the one for engine A", read(shaders_bin) == bin_a and os.stat(shaders_bin).st_mtime_ns == mtime_a,
+            shaders_bin)
+    r.check(f"{name}: the record stays engine A", read(record) == record_a, record)
+
+    # 記録が読み取り専用: 消して B で作り直し、記録も B になる(A に戻したら作り直す)
+    os.chmod(record, stat.S_IREAD)
+    try:
+        code, result, stderr = r.run_json(r.render_args(png) + ["--engine-path", engine_b], exe)
+        r.check(f"{name}: engine B with a read-only record: exit code", code == EXIT_SUCCESS,
+                f"got {code}; result: {result}; stderr: {stderr.strip()}")
+        r.check(f"{name}: engine B with a read-only record: the record is replaced",
+                os.path.isfile(record) and read(record) != record_a and os.stat(shaders_bin).st_mtime_ns != mtime_a, record)
+    finally:
+        if os.path.exists(record):
+            os.chmod(record, stat.S_IREAD | stat.S_IWRITE)
+    r.report(name)
 
 
 def update_baselines(exe, args, config, has_dxc):
@@ -612,6 +834,11 @@ def main():
         if has_dxc:
             test_graphics_init_failed(r)
             test_shader_compilation_throws(r)
+            test_engine_path_outside_repo(r)
+            test_engine_path_with_non_acp_characters(r)
+            test_engine_path_wins_over_default_include(r)
+            test_shader_cache_follows_engine_path(r)
+            test_shader_cache_record_cannot_be_removed(r)
             rgb = test_warp_render_and_determinism(r)
             if rgb is not None:
                 test_baseline_comparison(r, rgb, config, require_render)

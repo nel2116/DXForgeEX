@@ -12,6 +12,11 @@
 // 2026/10/29 予期しない例外を最上位で捕捉し、段階に応じた終了コードとJSONを返すようにした (#128 のレビュー)
 // 2026/10/30 メッシュとマテリアルを、エディタの形のデータからDLLと同じ経路(ResourceUpload)で作るようにし、
 //            テクスチャ・マテリアル・メッシュを作って破棄し、作り直す確認を足した (Primal Day 077, #30)
+// 2026/11/02 シェーダーのコンパイルとグラフィックスの初期化・終了を、DLLの InitializeEngine / ShutdownEngine と
+//            同じ経路(EngineInit)で行うようにした (Primal Day 078, #31)
+// 2026/11/02 エンジンのシェーダーのソースを探すルートのフォルダを --engine-path で渡せるようにした (#31 の Codex の指摘)
+// 2026/11/02 TestShader.hlsl のパスを ANSI に変換せずに渡すようにした (#31 の Codex の指摘)
+// 2026/11/02 エンジンのシェーダーのフォルダを extra_args の -I ではなく compile_shader() の引数で渡すようにした (#150)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -24,6 +29,7 @@
 #include "Components/Geometry.h"
 #include "../DXForgeEngineDLL/ShaderCompilation.h"
 #include "../DXForgeEngineDLL/ResourceUpload.h"
+#include "../DXForgeEngineDLL/EngineInit.h"
 #include "EditorAssetPacking.h"
 
 #include <cmath>
@@ -59,6 +65,7 @@ namespace dxforge::headless::render
 		struct options
 		{
 			std::wstring	screenshot{};
+			std::wstring	engine_path{};		// エンジン(リポジトリ)のルート。空なら作業フォルダ(実行ファイルのフォルダ)の ..\..\ を使う
 			u32				frames{ 0 };
 			u32				width{ 0 };
 			u32				height{ 0 };
@@ -200,6 +207,12 @@ namespace dxforge::headless::render
 					if (!has_value) return "--screenshot requires a value";
 					opt.screenshot = argv[++i];
 					if (opt.screenshot.empty()) return "--screenshot must not be empty";
+				}
+				else if (arg == L"--engine-path")
+				{
+					if (!has_value) return "--engine-path requires a value";
+					opt.engine_path = argv[++i];
+					if (opt.engine_path.empty()) return "--engine-path must not be empty";
 				}
 				else if (arg == L"--adapter")
 				{
@@ -355,23 +368,28 @@ namespace dxforge::headless::render
 			~test_scene() { destroy(); }
 
 			/// @brief マテリアルのシェーダー(EngineTest/TestShader.hlsl。EngineTestと同じ)をコンパイルする
+			/// @param engine_root エンジン(リポジトリ)のルート。TestShader.hlsl とエンジンのシェーダー(-I)をここから探す
 			/// @return 失敗したときはその説明(成功なら空)
-			std::string create_shaders()
+			std::string create_shaders(const std::filesystem::path& engine_root)
 			{
-				constexpr const char* shader_path{ "..\\..\\EngineTest\\" };
+				// NOTE: .string() で ANSI に変換すると、ACP で表せない文字を含むパスでコンパイルできない
+				const std::filesystem::path shader_path{ engine_root / L"EngineTest" / L"" };
 				shader_file_info info{};
 				info.file_name = "TestShader.hlsl";
 				info.function = "TestShaderVS";
 				info.type = graphics::shader_type::vertex;
+				// NOTE: エンジンのシェーダーのフォルダは引数で渡す。extra_args の -I にすると、既定のフォルダ(実行ファイルの
+				//		 ..\..\)より後になり、そこにある別のエンジンのヘッダーが優先される(#150)
+				const std::filesystem::path include_folder{ editor::engine_shaders_source_folder(engine_root) };
 				utl::vector<std::wstring> extra_args{};
 				extra_args.emplace_back(L"-D");
 				extra_args.emplace_back(L"ELEMENTS_TYPE=1");
-				const std::unique_ptr<u8[]> vertex_shader{ compile_shader(info, shader_path, extra_args) };
+				const std::unique_ptr<u8[]> vertex_shader{ compile_shader(info, shader_path, extra_args, false, include_folder) };
 
 				info.function = "TestShaderPS";
 				info.type = graphics::shader_type::pixel;
 				extra_args.clear();
-				const std::unique_ptr<u8[]> pixel_shader{ compile_shader(info, shader_path, extra_args) };
+				const std::unique_ptr<u8[]> pixel_shader{ compile_shader(info, shader_path, extra_args, false, include_folder) };
 				if (!vertex_shader || !pixel_shader) return "failed to compile EngineTest/TestShader.hlsl";
 
 				const u8* vertex_shaders[]{ vertex_shader.get() };
@@ -680,12 +698,12 @@ namespace dxforge::headless::render
 		};
 
 		/// @brief 描画して読み戻し、PNGに書き出す(graphics::initialize()のあと)
-		void render_and_capture(const options& opt, run_result& result, run_state& state)
+		void render_and_capture(const options& opt, const std::filesystem::path& engine_root, run_result& result, run_state& state)
 		{
 			// NOTE: 例外で抜けたときは、sceneとsurfaceのデストラクタが、graphics::shutdown()より先に後片付けをする
 			test_scene scene{};
 			state.stage = run_stage::shaders;
-			const std::string shader_error{ scene.create_shaders() };
+			const std::string shader_error{ scene.create_shaders(engine_root) };
 			if (!shader_error.empty())
 			{
 				fail(result, exit_code::shaders_unavailable, "shaders_unavailable", shader_error);
@@ -766,6 +784,17 @@ namespace dxforge::headless::render
 				return;
 			}
 			opt.screenshot = screenshot.wstring();
+			// エンジンのパスも、作業フォルダを移す前に絶対パスにする
+			std::filesystem::path engine_root{ L"..\\..\\" };
+			if (!opt.engine_path.empty())
+			{
+				engine_root = std::filesystem::absolute(opt.engine_path, error);
+				if (error)
+				{
+					fail(result, exit_code::shaders_unavailable, "shaders_unavailable", "invalid engine path: " + to_utf8(opt.engine_path));
+					return;
+				}
+			}
 
 			const std::filesystem::path exe_folder{ executable_folder() };
 			if (exe_folder.empty() || !SetCurrentDirectoryW(exe_folder.c_str()))
@@ -781,43 +810,66 @@ namespace dxforge::headless::render
 					"dxcompiler.dll was not found next to EngineUnitTests.exe (build EngineTest, or run Restore.ps1 and rebuild EngineUnitTests)");
 				return;
 			}
-			if (!std::filesystem::is_directory(L"..\\..\\DXForgeEngine\\Graphics\\Direct3D12\\Shaders", error) ||
-				!std::filesystem::is_regular_file(L"..\\..\\EngineTest\\TestShader.hlsl", error))
+			if (!std::filesystem::is_directory(editor::engine_shaders_source_folder(engine_root), error) ||
+				!std::filesystem::is_regular_file(engine_root / L"EngineTest" / L"TestShader.hlsl", error))
 			{
 				fail(result, exit_code::shaders_unavailable, "shaders_unavailable",
-					"shader sources were not found (EngineUnitTests.exe must stay in x64\\<configuration>\\ of the repository)");
+					"shader sources were not found (EngineUnitTests.exe must stay in x64\\<configuration>\\ of the repository, or pass --engine-path)");
 				return;
 			}
-			if (!compile_shaders())
-			{
-				fail(result, exit_code::shaders_unavailable, "shaders_unavailable", "failed to compile the engine shaders");
-				return;
-			}
-
-			state.stage = run_stage::graphics_init;
+			// NOTE: エディタから初期化するときと同じ経路(DLLの InitializeEngine = editor::initialize_engine)で、
+			//		 シェーダーをコンパイルしてからグラフィックスを初期化する(Primal Day 078)。
+			//		 初期化に失敗したときは、D3D12の側(failed_init())でデバッグレイヤーのメッセージを出してから後片付けまで
+			//		 済ませている。editor::shutdown_engine() は、そのときに graphics::shutdown() を重ねて呼ばない(#128のレビュー)。
 			graphics::graphics_init_info init_info{};
 			init_info.adapter = opt.adapter;
 			init_info.unattended = true;
-			// NOTE: 初期化に失敗したときは、D3D12の側(failed_init())でデバッグレイヤーのメッセージを出してから後片付けまで
-			//		 済ませている。ここでもう一度 graphics::shutdown() を呼ぶと、解放済みのフェンスを待ってクラッシュする(#128のレビュー)。
-			if (!graphics::initialize(graphics::graphics_platform::direct3d12, init_info))
+			// --engine-path がなければ、エンジンのパスを渡さない経路(作業フォルダの ..\..\)を確かめる
+			const std::filesystem::path init_engine_path{ opt.engine_path.empty() ? std::filesystem::path{} : engine_root };
+			const editor::engine_init_error::error_code init_result{ editor::initialize_engine(init_info, init_engine_path) };
+			if (init_result != editor::engine_init_error::succeeded)
 			{
-				fail(result, exit_code::graphics_init_failed, "graphics_init_failed",
-					std::string{ "failed to initialize Direct3D 12 with the " } + adapter_label(opt.adapter) + " adapter");
+				// 失敗したあとの ShutdownEngine は何もしない(エディタは失敗しても終了時に呼ぶ)
+				editor::shutdown_engine();
+				if (init_result == editor::engine_init_error::shader_compilation)
+				{
+					fail(result, exit_code::shaders_unavailable, "shaders_unavailable", "failed to compile the engine shaders");
+				}
+				else
+				{
+					fail(result, exit_code::graphics_init_failed, "graphics_init_failed",
+						std::string{ "failed to initialize Direct3D 12 with the " } + adapter_label(opt.adapter) + " adapter (engine_init_error " +
+						std::to_string((u32)init_result) + ")");
+				}
 				return;
 			}
+			state.stage = run_stage::graphics_init;
 			state.graphics_initialized = true;
+			// 初期化済みのときの InitializeEngine は、初期化し直さずに成功を返す
+			if (editor::initialize_engine(init_info, init_engine_path) != editor::engine_init_error::succeeded || !editor::is_engine_initialized())
+			{
+				fail(result, exit_code::graphics_init_failed, "graphics_init_failed", "initialize_engine() did not succeed when already initialized");
+				state.graphics_initialized = false;
+				editor::shutdown_engine();
+				return;
+			}
 			result.adapter_name = graphics::adapter_name();
 			std::fprintf(stderr, "[render] adapter: %s (%s)\n", result.adapter_name.c_str(), adapter_label(opt.adapter));
 
-			render_and_capture(opt, result, state);
+			render_and_capture(opt, engine_root, result, state);
 
 			// 後片付けで出たメッセージも出す(失敗の扱いは描画のときのものを優先する)
 			state.stage = run_stage::render;
 			if (result.exit_code == exit_code::success) check_debug_messages(result, "while cleaning up");
 			else graphics::flush_debug_messages();
 			state.graphics_initialized = false;
-			graphics::shutdown();
+			editor::shutdown_engine();
+			// 2回目の ShutdownEngine は何もしない(エディタはウィンドウを閉じるときとキャンセルのときに呼ぶ)
+			editor::shutdown_engine();
+			if (editor::is_engine_initialized() && result.exit_code == exit_code::success)
+			{
+				fail(result, exit_code::render_failed, "render_failed", "the engine is still initialized after shutdown_engine()");
+			}
 		}
 
 		/// @brief 例外のメッセージ(what())を、JSONに入れられるASCIIにする(ASCII以外のバイトは\xNN)
@@ -863,7 +915,7 @@ namespace dxforge::headless::render
 				try
 				{
 					graphics::flush_debug_messages();
-					graphics::shutdown();
+					editor::shutdown_engine();
 				}
 				catch (...)
 				{
@@ -922,6 +974,7 @@ namespace dxforge::headless::render
 			"  --height <h>         height in pixels (required, 16..16384)\n"
 			"  --screenshot <png>   PNG file to write (required; 8-bit sRGB, no tone mapping)\n"
 			"  --adapter <a>        warp (default; software rasterizer, deterministic) or hardware (default GPU selection)\n"
+			"  --engine-path <dir>  root of the engine repository for the shader sources (default: ..\\..\\ of the exe folder)\n"
 			"  --json               print a machine-readable result to stdout (logs go to stderr)\n"
 			"  Needs dxcompiler.dll/dxil.dll next to the exe and the shader sources of the repository\n"
 			"  (EngineTest/TestShader.hlsl, DXForgeEngine/Graphics/Direct3D12/Shaders) at ..\\..\\ from the exe.\n"

@@ -11,10 +11,16 @@
 // 2026/10/27 EngineTestからDXForgeEngineDLLへ移動し、エディタからメモリ上のソースをコンパイルできるようにした(Primal Day 076)。
 //            DXCは実行時に読み込み、エラーと逆アセンブルも返せるようにした
 // 2026/10/27 TILE_SIZEを定義する条件が常に真だったのを修正し、ライトカリングの2つのコンピュートシェーダだけに渡すようにした(#101)
+// 2026/11/02 エンジンのシェーダーのソースのフォルダを compile_shaders() に渡せるようにし、DXCの読み込みの失敗をキャッシュしないようにした(#31)
+// 2026/11/02 compile_shader() のフォルダを std::filesystem::path で受け、ANSI に変換しないようにした(#31)
+// 2026/11/02 インクルードのフォルダの指定があるときは、既定のフォルダを -I に付けないようにした(#150)
+// 2026/11/02 shaders.bin を作ったソースのフォルダを shaders.bin.source に記録し、フォルダが変わったら作り直すようにした(#152)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
+#include <algorithm>
 #include <fstream>
 #include <filesystem>
+#include <mutex>
 
 #include "ShaderCompilation.h"
 #include "Graphics\Direct3D12\D3D12Shaders.h"
@@ -78,9 +84,16 @@ namespace
 	// DxcCreateInstance を返す。読み込めなければ nullptr。
 	// NOTE: dxcompiler.lib をリンクすると、dxcompiler.dll が無いだけで DXForgeEngineDLL.dll 自体を読み込めなくなり、
 	//       エディタのエンジンの機能がすべて使えなくなる。実行時に読み込めば、失敗するのはシェーダーのコンパイルだけになる。
+	// NOTE: 読み込めたときだけ覚えておく。失敗を覚えると、dxcompiler.dll を置いてからエディタで「再試行」しても
+	//       読み込み直さず、コンパイルが失敗し続ける(#31)。エディタはスレッドプールからもコンパイルするので、mutex で守る。
 	DxcCreateInstanceProc get_dxc_create_instance()
 	{
-		static const DxcCreateInstanceProc create_instance{ []() -> DxcCreateInstanceProc
+		static std::mutex mutex{};
+		static DxcCreateInstanceProc create_instance{ nullptr };
+		std::lock_guard lock{ mutex };
+		if (create_instance) return create_instance;
+
+		create_instance = []() -> DxcCreateInstanceProc
 		{
 			HMODULE self{ nullptr };
 			if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
@@ -114,7 +127,7 @@ namespace
 			}
 
 			return reinterpret_cast<DxcCreateInstanceProc>(GetProcAddress(dxc, "DxcCreateInstance"));
-		}() };
+		}();
 
 		return create_instance;
 	}
@@ -140,7 +153,8 @@ namespace
 
 		bool is_valid() const { return _compiler && _utils && _include_handler; }
 
-		dxc_compiled_shader compile(const u8* data, u32 data_size, graphics::shader_type::type type, const char* function, dxforge::utl::vector<std::wstring>& extra_args)
+		dxc_compiled_shader compile(const u8* data, u32 data_size, graphics::shader_type::type type, const char* function, dxforge::utl::vector<std::wstring>& extra_args,
+			const std::filesystem::path& include_folder = {})
 		{
 			assert(data && data_size && function);
 			assert(type < graphics::shader_type::count);
@@ -160,10 +174,12 @@ namespace
 			OutputDebugStringA("Compiling ");
 			OutputDebugStringA(function);
 			OutputDebugStringA("\n");
-			return compile(source_blob.Get(), get_args(info, extra_args), DXC_CP_UTF8);
+			return compile(source_blob.Get(), get_args(info, extra_args, include_folder), DXC_CP_UTF8);
 		}
 
-		dxc_compiled_shader compile(shader_file_info info, std::filesystem::path full_path, dxforge::utl::vector<std::wstring>& extra_args)
+		// include_folder: -I に渡すフォルダ。-I の決め方は get_args() を参照
+		dxc_compiled_shader compile(shader_file_info info, std::filesystem::path full_path, dxforge::utl::vector<std::wstring>& extra_args,
+			const std::filesystem::path& include_folder = {})
 		{
 			if (!is_valid()) return {};
 			HRESULT hr{ S_OK };
@@ -179,7 +195,7 @@ namespace
 			OutputDebugStringA(" : ");
 			OutputDebugStringA(info.function);
 			OutputDebugStringA("\n");
-			return compile(source_blob.Get(), get_args(info, extra_args), DXC_CP_ACP);
+			return compile(source_blob.Get(), get_args(info, extra_args, include_folder), DXC_CP_ACP);
 		}
 
 		// コンパイルに失敗したときは、byte_code が空で errors だけを持つ結果を返す。
@@ -260,7 +276,11 @@ namespace
 		}
 
 	private:	// プライベート関数
-		utl::vector<std::wstring> get_args(const shader_file_info& info, utl::vector<std::wstring>& extra_args)
+		// -I は、include_folder があればそれ、なければ extra_args の -I(呼び出し側の指定)、どちらもなければ
+		// shaders_source_path(作業フォルダからの相対パス。EngineTest)。既定のフォルダを指定より先に付けると、そこにある
+		// 同名のヘッダーが優先されて別のツリーのソースが混ざるので、指定があるときは付けない(#150)。
+		utl::vector<std::wstring> get_args(const shader_file_info& info, utl::vector<std::wstring>& extra_args,
+			const std::filesystem::path& include_folder = {})
 		{
 			utl::vector<std::wstring> args{};
 
@@ -270,8 +290,17 @@ namespace
 			args.emplace_back(to_wstring(info.function));
 			args.emplace_back(L"-T");
 			args.emplace_back(to_wstring(_profile_string[(u32)info.type]));
-			args.emplace_back(L"-I");
-			args.emplace_back(to_wstring(shaders_source_path));
+			const bool has_include_arg{ std::find(extra_args.begin(), extra_args.end(), L"-I") != extra_args.end() };
+			if (!include_folder.empty())
+			{
+				args.emplace_back(L"-I");
+				args.emplace_back(include_folder.wstring());
+			}
+			else if (!has_include_arg)
+			{
+				args.emplace_back(L"-I");
+				args.emplace_back(to_wstring(shaders_source_path));
+			}
 			args.emplace_back(L"-enable-16bit-types");
 			args.emplace_back(DXC_ARG_ALL_RESOURCES_BOUND);
 #if _DEBUG
@@ -310,13 +339,76 @@ namespace
 		return std::filesystem::path{ graphics::get_engine_shaders_path(graphics::graphics_platform::direct3d12) };
 	}
 
-	bool compiled_shaders_are_up_to_date()
+	// shaders.bin を作ったソースのフォルダを記録するファイル(shaders.bin の隣。中身は絶対パスの UTF-8)。
+	// NOTE: shaders.bin の形式はエンジン(D3D12Shaders.cpp)が読むので変えず、隣のファイルに書く(#152)。
+	std::filesystem::path get_shaders_source_record_path()
+	{
+		std::filesystem::path path{ get_engine_shaders_path() };
+		path += L".source";
+		return path;
+	}
+
+	std::string to_utf8(const std::wstring& text)
+	{
+		if (text.empty()) return {};
+		const s32 length{ WideCharToMultiByte(CP_UTF8, 0, text.c_str(), (s32)text.size(), nullptr, 0, nullptr, nullptr) };
+		if (length <= 0) return {};
+		std::string result(length, '\0');
+		WideCharToMultiByte(CP_UTF8, 0, text.c_str(), (s32)text.size(), result.data(), length, nullptr, nullptr);
+		return result;
+	}
+
+	// shaders.bin を作ったソースのフォルダが source_folder と同じか。記録がない・読めないときは false(作り直す)。
+	bool is_recorded_source_folder(const std::filesystem::path& source_folder)
+	{
+		std::ifstream file{ get_shaders_source_record_path(), std::ios::in | std::ios::binary };
+		if (!file) return false;
+		const std::string recorded{ std::istreambuf_iterator<char>{ file }, std::istreambuf_iterator<char>{} };
+		if (recorded.empty()) return false;
+		std::error_code error{};
+		// NOTE: 大文字小文字や末尾の区切り、相対パスの違いがあっても、同じフォルダなら同じとみなす
+		return std::filesystem::equivalent(std::filesystem::path{ to_wstring(recorded.c_str()) }, source_folder, error) && !error;
+	}
+
+	// shaders.bin を書き換える前に、前の記録を消す。消せなければ false。
+	// NOTE: 前の記録を残したまま shaders.bin を別のフォルダのものに書き換えると、前のフォルダに戻したときに、
+	//       今のフォルダのバイナリを前のフォルダのものとして使ってしまう(記録が読み取り専用のときなど。#152)。
+	bool remove_source_record()
+	{
+		std::error_code error{};
+		const std::filesystem::path record{ get_shaders_source_record_path() };
+		std::filesystem::remove(record, error);
+		if (std::filesystem::exists(record, error) || error)
+		{
+			OutputDebugStringW(L"[DXForgeEngineDLL] failed to remove the old source record of shaders.bin; shaders.bin is not updated\n");
+			return false;
+		}
+		return true;
+	}
+
+	// shaders.bin を作ったソースのフォルダを記録する。書けなくても失敗にはしない(記録がないので、次に作り直すだけ)。
+	void record_source_folder(const std::filesystem::path& source_folder)
+	{
+		std::error_code error{};
+		const std::filesystem::path absolute_folder{ std::filesystem::absolute(source_folder, error).lexically_normal() };
+		const std::string utf8{ error ? std::string{} : to_utf8(absolute_folder.wstring()) };
+		std::ofstream file{ get_shaders_source_record_path(), std::ios::out | std::ios::binary | std::ios::trunc };
+		if (!utf8.empty() && file) file.write(utf8.data(), (std::streamsize)utf8.size());
+		if (utf8.empty() || !file)
+		{
+			OutputDebugStringW(L"[DXForgeEngineDLL] failed to record the source folder of shaders.bin\n");
+			file.close();
+			std::filesystem::remove(get_shaders_source_record_path(), error);
+		}
+	}
+
+	bool compiled_shaders_are_up_to_date(const std::filesystem::path& source_folder)
 	{
 		auto engine_shaders_path = get_engine_shaders_path();
 		if (!std::filesystem::exists(engine_shaders_path)) return false;
 		auto shaders_compilation_time = std::filesystem::last_write_time(engine_shaders_path);
 
-		for (const auto& entry : std::filesystem::directory_iterator{ shaders_source_path })
+		for (const auto& entry : std::filesystem::directory_iterator{ source_folder })
 		{
 			if (entry.last_write_time() > shaders_compilation_time)
 			{
@@ -324,7 +416,9 @@ namespace
 			}
 		}
 
-		return true;
+		// ソースが shaders.bin より古くても、別のエンジンのフォルダから作った shaders.bin なら作り直す(#152)。
+		// 記録がない shaders.bin(記録を始める前に作ったもの)も作り直す。
+		return is_recorded_source_folder(source_folder);
 	}
 
 	bool save_compiled_shaders(utl::vector<dxc_compiled_shader>& shaders)
@@ -406,17 +500,19 @@ std::wstring to_wstring(const char* c)
 	return s;
 }
 
-std::unique_ptr<u8[]> compile_shader(shader_file_info info, const u8* code, u32 code_size, utl::vector<std::wstring>& extra_args, bool include_errors_and_disassembly/*=false*/)
+std::unique_ptr<u8[]> compile_shader(shader_file_info info, const u8* code, u32 code_size, utl::vector<std::wstring>& extra_args, bool include_errors_and_disassembly/*=false*/,
+	const std::filesystem::path& include_folder/*={}*/)
 {
 	assert(!info.file_name && info.function && code && code_size);
 
 	// NOTE: according to marcelolr()
 	//		"...コンパイラー・インスタンスを作るのはかなり安いので、キャッシュしたり共有したりする手間をかける価値はないだろう。"
 	shader_compiler compiler{};
-	return pack_compiled_shader(compiler.compile(code, code_size, info.type, info.function, extra_args), include_errors_and_disassembly);
+	return pack_compiled_shader(compiler.compile(code, code_size, info.type, info.function, extra_args, include_folder), include_errors_and_disassembly);
 }
 
-std::unique_ptr<u8[]> compile_shader(shader_file_info info, const char* file_path, utl::vector<std::wstring>& extra_args, bool include_errors_and_disassembly/*=false*/)
+std::unique_ptr<u8[]> compile_shader(shader_file_info info, const std::filesystem::path& file_path, utl::vector<std::wstring>& extra_args, bool include_errors_and_disassembly/*=false*/,
+	const std::filesystem::path& include_folder/*={}*/)
 {
 	std::filesystem::path full_path{ file_path };
 	full_path += info.file_name;
@@ -425,13 +521,14 @@ std::unique_ptr<u8[]> compile_shader(shader_file_info info, const char* file_pat
 	// NOTE: according to marcelolr()
 	//		"...コンパイラー・インスタンスを作るのはかなり安いので、キャッシュしたり共有したりする手間をかける価値はないだろう。"
 	shader_compiler compiler{};
-	return pack_compiled_shader(compiler.compile(info, full_path, extra_args), include_errors_and_disassembly);
+	return pack_compiled_shader(compiler.compile(info, full_path, extra_args, include_folder), include_errors_and_disassembly);
 }
 
 
-bool compile_shaders()
+bool compile_shaders(const std::filesystem::path& source_folder/*={}*/)
 {
-	if (compiled_shaders_are_up_to_date()) return true;
+	const std::filesystem::path folder{ source_folder.empty() ? std::filesystem::path{ shaders_source_path } : source_folder };
+	if (compiled_shaders_are_up_to_date(folder)) return true;
 
 	shader_compiler compiler{};
 	utl::vector<dxc_compiled_shader> shaders{};
@@ -442,8 +539,7 @@ bool compile_shaders()
 	{
 		auto& file = engine_shader_files[i];
 
-		full_path = shaders_source_path;
-		full_path += file.info.file_name;
+		full_path = folder / file.info.file_name;
 		if (!std::filesystem::exists(full_path)) return false;
 		utl::vector<std::wstring> extra_args{};
 
@@ -454,7 +550,7 @@ bool compile_shaders()
 			extra_args.emplace_back(L"TILE_SIZE=16");
 		}
 
-		dxc_compiled_shader compiled_shader{ compiler.compile(file.info,full_path,extra_args) };
+		dxc_compiled_shader compiled_shader{ compiler.compile(file.info, full_path, extra_args, folder) };
 		if (compiled_shader.byte_code && compiled_shader.byte_code->GetBufferPointer() && compiled_shader.byte_code->GetBufferSize())
 		{
 			shaders.emplace_back(std::move(compiled_shader));
@@ -465,5 +561,9 @@ bool compile_shaders()
 		}
 	}
 
-	return save_compiled_shaders(shaders);
+	// 前の記録を消せなければ、shaders.bin を書き換えずに失敗にする(エディタではシェーダーのコンパイルのエラーになる。#152)
+	if (!remove_source_record()) return false;
+	if (!save_compiled_shaders(shaders)) return false;
+	record_source_folder(folder);
+	return true;
 }
