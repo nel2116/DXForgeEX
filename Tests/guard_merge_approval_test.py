@@ -32,20 +32,25 @@ class AddsMergeOk(unittest.TestCase):
             "git fetch origin; gh pr edit 158 --add-label merge-ok",
             "cd x && gh pr edit 158 --add-label merge-ok && echo done",
             "Set-Location x\ngh pr edit 158 --add-label merge-ok",
+            # PR #161 の Codex の指摘: グローバルオプションと行の継続
+            "gh --repo nel2116/DXForgeEX pr edit 161 --add-label merge-ok",
+            "gh pr edit 161 \\\n  --add-label merge-ok",
+            "gh pr edit 161 `\n  --add-label merge-ok",
+            # 構文を解析しないので、読み取りや本文の中の文字列でも止める(意図した割り切り)
+            "gh pr view 158 --json labels | grep merge-ok",
+            "gh pr edit 161 --body '承認は --add-label merge-ok で行う'",
+            "gh label create merge-ok --color 0E8A16",
         ]:
             with self.subTest(command=command):
                 self.assertTrue(guard.adds_merge_ok(command))
 
     def test_allows_other_commands(self):
         for command in [
-            "gh pr edit 158 --remove-label merge-ok",
             "gh pr edit 158 --add-label hold",
-            "gh api -X DELETE repos/{owner}/{repo}/issues/158/labels/merge-ok",
-            "gh api --method DELETE repos/{owner}/{repo}/issues/158/labels/merge-ok",
-            "gh pr list --label merge-ok",
-            "gh pr view 158 --json labels | grep merge-ok",
-            "gh label create merge-ok --color 0E8A16 --description 'approve'",
+            "gh pr view 158 --json labels --jq '.labels[].name'",
+            "gh pr edit 161 --body-file C:/tmp/body.md",
             'git commit -m "[fix] merge-ok を人が付ける (#160)"',
+            "python Tests/guard_merge_approval.py --help-merge-ok",
             "grep -n merge-ok .github/workflows/pr-automation.yml",
             "gh pr checks 158",
             "./CodexReview.ps1 -Pr 158 -Post -SetStatus",

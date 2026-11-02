@@ -14,32 +14,23 @@ import sys
 
 LABEL = "merge-ok"
 
-# gh の呼び出しを、次のコマンドの区切り(; && || | 改行)までで切り出す
-_GH_CALL = re.compile(r"(?<![\w.-])gh(?:\.exe)?\s+[^;&|\r\n]*")
-_PR_OR_ISSUE_WRITE = re.compile(r"^gh(?:\.exe)?\s+(?:pr|issue)\s+(?:edit|create)\b")
-_LABEL_OPTION = re.compile(r"(?<![\w-])(?:--add-label|--label|-l)(?![\w-])")
-_API = re.compile(r"^gh(?:\.exe)?\s+api\b")
-_DELETE = re.compile(r"(?:-X|--method)[\s=]*['\"]?DELETE\b", re.IGNORECASE)
+# シェルの構文(グローバルオプション、行の継続、引用符の中の本文)は解析しない。正規表現で構文を追う方式は
+# 見落としと誤検出の指摘が続く(#124、PR #161 の Codex レビュー)。そのため、gh と merge-ok が同じコマンドに
+# あれば、読み取りのコマンドも含めて止める。ラベルの確認は --json labels で行い、本文は --body-file で渡せば、
+# コマンドに merge-ok を書かずに済む。
+_GH = re.compile(r"(?<![\w.-])gh(?:\.exe)?(?![\w.-])")
 
 
 def adds_merge_ok(command: str) -> bool:
-    """コマンドに、PR(Issue)へ merge-ok ラベルを付ける gh の呼び出しが含まれていれば True。"""
-    for match in _GH_CALL.finditer(command):
-        call = match.group(0)
-        if LABEL not in call:
-            continue
-        # gh pr edit --add-label merge-ok / gh pr create --label merge-ok など
-        if _PR_OR_ISSUE_WRITE.match(call) and _LABEL_OPTION.search(call):
-            return True
-        # gh api repos/{owner}/{repo}/issues/<N>/labels -f "labels[]=merge-ok" など(DELETE で外すのは止めない)
-        if _API.match(call) and "labels" in call and not _DELETE.search(call):
-            return True
-    return False
+    """gh を呼ぶコマンドに merge-ok が含まれていれば True(付けるかどうかは区別しない)。"""
+    return LABEL in command and _GH.search(command) is not None
 
 
 MESSAGE = (
     "merge-ok は、人がマージを承認するためのラベルです。エージェントは付けません(#160)。\n"
-    "マージの準備ができたら、承認待ちであることを PR の番号とともにユーザーに報告してください。"
+    "マージの準備ができたら、承認待ちであることを PR の番号とともにユーザーに報告してください。\n"
+    "gh のコマンドに merge-ok を書くと、読み取りでも止めます。ラベルは --json labels で確かめ、"
+    "本文やコメントは --body-file で渡してください。"
 )
 
 
