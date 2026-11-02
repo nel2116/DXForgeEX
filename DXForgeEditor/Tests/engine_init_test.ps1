@@ -17,7 +17,7 @@
            ShaderCompilation が返る(グラフィックスは初期化しない)。そのあとの ShutdownEngine も落ちない。
          - 同じ作業フォルダで、エンジンのパスにこのリポジトリを渡すと、エンジンのシェーダーをコンパイルして作業フォルダに
            shaders.bin を書き、グラフィックスを初期化する(GPU がなければ Graphics)。ShutdownEngine を2回呼んで終える。
-         DLL がないとき(CI のランナーには ATL がなく DLL をビルドできない): InitializeEngine が例外を投げずに Unknown を返し、
+         DLL がないとき: InitializeEngine が例外を投げずに Unknown を返し、
          ShutdownEngine も例外を投げない。-RequireEngineDll を付けると、DLL がないときは失敗にする(ローカルでは付ける)。
       初期化に成功する経路(シェーダーのコンパイル → Direct3D 12 の初期化 → リソースの作成・破棄 → 終了)は、DLL と同じ
       editor::initialize_engine を使う EngineUnitTests の --render(render_run_test.py、WARP)で確かめる。
