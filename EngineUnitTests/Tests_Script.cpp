@@ -13,7 +13,7 @@
 // 2026/10/18 update()/begin_play()の中で削除されたスクリプトのデストラクタからTransformを読めることのテストを追加 (#54)
 // 2026/10/19 update()の中でset_position()したエンティティを削除するテストと、同じフレームでIDを再利用したエンティティのTransformが上書きされないことのテストを追加 (#78)
 // 2026/10/27 未登録のタグでget_script_creator()がnullptrを返すことのテストを追加 (#113)
-// 2026/11/02 エディタ向けのスクリプト名のSAFEARRAY(make_script_names_safe_array())の要素数・中身・解放のテストを追加 (#146)
+// 2026/11/02 エディタ向けのスクリプト名のSAFEARRAY(make_script_names_safe_array())の要素数・中身・解放と、エディタのANSIマーシャリングとの往復のテストを追加(名前はACPで往復できる文字を選ぶ) (#146)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
@@ -25,6 +25,8 @@
 #include <unordered_map>
 #include <string>
 #include <vector>
+#include <cstdio>
+#include <algorithm>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -815,7 +817,7 @@ DXFORGE_TEST_CASE(script_stale_transform_cache_does_not_overwrite_entity_reusing
 // get_script_names()(USE_WITH_EDITORのときだけ公開)は、この関数にscript_names()を渡すだけである。
 // エディタは名前をGetScriptCreater(string)にANSI(CP_ACP)でマーシャリングして渡し、DLLはそのバイト列のハッシュで探すので、
 // 名前はCP_ACPで復号しなければならない(登録時のバイト列に戻らないと、スクリプトが見つからなくなる)。
-// ACPは環境によって違う(CIは1252、日本語のWindowsは932)ので、テストの名前はACPで往復できるものを選んで作る。
+// ACPは環境によって違う(CIは1252、日本語のWindowsは932)ので、テストの名前はACPで往復できる文字を選んで作る。
 namespace
 {
 	/// REQUIRE で中断してもSAFEARRAYを解放するためのガード
@@ -852,9 +854,15 @@ namespace
 		return result;
 	}
 
-	/// エディタのANSIマーシャリングと同じく、UTF-16をCP_ACPのバイト列にする
-	/// @param lossless 置き換え文字なしで変換できたらtrue
-	std::string to_acp(const std::wstring& text, bool* lossless = nullptr)
+	/// コードページがUTF-8(65001)か。CP_ACPのときは実際のACPで判断する
+	bool is_utf8_code_page(UINT code_page)
+	{
+		return code_page == CP_UTF8 || (code_page == CP_ACP && GetACP() == CP_UTF8);
+	}
+
+	/// UTF-16をコードページのバイト列にする(エディタのANSIマーシャリングは CP_ACP)
+	/// @param lossless 置き換え文字(既定の文字・最も近い文字)なしで変換できたらtrue
+	std::string to_code_page(UINT code_page, const std::wstring& text, bool* lossless = nullptr)
 	{
 		if (lossless) *lossless = false;
 		if (text.empty())
@@ -862,81 +870,162 @@ namespace
 			if (lossless) *lossless = true;
 			return {};
 		}
-		// NOTE: ACPがUTF-8(65001)のときは、WC_NO_BEST_FIT_CHARS と lpUsedDefaultChar を渡せない
-		const bool utf8_acp{ GetACP() == CP_UTF8 };
-		const DWORD flags{ utf8_acp ? 0u : (DWORD)WC_NO_BEST_FIT_CHARS };
+		// NOTE: UTF-8のコードページには、WC_NO_BEST_FIT_CHARS と lpUsedDefaultChar を渡せない
+		const bool utf8{ is_utf8_code_page(code_page) };
+		const DWORD flags{ utf8 ? 0u : (DWORD)WC_NO_BEST_FIT_CHARS };
 		BOOL used_default{ FALSE };
-		BOOL* const used_default_ptr{ utf8_acp ? nullptr : &used_default };
-		const int length{ WideCharToMultiByte(CP_ACP, flags, text.data(), (int)text.size(), nullptr, 0, nullptr, used_default_ptr) };
+		BOOL* const used_default_ptr{ utf8 ? nullptr : &used_default };
+		const int length{ WideCharToMultiByte(code_page, flags, text.data(), (int)text.size(), nullptr, 0, nullptr, used_default_ptr) };
 		if (length <= 0) return {};
 		std::string result((size_t)length, '\0');
-		if (WideCharToMultiByte(CP_ACP, flags, text.data(), (int)text.size(), result.data(), length, nullptr, used_default_ptr) != length) return {};
+		if (WideCharToMultiByte(code_page, flags, text.data(), (int)text.size(), result.data(), length, nullptr, used_default_ptr) != length) return {};
 		if (lossless) *lossless = !used_default;
 		return result;
 	}
 
-	/// CP_ACPのバイト列をUTF-16にする。ACPとして不正なら空
-	std::wstring from_acp(const std::string& bytes)
+	std::string to_acp(const std::wstring& text)
+	{
+		return to_code_page(CP_ACP, text);
+	}
+
+	/// コードページのバイト列をUTF-16にする。そのコードページとして不正なら空
+	std::wstring from_code_page(UINT code_page, const std::string& bytes)
 	{
 		if (bytes.empty()) return {};
-		const int length{ MultiByteToWideChar(CP_ACP, MB_ERR_INVALID_CHARS, bytes.data(), (int)bytes.size(), nullptr, 0) };
+		const int length{ MultiByteToWideChar(code_page, MB_ERR_INVALID_CHARS, bytes.data(), (int)bytes.size(), nullptr, 0) };
 		if (length <= 0) return {};
 		std::wstring result((size_t)length, L'\0');
-		if (MultiByteToWideChar(CP_ACP, MB_ERR_INVALID_CHARS, bytes.data(), (int)bytes.size(), result.data(), length) != length) return {};
+		if (MultiByteToWideChar(code_page, MB_ERR_INVALID_CHARS, bytes.data(), (int)bytes.size(), result.data(), length) != length) return {};
 		return result;
 	}
 
-	/// ACPで往復できる、ASCII以外の文字を含む名前(UTF-16)を選ぶ。見つからなければ空
-	std::wstring pick_non_ascii_acp_name()
+	/// コードページで往復でき(バイト列 → UTF-16 → 同じバイト列)、名前に使える文字(制御文字・置換文字でない)だけか
+	bool round_trips(UINT code_page, const std::string& bytes)
 	{
-		const wchar_t* const candidates[]{
-			L"script_test_acp_café",			// 1252 など
-			L"script_test_acp_スクリプト",	// 932(スクリプト)
-		};
-		for (const wchar_t* candidate : candidates)
+		const std::wstring wide{ from_code_page(code_page, bytes) };
+		if (wide.empty()) return false;
+		for (const wchar_t c : wide)
 		{
-			bool lossless{ false };
-			const std::string bytes{ to_acp(candidate, &lossless) };
-			if (lossless && !bytes.empty() && from_acp(bytes) == candidate) return candidate;
+			if (c < 0x20 || (c >= 0x7F && c <= 0x9F) || c == 0xFFFD) return false;
 		}
-		return {};
+		bool lossless{ false };
+		return to_code_page(code_page, wide, &lossless) == bytes && lossless;
 	}
 
-	/// ACPのバイト列としても、UTF-8としても正しい名前(バイト列)を選ぶ。見つからなければ空
-	/// (UTF-8を先に試す復号では、ACPの名前をUTF-8として誤って復号してしまう)
-	std::string pick_acp_name_valid_as_utf8()
+	// NOTE: CHECK は式を狭い文字列リテラルにするので、ASCII以外の文字を含むリテラルは CHECK の中に直接書かない(C4566)
+	constexpr const wchar_t* latin_candidate{ L"café" };			///< 1252などで往復できる
+	constexpr const wchar_t* japanese_candidate{ L"スクリプト" };	///< 932で往復できる
+
+	/// テストの名前に入れる、ASCII以外の文字
+	struct non_ascii_text
 	{
-		// C3 A9: 1252では「Ã©」、932では半角カナ2文字、UTF-8では「é」
-		const char* const candidates[]{ "script_test_acp_utf8_\xC3\xA9" };
-		for (const char* candidate : candidates)
+		std::string bytes;		///< コードページのバイト列
+		std::wstring wide;		///< UTF-16
+	};
+
+	/// コードページで往復できる、ASCII以外の文字を探す
+	/// @param valid_as_utf8 trueなら、UTF-8としても正しい2バイト(C2-DF + 80-BF)に限る
+	///		   (UTF-8を先に試す復号では、このような名前をUTF-8として誤って復号してしまう)
+	/// @return 見つからない場合、またはUTF-8のコードページ(ANSIとUTF-8の区別がない)では空
+	non_ascii_text find_non_ascii_text(UINT code_page, bool valid_as_utf8)
+	{
+		if (is_utf8_code_page(code_page)) return {};
+
+		// まず、これまで確かめてきた文字を試す(1252の「é」、932の「スクリプト」、1252の「Ã©」/932の半角カナ2文字になるC3 A9)
+		if (valid_as_utf8)
 		{
-			const std::string bytes{ candidate };
-			const std::wstring wide{ from_acp(bytes) };
-			bool lossless{ false };
-			if (!wide.empty() && to_acp(wide, &lossless) == bytes && lossless) return bytes;
+			const std::string bytes{ "\xC3\xA9" };
+			if (round_trips(code_page, bytes)) return { bytes, from_code_page(code_page, bytes) };
+		}
+		else
+		{
+			const wchar_t* const candidates[]{ latin_candidate, japanese_candidate };
+			for (const wchar_t* candidate : candidates)
+			{
+				bool lossless{ false };
+				const std::string bytes{ to_code_page(code_page, candidate, &lossless) };
+				if (lossless && round_trips(code_page, bytes) && from_code_page(code_page, bytes) == candidate) return { bytes, candidate };
+			}
+		}
+
+		// ほかのコードページ(1251など)では、往復できるバイト列を探す
+		std::vector<std::string> sequences;
+		if (valid_as_utf8)
+		{
+			for (int lead{ 0xC2 }; lead <= 0xDF; ++lead)
+				for (int trail{ 0x80 }; trail <= 0xBF; ++trail)
+					sequences.push_back({ (char)lead, (char)trail });
+		}
+		else
+		{
+			for (int lead{ 0x80 }; lead <= 0xFF; ++lead)
+			{
+				if (!IsDBCSLeadByteEx(code_page, (BYTE)lead))
+				{
+					sequences.push_back({ (char)lead });
+					continue;
+				}
+				for (int trail{ 0x40 }; trail <= 0xFE; ++trail)
+					sequences.push_back({ (char)lead, (char)trail });
+			}
+		}
+		for (const std::string& bytes : sequences)
+		{
+			if (round_trips(code_page, bytes)) return { bytes, from_code_page(code_page, bytes) };
 		}
 		return {};
 	}
 }
 
+// テストの名前を選ぶ処理そのもののテスト。ACPが1252・932以外(1251など)でも、ASCII以外の名前を作れること
+DXFORGE_TEST_CASE(script_test_finds_non_ascii_names_for_ansi_code_pages)
+{
+	const UINT code_pages[]{ 874, 932, 936, 949, 950, 1250, 1251, 1252, 1253, 1254, 1255, 1256, 1257, 1258 };
+	for (const UINT code_page : code_pages)
+	{
+		if (!IsValidCodePage(code_page)) continue;
+		for (const bool valid_as_utf8 : { false, true })
+		{
+			const non_ascii_text text{ find_non_ascii_text(code_page, valid_as_utf8) };
+			if (text.bytes.empty()) std::printf("    no non-ASCII name for code page %u (valid_as_utf8=%d)\n", code_page, valid_as_utf8 ? 1 : 0);
+			CHECK(!text.bytes.empty());
+			CHECK(round_trips(code_page, text.bytes));
+			CHECK(std::any_of(text.wide.begin(), text.wide.end(), [](wchar_t c) { return c > 0x7F; }));
+		}
+	}
+	// 1252と932では、これまでと同じ文字を使う
+	if (IsValidCodePage(1252))
+	{
+		CHECK(find_non_ascii_text(1252, false).wide == latin_candidate);
+		CHECK(find_non_ascii_text(1252, true).bytes == "\xC3\xA9");
+	}
+	if (IsValidCodePage(932))
+	{
+		CHECK(find_non_ascii_text(932, false).wide == japanese_candidate);
+		CHECK(find_non_ascii_text(932, true).bytes == "\xC3\xA9");
+	}
+	// UTF-8のコードページでは、ANSIとUTF-8の区別がないので探さない
+	CHECK(find_non_ascii_text(CP_UTF8, false).bytes.empty());
+}
+
 DXFORGE_TEST_CASE(script_names_safe_array_has_bstr_elements_matching_names)
 {
-	const std::wstring non_ascii{ pick_non_ascii_acp_name() };
-	REQUIRE(!non_ascii.empty());
+	std::vector<std::string> names{ "script_test_counter", "" };
+	std::vector<std::wstring> expected{ L"script_test_counter", L"" };
 
-	const std::string names[]{
-		"script_test_counter",
-		to_acp(non_ascii),
-		"",
-	};
-	const std::wstring expected[]{
-		L"script_test_counter",
-		non_ascii,
-		L"",
-	};
-	constexpr u32 count{ (u32)_countof(names) };
+	const non_ascii_text non_ascii{ find_non_ascii_text(CP_ACP, false) };
+	if (non_ascii.bytes.empty())
+	{
+		std::printf("    [SKIP] non-ASCII name: no character round-trips through the ANSI code page %u\n", GetACP());
+	}
+	else
+	{
+		names.push_back("script_test_acp_" + non_ascii.bytes);
+		expected.push_back(L"script_test_acp_" + non_ascii.wide);
+	}
+	const u32 count{ (u32)names.size() };
 
-	safe_array_guard guard{ script::detail::make_script_names_safe_array(names, count) };
+	safe_array_guard guard{ script::detail::make_script_names_safe_array(names.data(), count) };
 	REQUIRE(guard.array != nullptr);
 	CHECK(SafeArrayGetDim(guard.array) == 1);
 	VARTYPE vt{ VT_EMPTY };
@@ -965,17 +1054,16 @@ DXFORGE_TEST_CASE(script_names_safe_array_is_null_for_no_names)
 // 登録したスクリプトが見つかる。ATLのA2BSTR_EXもACPで復号していたので、往復でバイト列が保たれていた
 DXFORGE_TEST_CASE(script_names_safe_array_round_trips_through_ansi_marshaling_to_script_creator)
 {
-	const std::wstring non_ascii{ pick_non_ascii_acp_name() };
-	REQUIRE(!non_ascii.empty());
-	const std::string valid_as_utf8{ pick_acp_name_valid_as_utf8() };
-	REQUIRE(!valid_as_utf8.empty());
-
-	const std::string names[]{
-		"script_test_acp_ascii",
-		to_acp(non_ascii),
-		valid_as_utf8,
-	};
-	constexpr u32 count{ (u32)_countof(names) };
+	std::vector<std::string> names{ "script_test_acp_ascii" };
+	const non_ascii_text non_ascii{ find_non_ascii_text(CP_ACP, false) };
+	const non_ascii_text valid_as_utf8{ find_non_ascii_text(CP_ACP, true) };
+	if (non_ascii.bytes.empty() || valid_as_utf8.bytes.empty())
+	{
+		std::printf("    [SKIP] non-ASCII names: no character round-trips through the ANSI code page %u\n", GetACP());
+	}
+	if (!non_ascii.bytes.empty()) names.push_back("script_test_acp_" + non_ascii.bytes);
+	if (!valid_as_utf8.bytes.empty()) names.push_back("script_test_acp_utf8_" + valid_as_utf8.bytes);
+	const u32 count{ (u32)names.size() };
 
 	// REGISTER_SCRIPT と同じく、名前のバイト列のハッシュで登録する
 	const script::detail::script_creator creator{ &script::detail::create_script<script_test_counter> };
@@ -984,7 +1072,7 @@ DXFORGE_TEST_CASE(script_names_safe_array_round_trips_through_ansi_marshaling_to
 		REQUIRE(script::detail::register_script(script::detail::string_hash()(name), creator) == 1);
 	}
 
-	safe_array_guard guard{ script::detail::make_script_names_safe_array(names, count) };
+	safe_array_guard guard{ script::detail::make_script_names_safe_array(names.data(), count) };
 	REQUIRE(guard.array != nullptr);
 	const std::vector<std::wstring> actual{ read_bstr_array(guard.array) };
 	REQUIRE(actual.size() == count);
