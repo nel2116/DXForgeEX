@@ -10,6 +10,7 @@
 // 2026/10/30 エディタからアセットのリソースを作る・破棄する CreateResource / DestroyResource を追加(Primal Day 077, #30)
 // 2026/11/02 エディタからエンジンを初期化・終了する InitializeEngine / ShutdownEngine を追加(Primal Day 078, #31)
 // 2026/11/02 CompileShader のインクルードのフォルダの扱いをコメントに追加(#150)
+// 2026/11/02 使っている D3D12 のランタイムをエディタに返す GetGraphicsRuntimeDescription を追加(#155)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Common.h"
@@ -42,6 +43,7 @@ namespace
 	using _get_script_names = LPSAFEARRAY(*)(void);
 	_get_script_names get_script_names{ nullptr };
 	utl::vector<graphics::render_surface> surfaces;
+	std::wstring graphics_runtime_description{};	// GetGraphicsRuntimeDescription が返す文字列の実体
 } // 匿名名前空間
 
 // エンジンのシェーダーをコンパイルし、グラフィックスを初期化する(Primal Day 078)。返す値は editor::engine_init_error。
@@ -65,6 +67,34 @@ EDITOR_INTERFACE u32 InitializeEngine(const wchar_t* engine_path)
 EDITOR_INTERFACE void ShutdownEngine()
 {
 	editor::shutdown_engine();
+}
+
+// 使っている D3D12 のランタイム(Agility SDK か OS か、バージョンとパス)の説明(UTF-16、#155)。InitializeEngine のあとで呼ぶ。
+// agility_sdk には Agility SDK を使っているとき 1、OS のランタイムなら 0 を入れる(nullptr でもよい)。
+// 返す文字列は、次にこの関数を呼ぶまで使える。初期化前は空。
+EDITOR_INTERFACE const wchar_t* GetGraphicsRuntimeDescription(u32* agility_sdk)
+{
+	const graphics::runtime_info info{ graphics::runtime() };
+	if (agility_sdk) *agility_sdk = info.agility_sdk ? 1 : 0;
+	const auto to_wide = [](const char* text) {
+		const int size{ MultiByteToWideChar(CP_UTF8, 0, text, -1, nullptr, 0) };
+		std::wstring wide(size > 0 ? (size_t)size : 0, L'\0');
+		if (size > 0) MultiByteToWideChar(CP_UTF8, 0, text, -1, wide.data(), size);
+		if (!wide.empty()) wide.pop_back();	// 終端の L'\0'
+		return wide;
+	};
+	graphics_runtime_description.clear();
+	if (!info.sdk_version) return graphics_runtime_description.c_str();
+	const std::wstring core{ L"D3D12Core " + (*info.core_version ? to_wide(info.core_version) : std::wstring{ L"unknown" }) + L", " + to_wide(info.core_path) };
+	if (info.agility_sdk)
+	{
+		graphics_runtime_description = L"Agility SDK " + std::to_wstring(info.sdk_version) + L" (" + core + L")";
+	}
+	else
+	{
+		graphics_runtime_description = L"OS (" + core + L"); Agility SDK " + std::to_wstring(info.sdk_version) + L" is not used: " + to_wide(info.fallback_reason);
+	}
+	return graphics_runtime_description.c_str();
 }
 
 EDITOR_INTERFACE u32 LoadGameCodeDll(const char* dll_path)

@@ -17,6 +17,7 @@
 // 2026/11/02 エンジンのシェーダーのソースを探すルートのフォルダを --engine-path で渡せるようにした (#31 の Codex の指摘)
 // 2026/11/02 TestShader.hlsl のパスを ANSI に変換せずに渡すようにした (#31 の Codex の指摘)
 // 2026/11/02 エンジンのシェーダーのフォルダを extra_args の -I ではなく compile_shader() の引数で渡すようにした (#150)
+// 2026/11/02 使ったD3D12のランタイム(Agility SDK か OS か、バージョン)を --json と結果に出すようにした (#155)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -85,6 +86,13 @@ namespace dxforge::headless::render
 			u32				frames_run{ 0 };
 			std::string		adapter_name{};
 			std::string		pixel_hash{};		// 書き出したRGB(8ビット)のFNV-1a(64ビット)
+			// 使ったD3D12のランタイム(#155)。グラフィックスを初期化できたときだけ runtime_known が true
+			bool			runtime_known{ false };
+			bool			agility_sdk{ false };
+			u32				sdk_version{ 0 };
+			std::string		core_version{};
+			std::string		core_path{};
+			std::string		fallback_reason{};
 		};
 
 		// 実行中の段階。予期しない例外を捕捉したとき、どの終了コードにするかを決めるのに使う
@@ -855,6 +863,15 @@ namespace dxforge::headless::render
 			}
 			result.adapter_name = graphics::adapter_name();
 			std::fprintf(stderr, "[render] adapter: %s (%s)\n", result.adapter_name.c_str(), adapter_label(opt.adapter));
+			{
+				const graphics::runtime_info runtime{ graphics::runtime() };
+				result.runtime_known = true;
+				result.agility_sdk = runtime.agility_sdk;
+				result.sdk_version = runtime.sdk_version;
+				result.core_version = runtime.core_version;
+				result.core_path = runtime.core_path;
+				result.fallback_reason = runtime.fallback_reason;
+			}
 
 			render_and_capture(opt, engine_root, result, state);
 
@@ -929,6 +946,17 @@ namespace dxforge::headless::render
 			std::printf("{\"mode\":\"render\",\"screenshot\":\"%s\",", escape_json(to_utf8(opt.screenshot)).c_str());
 			std::printf("\"frames_requested\":%u,\"frames_run\":%u,\"width\":%u,\"height\":%u,", opt.frames, result.frames_run, opt.width, opt.height);
 			std::printf("\"adapter\":\"%s\",\"adapter_name\":\"%s\",", adapter_label(opt.adapter), escape_json(result.adapter_name).c_str());
+			if (result.runtime_known)
+			{
+				std::printf("\"d3d12_runtime\":{\"source\":\"%s\",\"sdk_version\":%u,\"core_version\":\"%s\",\"core_path\":\"%s\",\"fallback_reason\":",
+					result.agility_sdk ? "agility" : "os", result.sdk_version, escape_json(result.core_version).c_str(), escape_json(result.core_path).c_str());
+				if (result.fallback_reason.empty()) std::printf("null},");
+				else std::printf("\"%s\"},", escape_json(result.fallback_reason).c_str());
+			}
+			else
+			{
+				std::printf("\"d3d12_runtime\":null,");
+			}
 			std::printf("\"success\":%s,\"exit_code\":%d,\"error\":", result.exit_code == exit_code::success ? "true" : "false", result.exit_code);
 			if (result.exit_code == exit_code::success)
 			{
@@ -952,6 +980,11 @@ namespace dxforge::headless::render
 			}
 			std::printf("render: OK, %u frames, %ux%u, %s (%s), pixel hash %s\n  %s\n", result.frames_run, opt.width, opt.height,
 				adapter_label(opt.adapter), result.adapter_name.c_str(), result.pixel_hash.c_str(), to_utf8(opt.screenshot).c_str());
+			if (result.runtime_known)
+			{
+				std::printf("  D3D12 runtime: %s %u (D3D12Core %s)\n", result.agility_sdk ? "Agility SDK" : "OS, not the Agility SDK",
+					result.sdk_version, result.core_version.empty() ? "unknown" : result.core_version.c_str());
+			}
 		}
 	}	// 匿名名前空間
 

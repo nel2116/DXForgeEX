@@ -11,6 +11,7 @@
 // 2025/01/14 render_item関連の処理をresources構造体に追加
 // 2025/01/18 light構造体を追加
 // 2026/10/29 画面外のサーフェスと読み戻し、初期化情報を追加 (#127)
+// 2026/11/02 D3D12 のランタイム(Agility SDK か OS か)の情報を追加 (#155)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -25,6 +26,7 @@ namespace dxforge::graphics
 		void(*shutdown)(void);
 		u32(*flush_debug_messages)(void);
 		const char* (*adapter_name)(void);
+		runtime_info(*runtime)(void);
 
 		struct
 		{

@@ -138,6 +138,30 @@ namespace DXForgeEditor.DllWrappers
             }
         }
 
+        [DllImport(_engineDll, EntryPoint = "GetGraphicsRuntimeDescription")]
+        private static extern IntPtr GetGraphicsRuntimeDescriptionNative(out uint agilitySdk);
+
+        /// <summary>
+        /// 使っている D3D12 のランタイム(Agility SDK か OS か、バージョンとパス)の説明(#155)。InitializeEngine のあとで呼ぶ。
+        /// agilitySdk は Agility SDK を使っているとき true。DLL を呼べないときは空を返し、例外は投げない。
+        /// </summary>
+        public static string GetGraphicsRuntimeDescription(out bool agilitySdk)
+        {
+            agilitySdk = false;
+            try
+            {
+                var description = GetGraphicsRuntimeDescriptionNative(out uint agility);
+                agilitySdk = agility != 0;
+                // NOTE: 文字列は DLL の持ち物なので、IntPtr で受けて写す(string で受けると CoTaskMemFree される)
+                return description == IntPtr.Zero ? string.Empty : Marshal.PtrToStringUni(description) ?? string.Empty;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                return string.Empty;
+            }
+        }
+
         [DllImport(_engineDll, EntryPoint = "ShutdownEngine")]
         private static extern void ShutdownEngineNative();
 

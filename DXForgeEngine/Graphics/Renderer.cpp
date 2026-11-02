@@ -12,6 +12,7 @@
 // 2025/01/18 light関連の処理の追加
 // 2026/10/18 カメラの上方向のsetterを削除 (#62)
 // 2026/10/29 画面外のサーフェス、読み戻し、初期化情報の転送を追加 (#127)
+// 2026/11/02 D3D12 のランタイム(Agility SDK か OS か)の情報を追加 (#155)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Renderer.h"
@@ -73,6 +74,11 @@ namespace dxforge::graphics
 	const char* adapter_name()
 	{
 		return gfx.adapter_name ? gfx.adapter_name() : "";
+	}
+
+	runtime_info runtime()
+	{
+		return gfx.runtime ? gfx.runtime() : runtime_info{};
 	}
 
 	const char* get_engine_shaders_path()

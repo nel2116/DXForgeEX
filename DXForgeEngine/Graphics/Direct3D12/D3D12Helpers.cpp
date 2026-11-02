@@ -7,12 +7,14 @@
 // 更新履歴
 // 2025/01/02 新規作成
 // 2025/01/12 D3D12Upload.hの追加
+// 2026/11/02 ルートシグネチャのシリアライズを、使っている D3D12 のランタイムで行うようにした (#155)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
 #include "D3D12Helpers.h"
 #include "D3D12Core.h"
 #include "D3D12Upload.h"
+#include "D3D12Runtime.h"
 
 namespace dxforge::graphics::d3d12::d3dx
 {
@@ -56,7 +58,8 @@ namespace dxforge::graphics::d3d12::d3dx
 		ComPtr<ID3DBlob> signature_blob{ nullptr };
 		ComPtr<ID3DBlob> error_blob{ nullptr };
 		HRESULT hr{ S_OK };
-		if (FAILED(hr = D3D12SerializeVersionedRootSignature(&versioned_desc, &signature_blob, &error_blob)))
+		// Agility SDK のデバイスでは、そのランタイムでシリアライズする(Primal Day 079)
+		if (FAILED(hr = runtime::serialize_root_signature(core::device(), &versioned_desc, &signature_blob, &error_blob)))
 		{
 			// エラーメッセージを出力
 			DEBUG_OP(const char* error_msg{ error_blob ? (const char*)error_blob->GetBufferPointer() : "" });

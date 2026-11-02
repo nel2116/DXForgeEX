@@ -22,6 +22,9 @@
 #      %TEMP%\dxforge_render_diff\<構成>\(環境変数 DXFORGE_RENDER_DIFF_DIR で変更できる。CIで使う)に
 #      expected.png / actual.png / diff.png(基準|実際|差分を横に並べた画像)を書く。合格したときは何も残さない。
 #      --adapter hardware の結果は基準画像と比べない(GPUやドライバーで変わるため)。差を表示するだけにする。
+#   6. D3D12 Agility SDK(#155): 描画したとき --json の d3d12_runtime が、実行ファイルの隣の D3D12\D3D12Core.dll
+#      (DXForgeEngine/packages.config の Microsoft.Direct3D.D3D12 と同じバージョン)を使ったことを示す。
+#      D3D12\D3D12Core.dll がないときは、警告を出して OS のランタイムで描画を続ける(source が "os" になり、理由が入る)。
 #   構成は --config か、--exe のフォルダ名(x64/<構成>/、build.ps1 -RunTests の渡し方)から決める。
 #
 # DXC(dxcompiler.dll)が実行ファイルの隣にないとき(packages/DirectXShaderCompiler なしで EngineUnitTests だけをビルドした場合、#61)は、
@@ -38,6 +41,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import xml.etree.ElementTree as ElementTree
 import zlib
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -280,6 +284,28 @@ class Runner:
         self.report(name)
 
 
+def agility_sdk_package_version():
+    """DXForgeEngine/packages.config の Microsoft.Direct3D.D3D12 のバージョン(例 "1.620.1")"""
+    tree = ElementTree.parse(os.path.join(REPO_ROOT, "DXForgeEngine", "packages.config"))
+    for package in tree.getroot().iter("package"):
+        if package.get("id") == "Microsoft.Direct3D.D3D12":
+            return package.get("version")
+    raise RuntimeError("Microsoft.Direct3D.D3D12 is not in DXForgeEngine/packages.config")
+
+
+def check_agility_runtime(r, name, result, exe):
+    """--json の d3d12_runtime が、exe の隣の D3D12\\ の Agility SDK(packages.config と同じバージョン)を示すことを確かめる(#155)"""
+    version = agility_sdk_package_version()
+    runtime = result.get("d3d12_runtime") or {}
+    r.check(f"{name}: D3D12 runtime is the Agility SDK", runtime.get("source") == "agility" and runtime.get("fallback_reason") is None, runtime)
+    # パッケージ 1.620.1 の d3d12.h の D3D12_SDK_VERSION は 620、D3D12Core.dll のファイルバージョンは 1.620.1.0
+    r.check(f"{name}: Agility SDK version", runtime.get("sdk_version") == int(version.split(".")[1]), (version, runtime))
+    r.check(f"{name}: D3D12Core.dll version", (runtime.get("core_version") or "").startswith(version + "."), (version, runtime))
+    expected_path = os.path.join(os.path.dirname(os.path.abspath(exe)), "D3D12", "D3D12Core.dll")
+    r.check(f"{name}: D3D12Core.dll next to the exe", os.path.normcase(runtime.get("core_path") or "") == os.path.normcase(expected_path),
+            (expected_path, runtime))
+
+
 def render_ok(r, name, png, adapter="warp"):
     """描画して、成功したことと --json の内容を確かめる。結果(JSON)を返す(失敗ならNone)"""
     code, result, stderr = r.run_json(r.render_args(png, adapter))
@@ -294,7 +320,11 @@ def render_ok(r, name, png, adapter="warp"):
     r.check(f"{name}: adapter", result.get("adapter") == adapter and bool(result.get("adapter_name")), result)
     r.check(f"{name}: screenshot", os.path.normcase(result.get("screenshot", "")) == os.path.normcase(os.path.abspath(png)), result)
     r.check(f"{name}: logs go to stderr", "[render] adapter: " in stderr and "[render] wrote " in stderr, stderr)
-    print(f"  {name}: adapter_name={result.get('adapter_name')!r} pixel_hash={result.get('pixel_hash')}")
+    check_agility_runtime(r, name, result, r.exe)
+    r.check(f"{name}: the runtime is logged", "[D3D12] runtime: Agility SDK " in stderr, stderr)
+    runtime = result.get("d3d12_runtime") or {}
+    print(f"  {name}: adapter_name={result.get('adapter_name')!r} pixel_hash={result.get('pixel_hash')} "
+          f"d3d12_runtime={runtime.get('source')} {runtime.get('sdk_version')} ({runtime.get('core_version')})")
     return result if code == EXIT_SUCCESS else None
 
 
@@ -582,6 +612,34 @@ def test_engine_path_outside_repo(r):
     r.report(name)
 
 
+def test_agility_sdk_missing(r):
+    """D3D12\\D3D12Core.dll がないと、警告を出して OS の D3D12 のランタイムで描画を続ける(#155)
+
+    実行ファイルと DXC を一時フォルダにコピーし、D3D12\\ には d3d12SDKLayers.dll(Debug のとき)だけを置く。
+    """
+    name = "Agility SDK missing (no D3D12\\D3D12Core.dll)"
+    folder = os.path.join(r.work_dir, "no_agility", "x64", "Config")
+    os.makedirs(os.path.join(folder, "D3D12"))
+    exe = shutil.copy2(r.exe, folder)
+    for dll in ("dxcompiler.dll", "dxil.dll"):
+        shutil.copy2(os.path.join(os.path.dirname(r.exe), dll), folder)
+    layers = os.path.join(os.path.dirname(r.exe), "D3D12", "d3d12SDKLayers.dll")
+    if os.path.isfile(layers):
+        shutil.copy2(layers, os.path.join(folder, "D3D12"))
+    png = os.path.join(r.work_dir, "no_agility.png")
+    code, result, stderr = r.run_json(r.render_args(png) + ["--engine-path", REPO_ROOT + os.sep], exe)
+    r.check_no_crash(name, code, stderr)
+    r.check(f"{name}: exit code", code == EXIT_SUCCESS, f"got {code}; result: {result}; stderr: {stderr.strip()}")
+    r.check(f"{name}: png", os.path.isfile(png), png)
+    runtime = (result or {}).get("d3d12_runtime") or {}
+    r.check(f"{name}: OS runtime", runtime.get("source") == "os", runtime)
+    r.check(f"{name}: fallback reason", "CreateDeviceFactory" in (runtime.get("fallback_reason") or ""), runtime)
+    r.check(f"{name}: not the D3D12Core.dll of the build", "D3D12Core.dll" in (runtime.get("core_path") or "")
+            and not os.path.normcase(runtime["core_path"]).startswith(os.path.normcase(folder)), runtime)
+    r.check(f"{name}: warning on stderr", "[D3D12] warning: the Agility SDK " in stderr and "[D3D12] runtime: OS " in stderr, stderr)
+    r.report(name)
+
+
 # ACP(CI の 1252、日本語の Windows の 932)のどちらでも表せない文字を含むフォルダ名(日本語・ハングル・ő)
 NON_ACP_FOLDER_NAME = "開発_한글_ő"
 
@@ -835,6 +893,7 @@ def main():
             test_graphics_init_failed(r)
             test_shader_compilation_throws(r)
             test_engine_path_outside_repo(r)
+            test_agility_sdk_missing(r)
             test_engine_path_with_non_acp_characters(r)
             test_engine_path_wins_over_default_include(r)
             test_shader_cache_follows_engine_path(r)

@@ -83,6 +83,13 @@ namespace DXForgeEditor
                 {
                     Debug.WriteLine("[DXForgeEditor] エンジンを初期化しました");
                     Logger.Log(MessageType.Info, "エンジンを初期化しました");
+                    // 使っている D3D12 のランタイム(#155)。Agility SDK を使えずに OS のランタイムで動いているときは警告にする
+                    var runtime = EngineAPI.GetGraphicsRuntimeDescription(out bool agilitySdk);
+                    if (!string.IsNullOrEmpty(runtime))
+                    {
+                        Debug.WriteLine($"[DXForgeEditor] D3D12 のランタイム: {runtime}");
+                        Logger.Log(agilitySdk ? MessageType.Info : MessageType.Warning, $"D3D12 のランタイム: {runtime}");
+                    }
                     return true;
                 }
 

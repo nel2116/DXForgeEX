@@ -13,6 +13,7 @@
 // 2026/10/29 画面外のサーフェスの作成の失敗を返すようにした (#128 のレビュー)
 // 2026/10/29 初期化に失敗したときに、デバッグレイヤーのメッセージを出し、作る前のコマンドを待たないようにした (#128 のレビュー)
 // 2026/10/29 初期化の途中で失敗したとき、初期化できたモジュールだけを終了させるようにした (#128 のレビュー)
+// 2026/11/02 D3D12 Agility SDK のランタイム(D3D12Runtime)からデバイスを作るようにした (#155、Primal Day 079)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Core.h"
@@ -25,9 +26,11 @@
 #include "D3D12Light.h"
 #include "D3D12LightCulling.h"
 #include "D3D12Camera.h"
+#include "D3D12Runtime.h"
 #include "Shaders/SharedTypes.h"
 #include <DirectXPackedVector.h>
 #include <cstdio>
+#include <dxgidebug.h>
 
 using namespace Microsoft::WRL;	// ComPtrを使うため
 
@@ -298,7 +301,7 @@ namespace dxforge::graphics::d3d12::core
 			for (u32 i{ 0 }; dxgi_factory->EnumAdapterByGpuPreference(i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&adapter)) != DXGI_ERROR_NOT_FOUND; ++i)
 			{
 				// 最小の機能レベルをサポートする最初のアダプタを選ぶ。
-				if (SUCCEEDED(D3D12CreateDevice(adapter, minimum_feature_level, __uuidof(ID3D12Device), nullptr)))
+				if (SUCCEEDED(runtime::create_device(adapter, minimum_feature_level, __uuidof(ID3D12Device), nullptr)))
 				{
 					return adapter;
 				}
@@ -313,7 +316,7 @@ namespace dxforge::graphics::d3d12::core
 		{
 			IDXGIAdapter4* adapter{ nullptr };
 			if (FAILED(dxgi_factory->EnumWarpAdapter(IID_PPV_ARGS(&adapter)))) return nullptr;
-			if (SUCCEEDED(D3D12CreateDevice(adapter, minimum_feature_level, __uuidof(ID3D12Device), nullptr)))
+			if (SUCCEEDED(runtime::create_device(adapter, minimum_feature_level, __uuidof(ID3D12Device), nullptr)))
 			{
 				return adapter;
 			}
@@ -350,7 +353,7 @@ namespace dxforge::graphics::d3d12::core
 			feature_level_info.pFeatureLevelsRequested = feature_levels;
 
 			ComPtr<ID3D12Device> device;
-			DXCall(D3D12CreateDevice(adapter, minimum_feature_level, IID_PPV_ARGS(&device)));
+			DXCall(runtime::create_device(adapter, minimum_feature_level, IID_PPV_ARGS(&device)));
 			DXCall(device->CheckFeatureSupport(D3D12_FEATURE_FEATURE_LEVELS, &feature_level_info, sizeof(feature_level_info)));
 			return feature_level_info.MaxSupportedFeatureLevel;
 		}
@@ -440,25 +443,33 @@ namespace dxforge::graphics::d3d12::core
 
 		unattended_mode = init_info.unattended;
 
+		// 使うD3D12のランタイムを決める(Agility SDK。使えなければOSのランタイム、#155)。デバッグレイヤーより先に決める
+		runtime::initialize(unattended_mode);
+
 		u32 dxgi_factory_flag{ 0 };
 #if _DEBUG
-		// デバッグレイヤーを有効にする。 グラフィックツールオプション機能が必要です。
+		// デバッグレイヤーを有効にする。Agility SDK では D3D12\d3d12SDKLayers.dll、OSのランタイムでは Graphics Tools のものを使う。
 		{
 			ComPtr<ID3D12Debug3> debug_interface;
-			if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug_interface))))
+			if (SUCCEEDED(runtime::get_debug_interface(IID_PPV_ARGS(&debug_interface))))
 			{
 				debug_interface->EnableDebugLayer();
-				dxgi_factory_flag |= DXGI_CREATE_FACTORY_DEBUG;
 			}
 			else
 			{
-				// NOTE: Graphics Toolsがないと、DXGI_CREATE_FACTORY_DEBUGを付けたCreateDXGIFactory2()も失敗するので付けない(#127)。
 				OutputDebugStringW(L"Warning: D3D12 デバッグインターフェイスは使用できません。 このデバイスにGraphics Toolsオプション機能がインストールされているか確認してください。\n");
 			}
+			// NOTE: DXGI_CREATE_FACTORY_DEBUG には Graphics Tools の dxgidebug.dll が要る(ないと CreateDXGIFactory2() が失敗する、#127)。
+			//		 Agility SDK の d3d12SDKLayers.dll で D3D12 のデバッグレイヤーが使えても dxgidebug.dll があるとは限らないので、別に確かめる。
+			ComPtr<IDXGIInfoQueue> dxgi_info_queue;
+			const bool dxgi_debug{ SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_info_queue))) };
+			if (dxgi_debug) dxgi_factory_flag |= DXGI_CREATE_FACTORY_DEBUG;
 			// 無人実行では、デバッグレイヤーで確かめたかどうかがログで分かるようにする
 			if (unattended_mode)
 			{
-				std::fprintf(stderr, "[D3D12] debug layer: %s\n", debug_interface ? "enabled" : "unavailable (Graphics Tools is not installed)");
+				std::fprintf(stderr, "[D3D12] debug layer: %s, DXGI debug: %s\n",
+					debug_interface ? "enabled" : "unavailable (no d3d12SDKLayers.dll and Graphics Tools is not installed)",
+					dxgi_debug ? "enabled" : "unavailable (Graphics Tools is not installed)");
 			}
 		}
 #endif // _DEBUG
@@ -479,8 +490,11 @@ namespace dxforge::graphics::d3d12::core
 		if (max_feature_level < minimum_feature_level) return failed_init();
 
 		// デバイスを作成
-		DXCall(D3D12CreateDevice(main_adapter.Get(), max_feature_level, IID_PPV_ARGS(&main_device)));
+		DXCall(runtime::create_device(main_adapter.Get(), max_feature_level, IID_PPV_ARGS(&main_device)));
 		if (!main_device) return failed_init();
+
+		// 読み込まれた D3D12Core.dll(Agility SDK か OS か、バージョン)をログに出す
+		runtime::detect_loaded_runtime();
 
 		// デバイスのデバッグ情報を設定
 #ifdef _DEBUG
@@ -607,6 +621,9 @@ namespace dxforge::graphics::d3d12::core
 		// メインデバイスの解放
 		release(main_device);
 		main_adapter_name[0] = '\0';
+
+		// Agility SDK のファクトリはデバイスのあとで解放する(Primal Day 079)
+		runtime::shutdown();
 	}
 
 	u32 flush_debug_messages(void)

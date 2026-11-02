@@ -160,6 +160,17 @@
       <ProgramDatabaseFile>$(OutDir)$(TargetName)-$([System.DateTime]::Now.ToString("HH_mm_ss_fff")).pdb</ProgramDatabaseFile>
     </Link>
   </ItemDefinitionGroup>
+  <!-- D3D12 Agility SDK (DXForgeEX issue #155): the engine creates its D3D12 device from D3D12\D3D12Core.dll next to the game's exe
+       (ID3D12SDKConfiguration1::CreateDeviceFactory) and falls back to the OS runtime without it. The engine build copies the runtime
+       it was built with into $(DXForge_LibraryPath)D3D12\; copy it next to the exe. The *Editor configs build a DLL for the editor,
+       which uses the editor's own copy. -->
+  <Target Name="DXForgeCopyAgilitySdk" AfterTargets="Build" Condition="'$(ConfigurationType)' == 'Application'">
+    <ItemGroup>
+      <DXForgeAgilitySdkRuntime Include="$(DXForge_LibraryPath)D3D12\*.dll" />
+    </ItemGroup>
+    <Warning Condition="'@(DXForgeAgilitySdkRuntime)' == ''" Text="$(DXForge_LibraryPath)D3D12\ has no D3D12 Agility SDK runtime. Build the engine in this configuration first; until then the game uses the OS D3D12 runtime." />
+    <Copy SourceFiles="@(DXForgeAgilitySdkRuntime)" DestinationFolder="$(OutDir)D3D12\" SkipUnchangedFiles="true" />
+  </Target>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

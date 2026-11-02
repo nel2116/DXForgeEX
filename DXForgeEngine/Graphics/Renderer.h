@@ -15,6 +15,7 @@
 // 2026/10/29 画面外のサーフェス、読み戻し、アダプタの選択(graphics_init_info)を追加 (#127)
 // 2026/10/29 画面外のサーフェスの最小の大きさを追加 (#128 のレビュー)
 // 2026/10/30 material_surface から ambient_occlusion を削除(エディタのマテリアルと合わせる。Primal Day 077, #30)
+// 2026/11/02 D3D12 のランタイム(Agility SDK か OS か)の情報を追加 (#155)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -308,6 +309,17 @@ namespace dxforge::graphics
 
 	/// @brief 使っているアダプタの名前(UTF-8)。初期化前は空
 	const char* adapter_name();
+
+	/// @brief 使っているグラフィックスのランタイムの情報(D3D12 では D3D12Core.dll、#155)。文字列はUTF-8で、初期化前は空
+	struct runtime_info
+	{
+		bool agility_sdk{ false };			// D3D12 Agility SDK(エンジンのexe/DLLの隣の D3D12\)を使っているときtrue。falseならOSのランタイム
+		u32 sdk_version{ 0 };				// 要求した Agility SDK のバージョン(D3D12_SDK_VERSION。OSのランタイムに戻ったときも入る)
+		const char* core_version{ "" };		// 読み込まれた D3D12Core.dll のファイルバージョン(例 "1.620.1.0")。分からなければ空
+		const char* core_path{ "" };		// その D3D12Core.dll のパス
+		const char* fallback_reason{ "" };	// Agility SDK を使えなかった理由(使えたときは空)
+	};
+	runtime_info runtime();
 
 	// コンパイルされたエンジンシェーダーの場所を、実行ファイルのパスから相対的に取得する。
 	// このパスは、現在使用されているグラフィックスAPIのものです。
