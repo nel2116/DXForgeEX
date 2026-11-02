@@ -125,6 +125,13 @@ jobs:
         shell: pwsh
         run: ./build.ps1 -Target editor -Configuration DebugEditor -WarningsAsErrors
 
+      # エディタのシェーダのコンパイルとアセットのリソース(Primal Day 076/077)を通す DLL。エディタと同じ x64\DebugEditor\ に出力する。
+      # 以前は Script.cpp の get_script_names() が ATL(atlsafe.h)を使っていて、ATL のないランナーではビルドできなかった(#146)。
+      # DXC は NuGet の Microsoft.Direct3D.DXC(バージョン固定)を使うので、GetDXC.ps1 も GitHub API も要らない。
+      - name: Build engine DLL (DebugEditor)
+        shell: pwsh
+        run: ./build.ps1 -Target native -Configuration DebugEditor -Project DXForgeEngineDLL -WarningsAsErrors
+
       # コマンドラインのインポーター DXForgeImport(#10)の引数・異常系のテスト。ContentTools.dll は FBX SDK が要るので
       # ランナーではビルドできないが、引数の解析と、入力なし・未対応の拡張子・設定の誤りなどの終了コードと --json の出力、
       # ContentTools.dll がないときの終了コード7は、それなしで確かめられる。実際のインポートはローカルで確かめる。
@@ -151,12 +158,17 @@ jobs:
         run: pwsh -NoProfile -File DXForgeEditor/Tests/debug_define_test.ps1 -Configuration DebugEditor
 
       # エディタのマテリアルのアセット(Material / AppliedMaterial)と既定のマテリアル(Primal Day 077, #30)。
-      # ランナーには ATL(atlsafe.h)がなく DXForgeEngineDLL をビルドできないので、シェーダの登録は偽物を使い、
-      # DLL が要る項目(実際のシェーダのコンパイル、DLL の CreateResource / DestroyResource)は SKIP と表示される。
-      # 全項目はローカルで -RequireEngineDll を付けて実行する。GPU は要らない。
+      # 上でビルドした DXForgeEngineDLL を使い、実際のシェーダのコンパイルと DLL の CreateResource / DestroyResource も確かめる。
+      # -RequireEngineDll で、DLL がないときに項目を SKIP にせず失敗にする(#146)。GPU は要らない(エンジンを初期化しない)。
       - name: Test editor material assets
         shell: pwsh
-        run: pwsh -STA -NoProfile -File DXForgeEditor/Tests/material_asset_test.ps1 -Configuration DebugEditor
+        run: pwsh -STA -NoProfile -File DXForgeEditor/Tests/material_asset_test.ps1 -Configuration DebugEditor -RequireEngineDll
+
+      # エディタの DllWrappers(EngineAPI.CompileShader / AddShaderGroup / RemoveShaderGroup)を通したシェーダのコンパイルと登録
+      # (Primal Day 076, #29)。上でビルドした DXForgeEngineDLL と、その隣の dxcompiler.dll を使う。GUI も GPU も要らない(#146)。
+      - name: Test editor shader compilation
+        shell: pwsh
+        run: pwsh -STA -NoProfile -File DXForgeEngineDLL/Tests/editor_shader_compilation_test.ps1 -Configuration DebugEditor
 
       # エディタからのエンジンの初期化(Primal Day 078, #31): EngineInitError と C++ の engine_init_error の値、
       # 失敗したときの文言が例外を投げないこと。ランナーには DXForgeEngineDLL がないので、DLL がないときに

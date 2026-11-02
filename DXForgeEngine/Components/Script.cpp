@@ -14,11 +14,22 @@
 // 2026/10/18 update()中に削除したスクリプトもremove()の中で破棄し、実行中のスクリプト自身の削除だけを遅らせるよう変更(デストラクタからTransformを読めるようにするため) (#54)
 // 2026/10/19 update()の中で削除されたエンティティのTransformキャッシュを、適用する前に取り除くよう修正(削除済み・再利用されたスロットに書き込んでいたため) (#78)
 // 2026/10/27 get_script_creator()が未登録のタグでassertし、Releaseではend()を参照外ししていたのを、nullptrを返すように修正 (#113)
+// 2026/11/02 get_script_names()をATL(CComSafeArray/A2BSTR_EX)からOLE AutomationのAPIに書き直し(名前は従来どおりANSIコードページで復号する) (#146)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Script.h"
 #include "Entity.h"
 #include "Transform.h"
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif // !WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include <oleauto.h>
+#include <climits>
+
+// SafeArrayCreateVector / SysAllocStringLen など。DXForgeEngine.lib をリンクするプロジェクト(ゲームのDLL、EngineUnitTests)に伝わる
+#pragma comment(lib, "oleaut32.lib")
 
 #define USE_TRANSFORM_CACHE_MAP 1
 
@@ -343,20 +354,74 @@ namespace dxforge::script
 
 }	// namespace dxforge::script
 
+namespace dxforge::script::detail
+{
+	namespace
+	{
+		/// @brief 狭い文字列をBSTRに変換する
+		/// @param name 変換する文字列。ANSIコードページ(CP_ACP)として読む(A2BSTR_EXと同じ)
+		/// @note エディタは表示した名前をGetScriptCreater(string)にANSIでマーシャリングして渡し、DLLはそのバイト列のハッシュで
+		///		  スクリプトを探す。ここもCP_ACPで復号しないと往復で登録時のバイト列に戻らず、スクリプトが見つからなくなる。
+		///		  ゲームのプロジェクトは /utf-8 なしでビルドするので、REGISTER_SCRIPT の #TYPE もANSIのバイト列になる。
+		///		  UTF-8を先に試すと、UTF-8としても正しいANSIのバイト列を誤って復号するので、試さない
+
+		/// @return 作ったBSTR。呼び出し側がSysFreeString()で解放する。変換できない場合はnullptr
+		BSTR to_bstr(const std::string& name)
+		{
+			if (name.empty()) return SysAllocStringLen(L"", 0);
+			if (name.size() > (size_t)INT_MAX) return nullptr;
+
+			const int length{ (int)name.size() };
+			const int wide_length{ MultiByteToWideChar(CP_ACP, 0, name.data(), length, nullptr, 0) };
+			if (wide_length <= 0) return nullptr;
+
+			BSTR bstr{ SysAllocStringLen(nullptr, (UINT)wide_length) };
+			if (!bstr) return nullptr;
+			if (MultiByteToWideChar(CP_ACP, 0, name.data(), length, bstr, wide_length) != wide_length)
+			{
+				SysFreeString(bstr);
+				return nullptr;
+			}
+			return bstr;
+		}
+	}	// namespace
+
+	SAFEARRAY* make_script_names_safe_array(const std::string* names, u32 count)
+	{
+		if (!names || !count) return nullptr;
+
+		SAFEARRAY* const array{ SafeArrayCreateVector(VT_BSTR, 0, count) };
+		if (!array) return nullptr;
+
+		for (u32 i{ 0 }; i < count; ++i)
+		{
+			BSTR bstr{ to_bstr(names[i]) };
+			HRESULT hr{ bstr ? S_OK : E_OUTOFMEMORY };
+			if (SUCCEEDED(hr))
+			{
+				LONG index{ (LONG)i };
+				// NOTE: SafeArrayPutElement は VT_BSTR の要素をコピーして格納するので、渡したBSTRはここで解放する
+				hr = SafeArrayPutElement(array, &index, bstr);
+				SysFreeString(bstr);
+			}
+			if (FAILED(hr))
+			{
+				// 格納済みの要素のBSTRも SafeArrayDestroy が解放する
+				SafeArrayDestroy(array);
+				return nullptr;
+			}
+		}
+		return array;
+	}
+}	// namespace dxforge::script::detail
+
 #ifdef USE_WITH_EDITOR
-#include <atlsafe.h>
 
 extern "C" __declspec(dllexport)
 LPSAFEARRAY get_script_names()
 {
-	const u32 size{ (u32)dxforge::script::script_names().size() };
-	if (!size) return nullptr;
-	CComSafeArray<BSTR> names{ size };
-	for (u32 i{ 0 }; i < size; ++i)
-	{
-		names.SetAt(i, A2BSTR_EX(dxforge::script::script_names()[i].c_str()), false);
-	}
-	return names.Detach();
+	const auto& names{ dxforge::script::script_names() };
+	return dxforge::script::detail::make_script_names_safe_array(names.data(), (u32)names.size());
 }
 
 #endif // USE_WITH_EDITOR
