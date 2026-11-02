@@ -16,6 +16,8 @@
 #   3. 不正な引数(関数名やソースが無い、シェーダの種類が範囲外)では、FALSEが返り、バッファは返らない。
 #   4. コンパイルしたシェーダをエディタと同じ形式(keys[count], {u64 長さ, ハッシュ, バイトコード}[count])に詰めて
 #      AddShaderGroup() に渡すと有効なIDが返り、RemoveShaderGroup() で消せる。壊れたデータでは無効なIDが返る。
+#   1b. エンジンのシェーダーのフォルダ(-I)のパスに ACP(1252、932)で表せない文字が入っていても、同じようにコンパイルできる
+#      (引数は UTF-8 で渡し、DLL の中で UTF-16 にする。ANSI には変換しない。#31 の Codex の指摘)。
 #   5. dxcompiler.dll を読み込めずにコンパイルが失敗しても、あとで dxcompiler.dll / dxil.dll を置けば、同じプロセスで
 #      次のコンパイルが成功する(失敗をキャッシュしない。エディタの「再試行」のため。#31 の Codex の指摘)。
 #      DLL を一時フォルダにコピーし、別のプロセス(--dxc-retry-child)で確かめる。
@@ -205,6 +207,17 @@ def main():
 	check(len({r.hash for r in vertex_shaders}) == len(vertex_shaders), "each MainVS variant has its own hash")
 	again = compile_shader(dll, code, "MainPS", SHADER_TYPE_PIXEL, include)
 	check(again.ok and again.hash == pixel_shader.hash and again.byte_code == pixel_shader.byte_code, "compiling twice gives the same byte code")
+
+	print("1b. Include folder with characters outside the ANSI code page")
+	non_acp_root = tempfile.mkdtemp(prefix="dxforge_non_acp_")
+	try:
+		non_acp_shaders = os.path.join(non_acp_root, "開発_한글_ő", "Shaders")
+		shutil.copytree(ENGINE_SHADERS_DIR, non_acp_shaders)
+		r = compile_shader(dll, code, "MainPS", SHADER_TYPE_PIXEL, ["-I", non_acp_shaders])
+		check(r.ok and r.byte_code == pixel_shader.byte_code and not r.errors,
+			f"MainPS with -I {non_acp_shaders!a}: {len(r.byte_code)} bytes, errors={r.errors!a}")
+	finally:
+		shutil.rmtree(non_acp_root, ignore_errors=True)
 
 	print("2. Broken shaders")
 	broken = code.replace("PixelOut psOut;", "PixelOut psOut = ;", 1)

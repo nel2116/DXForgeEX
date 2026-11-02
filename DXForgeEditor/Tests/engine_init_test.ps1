@@ -210,6 +210,28 @@ try
 		{
 			Check $false "ShutdownEngine after InitializeEngine threw $($_.Exception.InnerException.Message)"
 		}
+
+		# エンジンのパスに ACP(1252、932)で表せない文字が入っていても初期化できる(パスは UTF-16 のまま渡す。#31 の Codex の指摘)。
+		# 別の作業フォルダにして、shaders.bin をコンパイルし直させる。
+		$nonAcpEngine = Join-Path $work "開発_한글_ő\engine"
+		$nonAcpShaders = Join-Path $nonAcpEngine "DXForgeEngine\Graphics\Direct3D12\Shaders"
+		$null = New-Item -ItemType Directory -Force $nonAcpShaders
+		Copy-Item -Path (Join-Path $RepoRoot "DXForgeEngine\Graphics\Direct3D12\Shaders\*") -Destination $nonAcpShaders
+		$cwd2 = Join-Path $work "c\d"
+		$null = New-Item -ItemType Directory -Force $cwd2
+		[System.IO.Directory]::SetCurrentDirectory($cwd2)
+		$result = $initialize.Invoke($null, @([string]$nonAcpEngine))
+		Check ("$result" -eq "Succeeded" -or "$result" -eq "Graphics") "InitializeEngine with an engine path outside the ANSI code page compiles the engine shaders: $result"
+		Check (Test-Path (Join-Path $cwd2 "shaders\d3d12\shaders.bin")) "shaders.bin is written in the working folder"
+		try
+		{
+			$shutdown.Invoke($null, @())
+			Check $true "ShutdownEngine after InitializeEngine ($result)"
+		}
+		catch
+		{
+			Check $false "ShutdownEngine after InitializeEngine threw $($_.Exception.InnerException.Message)"
+		}
 	}
 	else
 	{

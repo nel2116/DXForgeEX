@@ -9,6 +9,7 @@
 // 2025/01/13 ユーザー定義のシェーダーをコンパイルする処理を追加
 // 2026/10/27 EngineTestからDXForgeEngineDLLへ移動し、メモリ上のソースをコンパイルする関数を追加(Primal Day 076)
 // 2026/11/02 compile_shaders() にエンジンのシェーダーのソースのフォルダを渡せるようにした(#31)
+// 2026/11/02 compile_shader() のフォルダを std::filesystem::path で受け、ANSI に変換しないようにした(#31)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -29,7 +30,9 @@ struct shader_file_info
 // バッファを返すことがある。失敗の理由がわからない場合(DXCを読み込めないなど)は nullptr を返す。
 std::unique_ptr<u8[]> compile_shader(shader_file_info info, const u8* code, u32 code_size, dxforge::utl::vector<std::wstring>& extra_args,
 	bool include_errors_and_disassembly = false);
-std::unique_ptr<u8[]> compile_shader(shader_file_info info, const char* file_path, dxforge::utl::vector<std::wstring>& extra_args,
+// file_path: ソースのあるフォルダ(末尾に区切りを付ける)。ファイル名は info.file_name。
+// NOTE: パスは ANSI に変換せずに使う(ACP で表せない文字を含むフォルダでもコンパイルできるように。#31)。
+std::unique_ptr<u8[]> compile_shader(shader_file_info info, const std::filesystem::path& file_path, dxforge::utl::vector<std::wstring>& extra_args,
 	bool include_errors_and_disassembly = false);
 // エンジンのシェーダーをコンパイルして shaders.bin(.\shaders\d3d12\、作業フォルダからの相対パス)に書く。最新なら何もしない。
 // source_folder: エンジンのシェーダーのソースのフォルダ(DXForgeEngine\Graphics\Direct3D12\Shaders\)。

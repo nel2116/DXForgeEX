@@ -575,6 +575,39 @@ def test_engine_path_outside_repo(r):
     r.report(name)
 
 
+# ACP(CI の 1252、日本語の Windows の 932)のどちらでも表せない文字を含むフォルダ名(日本語・ハングル・ő)
+NON_ACP_FOLDER_NAME = "開発_한글_ő"
+
+
+def copy_engine_sources(root):
+    """エンジンのシェーダーのソースと EngineTest/TestShader.hlsl を、root の下にリポジトリと同じ並びでコピーする"""
+    shutil.copytree(os.path.join(REPO_ROOT, "DXForgeEngine", "Graphics", "Direct3D12", "Shaders"),
+                    os.path.join(root, "DXForgeEngine", "Graphics", "Direct3D12", "Shaders"))
+    os.makedirs(os.path.join(root, "EngineTest"))
+    shutil.copy2(os.path.join(REPO_ROOT, "EngineTest", "TestShader.hlsl"), os.path.join(root, "EngineTest"))
+
+
+def test_engine_path_with_non_acp_characters(r):
+    """--engine-path に ACP で表せない文字が入っていても、シェーダーをコンパイルして描画できる(#31 の Codex の指摘)
+
+    エンジンのシェーダー(compile_shaders)も EngineTest/TestShader.hlsl(compile_shader)も、パスを ANSI に変換せずに渡す。
+    """
+    name = "engine path with characters outside the ANSI code page"
+    engine_root = os.path.join(r.work_dir, NON_ACP_FOLDER_NAME, "engine")
+    copy_engine_sources(engine_root)
+    folder = os.path.join(r.work_dir, "non_acp_exe", "x64", "Config")
+    os.makedirs(folder)
+    exe = shutil.copy2(r.exe, folder)
+    for dll in ("dxcompiler.dll", "dxil.dll"):
+        shutil.copy2(os.path.join(os.path.dirname(r.exe), dll), folder)
+    png = os.path.join(r.work_dir, "non_acp.png")
+    code, result, stderr = r.run_json(r.render_args(png) + ["--engine-path", engine_root], exe)
+    r.check_no_crash(name, code, stderr)
+    r.check(f"{name}: exit code", code == EXIT_SUCCESS, f"got {code}; result: {result}; stderr: {stderr.strip()}")
+    r.check(f"{name}: png", os.path.isfile(png), png)
+    r.report(name)
+
+
 def update_baselines(exe, args, config, has_dxc):
     """WARPで2回描き、画素が一致したら baselines/ の基準画像を書き換える。@return 終了コード"""
     # 意図しない更新を防ぐ: 構成を明示させ、CIでは更新しない
@@ -643,6 +676,7 @@ def main():
             test_graphics_init_failed(r)
             test_shader_compilation_throws(r)
             test_engine_path_outside_repo(r)
+            test_engine_path_with_non_acp_characters(r)
             rgb = test_warp_render_and_determinism(r)
             if rgb is not None:
                 test_baseline_comparison(r, rgb, config, require_render)

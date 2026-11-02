@@ -12,6 +12,7 @@
 //            DXCは実行時に読み込み、エラーと逆アセンブルも返せるようにした
 // 2026/10/27 TILE_SIZEを定義する条件が常に真だったのを修正し、ライトカリングの2つのコンピュートシェーダだけに渡すようにした(#101)
 // 2026/11/02 エンジンのシェーダーのソースのフォルダを compile_shaders() に渡せるようにし、DXCの読み込みの失敗をキャッシュしないようにした(#31)
+// 2026/11/02 compile_shader() のフォルダを std::filesystem::path で受け、ANSI に変換しないようにした(#31)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include <fstream>
@@ -428,7 +429,7 @@ std::unique_ptr<u8[]> compile_shader(shader_file_info info, const u8* code, u32 
 	return pack_compiled_shader(compiler.compile(code, code_size, info.type, info.function, extra_args), include_errors_and_disassembly);
 }
 
-std::unique_ptr<u8[]> compile_shader(shader_file_info info, const char* file_path, utl::vector<std::wstring>& extra_args, bool include_errors_and_disassembly/*=false*/)
+std::unique_ptr<u8[]> compile_shader(shader_file_info info, const std::filesystem::path& file_path, utl::vector<std::wstring>& extra_args, bool include_errors_and_disassembly/*=false*/)
 {
 	std::filesystem::path full_path{ file_path };
 	full_path += info.file_name;
