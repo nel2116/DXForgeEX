@@ -6,6 +6,7 @@
 // 　使うD3D12のランタイム(Agility SDK か OS か)の選択と、それを通したデバイスの作成
 // 更新履歴
 // 2026/11/02 新規作成 (#155、Primal Day 079)
+// 2026/11/02 D3D12GetInterface を静的にインポートせず GetProcAddress で解決する(古い d3d12.dll でも起動できるように、#155)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 // NOTE: CLSID_D3D12SDKConfiguration/CLSID_D3D12Debug の実体をこの翻訳単位で作る(Primal Day 079 の D3D12Core.cpp と同じ)。
@@ -134,6 +135,18 @@ namespace dxforge::graphics::d3d12::runtime
 		return text;
 	}
 
+	FARPROC find_get_interface(HMODULE d3d12_module, std::string& reason)
+	{
+		if (!d3d12_module)
+		{
+			reason = "d3d12.dll is not loaded";
+			return nullptr;
+		}
+		const FARPROC get_interface{ GetProcAddress(d3d12_module, "D3D12GetInterface") };
+		if (!get_interface) reason = "d3d12.dll has no D3D12GetInterface (the OS predates the Agility SDK)";
+		return get_interface;
+	}
+
 	void initialize(bool unattended)
 	{
 		release_factory();
@@ -144,7 +157,13 @@ namespace dxforge::graphics::d3d12::runtime
 		fallback_reason.clear();
 		initialized_once = true;
 
-		HRESULT hr{ D3D12GetInterface(CLSID_D3D12SDKConfiguration, IID_PPV_ARGS(&sdk_config)) };
+		// NOTE: D3D12GetInterface は Agility SDK に対応した d3d12.dll にしかない。静的にインポートすると、古い Windows 10 では
+		//		 ローダーがエクスポートを解決できず main に入る前に起動に失敗するため、GetProcAddress で解決する
+		//		 (render_run_test.py がインポートテーブルを確かめる)。d3d12.dll はほかの関数の静的インポートで読み込まれている。
+		const auto get_interface{ reinterpret_cast<PFN_D3D12_GET_INTERFACE>(find_get_interface(GetModuleHandleW(L"d3d12.dll"), fallback_reason)) };
+		if (!get_interface) return;
+
+		HRESULT hr{ get_interface(CLSID_D3D12SDKConfiguration, IID_PPV_ARGS(&sdk_config)) };
 		if (FAILED(hr))
 		{
 			// OS の d3d12.dll が ID3D12SDKConfiguration1 を持たない(古い Windows)

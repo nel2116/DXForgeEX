@@ -19,6 +19,8 @@
            shaders.bin を書き、グラフィックスを初期化する(GPU がなければ Graphics)。ShutdownEngine を2回呼んで終える。
          初期化できたときは、EngineAPI.GetGraphicsRuntimeDescription が、DLL の隣の D3D12\ の D3D12 Agility SDK
          (DXForgeEngine/packages.config のバージョン)を使ったことを示す(#155)。DLL の隣と exe(pwsh.exe)の隣が違う場合の確認になる。
+         DLL が D3D12GetInterface など古い d3d12.dll にない関数を静的にインポートしていない(render_run_test.py --check-imports。
+         インポートすると Agility SDK 対応前の Windows 10 では DLL を読み込めず、OS のランタイムに戻れない、#155)。
          DLL がないとき: InitializeEngine が例外を投げずに Unknown を返し、
          ShutdownEngine も GetGraphicsRuntimeDescription も例外を投げない。-RequireEngineDll を付けると、DLL がないときは失敗にする(ローカルでは付ける)。
       初期化に成功する経路(シェーダーのコンパイル → Direct3D 12 の初期化 → リソースの作成・破棄 → 終了)は、DLL と同じ
@@ -64,6 +66,8 @@ if (-not $hasEngineDll)
 }
 else
 {
+	$importsOutput = & python (Join-Path $RepoRoot "EngineUnitTests\Tests\render_run_test.py") --check-imports $engineDllPath 2>&1
+	Check ($LASTEXITCODE -eq 0) "DXForgeEngineDLL.dll does not statically import new d3d12.dll functions: $($importsOutput -join ' / ')"
 	[void][System.Runtime.InteropServices.NativeLibrary]::Load($engineDllPath)
 }
 if ($hasEngineDll -and $Configuration -eq "DebugEditor")

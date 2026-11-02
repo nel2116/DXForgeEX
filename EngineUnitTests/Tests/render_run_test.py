@@ -6,6 +6,7 @@
 #   python EngineUnitTests/Tests/render_run_test.py --config Release
 #   python EngineUnitTests/Tests/render_run_test.py --exe <EngineUnitTests.exeのパス>
 #   python EngineUnitTests/Tests/render_run_test.py --update-baselines --config Release   # 基準画像を更新する(テストは実行しない)
+#   python EngineUnitTests/Tests/render_run_test.py --check-imports <exe/DLL>...  # 7. のインポートの確認だけ(engine_init_test.ps1 が DLL に使う)
 # すべて合格すれば終了コード0、不合格があれば1。
 #
 # 確かめること:
@@ -25,6 +26,8 @@
 #   6. D3D12 Agility SDK(#155): 描画したとき --json の d3d12_runtime が、実行ファイルの隣の D3D12\D3D12Core.dll
 #      (DXForgeEngine/packages.config の Microsoft.Direct3D.D3D12 と同じバージョン)を使ったことを示す。
 #      D3D12\D3D12Core.dll がないときは、警告を出して OS のランタイムで描画を続ける(source が "os" になり、理由が入る)。
+#      実行ファイル(隣の EngineTest.exe・DXForgeEngineDLL.dll も)が、D3D12GetInterface など古い d3d12.dll にない関数を
+#      静的にインポートしていない(インポートテーブルを読む。古い Windows でもローダーで落ちずに OS のランタイムに戻れる)。
 #   構成は --config か、--exe のフォルダ名(x64/<構成>/、build.ps1 -RunTests の渡し方)から決める。
 #
 # DXC(dxcompiler.dll)が実行ファイルの隣にないとき(packages/DirectXShaderCompiler なしで EngineUnitTests だけをビルドした場合、#61)は、
@@ -612,6 +615,76 @@ def test_engine_path_outside_repo(r):
     r.report(name)
 
 
+# 実行ファイルが静的にインポートしてよい d3d12.dll の関数(Agility SDK 対応前の Windows 10 1607 以降の d3d12.dll にもある)。
+# D3D12GetInterface などの新しい関数を静的にインポートすると、それがない d3d12.dll ではローダーがエクスポートを解決できず、
+# main に入る前に起動に失敗する(OS のランタイムに戻れない)。新しい関数は GetProcAddress で解決する(#155、Codex の指摘)。
+# d3d12.lib は D3D12CreateDevice を序数 101、D3D12GetDebugInterface を序数 102 でインポートする(Windows 10 の最初の d3d12.dll から同じ)。
+ALLOWED_D3D12_IMPORTS = {"#101", "#102", "D3D12CreateDevice", "D3D12GetDebugInterface", "D3D12SerializeVersionedRootSignature"}
+
+
+def pe_imports(path):
+    """PE32+ のインポートテーブル(遅延読み込みは含まない)を {DLL名(小文字): {関数名か "#序数"}} で返す(標準ライブラリだけで読む)"""
+    with open(path, "rb") as f:
+        data = f.read()
+    pe = struct.unpack_from("<I", data, 0x3C)[0]
+    if data[pe:pe + 4] != b"PE\0\0":
+        raise ValueError(f"not a PE file: {path}")
+    section_count, optional_size = struct.unpack_from("<H", data, pe + 6)[0], struct.unpack_from("<H", data, pe + 20)[0]
+    optional = pe + 24
+    if struct.unpack_from("<H", data, optional)[0] != 0x20B:
+        raise ValueError(f"not PE32+: {path}")
+    import_rva = struct.unpack_from("<I", data, optional + 112 + 8 * 1)[0]  # データディレクトリ 1 = インポート
+    sections = []
+    for i in range(section_count):
+        header = optional + optional_size + 40 * i
+        virtual_size, virtual_address, raw_size, raw_offset = struct.unpack_from("<IIII", data, header + 8)
+        sections.append((virtual_address, max(virtual_size, raw_size), raw_offset))
+
+    def offset(rva):
+        for virtual_address, size, raw_offset in sections:
+            if virtual_address <= rva < virtual_address + size:
+                return rva - virtual_address + raw_offset
+        raise ValueError(f"RVA 0x{rva:X} is not in any section: {path}")
+
+    def c_string(rva):
+        start = offset(rva)
+        return data[start:data.index(b"\0", start)].decode("ascii")
+
+    imports = {}
+    if import_rva == 0:
+        return imports
+    descriptor = offset(import_rva)
+    while True:
+        original_thunk, _, _, name_rva, first_thunk = struct.unpack_from("<IIIII", data, descriptor)
+        if name_rva == 0:
+            break
+        functions = imports.setdefault(c_string(name_rva).lower(), set())
+        thunk = offset(original_thunk or first_thunk)
+        while True:
+            entry = struct.unpack_from("<Q", data, thunk)[0]
+            if entry == 0:
+                break
+            functions.add(f"#{entry & 0xFFFF}" if entry & (1 << 63) else c_string((entry & 0x7FFFFFFF) + 2))
+            thunk += 8
+        descriptor += 20
+    return imports
+
+
+def test_no_static_import_of_new_d3d12_functions(r, binaries=None):
+    """エンジンを含む実行ファイル(隣にある EngineTest.exe・DXForgeEngineDLL.dll も)が、古い d3d12.dll にない関数を
+    静的にインポートしていない(Agility SDK を使えない古い Windows でも起動して OS のランタイムに戻れる、#155)"""
+    name = "no static import of new d3d12.dll functions"
+    if binaries is None:
+        folder = os.path.dirname(r.exe)
+        binaries = [r.exe] + [os.path.join(folder, other) for other in ("EngineTest.exe", "DXForgeEngineDLL.dll")
+                              if os.path.isfile(os.path.join(folder, other))]
+    for binary in binaries:
+        d3d12 = pe_imports(binary).get("d3d12.dll", set())
+        r.check(f"{name}: {os.path.basename(binary)}", d3d12 <= ALLOWED_D3D12_IMPORTS,
+                f"imports {sorted(d3d12 - ALLOWED_D3D12_IMPORTS)} from d3d12.dll; resolve them with GetProcAddress")
+    r.report(name)
+
+
 def test_agility_sdk_missing(r):
     """D3D12\\D3D12Core.dll がないと、警告を出して OS の D3D12 のランタイムで描画を続ける(#155)
 
@@ -866,9 +939,18 @@ def main():
     parser.add_argument("--config", choices=["Debug", "Release"],
                         help="構成(省略時は --exe のフォルダ名から決め、--exe もなければ Debug)")
     parser.add_argument("--exe", help="EngineUnitTests.exe のパス(省略時は x64/<config>/EngineUnitTests.exe)")
+    parser.add_argument("--check-imports", nargs="+", metavar="BINARY",
+                        help="指定した exe/DLL の d3d12.dll のインポートだけを確かめる(描画しない。#155)")
     parser.add_argument("--update-baselines", action="store_true",
                         help="WARPで描いた画像で baselines/ の基準画像を書き換える(--config か --exe が必要。テストは実行しない)")
     args = parser.parse_args()
+    if args.check_imports:
+        r = Runner(None, None)
+        missing = [binary for binary in args.check_imports if not os.path.isfile(binary)]
+        r.check("binaries exist", not missing, missing)
+        test_no_static_import_of_new_d3d12_functions(r, [os.path.abspath(binary) for binary in args.check_imports if os.path.isfile(binary)])
+        print(f"{r.passed} checks passed, {len(r.failures)} failed")
+        return 1 if r.failures else 0
     exe = os.path.abspath(args.exe or os.path.join(REPO_ROOT, "x64", args.config or "Debug", "EngineUnitTests.exe"))
     if not os.path.isfile(exe):
         print(f"EngineUnitTests.exe not found: {exe}", file=sys.stderr)
@@ -887,6 +969,7 @@ def main():
     try:
         r = Runner(exe, work_dir)
         test_clear_diff_dir(r)
+        test_no_static_import_of_new_d3d12_functions(r)
         test_usage_errors(r)
         test_shaders_unavailable(r, has_dxc)
         if has_dxc:

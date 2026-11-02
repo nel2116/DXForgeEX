@@ -8,6 +8,7 @@
 // --render のヘッドレス実行(EngineUnitTests/Tests/render_run_test.py)で確かめる。
 // 更新履歴
 // 2026/11/02 新規作成 (#155)
+// 2026/11/02 D3D12GetInterface を GetProcAddress で探すテストを追加 (#155)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
@@ -27,6 +28,25 @@ DXFORGE_TEST_CASE(D3D12Runtime_SdkFolderIsNextToTheEngineModule)
 	CHECK(runtime::sdk_folder_for_module(long_folder + L"Game.exe") == long_folder + L"D3D12\\");
 	// フォルダの区切りがなければ、作業フォルダではなく exe からの相対パス(CreateDeviceFactory の解釈)にする
 	CHECK(runtime::sdk_folder_for_module(L"Game.exe") == L".\\D3D12\\");
+}
+
+DXFORGE_TEST_CASE(D3D12Runtime_FindsD3D12GetInterfaceAtRunTime)
+{
+	// d3d12.dll が D3D12GetInterface を持たない(Agility SDK 対応前の Windows 10)ときは、理由を残して OS のランタイムに戻る。
+	// ここでは、その関数を持たない kernel32.dll を代わりに渡す
+	std::string reason{};
+	CHECK(runtime::find_get_interface(GetModuleHandleW(L"kernel32.dll"), reason) == nullptr);
+	CHECK(reason.find("D3D12GetInterface") != std::string::npos);
+
+	reason.clear();
+	CHECK(runtime::find_get_interface(nullptr, reason) == nullptr);
+	CHECK(reason == "d3d12.dll is not loaded");
+
+	// このテストの exe は d3d12.dll を(D3D12CreateDevice などの静的インポートで)読み込んでいる。
+	// このマシンと CI の Windows の d3d12.dll には D3D12GetInterface がある
+	reason.clear();
+	CHECK(runtime::find_get_interface(GetModuleHandleW(L"d3d12.dll"), reason) != nullptr);
+	CHECK(reason.empty());
 }
 
 DXFORGE_TEST_CASE(D3D12Runtime_FormatsTheFileVersion)

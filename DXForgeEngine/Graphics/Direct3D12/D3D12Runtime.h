@@ -6,6 +6,7 @@
 // 　使うD3D12のランタイム(Agility SDK か OS か)の選択と、それを通したデバイスの作成
 // 更新履歴
 // 2026/11/02 新規作成 (#155、Primal Day 079)
+// 2026/11/02 D3D12GetInterface を GetProcAddress で解決する find_get_interface() を追加 (#155)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -41,6 +42,13 @@ namespace dxforge::graphics::d3d12::runtime
 
 	/// @brief 使っているランタイムの情報(graphics::runtime())
 	[[nodiscard]] runtime_info info(void);
+
+	/// @brief d3d12.dll の D3D12GetInterface を探す。静的にインポートすると、それがない d3d12.dll(Agility SDK 対応前の Windows 10)では
+	///		   exe/DLL の読み込みに失敗するため、GetProcAddress で解決する
+	/// @param d3d12_module d3d12.dll のハンドル(nullptr なら読み込まれていない)
+	/// @param fallback_reason 見つからないときに、OS のランタイムに戻る理由を入れる
+	/// @return D3D12GetInterface(PFN_D3D12_GET_INTERFACE)。見つからなければ nullptr
+	[[nodiscard]] FARPROC find_get_interface(HMODULE d3d12_module, std::string& fallback_reason);
 
 	/// @brief エンジンのモジュール(exe か DLL)のパスから、Agility SDK のフォルダ(<モジュールのフォルダ>\D3D12\)を作る
 	[[nodiscard]] std::wstring sdk_folder_for_module(const std::wstring& module_path);
