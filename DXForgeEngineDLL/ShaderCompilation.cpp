@@ -370,7 +370,23 @@ namespace
 		return std::filesystem::equivalent(std::filesystem::path{ to_wstring(recorded.c_str()) }, source_folder, error) && !error;
 	}
 
-	// shaders.bin を作ったソースのフォルダを記録する。書けなくても失敗にはしない(次に作り直すだけ)。
+	// shaders.bin を書き換える前に、前の記録を消す。消せなければ false。
+	// NOTE: 前の記録を残したまま shaders.bin を別のフォルダのものに書き換えると、前のフォルダに戻したときに、
+	//       今のフォルダのバイナリを前のフォルダのものとして使ってしまう(記録が読み取り専用のときなど。#152)。
+	bool remove_source_record()
+	{
+		std::error_code error{};
+		const std::filesystem::path record{ get_shaders_source_record_path() };
+		std::filesystem::remove(record, error);
+		if (std::filesystem::exists(record, error) || error)
+		{
+			OutputDebugStringW(L"[DXForgeEngineDLL] failed to remove the old source record of shaders.bin; shaders.bin is not updated\n");
+			return false;
+		}
+		return true;
+	}
+
+	// shaders.bin を作ったソースのフォルダを記録する。書けなくても失敗にはしない(記録がないので、次に作り直すだけ)。
 	void record_source_folder(const std::filesystem::path& source_folder)
 	{
 		std::error_code error{};
@@ -545,6 +561,8 @@ bool compile_shaders(const std::filesystem::path& source_folder/*={}*/)
 		}
 	}
 
+	// 前の記録を消せなければ、shaders.bin を書き換えずに失敗にする(エディタではシェーダーのコンパイルのエラーになる。#152)
+	if (!remove_source_record()) return false;
 	if (!save_compiled_shaders(shaders)) return false;
 	record_source_folder(folder);
 	return true;

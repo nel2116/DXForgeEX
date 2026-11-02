@@ -27,10 +27,12 @@
 # DXC(dxcompiler.dll)が実行ファイルの隣にないとき(packages/DirectXShaderCompiler なしで EngineUnitTests だけをビルドした場合、#61)は、
 # 描画が要るテストをスキップする(理由を表示する)。環境変数 DXFORGE_REQUIRE_RENDER_TEST=1 のとき(CI)は、スキップせずに失敗にする。
 import argparse
+import ctypes
 import hashlib
 import json
 import os
 import shutil
+import stat
 import struct
 import subprocess
 import sys
@@ -682,6 +684,89 @@ def test_shader_cache_follows_engine_path(r):
     r.report(name)
 
 
+class LockedFile:
+    """ファイルを共有モード READ だけで開いたままにする(ほかのプロセスは上書きも削除もできない)"""
+
+    def __init__(self, path):
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateFileW.restype = ctypes.c_void_p
+        kernel32.CreateFileW.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p,
+                                         ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p]
+        kernel32.CloseHandle.argtypes = [ctypes.c_void_p]
+        self._kernel32 = kernel32
+        GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING = 0x80000000, 0x1, 3
+        self._handle = kernel32.CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, None, OPEN_EXISTING, 0, None)
+        if self._handle in (None, ctypes.c_void_p(-1).value):
+            raise OSError(ctypes.get_last_error(), f"CreateFileW failed: {path}")
+
+    def close(self):
+        if self._handle:
+            self._kernel32.CloseHandle(self._handle)
+            self._handle = None
+
+
+def test_shader_cache_record_cannot_be_removed(r):
+    """前の記録(shaders.bin.source)を消せないときは、shaders.bin を書き換えずに失敗する(#152 の Codex の指摘)
+
+    エンジン A でコンパイルしたあと、記録をほかのプロセス(このテスト)が共有モード READ だけで開いたままにして、
+    エンジン B を渡す。記録を消せないまま shaders.bin を B のものにすると、A に戻したときに B のバイナリを
+    A のものとして使ってしまうので、B は終了コード 21 で失敗し、shaders.bin と記録は A のまま変わらない。
+    NOTE: 読み取り専用の属性だけでは、MSVC の std::filesystem::remove が消せる(POSIX の削除)ので、この状態にならない。
+          読み取り専用のときは、記録を消して B の記録に置き換えることを確かめる。属性は最後に必ず外す。
+    """
+    name = "shader cache record cannot be removed"
+    folder = os.path.join(r.work_dir, "shader_record_exe", "x64", "Config")
+    os.makedirs(folder)
+    exe = shutil.copy2(r.exe, folder)
+    for dll in ("dxcompiler.dll", "dxil.dll"):
+        shutil.copy2(os.path.join(os.path.dirname(r.exe), dll), folder)
+    engine_a = os.path.join(r.work_dir, "shader_record_engines", "A")
+    engine_b = os.path.join(r.work_dir, "shader_record_engines", "B")
+    copy_engine_sources(engine_a)
+    copy_engine_sources(engine_b)
+    shaders_bin = os.path.join(folder, "shaders", "d3d12", "shaders.bin")
+    record = shaders_bin + ".source"
+    png = os.path.join(r.work_dir, "shader_record.png")
+
+    def read(path):
+        with open(path, "rb") as f:
+            return f.read()
+
+    code, result, stderr = r.run_json(r.render_args(png) + ["--engine-path", engine_a], exe)
+    r.check(f"{name}: engine A: exit code", code == EXIT_SUCCESS, f"got {code}; result: {result}; stderr: {stderr.strip()}")
+    if not os.path.isfile(shaders_bin) or not os.path.isfile(record):
+        r.check(f"{name}: shaders.bin and its record are written for engine A", False, folder)
+        return
+    bin_a = read(shaders_bin)
+    record_a = read(record)
+    mtime_a = os.stat(shaders_bin).st_mtime_ns
+    time.sleep(1.1)
+
+    # 記録を上書きも削除もできない: B は失敗し、shaders.bin と記録は A のまま
+    lock = LockedFile(record)
+    try:
+        r.expect_error(f"{name}: engine B while the record is locked", r.render_args(png) + ["--engine-path", engine_b],
+                       EXIT_SHADERS_UNAVAILABLE, "shaders_unavailable", exe=exe, message_part="failed to compile the engine shaders")
+    finally:
+        lock.close()
+    r.check(f"{name}: shaders.bin stays the one for engine A", read(shaders_bin) == bin_a and os.stat(shaders_bin).st_mtime_ns == mtime_a,
+            shaders_bin)
+    r.check(f"{name}: the record stays engine A", read(record) == record_a, record)
+
+    # 記録が読み取り専用: 消して B で作り直し、記録も B になる(A に戻したら作り直す)
+    os.chmod(record, stat.S_IREAD)
+    try:
+        code, result, stderr = r.run_json(r.render_args(png) + ["--engine-path", engine_b], exe)
+        r.check(f"{name}: engine B with a read-only record: exit code", code == EXIT_SUCCESS,
+                f"got {code}; result: {result}; stderr: {stderr.strip()}")
+        r.check(f"{name}: engine B with a read-only record: the record is replaced",
+                os.path.isfile(record) and read(record) != record_a and os.stat(shaders_bin).st_mtime_ns != mtime_a, record)
+    finally:
+        if os.path.exists(record):
+            os.chmod(record, stat.S_IREAD | stat.S_IWRITE)
+    r.report(name)
+
+
 def update_baselines(exe, args, config, has_dxc):
     """WARPで2回描き、画素が一致したら baselines/ の基準画像を書き換える。@return 終了コード"""
     # 意図しない更新を防ぐ: 構成を明示させ、CIでは更新しない
@@ -753,6 +838,7 @@ def main():
             test_engine_path_with_non_acp_characters(r)
             test_engine_path_wins_over_default_include(r)
             test_shader_cache_follows_engine_path(r)
+            test_shader_cache_record_cannot_be_removed(r)
             rgb = test_warp_render_and_determinism(r)
             if rgb is not None:
                 test_baseline_comparison(r, rgb, config, require_render)
