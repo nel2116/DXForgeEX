@@ -68,15 +68,16 @@ jobs:
           fi
           exit 1
       # イベントに記録されたラベルではなく、実行時点のラベルを見る(hold と同じ)。
-      # さらに、最後に merge-ok を付けた時刻が、この head が push された時刻(この head に対するこのPRの
-      # 最初のワークフローの実行の時刻)より後であることを確かめる。ラベルが外れずに残っていても、
-      # push の前の承認は通らない
+      # さらに、最後に merge-ok を付けた時刻が、head が最後にこの SHA になった時刻より後であることを確かめる。
+      # ラベルが外れずに残っていても、push の前の承認は通らない。head を前の SHA に戻した(force-push)ときも、
+      # 戻す前の head への承認は通らない(PR #161 の Codex の指摘)
       - name: Fail until the merge-ok label is set for this head
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         shell: bash
         run: |
@@ -94,8 +95,12 @@ jobs:
           # 時刻はどちらも UTC の ISO 8601(YYYY-MM-DDTHH:MM:SSZ)なので、文字列のまま比べられる
           approved_at=$(gh api --paginate "repos/$GH_REPO/issues/$PR_NUMBER/events" \
             --jq '.[] | select(.event == "labeled" and .label.name == "merge-ok") | .created_at' | sort | tail -n 1)
-          pushed_at=$(gh api --paginate "repos/$GH_REPO/actions/runs?event=pull_request&head_sha=$HEAD_SHA" \
-            --jq ".workflow_runs[] | select(any(.pull_requests[]?; .number == $PR_NUMBER)) | .created_at" | sort | head -n 1)
+          # head が最後にこの SHA になった時刻: このPRの実行を時刻の順に並べ、最後に続いているこの SHA の実行の
+          # うち最初のものの時刻。同じ SHA の最初の実行の時刻にすると、A → B(承認)→ A と戻したときに、
+          # B への承認が A にも効いてしまう
+          pushed_at=$(gh api --paginate "repos/$GH_REPO/actions/runs?event=pull_request&branch=$HEAD_REF" \
+            --jq ".workflow_runs[] | select(any(.pull_requests[]?; .number == $PR_NUMBER)) | [.created_at, .head_sha] | @tsv" \
+            | sort | awk -F '\t' -v sha="$HEAD_SHA" '$2 != sha { start = "" } $2 == sha && start == "" { start = $1 } END { print start }')
           if [ -z "$approved_at" ] || [ -z "$pushed_at" ]; then
             echo "::error::Could not read when 'merge-ok' was added ($approved_at) or when ${HEAD_SHA:0:7} was pushed ($pushed_at)."
             exit 1
