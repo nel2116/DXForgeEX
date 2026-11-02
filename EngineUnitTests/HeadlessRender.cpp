@@ -16,6 +16,7 @@
 //            同じ経路(EngineInit)で行うようにした (Primal Day 078, #31)
 // 2026/11/02 エンジンのシェーダーのソースを探すルートのフォルダを --engine-path で渡せるようにした (#31 の Codex の指摘)
 // 2026/11/02 TestShader.hlsl のパスを ANSI に変換せずに渡すようにした (#31 の Codex の指摘)
+// 2026/11/02 エンジンのシェーダーのフォルダを extra_args の -I ではなく compile_shader() の引数で渡すようにした (#150)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -377,17 +378,18 @@ namespace dxforge::headless::render
 				info.file_name = "TestShader.hlsl";
 				info.function = "TestShaderVS";
 				info.type = graphics::shader_type::vertex;
+				// NOTE: エンジンのシェーダーのフォルダは引数で渡す。extra_args の -I にすると、既定のフォルダ(実行ファイルの
+				//		 ..\..\)より後になり、そこにある別のエンジンのヘッダーが優先される(#150)
+				const std::filesystem::path include_folder{ editor::engine_shaders_source_folder(engine_root) };
 				utl::vector<std::wstring> extra_args{};
-				extra_args.emplace_back(L"-I");
-				extra_args.emplace_back(editor::engine_shaders_source_folder(engine_root).wstring());
 				extra_args.emplace_back(L"-D");
 				extra_args.emplace_back(L"ELEMENTS_TYPE=1");
-				const std::unique_ptr<u8[]> vertex_shader{ compile_shader(info, shader_path, extra_args) };
+				const std::unique_ptr<u8[]> vertex_shader{ compile_shader(info, shader_path, extra_args, false, include_folder) };
 
 				info.function = "TestShaderPS";
 				info.type = graphics::shader_type::pixel;
-				extra_args.resize(2);	// -I だけを残す
-				const std::unique_ptr<u8[]> pixel_shader{ compile_shader(info, shader_path, extra_args) };
+				extra_args.clear();
+				const std::unique_ptr<u8[]> pixel_shader{ compile_shader(info, shader_path, extra_args, false, include_folder) };
 				if (!vertex_shader || !pixel_shader) return "failed to compile EngineTest/TestShader.hlsl";
 
 				const u8* vertex_shaders[]{ vertex_shader.get() };

@@ -18,6 +18,8 @@
 #      AddShaderGroup() に渡すと有効なIDが返り、RemoveShaderGroup() で消せる。壊れたデータでは無効なIDが返る。
 #   1b. エンジンのシェーダーのフォルダ(-I)のパスに ACP(1252、932)で表せない文字が入っていても、同じようにコンパイルできる
 #      (引数は UTF-8 で渡し、DLL の中で UTF-16 にする。ANSI には変換しない。#31 の Codex の指摘)。
+#   1c. 作業フォルダの ..\..\DXForgeEngine\Graphics\Direct3D12\Shaders(既定の -I)に、内容の違う同名のヘッダーがあっても、
+#      -I で指定したフォルダのヘッダーでコンパイルされる(指定があるときは既定のフォルダを -I に付けない。#150)。
 #   5. dxcompiler.dll を読み込めずにコンパイルが失敗しても、あとで dxcompiler.dll / dxil.dll を置けば、同じプロセスで
 #      次のコンパイルが成功する(失敗をキャッシュしない。エディタの「再試行」のため。#31 の Codex の指摘)。
 #      DLL を一時フォルダにコピーし、別のプロセス(--dxc-retry-child)で確かめる。
@@ -146,6 +148,8 @@ def add_shader_group(dll, shader_type, count, packed):
 
 
 DXC_DLLS = ("dxcompiler.dll", "dxil.dll")
+# 既定の -I のフォルダに置く、使われたらコンパイルが失敗するヘッダーの中身(#150)
+DEFAULT_INCLUDE_POISON = "#error the default include folder (../../DXForgeEngine/Graphics/Direct3D12/Shaders/ of the working folder) was used\n"
 
 
 def dxc_retry_child(folder, dxc_source_folder):
@@ -218,6 +222,27 @@ def main():
 			f"MainPS with -I {non_acp_shaders!a}: {len(r.byte_code)} bytes, errors={r.errors!a}")
 	finally:
 		shutil.rmtree(non_acp_root, ignore_errors=True)
+
+	print("1c. The specified include folder wins over the default one (#150)")
+	poison_root = tempfile.mkdtemp(prefix="dxforge_default_include_")
+	previous_cwd = os.getcwd()
+	try:
+		# 作業フォルダ <root>\a\b の ..\..\DXForgeEngine\Graphics\Direct3D12\Shaders に、#error だけの同名のヘッダーを置く
+		default_shaders = os.path.join(poison_root, "DXForgeEngine", "Graphics", "Direct3D12", "Shaders")
+		os.makedirs(default_shaders)
+		for header in os.listdir(ENGINE_SHADERS_DIR):
+			if header.endswith(".hlsli"):
+				with open(os.path.join(default_shaders, header), "w", encoding="utf-8") as f:
+					f.write(DEFAULT_INCLUDE_POISON)
+		work = os.path.join(poison_root, "a", "b")
+		os.makedirs(work)
+		os.chdir(work)
+		r = compile_shader(dll, code, "MainPS", SHADER_TYPE_PIXEL, include)
+		check(r.ok and r.byte_code == pixel_shader.byte_code and not r.errors,
+			f"MainPS with -I <engine shaders> while the default folder has other headers: {len(r.byte_code)} bytes, errors={r.errors!a}")
+	finally:
+		os.chdir(previous_cwd)
+		shutil.rmtree(poison_root, ignore_errors=True)
 
 	print("2. Broken shaders")
 	broken = code.replace("PixelOut psOut;", "PixelOut psOut = ;", 1)

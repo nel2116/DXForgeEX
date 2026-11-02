@@ -608,6 +608,34 @@ def test_engine_path_with_non_acp_characters(r):
     r.report(name)
 
 
+def test_engine_path_wins_over_default_include(r):
+    """--engine-path を渡したら、実行ファイルの ..\\..\\ にある別のエンジンのヘッダーを使わない(#150)
+
+    実行ファイルの ..\\..\\DXForgeEngine\\Graphics\\Direct3D12\\Shaders(既定の -I)に、#error だけの同名のヘッダーを置き、
+    --engine-path にはこのリポジトリを渡す。エンジンのシェーダーも EngineTest/TestShader.hlsl も、指定したほうでコンパイルされる。
+    """
+    name = "engine path wins over the default include folder"
+    root = os.path.join(r.work_dir, "default_include_repo")
+    folder = os.path.join(root, "x64", "Config")
+    os.makedirs(folder)
+    exe = shutil.copy2(r.exe, folder)
+    for dll in ("dxcompiler.dll", "dxil.dll"):
+        shutil.copy2(os.path.join(os.path.dirname(r.exe), dll), folder)
+    default_shaders = os.path.join(root, "DXForgeEngine", "Graphics", "Direct3D12", "Shaders")
+    os.makedirs(default_shaders)
+    engine_shaders = os.path.join(REPO_ROOT, "DXForgeEngine", "Graphics", "Direct3D12", "Shaders")
+    for header in os.listdir(engine_shaders):
+        if header.endswith(".hlsli"):
+            with open(os.path.join(default_shaders, header), "w", encoding="utf-8") as f:
+                f.write("#error the default include folder (..\\..\\ of the exe) was used\n")
+    png = os.path.join(r.work_dir, "default_include.png")
+    code, result, stderr = r.run_json(r.render_args(png) + ["--engine-path", REPO_ROOT + os.sep], exe)
+    r.check_no_crash(name, code, stderr)
+    r.check(f"{name}: exit code", code == EXIT_SUCCESS, f"got {code}; result: {result}; stderr: {stderr.strip()}")
+    r.check(f"{name}: png", os.path.isfile(png), png)
+    r.report(name)
+
+
 def update_baselines(exe, args, config, has_dxc):
     """WARPで2回描き、画素が一致したら baselines/ の基準画像を書き換える。@return 終了コード"""
     # 意図しない更新を防ぐ: 構成を明示させ、CIでは更新しない
@@ -677,6 +705,7 @@ def main():
             test_shader_compilation_throws(r)
             test_engine_path_outside_repo(r)
             test_engine_path_with_non_acp_characters(r)
+            test_engine_path_wins_over_default_include(r)
             rgb = test_warp_render_and_determinism(r)
             if rgb is not None:
                 test_baseline_comparison(r, rgb, config, require_render)

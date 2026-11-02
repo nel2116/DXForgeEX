@@ -13,8 +13,10 @@
 // 2026/10/27 TILE_SIZEを定義する条件が常に真だったのを修正し、ライトカリングの2つのコンピュートシェーダだけに渡すようにした(#101)
 // 2026/11/02 エンジンのシェーダーのソースのフォルダを compile_shaders() に渡せるようにし、DXCの読み込みの失敗をキャッシュしないようにした(#31)
 // 2026/11/02 compile_shader() のフォルダを std::filesystem::path で受け、ANSI に変換しないようにした(#31)
+// 2026/11/02 インクルードのフォルダの指定があるときは、既定のフォルダを -I に付けないようにした(#150)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
+#include <algorithm>
 #include <fstream>
 #include <filesystem>
 #include <mutex>
@@ -150,7 +152,8 @@ namespace
 
 		bool is_valid() const { return _compiler && _utils && _include_handler; }
 
-		dxc_compiled_shader compile(const u8* data, u32 data_size, graphics::shader_type::type type, const char* function, dxforge::utl::vector<std::wstring>& extra_args)
+		dxc_compiled_shader compile(const u8* data, u32 data_size, graphics::shader_type::type type, const char* function, dxforge::utl::vector<std::wstring>& extra_args,
+			const std::filesystem::path& include_folder = {})
 		{
 			assert(data && data_size && function);
 			assert(type < graphics::shader_type::count);
@@ -170,10 +173,10 @@ namespace
 			OutputDebugStringA("Compiling ");
 			OutputDebugStringA(function);
 			OutputDebugStringA("\n");
-			return compile(source_blob.Get(), get_args(info, extra_args), DXC_CP_UTF8);
+			return compile(source_blob.Get(), get_args(info, extra_args, include_folder), DXC_CP_UTF8);
 		}
 
-		// include_folder: -I に渡すフォルダ。空なら shaders_source_path(作業フォルダからの相対パス)
+		// include_folder: -I に渡すフォルダ。-I の決め方は get_args() を参照
 		dxc_compiled_shader compile(shader_file_info info, std::filesystem::path full_path, dxforge::utl::vector<std::wstring>& extra_args,
 			const std::filesystem::path& include_folder = {})
 		{
@@ -272,6 +275,9 @@ namespace
 		}
 
 	private:	// プライベート関数
+		// -I は、include_folder があればそれ、なければ extra_args の -I(呼び出し側の指定)、どちらもなければ
+		// shaders_source_path(作業フォルダからの相対パス。EngineTest)。既定のフォルダを指定より先に付けると、そこにある
+		// 同名のヘッダーが優先されて別のツリーのソースが混ざるので、指定があるときは付けない(#150)。
 		utl::vector<std::wstring> get_args(const shader_file_info& info, utl::vector<std::wstring>& extra_args,
 			const std::filesystem::path& include_folder = {})
 		{
@@ -283,8 +289,17 @@ namespace
 			args.emplace_back(to_wstring(info.function));
 			args.emplace_back(L"-T");
 			args.emplace_back(to_wstring(_profile_string[(u32)info.type]));
-			args.emplace_back(L"-I");
-			args.emplace_back(include_folder.empty() ? to_wstring(shaders_source_path) : include_folder.wstring());
+			const bool has_include_arg{ std::find(extra_args.begin(), extra_args.end(), L"-I") != extra_args.end() };
+			if (!include_folder.empty())
+			{
+				args.emplace_back(L"-I");
+				args.emplace_back(include_folder.wstring());
+			}
+			else if (!has_include_arg)
+			{
+				args.emplace_back(L"-I");
+				args.emplace_back(to_wstring(shaders_source_path));
+			}
 			args.emplace_back(L"-enable-16bit-types");
 			args.emplace_back(DXC_ARG_ALL_RESOURCES_BOUND);
 #if _DEBUG
@@ -419,17 +434,19 @@ std::wstring to_wstring(const char* c)
 	return s;
 }
 
-std::unique_ptr<u8[]> compile_shader(shader_file_info info, const u8* code, u32 code_size, utl::vector<std::wstring>& extra_args, bool include_errors_and_disassembly/*=false*/)
+std::unique_ptr<u8[]> compile_shader(shader_file_info info, const u8* code, u32 code_size, utl::vector<std::wstring>& extra_args, bool include_errors_and_disassembly/*=false*/,
+	const std::filesystem::path& include_folder/*={}*/)
 {
 	assert(!info.file_name && info.function && code && code_size);
 
 	// NOTE: according to marcelolr()
 	//		"...コンパイラー・インスタンスを作るのはかなり安いので、キャッシュしたり共有したりする手間をかける価値はないだろう。"
 	shader_compiler compiler{};
-	return pack_compiled_shader(compiler.compile(code, code_size, info.type, info.function, extra_args), include_errors_and_disassembly);
+	return pack_compiled_shader(compiler.compile(code, code_size, info.type, info.function, extra_args, include_folder), include_errors_and_disassembly);
 }
 
-std::unique_ptr<u8[]> compile_shader(shader_file_info info, const std::filesystem::path& file_path, utl::vector<std::wstring>& extra_args, bool include_errors_and_disassembly/*=false*/)
+std::unique_ptr<u8[]> compile_shader(shader_file_info info, const std::filesystem::path& file_path, utl::vector<std::wstring>& extra_args, bool include_errors_and_disassembly/*=false*/,
+	const std::filesystem::path& include_folder/*={}*/)
 {
 	std::filesystem::path full_path{ file_path };
 	full_path += info.file_name;
@@ -438,7 +455,7 @@ std::unique_ptr<u8[]> compile_shader(shader_file_info info, const std::filesyste
 	// NOTE: according to marcelolr()
 	//		"...コンパイラー・インスタンスを作るのはかなり安いので、キャッシュしたり共有したりする手間をかける価値はないだろう。"
 	shader_compiler compiler{};
-	return pack_compiled_shader(compiler.compile(info, full_path, extra_args), include_errors_and_disassembly);
+	return pack_compiled_shader(compiler.compile(info, full_path, extra_args, include_folder), include_errors_and_disassembly);
 }
 
 
