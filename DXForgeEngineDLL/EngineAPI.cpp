@@ -9,6 +9,7 @@
 // 2026/10/27 シェーダーのコンパイルとシェーダーグループの登録・削除を追加(Primal Day 076)
 // 2026/10/30 エディタからアセットのリソースを作る・破棄する CreateResource / DestroyResource を追加(Primal Day 077, #30)
 // 2026/11/02 エディタからエンジンを初期化・終了する InitializeEngine / ShutdownEngine を追加(Primal Day 078, #31)
+// 2026/11/02 CompileShader のインクルードのフォルダの扱いをコメントに追加(#150)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Common.h"
@@ -232,6 +233,8 @@ EDITOR_INTERFACE void RemoveShaderGroup(id::id_type id)
 // コンパイルできたら TRUE。失敗しても、DXCのエラーがあれば byte_code_size = 0 でエラーを返す。
 // 返すバッファ(byte_code_error_assembly_hash)は CoTaskMemAlloc で確保するので、呼び出し側が CoTaskMemFree で解放する。
 // 並び: バイトコード, エラー, 逆アセンブル, ハッシュ
+// NOTE: エディタはエンジンのシェーダーのフォルダを extra_args の -I で渡す(ShaderGroup.ExtraArgs としてアセットに保存される)。
+//       -I があるときは、作業フォルダからの相対パスの既定のフォルダを -I に付けない(get_args()。#150)。
 EDITOR_INTERFACE u32 CompileShader(shader_data* data)
 {
 	if (!data) return FALSE;
