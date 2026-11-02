@@ -45,10 +45,13 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
+      actions: read
+      issues: read
       pull-requests: write
     steps:
       # 承認したあとに足されたコミットを、承認されたまま通さない(codex-review がコミットごとに付くのと同じ考え方)。
-      # ラベルを外せなかったとき(forkからのPRでトークンが読み取り専用など)も、このrunは失敗にする
+      # ここでラベルを外すのは見た目のため。外せなくても(forkからのPRでトークンが読み取り専用など)、
+      # 次のステップが承認の時刻と head の時刻を比べるので、古い承認は通らない
       - name: Withdraw the approval when new commits are pushed
         if: github.event.action == 'synchronize'
         env:
@@ -58,25 +61,50 @@ jobs:
         run: |
           labels=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')
           if printf '%s\n' "$labels" | grep -qx 'merge-ok'; then
-            gh pr edit "$PR_NUMBER" --remove-label merge-ok
+            gh pr edit "$PR_NUMBER" --remove-label merge-ok || echo "::warning::Could not remove the 'merge-ok' label; the old approval is still rejected by its time."
             echo "::error::New commits were pushed after the approval; the 'merge-ok' label was removed. Add it again to approve this head."
           else
             echo "::error::New commits were pushed. Add the 'merge-ok' label to approve this head."
           fi
           exit 1
-      # イベントに記録されたラベルではなく、実行時点のラベルを見る(hold と同じ)
-      - name: Fail until the merge-ok label is set
+      # イベントに記録されたラベルではなく、実行時点のラベルを見る(hold と同じ)。
+      # さらに、最後に merge-ok を付けた時刻が、この head が push された時刻(この head に対するこのPRの
+      # 最初のワークフローの実行の時刻)より後であることを確かめる。ラベルが外れずに残っていても、
+      # push の前の承認は通らない
+      - name: Fail until the merge-ok label is set for this head
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        shell: bash
         run: |
+          set -euo pipefail
+          # forkからのPRの実行には pull_requests が記録されず、head の push の時刻を確かめられないので承認できない
+          if [ "$HEAD_REPO" != "$GH_REPO" ]; then
+            echo "::error::Pull requests from forks cannot be approved with 'merge-ok' (the approval cannot be tied to the head). Push the branch to $GH_REPO instead."
+            exit 1
+          fi
           labels=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')
           if ! printf '%s\n' "$labels" | grep -qx 'merge-ok'; then
             echo "::error::This PR has no 'merge-ok' label. A human adds it to approve the merge."
             exit 1
           fi
-          echo "Approved by the 'merge-ok' label."
+          # 時刻はどちらも UTC の ISO 8601(YYYY-MM-DDTHH:MM:SSZ)なので、文字列のまま比べられる
+          approved_at=$(gh api --paginate "repos/$GH_REPO/issues/$PR_NUMBER/events" \
+            --jq '.[] | select(.event == "labeled" and .label.name == "merge-ok") | .created_at' | sort | tail -n 1)
+          pushed_at=$(gh api --paginate "repos/$GH_REPO/actions/runs?event=pull_request&head_sha=$HEAD_SHA" \
+            --jq ".workflow_runs[] | select(any(.pull_requests[]?; .number == $PR_NUMBER)) | .created_at" | sort | head -n 1)
+          if [ -z "$approved_at" ] || [ -z "$pushed_at" ]; then
+            echo "::error::Could not read when 'merge-ok' was added ($approved_at) or when ${HEAD_SHA:0:7} was pushed ($pushed_at)."
+            exit 1
+          fi
+          if [[ ! "$approved_at" > "$pushed_at" ]]; then
+            echo "::error::'merge-ok' was added at $approved_at, before ${HEAD_SHA:0:7} was pushed at $pushed_at. Add it again to approve this head."
+            exit 1
+          fi
+          echo "Approved by 'merge-ok' at $approved_at (head ${HEAD_SHA:0:7} pushed at $pushed_at)."
 
   close-issues:
     name: Close linked issues
