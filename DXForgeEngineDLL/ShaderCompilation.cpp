@@ -14,6 +14,7 @@
 // 2026/11/02 エンジンのシェーダーのソースのフォルダを compile_shaders() に渡せるようにし、DXCの読み込みの失敗をキャッシュしないようにした(#31)
 // 2026/11/02 compile_shader() のフォルダを std::filesystem::path で受け、ANSI に変換しないようにした(#31)
 // 2026/11/02 インクルードのフォルダの指定があるときは、既定のフォルダを -I に付けないようにした(#150)
+// 2026/11/02 shaders.bin を作ったソースのフォルダを shaders.bin.source に記録し、フォルダが変わったら作り直すようにした(#152)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include <algorithm>
@@ -338,6 +339,53 @@ namespace
 		return std::filesystem::path{ graphics::get_engine_shaders_path(graphics::graphics_platform::direct3d12) };
 	}
 
+	// shaders.bin を作ったソースのフォルダを記録するファイル(shaders.bin の隣。中身は絶対パスの UTF-8)。
+	// NOTE: shaders.bin の形式はエンジン(D3D12Shaders.cpp)が読むので変えず、隣のファイルに書く(#152)。
+	std::filesystem::path get_shaders_source_record_path()
+	{
+		std::filesystem::path path{ get_engine_shaders_path() };
+		path += L".source";
+		return path;
+	}
+
+	std::string to_utf8(const std::wstring& text)
+	{
+		if (text.empty()) return {};
+		const s32 length{ WideCharToMultiByte(CP_UTF8, 0, text.c_str(), (s32)text.size(), nullptr, 0, nullptr, nullptr) };
+		if (length <= 0) return {};
+		std::string result(length, '\0');
+		WideCharToMultiByte(CP_UTF8, 0, text.c_str(), (s32)text.size(), result.data(), length, nullptr, nullptr);
+		return result;
+	}
+
+	// shaders.bin を作ったソースのフォルダが source_folder と同じか。記録がない・読めないときは false(作り直す)。
+	bool is_recorded_source_folder(const std::filesystem::path& source_folder)
+	{
+		std::ifstream file{ get_shaders_source_record_path(), std::ios::in | std::ios::binary };
+		if (!file) return false;
+		const std::string recorded{ std::istreambuf_iterator<char>{ file }, std::istreambuf_iterator<char>{} };
+		if (recorded.empty()) return false;
+		std::error_code error{};
+		// NOTE: 大文字小文字や末尾の区切り、相対パスの違いがあっても、同じフォルダなら同じとみなす
+		return std::filesystem::equivalent(std::filesystem::path{ to_wstring(recorded.c_str()) }, source_folder, error) && !error;
+	}
+
+	// shaders.bin を作ったソースのフォルダを記録する。書けなくても失敗にはしない(次に作り直すだけ)。
+	void record_source_folder(const std::filesystem::path& source_folder)
+	{
+		std::error_code error{};
+		const std::filesystem::path absolute_folder{ std::filesystem::absolute(source_folder, error).lexically_normal() };
+		const std::string utf8{ error ? std::string{} : to_utf8(absolute_folder.wstring()) };
+		std::ofstream file{ get_shaders_source_record_path(), std::ios::out | std::ios::binary | std::ios::trunc };
+		if (!utf8.empty() && file) file.write(utf8.data(), (std::streamsize)utf8.size());
+		if (utf8.empty() || !file)
+		{
+			OutputDebugStringW(L"[DXForgeEngineDLL] failed to record the source folder of shaders.bin\n");
+			file.close();
+			std::filesystem::remove(get_shaders_source_record_path(), error);
+		}
+	}
+
 	bool compiled_shaders_are_up_to_date(const std::filesystem::path& source_folder)
 	{
 		auto engine_shaders_path = get_engine_shaders_path();
@@ -352,7 +400,9 @@ namespace
 			}
 		}
 
-		return true;
+		// ソースが shaders.bin より古くても、別のエンジンのフォルダから作った shaders.bin なら作り直す(#152)。
+		// 記録がない shaders.bin(記録を始める前に作ったもの)も作り直す。
+		return is_recorded_source_folder(source_folder);
 	}
 
 	bool save_compiled_shaders(utl::vector<dxc_compiled_shader>& shaders)
@@ -495,5 +545,7 @@ bool compile_shaders(const std::filesystem::path& source_folder/*={}*/)
 		}
 	}
 
-	return save_compiled_shaders(shaders);
+	if (!save_compiled_shaders(shaders)) return false;
+	record_source_folder(folder);
+	return true;
 }

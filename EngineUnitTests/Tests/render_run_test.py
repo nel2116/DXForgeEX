@@ -35,6 +35,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 import zlib
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -517,12 +518,16 @@ def test_graphics_init_failed(r):
     リポジトリと同じ並び(x64/<構成>/ と ..\\..\\ のシェーダーのソース)を一時フォルダに作り、ソースより新しい空の
     shaders.bin を置く。compile_shaders() は最新と見なしてコンパイルせず、エンジンのシェーダーの読み込み
     (shaders::initialize())が失敗して、D3D12の初期化が failed_init() で終わる。
+    shaders.bin を作ったソースのフォルダの記録(shaders.bin.source)も置く。記録がない・違うと作り直す(#152)。
     """
     name = "graphics initialization fails (empty shaders.bin)"
     exe, exe_folder = make_repo_copy(r, "init_failure_repo")
     shaders_bin = os.path.join(exe_folder, "shaders", "d3d12", "shaders.bin")
     os.makedirs(os.path.dirname(shaders_bin))
     open(shaders_bin, "wb").close()
+    source_folder = os.path.normpath(os.path.join(exe_folder, "..", "..", "DXForgeEngine", "Graphics", "Direct3D12", "Shaders"))
+    with open(shaders_bin + ".source", "wb") as f:
+        f.write(source_folder.encode("utf-8"))
     # NOTE: copy2 はソースの更新日時を保つので、今作った shaders.bin のほうが新しい
     png = os.path.join(r.work_dir, "init_failure.png")
     r.expect_error(name, r.render_args(png), EXIT_GRAPHICS_INIT_FAILED, "graphics_init_failed", exe=exe,
@@ -636,6 +641,47 @@ def test_engine_path_wins_over_default_include(r):
     r.report(name)
 
 
+def test_shader_cache_follows_engine_path(r):
+    """エンジンのフォルダを切り替えたら、ソースが shaders.bin より古くても shaders.bin を作り直す(#152)
+
+    エンジン A でコンパイルしたあと、ソースの更新日時が古い(2000 年)エンジン B を --engine-path に渡すと作り直す。
+    同じ B でもう一度実行したときは作り直さない。作り直したかどうかは shaders.bin の更新日時で見る。
+    """
+    name = "shader cache follows the engine path"
+    folder = os.path.join(r.work_dir, "shader_cache_exe", "x64", "Config")
+    os.makedirs(folder)
+    exe = shutil.copy2(r.exe, folder)
+    for dll in ("dxcompiler.dll", "dxil.dll"):
+        shutil.copy2(os.path.join(os.path.dirname(r.exe), dll), folder)
+    engine_a = os.path.join(r.work_dir, "shader_cache_engines", "A")
+    engine_b = os.path.join(r.work_dir, "shader_cache_engines", "B")
+    copy_engine_sources(engine_a)
+    copy_engine_sources(engine_b)
+    old = 946684800  # 2000-01-01
+    for dirpath, _, filenames in os.walk(engine_b):
+        for filename in filenames:
+            os.utime(os.path.join(dirpath, filename), (old, old))
+    shaders_bin = os.path.join(folder, "shaders", "d3d12", "shaders.bin")
+    png = os.path.join(r.work_dir, "shader_cache.png")
+
+    def render(engine, label):
+        code, result, stderr = r.run_json(r.render_args(png) + ["--engine-path", engine], exe)
+        r.check_no_crash(f"{name}: {label}", code, stderr)
+        r.check(f"{name}: {label}: exit code", code == EXIT_SUCCESS, f"got {code}; result: {result}; stderr: {stderr.strip()}")
+        return os.stat(shaders_bin).st_mtime_ns if os.path.isfile(shaders_bin) else None
+
+    first = render(engine_a, "engine A")
+    r.check(f"{name}: shaders.bin is written for engine A", first is not None, shaders_bin)
+    time.sleep(1.1)  # 更新日時の分解能より長く待つ
+    second = render(engine_b, "engine B (older sources)")
+    r.check(f"{name}: switching to engine B rebuilds shaders.bin", first is not None and second is not None and second > first,
+            f"mtime {first} -> {second}")
+    time.sleep(1.1)
+    third = render(engine_b, "engine B again")
+    r.check(f"{name}: the same engine B does not rebuild shaders.bin", second is not None and third == second, f"mtime {second} -> {third}")
+    r.report(name)
+
+
 def update_baselines(exe, args, config, has_dxc):
     """WARPで2回描き、画素が一致したら baselines/ の基準画像を書き換える。@return 終了コード"""
     # 意図しない更新を防ぐ: 構成を明示させ、CIでは更新しない
@@ -706,6 +752,7 @@ def main():
             test_engine_path_outside_repo(r)
             test_engine_path_with_non_acp_characters(r)
             test_engine_path_wins_over_default_include(r)
+            test_shader_cache_follows_engine_path(r)
             rgb = test_warp_render_and_determinism(r)
             if rgb is not None:
                 test_baseline_comparison(r, rgb, config, require_render)
