@@ -31,7 +31,8 @@
     このスクリプトも非ゼロの終了コードを返す。EngineUnitTestsはDebug/Release構成にしか
     マッピングされていないため、*Editor構成のソリューション全体や -Target editor、別の -Project を指定したときは、
     対応するDebug/Release構成でEngineUnitTestsを追加でビルドしてから実行する(以前のビルドで
-    残った古い実行ファイルを黙って実行しないため。#60)。ビルドに失敗したときはテストを実行しない。
+    残った古い実行ファイルを黙って実行しないため。#60)。その前に、-NoRestore でなければ Restore.ps1 で
+    D3D12 Agility SDK のパッケージを復元する(#155)。ビルドに失敗したときはテストを実行しない。
     続けて EngineUnitTests/Tests/headless_run_test.py(python)で、ヘッドレス実行(--game-bin)の
     終了コードと --json の出力を確かめる(#11)。さらに EngineUnitTests/Tests/render_run_test.py で、
     描画のヘッドレス実行(--render、WARPでPNGを書き出す)を確かめる(#127)。DXC(dxcompiler.dll)が
@@ -221,6 +222,20 @@ function Invoke-NativeBuild([string]$MSBuild, [string]$Config, [string]$TargetPr
 	return Invoke-BuildStep -Command { & $MSBuild @msbuildArgs } -ShowFullLog:$DetailedLog
 }
 
+# -RunTests のための EngineUnitTests の追加ビルド(#60)。EngineUnitTests は DXForgeEngine を通して
+# D3D12 Agility SDK のパッケージ(DXForgeEngine/packages.config)を使うため、ビルドの前に復元する。
+# -Target editor ではネイティブのビルドの復元が走らないので、ここで呼ばないとまっさらな worktree では
+# パッケージがなくて失敗する(#155)。-Project EngineUnitTests なので DXC は取得しない(#61)。
+function Invoke-TestsBuild([string]$MSBuild, [string]$Config)
+{
+	if (-not $NoRestore)
+	{
+		Write-Host "== Restore packages [$Config] (EngineUnitTests) =="
+		& "$RepoRoot\Restore.ps1" -Configuration $Config -Project "EngineUnitTests" -MSBuildPath $MSBuild
+	}
+	return Invoke-NativeBuild $MSBuild $Config "EngineUnitTests"
+}
+
 function Get-EditorConfiguration([string]$Config)
 {
 	if ($Config -like "*Editor") { return $Config }
@@ -289,8 +304,7 @@ if ($RunTests)
 	else
 	{
 		if (-not $msbuild) { $msbuild = Resolve-MSBuildPath }
-		# EngineUnitTestsはpackages/の中身を使わないため、復元は不要
-		$testsBuildExit = Invoke-NativeBuild $msbuild $nativeOutputConfiguration "EngineUnitTests"
+		$testsBuildExit = Invoke-TestsBuild $msbuild $nativeOutputConfiguration
 		$summary.testsBuild = [ordered]@{ exitCode = $testsBuildExit; configuration = $nativeOutputConfiguration }
 		if ($testsBuildExit -ne 0 -and $exitCode -eq 0) { $exitCode = $testsBuildExit }
 	}

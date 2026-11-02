@@ -9,6 +9,7 @@
 // 更新履歴
 // 2026/11/02 新規作成 (#155)
 // 2026/11/02 D3D12GetInterface を GetProcAddress で探すテストを追加 (#155)
+// 2026/11/03 D3D12GetInterface のない古い d3d12.dll でも失敗しないようにする (#155)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
@@ -43,10 +44,14 @@ DXFORGE_TEST_CASE(D3D12Runtime_FindsD3D12GetInterfaceAtRunTime)
 	CHECK(reason == "d3d12.dll is not loaded");
 
 	// このテストの exe は d3d12.dll を(D3D12CreateDevice などの静的インポートで)読み込んでいる。
-	// このマシンと CI の Windows の d3d12.dll には D3D12GetInterface がある
+	// このマシンと CI の Windows の d3d12.dll には D3D12GetInterface があるが、Agility SDK 対応前の Windows 10 にはない。
+	// どちらでも、エクスポートがあるときだけ見つかり、ないときは理由が残る(ないことも正しい結果)
 	reason.clear();
-	CHECK(runtime::find_get_interface(GetModuleHandleW(L"d3d12.dll"), reason) != nullptr);
-	CHECK(reason.empty());
+	const HMODULE d3d12{ GetModuleHandleW(L"d3d12.dll") };
+	CHECK(d3d12 != nullptr);
+	const FARPROC found{ runtime::find_get_interface(d3d12, reason) };
+	CHECK(found == GetProcAddress(d3d12, "D3D12GetInterface"));
+	CHECK(found ? reason.empty() : reason.find("D3D12GetInterface") != std::string::npos);
 }
 
 DXFORGE_TEST_CASE(D3D12Runtime_FormatsTheFileVersion)
