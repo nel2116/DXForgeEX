@@ -17,6 +17,7 @@ Current implementation has PBR direct lighting (GGX/Smith/Schlick BRDF in `Shade
 - **ContentTools** (`DynamicLibrary`) — offline asset pipeline: FBX import (`FbxImporter.*`, Autodesk FBX SDK), texture import (`TextureImpoter.cpp`, DirectXTex), procedural primitive meshes (`PrimitiveMesh.*`), tangent generation (MikkTSpace), normal-map detection. Consumed by the editor, not linked into the runtime engine.
 - **DXForgeEditor** (C#/.NET WPF, `ConfigurationType` mapped to the Editor configs) — project browser/creation, scene & game-entity editing (undo/redo commands), content browser, texture/geometry editors, Visual Studio automation for generating and building per-game-project C++ solutions (`ProjectTemplates/*`, `GameDev/VisualStudio.cs`).
 - **DXForgeImport** (C#/.NET console app, `DebugEditor`/`ReleaseEditor` only) — headless asset importer. See `docs/dev/DXForgeImport.md`.
+- **DXForgeCli** (`dxforge.exe`, C#/.NET console app, `DebugEditor`/`ReleaseEditor` only) — `--load-project`: loads a `.dxproj` with the editor's code, writes the editor's `game.bin` and runs it with `EngineUnitTests --game-bin`. See "Project loading" in `docs/dev/BuildAndTest.md`.
 
 ## Engine
 

@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- コマンドラインからプロジェクト(.dxproj)を読み込んで実行する dxforge(Issue #11)。エディタ(DXForgeEditor)の
+       .dxproj の読み込みと game.bin の書き出しのコードをそのまま使い、実行はヘッドレスのランナー(EngineUnitTests の game.bin の実行)に任せる。
+       出力先はエディタと同じ x64\<構成>\。 -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <AssemblyName>dxforge</AssemblyName>
+    <RootNamespace>DXForgeCli</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- エディタのログ(Logger)が WPF の Application/Dispatcher を使うため -->
+    <UseWPF>true</UseWPF>
+    <PlatformTarget>x64</PlatformTarget>
+    <BaseOutputPath>../</BaseOutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Configurations>DebugEditor;ReleaseEditor</Configurations>
+    <Platforms>x64</Platforms>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DebugEditor|x64'">
+    <Optimize>False</Optimize>
+    <!-- SDK が DEBUG を自動で定義するのは構成の名前が Debug のときだけなので、DebugEditor では明示する(#109) -->
+    <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseEditor|x64'">
+    <Optimize>True</Optimize>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DXForgeEditor\DXForgeEditor.csproj" />
+  </ItemGroup>
+</Project>

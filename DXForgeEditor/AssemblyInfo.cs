@@ -12,3 +12,5 @@ using System.Windows;
 
 // コマンドラインのインポーター(DXForgeImport, Issue #10)が、エディタと同じ .asset の書き出し(Content の internal な型)を使うため。
 [assembly: InternalsVisibleTo("DXForgeImport")]
+// コマンドラインの dxforge(DXForgeCli, Issue #11)が、エディタと同じ .dxproj の読み込みと game.bin の書き出しを使うため。
+[assembly: InternalsVisibleTo("dxforge")]

@@ -87,9 +87,13 @@ namespace DXForgeEditor.GameProject
             }
 
             Debug.Assert(_gameEntities != null);
-            foreach (var entity in _gameEntities)
+            // コマンドラインの dxforge(Issue #11)は、エンティティをエンジン(DXForgeEngineDLL)に作らない
+            if (!ProjectLoadEnvironment.Headless)
             {
-                entity.IsActive = IsActive;
+                foreach (var entity in _gameEntities)
+                {
+                    entity.IsActive = IsActive;
+                }
             }
 
             AddGameEntityCommand = new RelayCommand<GameEntity>(x =>

@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-    エディタ(DXForgeEditor)とインポーター(DXForgeImport)の構成ごとに、C# の DEBUG が定義されているかを確かめる回帰テスト(Issue #109)。
+    エディタ(DXForgeEditor)とインポーター(DXForgeImport)と dxforge(DXForgeCli)の構成ごとに、C# の DEBUG が定義されているかを確かめる回帰テスト(Issue #109)。
 
 .DESCRIPTION
     .NET SDK が DEBUG を自動で定義するのは構成の名前が Debug のときだけなので、DebugEditor では .csproj で定義する必要がある。
@@ -69,7 +69,8 @@ function Get-DebugCallCount([string]$assemblyPath, [string]$name)
 }
 
 Write-Host "1. Evaluated DefineConstants / Optimize"
-foreach ($project in @("DXForgeEditor\DXForgeEditor.csproj", "DXForgeImport\DXForgeImport.csproj"))
+# dxforge(DXForgeCli、#11)は DEBUG で既定のランナー(x64\Debug か x64\Release)を決めるので、これも確かめる
+foreach ($project in @("DXForgeEditor\DXForgeEditor.csproj", "DXForgeImport\DXForgeImport.csproj", "DXForgeCli\DXForgeCli.csproj"))
 {
 	foreach ($config in @("DebugEditor", "ReleaseEditor"))
 	{
