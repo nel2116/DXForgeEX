@@ -14,7 +14,7 @@
 // 2026/10/18 update()中に削除したスクリプトもremove()の中で破棄し、実行中のスクリプト自身の削除だけを遅らせるよう変更(デストラクタからTransformを読めるようにするため) (#54)
 // 2026/10/19 update()の中で削除されたエンティティのTransformキャッシュを、適用する前に取り除くよう修正(削除済み・再利用されたスロットに書き込んでいたため) (#78)
 // 2026/10/27 get_script_creator()が未登録のタグでassertし、Releaseではend()を参照外ししていたのを、nullptrを返すように修正 (#113)
-// 2026/11/02 get_script_names()をATL(CComSafeArray/A2BSTR_EX)からOLE AutomationのAPIに書き直し、UTF-8の名前をUTF-16に変換するよう変更 (#146)
+// 2026/11/02 get_script_names()をATL(CComSafeArray/A2BSTR_EX)からOLE AutomationのAPIに書き直し(名前は従来どおりANSIコードページで復号する) (#146)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Script.h"
@@ -359,7 +359,12 @@ namespace dxforge::script::detail
 	namespace
 	{
 		/// @brief 狭い文字列をBSTRに変換する
-		/// @param name 変換する文字列。UTF-8として読み、UTF-8として不正ならANSIコードページ(A2BSTR_EXと同じ)として読む
+		/// @param name 変換する文字列。ANSIコードページ(CP_ACP)として読む(A2BSTR_EXと同じ)
+		/// @note エディタは表示した名前をGetScriptCreater(string)にANSIでマーシャリングして渡し、DLLはそのバイト列のハッシュで
+		///		  スクリプトを探す。ここもCP_ACPで復号しないと往復で登録時のバイト列に戻らず、スクリプトが見つからなくなる。
+		///		  ゲームのプロジェクトは /utf-8 なしでビルドするので、REGISTER_SCRIPT の #TYPE もANSIのバイト列になる。
+		///		  UTF-8を先に試すと、UTF-8としても正しいANSIのバイト列を誤って復号するので、試さない
+
 		/// @return 作ったBSTR。呼び出し側がSysFreeString()で解放する。変換できない場合はnullptr
 		BSTR to_bstr(const std::string& name)
 		{
@@ -367,21 +372,12 @@ namespace dxforge::script::detail
 			if (name.size() > (size_t)INT_MAX) return nullptr;
 
 			const int length{ (int)name.size() };
-			UINT code_page{ CP_UTF8 };
-			DWORD flags{ MB_ERR_INVALID_CHARS };
-			int wide_length{ MultiByteToWideChar(code_page, flags, name.data(), length, nullptr, 0) };
-			if (wide_length <= 0)
-			{
-				// NOTE: /utf-8 なしでビルドしたゲームのコードでは、REGISTER_SCRIPT の #TYPE がANSIコードページになる
-				code_page = CP_ACP;
-				flags = 0;
-				wide_length = MultiByteToWideChar(code_page, flags, name.data(), length, nullptr, 0);
-				if (wide_length <= 0) return nullptr;
-			}
+			const int wide_length{ MultiByteToWideChar(CP_ACP, 0, name.data(), length, nullptr, 0) };
+			if (wide_length <= 0) return nullptr;
 
 			BSTR bstr{ SysAllocStringLen(nullptr, (UINT)wide_length) };
 			if (!bstr) return nullptr;
-			if (MultiByteToWideChar(code_page, flags, name.data(), length, bstr, wide_length) != wide_length)
+			if (MultiByteToWideChar(CP_ACP, 0, name.data(), length, bstr, wide_length) != wide_length)
 			{
 				SysFreeString(bstr);
 				return nullptr;

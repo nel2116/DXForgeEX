@@ -7,8 +7,8 @@
     シェーダのコンパイルとエンジンへのシェーダの登録には、x64\<Configuration>\ の DXForgeEngineDLL.dll を使う
     (エンジンの初期化は要らない)。DLL がなければ、コンパイル済みに見せた偽のシェーダーグループと、偽のシェーダーの登録
     (ShaderGroup.AddShaderGroupToEngine / RemoveShaderGroupFromEngine)を使い、DLL が要る項目は
-    SKIP として名前と件数を出す(CI のランナーには ATL がなく DLL をビルドできないため)。-RequireEngineDll を付けると、
-    DLL がないときは失敗にする(ローカルでは付けて、全項目を実行する)。Logger と Material.Save() のアイコンに WPF が要るので、WPF の Application を作ってから呼ぶ。
+    SKIP として名前と件数を出す(DLL をビルドしていない環境のため)。-RequireEngineDll を付けると、
+    DLL がないときは失敗にする(CI とローカルでは付けて、全項目を実行する。#146)。Logger と Material.Save() のアイコンに WPF が要るので、WPF の Application を作ってから呼ぶ。
     ファイルは %TEMP% の下に作り、最後に消す。
 
     確かめること:

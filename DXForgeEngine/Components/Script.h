@@ -34,7 +34,7 @@ namespace dxforge::script
 		[[nodiscard]] u32 pending_begin_play_count();
 
 		/// @brief スクリプト名の配列から、BSTRの1次元SAFEARRAY(下限0)を作る
-		/// @param names スクリプト名(UTF-8。UTF-8として読めない名前はANSIコードページとして読む)
+		/// @param names スクリプト名(ANSIコードページ(CP_ACP)のバイト列として読む。エディタのANSIマーシャリングと往復させるため)
 		/// @param count 名前の数
 		/// @return 作ったSAFEARRAY。呼び出し側がSafeArrayDestroy()で解放する。countが0、または作れなかった場合はnullptr
 		/// @note エディタ向けのget_script_names()が使う。ATLを使わずにOLE AutomationのAPIだけで作る(#146)
