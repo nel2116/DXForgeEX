@@ -2,6 +2,9 @@
 #
 #   - hold: PRに hold ラベルが付いている間は失敗する。develop のブランチ保護で必須にしているため、
 #     CI・codex-review がそろっていても、hold を外すまで自動マージされない(人が止めるための手段)。
+#   - approval: PRに merge-ok ラベルが付いているときだけ成功する(人がマージを承認するための手段、#160)。
+#     エージェントは codex-review を付けて自動マージを予約するところまでで、マージを確定するのは人が付ける
+#     merge-ok である。承認は head ごとに取るため、push(synchronize)されたらラベルを外して失敗する。
 #   - close-issues: develop にマージされたPRの本文にある "Closes #NN" のIssueを閉じる。
 #     GitHub がPRの本文でIssueを閉じるのは既定のブランチ(main)へのマージだけなので、ここで代わりに行う。
 #     pull_request_target は向き先に関係なく既定のブランチ(main)のワークフローを使うため、develop に
@@ -36,6 +39,44 @@ jobs:
             exit 1
           fi
           echo "No hold label."
+
+  approval:
+    name: Merge approved
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      # 承認したあとに足されたコミットを、承認されたまま通さない(codex-review がコミットごとに付くのと同じ考え方)。
+      # ラベルを外せなかったとき(forkからのPRでトークンが読み取り専用など)も、このrunは失敗にする
+      - name: Withdraw the approval when new commits are pushed
+        if: github.event.action == 'synchronize'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          labels=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')
+          if printf '%s\n' "$labels" | grep -qx 'merge-ok'; then
+            gh pr edit "$PR_NUMBER" --remove-label merge-ok
+            echo "::error::New commits were pushed after the approval; the 'merge-ok' label was removed. Add it again to approve this head."
+          else
+            echo "::error::New commits were pushed. Add the 'merge-ok' label to approve this head."
+          fi
+          exit 1
+      # イベントに記録されたラベルではなく、実行時点のラベルを見る(hold と同じ)
+      - name: Fail until the merge-ok label is set
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          labels=$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')
+          if ! printf '%s\n' "$labels" | grep -qx 'merge-ok'; then
+            echo "::error::This PR has no 'merge-ok' label. A human adds it to approve the merge."
+            exit 1
+          fi
+          echo "Approved by the 'merge-ok' label."
 
   close-issues:
     name: Close linked issues
