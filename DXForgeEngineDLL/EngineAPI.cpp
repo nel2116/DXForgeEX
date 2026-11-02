@@ -26,7 +26,7 @@
 #endif // WIN32_LEAN_AND_MEAN
 
 #include <Windows.h>
-#include <atlsafe.h>
+#include <oleauto.h>	// LPSAFEARRAY(GetScriptNames)。ATLは使わない (#146)
 #include <string_view>
 
 using namespace dxforge;
