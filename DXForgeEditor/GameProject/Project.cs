@@ -165,6 +165,22 @@ namespace DXForgeEditor.GameProject
             _scenes.Remove(scene);
         }
 
+        /// <summary>
+        /// アセットを登録した(ContentWatcher.Reset)あとに呼ぶ。デシリアライズのときはまだ登録されていないので読み込めなかった
+        /// コンポーネント(Geometry)を持つ、アクティブなシーンのエンティティを作り直す(Codexの指摘, #32)。
+        /// </summary>
+        public void LoadEntitiesWithAssets()
+        {
+            var entities = ActiveScene.GameEntities
+                .Where(x => x.IsActive && x.GetComponent<Components.Geometry>() is Components.Geometry geometry && !geometry.IsLoaded)
+                .ToList();
+            foreach (var entity in entities)
+            {
+                entity.IsActive = false;
+                entity.IsActive = true;
+            }
+        }
+
         public static Project Load(string file)
         {
             Debug.Assert(File.Exists(file));
@@ -174,6 +190,9 @@ namespace DXForgeEditor.GameProject
         public void Unload()
         {
             UnloadGameCodeDLL();
+            // スクリプトのないエンティティもエンジンから消し、コンポーネントがアップロードしたもの(Geometry のメッシュと
+            // マテリアル)を外す(Codexの指摘, #32)。UnloadGameCodeDLL はゲームのコードの読み直しでも呼ぶので、そこでは消さない。
+            _scenes.SelectMany(x => x.GameEntities).ToList().ForEach(x => x.IsActive = false);
             VisualStudio.CloseVisualStudio();
             UndoRedo.Reset();
             Logger.Clear();
@@ -184,6 +203,8 @@ namespace DXForgeEditor.GameProject
         {
             if (Directory.Exists(TempFolder))
             {
+                // 読み取り専用のファイルも消せるよう、属性を戻す(Primal Day 079)
+                _ = new DirectoryInfo(TempFolder) { Attributes = FileAttributes.Normal };
                 Directory.Delete(TempFolder, true);
             }
         }
@@ -208,15 +229,24 @@ namespace DXForgeEditor.GameProject
         /// <summary>
         /// シーンのエンティティを game.bin の形式(ゲームの exe とヘッドレスのランナーが content::load_game で読む)で書く。
         /// エディタ(SaveToBinary)とコマンドラインの dxforge(Issue #11)が同じ形式で書くよう、ここだけで実装する。
+        /// game.bin に書けないコンポーネント(Component.CanWriteToBinary が false の Geometry)は書かずに、警告のログを出す。
+        /// NOTE: Primal Day 079 の Geometry は WriteToBinary で NotImplementedException を投げるが、ここは async void の
+        ///       RunGame から呼ばれるので、投げるとエディタが落ちる。エンジンの content::load_game も Geometry を読まない(#32)。
         /// </summary>
         internal static void WriteGameBinary(Scene scene, BinaryWriter bw)
         {
             bw.Write(scene.GameEntities.Count);
             foreach (var entity in scene.GameEntities)
             {
+                var components = entity.Components.Where(x => x.CanWriteToBinary).ToList();
+                foreach (var skipped in entity.Components.Where(x => !x.CanWriteToBinary))
+                {
+                    Logger.Log(MessageType.Warning, $"エンティティ {entity.Name} の {skipped.GetType().Name} コンポーネントは game.bin に書き出せないので、飛ばします。");
+                }
+
                 bw.Write(0); // entity type (reserved for later)
-                bw.Write(entity.Components.Count);
-                foreach (var component in entity.Components)
+                bw.Write(components.Count);
+                foreach (var component in components)
                 {
                     bw.Write((int)component.ToEnumType());
                     component.WriteToBinary(bw);

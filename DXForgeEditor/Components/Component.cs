@@ -23,6 +23,22 @@ namespace DXForgeEditor.Components
         public abstract IMSComponent GetMultiselectionComponent(MSEntity msEntity);
         public abstract void WriteToBinary(BinaryWriter bw);
 
+        /// <summary>
+        /// game.bin(ゲームの exe とヘッドレスのランナーが読む)に書けるコンポーネントか。
+        /// 書けないもの(Geometry、Primal Day 079 では WriteToBinary がない)は、Project.WriteGameBinary が飛ばす。
+        /// </summary>
+        public virtual bool CanWriteToBinary => true;
+
+        /// <summary>
+        /// エンティティをエンジンに作る前に呼ばれる(GameEntity.IsActive が true になるとき。Primal Day 079)。
+        /// エンジンにアップロードするアセットがあれば、ここでアップロードする。
+        /// </summary>
+        public virtual void Load() { }
+        /// <summary>
+        /// エンティティをエンジンから消したあとに呼ばれる(GameEntity.IsActive が false になるとき)。Load() でアップロードしたものを外す。
+        /// </summary>
+        public virtual void Unload() { }
+
         public Component(GameEntity owner)
         {
             Debug.Assert(owner != null);

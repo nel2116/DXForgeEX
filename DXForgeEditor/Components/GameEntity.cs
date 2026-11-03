@@ -17,14 +17,14 @@ namespace DXForgeEditor.Components
     [DataContract]
     [KnownType(typeof(Transform))]
     [KnownType(typeof(Script))]
-
+    [KnownType(typeof(Geometry))]
     class GameEntity : ViewModelBase
     {
         private int _entityId = ID.INVALID_ID;
         public int EntityId
         {
             get => _entityId;
-            set
+            private set
             {
                 if (_entityId != value)
                 {
@@ -45,12 +45,15 @@ namespace DXForgeEditor.Components
                     _isActive = value;
                     if (_isActive)
                     {
+                        // エンジンに作る前に、コンポーネントが使うアセットをアップロードする(Primal Day 079)
+                        _components.ToList().ForEach(x => x.Load());
                         EntityId = EngineAPI.EntityAPI.CreateGameEntity(this);
                         Debug.Assert(ID.IsValid(_entityId));
                     }
                     else if (ID.IsValid(EntityId))
                     {
                         EngineAPI.EntityAPI.RemoveGameEntity(this);
+                        _components.ToList().ForEach(x => x.Unload());
                         EntityId = ID.INVALID_ID;
                     }
                     OnPropertyChanged(nameof(IsActive));
@@ -104,9 +107,11 @@ namespace DXForgeEditor.Components
             Debug.Assert(component != null);
             if (!Components.Any(x => x.GetType() == component.GetType()))
             {
+                // 非アクティブなエンティティにコンポーネントを足しても、アクティブにしない(Primal Day 079)
+                var wasActive = IsActive;
                 IsActive = false;
                 _components.Add(component);
-                IsActive = true;
+                IsActive = wasActive;
                 return true;
             }
             Logger.Log(MessageType.Warning, $"Entity {Name} はすでに {component.GetType().Name} Componentを持っています。");
@@ -203,6 +208,11 @@ namespace DXForgeEditor.Components
             }
         }
 
+        public static int? GetMixedValue<T>(List<T> objects, Func<T, int> getProperty)
+        {
+            var value = getProperty(objects.First());
+            return objects.Skip(1).Any(x => value != getProperty(x)) ? null : value;
+        }
         public static float? GetMixedValue<T>(List<T> objects, Func<T, float> getProperty)
         {
             var value = getProperty(objects.First());

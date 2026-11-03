@@ -60,6 +60,8 @@ namespace DXForgeEditor.Content
 
     class GeometryMetadata : AssetMetadata
     {
+        // NOTE: Primal Day 079 で足された(Primal は値を入れていない)。ここでは LOD グループの名前を入れる
+        public string Name { get; init; } = string.Empty;
         public List<LodInfo> LODs { get; init; } = [];
     }
 
@@ -771,10 +773,10 @@ namespace DXForgeEditor.Content
         /// </summary>
         public override GeometryMetadata GetMetadata()
         {
-            GeometryMetadata metadata = new();
-
             var lodGroup = GetLODGroup();
-            if (lodGroup == null) return metadata;
+            if (lodGroup == null) return new();
+
+            GeometryMetadata metadata = new() { Name = lodGroup.Name };
 
             foreach (var lod in lodGroup.LODs)
             {

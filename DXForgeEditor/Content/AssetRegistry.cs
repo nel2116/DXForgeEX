@@ -81,12 +81,18 @@ namespace DXForgeEditor.Content
             _assets.Where(x => !File.Exists(x.FullPath)).ToList().ForEach(x => UnregisterAsset(x.FullPath));
         }
 
+        /// <summary>
+        /// 登録しているアセットのフォルダ(最後に Reset() に渡したもの)。まだ登録していなければ null。
+        /// </summary>
+        public static string? ContentFolder { get; private set; }
+
         public static void Reset(string contentFolder)
         {
             ContentWatcher.ContentModified -= OnContentModified;
 
             _assetDictionary.Clear();
             _assets.Clear();
+            ContentFolder = contentFolder;
 
             Debug.Assert(Directory.Exists(contentFolder));
             RegisterAllAssets(contentFolder);

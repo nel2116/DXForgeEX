@@ -203,6 +203,7 @@ namespace DXForgeEditor
                 var project = projectBrowser.DataContext as Project;
                 Debug.Assert(project != null);
                 ContentWatcher.Reset(project.ContentPath, project.Path);
+                project.LoadEntitiesWithAssets();
                 DataContext = projectBrowser.DataContext;
             }
         }

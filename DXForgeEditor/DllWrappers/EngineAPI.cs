@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -43,11 +44,58 @@ namespace DXForgeEditor.EngineAPIStructs
         public IntPtr ScriptCreater;
     }
 
+    // DXForgeEngineDLL の geometry_component(EntityAPI.cpp)と同じ並び(Primal Day 079)
+    [StructLayout(LayoutKind.Sequential)]
+    class GeometryComponent : IDisposable
+    {
+        public int GeometryContentId = ID.INVALID_ID;
+        public int MaterialCount;
+        public IntPtr MaterialIds;
+
+        public GeometryComponent() { }
+
+        /// <summary>
+        /// アップロード済みのジオメトリと、サブメッシュごとのマテリアルのIDを詰める。マテリアルのIDの配列は Dispose() で解放する。
+        /// </summary>
+        public GeometryComponent(Components.Geometry geometry)
+        {
+            var materials = geometry.MaterialsList;
+            Debug.Assert(materials.Count > 0 && materials.All(x => ID.IsValid(x.UploadedAsset?.ContentId ?? ID.INVALID_ID)));
+
+            using var writer = new BinaryWriter(new MemoryStream());
+            materials.ForEach(mtl => writer.Write(mtl.UploadedAsset?.ContentId ?? ID.INVALID_ID));
+            writer.Flush();
+            var data = ((MemoryStream)writer.BaseStream).ToArray();
+            Debug.Assert(data.Length == materials.Count * sizeof(int));
+
+            GeometryContentId = geometry.ContentId;
+            MaterialCount = materials.Count;
+            MaterialIds = Marshal.AllocCoTaskMem(data.Length);
+            Marshal.Copy(data, 0, MaterialIds, data.Length);
+        }
+
+        public void Dispose()
+        {
+            if (MaterialIds != IntPtr.Zero)
+            {
+                Marshal.FreeCoTaskMem(MaterialIds);
+                MaterialIds = IntPtr.Zero;
+            }
+            GC.SuppressFinalize(this);
+        }
+
+        ~GeometryComponent()
+        {
+            Dispose();
+        }
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     class GameEntityDescriptor
     {
         public TransformComponent Transform = new();
         public ScriptComponent Script = new();
+        public GeometryComponent Geometry = new();
     }
 
     // DXForgeEngineDLL の shader_data(EngineAPI.cpp)と同じ並び
@@ -450,7 +498,24 @@ namespace DXForgeEditor.DllWrappers
                             Logger.Log(MessageType.Error, $"{c.Name}という名前のスクリプトが見つかりません！");
                         }
                     }
+                }
+                // geometry component(Primal Day 079)
+                {
+                    // NOTE: アップロードできなかった(Geometry.Load() が失敗した)ときは、Geometry なしで作る
+                    var c = entity.GetComponent<Components.Geometry>();
+                    if (c != null && ID.IsValid(c.ContentId) && c.MaterialsList.Count > 0)
+                    {
+                        desc.Geometry = new(c);
+                    }
+                }
+
+                try
+                {
                     return CreateGameEntity(desc);
+                }
+                finally
+                {
+                    desc.Geometry.Dispose();
                 }
             }
 

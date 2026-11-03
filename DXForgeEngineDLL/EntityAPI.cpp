@@ -6,6 +6,7 @@
 // エンティティのAPI
 // 更新履歴
 // 2024/12/10 新規作成
+// 2026/11/03 Geometryコンポーネントの受け渡しを追加 (Primal Day 079, #32)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Common.h"
@@ -14,6 +15,7 @@
 #include "Components/Entity.h"
 #include "Components/Transform.h"
 #include "Components/Script.h"
+#include "Components/Geometry.h"
 
 using namespace dxforge;
 
@@ -55,10 +57,28 @@ namespace
 		};
 	};
 
+	// NOTE: 並びはエディタの EngineAPIStructs.GeometryComponent(DllWrappers/EngineAPI.cs)と合わせる
+	struct geometry_component
+	{
+		id::id_type		geometry_content_id;	// エディタがアップロードしたジオメトリのID(無効ならGeometryを作らない)
+		u32				material_count;			// サブメッシュの数と同じ
+		id::id_type*	material_ids;			// サブメッシュごとのマテリアルのID(エディタが確保し、呼び出しのあとで解放する)
+
+		geometry::init_info to_init_info()
+		{
+			geometry::init_info info{};
+			info.geometry_content_id = geometry_content_id;
+			info.material_count = material_count;
+			info.material_ids = material_ids;
+			return info;
+		};
+	};
+
 	struct game_entity_descriptor
 	{
 		transform_component transform;
-		script_component script;
+		script_component	script;
+		geometry_component	geometry;
 	};
 
 	// エンティティIDからエンティティを取得する
@@ -76,10 +96,12 @@ EDITOR_INTERFACE id::id_type CreateGameEntity(game_entity_descriptor* e)
 	game_entity_descriptor& desc{ *e };
 	transform::init_info transform_info{ desc.transform.to_init_info() };
 	script::init_info script_info{ desc.script.to_init_info() };
+	geometry::init_info geometry_info{ desc.geometry.to_init_info() };
 	game_entity::entity_info entity_info
 	{
 		&transform_info,
 		&script_info,
+		id::is_valid(desc.geometry.geometry_content_id) ? &geometry_info : nullptr,
 	};
 	return game_entity::create(entity_info).get_id();
 }
