@@ -14,6 +14,8 @@
       2. 読み戻したメタデータが、LOD グループ "cube" の LOD 1 つ・メッシュ 1 つ・24 頂点・36 インデックス・12 三角形
          (ContentTools/Tests/primitive_mesh_cube_test.py が確かめる create_cube の既定の分割数 1x1x1 と同じ)。
       3. エンジンにアップロードする形(Geometry.PackForEngine())が作れる。
+      4. 既定のキューブの GUID は固定(DefaultAssets.DefaultGeometryGuid)。2 つの別のフォルダで作っても同じ GUID になり、
+         正しい GUID のものは書き直さず、GUID の違う古いものは作り直す(Codex の指摘)。
 
 .PARAMETER Configuration
     DebugEditor(既定)か ReleaseEditor。
@@ -90,6 +92,42 @@ try
 	Write-Host "3. PackForEngine"
 	$packed = if ($geometry) { $geometry.PackForEngine() } else { $null }
 	Check ($null -ne $packed -and $packed.Length -gt 0) "packs the geometry for the engine ($($packed.Length) bytes)"
+
+	# Codex の指摘(#32): 既定のキューブの GUID は、エディタの配置先(構成や worktree ごとの Resources\DefaultAssets\)によらず同じ。
+	# Primal は新しい GUID で作るので、別の配置先のエディタで開いたプロジェクトから見つからなくなっていた。
+	Write-Host "4. the same GUID wherever the editor is"
+	$expectedGuid = $defaultAssets.GetField("DefaultGeometryGuid", $flags).GetValue($null)
+	$ensure = $defaultAssets.GetMethod("EnsureDefaultCube", $flags)
+	$folders = @("DebugEditor\Resources\DefaultAssets", "OtherWorktree\Resources\DefaultAssets") | ForEach-Object { Join-Path $work $_ }
+	$guids = foreach ($folder in $folders)
+	{
+		$null = New-Item -ItemType Directory -Force $folder
+		$ensured = $ensure.Invoke($null, @([string](Join-Path $folder "DefaultCube.asset")))
+		if ($ensured) { $ensured.Guid } else { [Guid]::Empty }
+	}
+	Check ($guids.Count -eq 2 -and $guids[0] -eq $expectedGuid -and $guids[1] -eq $expectedGuid) "EnsureDefaultCube in two folders -> the same fixed GUID ($($guids -join ', '))"
+	Check ($info.Guid -eq $expectedGuid) "CreateDefaultCube uses the fixed GUID ($($info.Guid))"
+
+	# 正しい GUID のものは書き直さない。GUID の違う古いもの(Primal と同じ作り方)は作り直す。
+	[string]$kept = Join-Path $folders[0] "DefaultCube.asset"
+	$before = (Get-Item $kept).LastWriteTimeUtc
+	Start-Sleep -Milliseconds 50
+	$again = $ensure.Invoke($null, @($kept))
+	Check ($again -and $again.Guid -eq $expectedGuid -and (Get-Item $kept).LastWriteTimeUtc -eq $before) "EnsureDefaultCube keeps an existing cube with the fixed GUID (not rewritten)"
+	$staleFolder = Join-Path $work "Stale"
+	$null = New-Item -ItemType Directory -Force $staleFolder
+	[string]$stale = Join-Path $staleFolder "DefaultCube.asset"
+	$old = [Activator]::CreateInstance($geometryType)
+	$initType = $editor.GetType("DXForgeEditor.ContentToolsAPIStructs.PrimitiveInitInfo", $true)
+	$init = [Activator]::CreateInstance($initType, $true)
+	$init.Type = [Enum]::Parse($editor.GetType("DXForgeEditor.Content.PrimitiveMeshType", $true), "Cube")
+	$createPrimitive = $editor.GetType("DXForgeEditor.DllWrappers.ContentToolsAPI", $true).GetMethods($flags) | Where-Object { $_.Name -eq "CreatePrimitiveMesh" -and $_.IsPublic }
+	$null = $createPrimitive.Invoke($null, @($old, $init))
+	$null = $old.Save($stale)
+	$staleGuid = $assetType.GetMethod("TryGetAssetInfo", $flags).Invoke($null, @($stale)).Guid
+	$recreated = $ensure.Invoke($null, @($stale))
+	$reread = $assetType.GetMethod("TryGetAssetInfo", $flags).Invoke($null, @($stale))
+	Check ($staleGuid -ne $expectedGuid -and $recreated -and $recreated.Guid -eq $expectedGuid -and $reread.Guid -eq $expectedGuid) "EnsureDefaultCube recreates a cube saved with another GUID ($staleGuid -> $($reread.Guid))"
 }
 finally
 {

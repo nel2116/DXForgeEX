@@ -32,6 +32,11 @@ namespace DXForgeEditor.Content
         public static AssetInfo? DefaultGeometry { get; private set; }
 
         /// <summary>
+        /// 既定のジオメトリの GUID。.dxproj は GUID で参照するので、エディタの配置先によらず同じ値にする(#32)。
+        /// </summary>
+        public static readonly Guid DefaultGeometryGuid = new("6c0f1b3e-8d2a-4f57-9e41-d5a7c3b20f19");
+
+        /// <summary>
         /// 既定のマテリアル(DefaultMaterial.asset)。作れなかった場合は null。
         /// </summary>
         public static AssetInfo? DefaultMaterial { get; private set; }
@@ -82,14 +87,7 @@ namespace DXForgeEditor.Content
             //       ここでは既存のファイルからも読む。
             BrdfIntegrationLut = File.Exists(brdfLutFile) ? Asset.TryGetAssetInfo(brdfLutFile) : null;
 
-            // NOTE: Primal と同じく、ないときだけ作る(GUID を変えないため。.dxproj は GUID で参照する)
-            var cubeFile = DefaultGeometryFile;
-            if (!File.Exists(cubeFile))
-            {
-                CreateDefaultCube(cubeFile);
-            }
-            DefaultGeometry = File.Exists(cubeFile) ? Asset.TryGetAssetInfo(cubeFile) : null;
-            if (DefaultGeometry?.Type != AssetType.Mesh) DefaultGeometry = null;
+            DefaultGeometry = EnsureDefaultCube(DefaultGeometryFile);
 
             CompileDefaultMaterialShaders();
 
@@ -227,11 +225,28 @@ namespace DXForgeEditor.Content
             }
         }
 
+        /// <summary>
+        /// file に既定のジオメトリ(GUID が DefaultGeometryGuid のキューブ)がなければ作り、その AssetInfo を返す。作れなければ null。
+        /// NOTE: Primal はファイルがないときだけ新しい GUID で作るので、エディタの配置先(構成や worktree)ごとに GUID が変わり、
+        ///       ある配置先のエディタで既定のキューブを付けて保存したプロジェクトを、別の配置先のエディタで開くと見つからない。
+        ///       ここでは固定の GUID を使い、GUID が違うもの(古いもの)は作り直す(Codexの指摘, #32)。
+        /// </summary>
+        public static AssetInfo? EnsureDefaultCube(string file)
+        {
+            var info = File.Exists(file) ? Asset.TryGetAssetInfo(file) : null;
+            if (info?.Type != AssetType.Mesh || info.Guid != DefaultGeometryGuid)
+            {
+                CreateDefaultCube(file);
+                info = File.Exists(file) ? Asset.TryGetAssetInfo(file) : null;
+            }
+            return info?.Type == AssetType.Mesh && info.Guid == DefaultGeometryGuid ? info : null;
+        }
+
         private static void CreateDefaultCube(string file)
         {
             try
             {
-                var cube = new Geometry();
+                var cube = new Geometry() { FixedGuid = DefaultGeometryGuid };
                 var info = new PrimitiveInitInfo() { Type = PrimitiveMeshType.Cube };
                 if (!ContentToolsAPI.CreatePrimitiveMesh(cube, info) || !cube.Save(file).Any())
                 {

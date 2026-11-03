@@ -334,6 +334,12 @@ namespace DXForgeEditor.Content
 
     class Geometry : Asset
     {
+        /// <summary>
+        /// Save() でこの GUID を使う(null ならファイルごとに決める)。既定のジオメトリ(DefaultAssets.DefaultGeometryGuid)に使う。
+        /// NOTE: LOD グループが複数あると、すべてのファイルが同じ GUID になるので、LOD グループが 1 つのものにだけ使う
+        /// </summary>
+        public Guid? FixedGuid { get; init; }
+
         private readonly List<LODGroup> _lodGroups = new();
         private readonly object _lock = new();
 
@@ -600,7 +606,8 @@ namespace DXForgeEditor.Content
                         path + fileName + ((_lodGroups.Count > 1) ? "_" + ((lodGroup.LODs.Count > 1) ? lodGroup.Name : lodGroup.LODs[0].Name) : string.Empty)) + AssetFileExtension;
                     // NOTE: 新しいアセットファイルごとに異なるidを作成する必要がありますが、
                     //       同じ名前のジオメトリ・アセットファイルがすでに存在する場合は、代わりにそのguidを使用します。
-                    Guid = TryGetAssetInfo(meshFileName) is AssetInfo info && info.Type == Type ? info.Guid : Guid.NewGuid();
+                    // NOTE: FixedGuid があればそれを使う(既定のジオメトリ。どの配置先でも同じ GUID にするため, #32)
+                    Guid = FixedGuid ?? (TryGetAssetInfo(meshFileName) is AssetInfo info && info.Type == Type ? info.Guid : Guid.NewGuid());
                     byte[] data;
                     using (var writer = new BinaryWriter(new MemoryStream()))
                     {
