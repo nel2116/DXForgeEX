@@ -12,6 +12,7 @@
          アクティブなシーンがない・--scene の名前がない(32)。DebugEditor でも Debug.Assert で落ちない。
       3. --export-game-bin のバイト列が、エディタの Project.SaveToBinary(リフレクションで呼ぶ)が同じ .dxproj から書くものと、
          テストが game.bin の形式どおりに組んだものの両方と一致する(スクリプトのあるシーンも)。書き出せない場所は 36。
+         読み込んだ GameEntity の EntityId はすべて INVALID_ID(-1)で、IsEnabled の要素がなければ有効(#165)。
       4. 実行(ランナー EngineUnitTests.exe が必要): 終了コード0、エンティティの数・名前・Transform(回転はクォータニオン)が
          期待どおり。--scene、--dt、--frames 0、--keep-game-bin、日本語のパスと名前、JSONなしの出力、一時フォルダの後始末。
       5. スクリプトのあるシーン(33)、ランナーがない(34)、ランナーを起動できない(35)。
@@ -284,6 +285,23 @@ namespace DXForgeCliTest
 			Check (Bytes-Equal $editorBytes $expected) "$($case.Name): the editor's SaveToBinary writes the game.bin format ($($expected.Length) bytes)"
 			Check (Bytes-Equal $cliBytes $editorBytes) "$($case.Name): CLI game.bin == editor SaveToBinary game.bin"
 		}
+
+		# DataContractSerializer はフィールドの初期化子を実行しないので、読み込んだ GameEntity の EntityId が
+		# INVALID_ID(-1)ではなく 0(有効な ID)になっていた(#165)。エンジンに作っていないエンティティはすべて -1。
+		# アクティブでないシーン(TransformOnly の 2 つ目)のエンティティも確かめる(エディタでもエンジンに作らない)。
+		foreach ($case in @(@{ Name = "TransformOnly"; Path = $TransformOnly }, @{ Name = "WithScript"; Path = $WithScript }, @{ Name = "WithGeometry"; Path = $WithGeometry }))
+		{
+			$loaded = $projectType.GetMethod("Load", $flags).Invoke($null, [object[]]@([string]$case.Path))
+			$entities = @($loaded.Scenes | ForEach-Object { $_.GameEntities })
+			$ids = ($entities | ForEach-Object { "$($_.Name)=$($_.EntityId)" }) -join ", "
+			Check ($entities.Count -gt 0 -and @($entities | Where-Object { $_.EntityId -ne -1 }).Count -eq 0) "$($case.Name): every deserialized GameEntity has EntityId INVALID_ID (-1) (#165)" $ids
+		}
+		# IsEnabled の要素がない(古い).dxproj でも、新しく作るエンティティと同じく有効(true)として読む(#165)
+		$noIsEnabled = Join-Path $work "no_is_enabled.dxproj"
+		[System.IO.File]::WriteAllText($noIsEnabled, [regex]::Replace([System.IO.File]::ReadAllText($TransformOnly), "<a:IsEnabled>(true|false)</a:IsEnabled>", ""))
+		$loaded = $projectType.GetMethod("Load", $flags).Invoke($null, [object[]]@([string]$noIsEnabled))
+		$entities = @($loaded.Scenes | ForEach-Object { $_.GameEntities })
+		Check ($entities.Count -gt 0 -and @($entities | Where-Object { -not $_.IsEnabled -or $_.EntityId -ne -1 }).Count -eq 0) "no <IsEnabled>: every GameEntity is enabled and has EntityId -1 (#165)" (($entities | ForEach-Object { "$($_.Name)=$($_.IsEnabled)/$($_.EntityId)" }) -join ", ")
 
 		# Geometry コンポーネントの読み込みと、保存し直したときに中身が変わらないこと(エンジンにもアセットにも触らない)
 		$geometryType = $editor.GetType("DXForgeEditor.Components.Geometry", $true)
