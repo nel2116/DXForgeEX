@@ -1,21 +1,21 @@
 ---
 name: ship-pr
-description: DXForgeEX の PR を、CI の確認 → Codex レビュー → 指摘への対応 → 再レビュー → -SetStatus による自動マージの予約 → ユーザーの承認(merge-ok)を待つ → 後片付け、までやり切る。ユーザーに「マージして」「マージまで進めて」「PR を仕上げて」と言われたとき、自分で作った PR の完了条件がそろったとき、コーディネーターとして worker の PR を受け取ったときに使う。
+description: DXForgeEX の PR を、CI の確認 → Codex レビュー → 指摘への対応 → 再レビュー → -SetStatus による自動マージ → 後片付け、までやり切る。ユーザーに「マージして」「マージまで進めて」「PR を仕上げて」と言われたとき、自分で作った PR の完了条件がそろったとき、コーディネーターとして worker の PR を受け取ったときに使う。
 ---
 
 # PR をマージまで進める
 
 `CodexReview.ps1` と `CleanupMerged.ps1` は個々の手順を自動化しているが、それをどの順で、いつ、どこまで回すかはここに書く。仕組みの詳細と検証済みの落とし穴は `docs/dev/ReviewAndMerge.md`。
 
-自動マージの予約までと後片付けは、ユーザーに毎回頼まれなくても行う(ユーザーの方針)。**マージを確定するのはユーザーの承認(PR に付ける `merge-ok` ラベル)で、エージェントは付けない**(#160。`gh` で付けるコマンドは PreToolUse フック `Tests/guard_merge_approval.py` が止める)。ゲートは決して迂回しない。admin でのマージ、保護のないブランチでの `gh pr merge --auto`、`hold` ラベルの除去、`merge-ok` の付与はしない。
+自動マージの予約までと後片付けは、ユーザーに毎回頼まれなくても行う(ユーザーの方針)。今の develop は人の承認(`merge-ok`、#160)を必須にしていないので、CI と `codex-review` がそろえばそのままマージされる(個人開発で速度を優先するユーザーの方針、2026/11/03)。承認を必須に戻したときも、エージェントは `merge-ok` を付けない(`gh` で付けるコマンドは PreToolUse フック `Tests/guard_merge_approval.py` が止める)。ゲートは決して迂回しない。admin でのマージ、保護のないブランチでの `gh pr merge --auto`、`hold` ラベルの除去、`merge-ok` の付与はしない。
 
 `.ps1` は PowerShell ツールで実行する。Bash ツールで実行すると、BOM の行で構文エラーになる。
 
 ## 1. 完了条件を確かめる
 
-次の条件がそろうまで、`-SetStatus` を付けない(付けると、指摘がなければその場で自動マージが予約され、ユーザーが `merge-ok` を付けた時点でマージされる)。
+次の条件がそろうまで、`-SetStatus` を付けない(付けると、指摘がなければその場で自動マージが予約され、CI がそろった時点でマージされる)。
 
-- CI がすべて成功している: `gh pr checks <N>`。実行中なら `gh pr checks <N> --watch --interval 20` で待つ。`Merge approved` は承認(`merge-ok`)までは失敗するのが正常なので、それ以外がすべて成功していればよい(`--watch` は、この失敗のため終了コード 1 で終わる)。
+- CI がすべて成功している: `gh pr checks <N>`。実行中なら `gh pr checks <N> --watch --interval 20` で待つ。
 - PR の完了条件(Issue と PR 本文に書かれたもの)を満たし、根拠(コマンドと出力)が PR に書かれている。
 - **GUI 確認が要る変更**(エディタの画面、ゲームの実行、描画)は、確認が済んでいる。済んでいなければマージせずに止め、確認手順をユーザーに示す(確認は `gui-check` スキル、ユーザーの指示があるときだけ)。
 - GUI で確かめた PR は、本文の `<!-- gui-check:start -->` の節に、結果とスクリーンショットが載っている。ユーザーが自分で確かめた場合も、スクリーンショットをもらえたら同じ節に載せる(`gui-check` スキルの `push-pr-assets.ps1`)。載っていなければ、マージの前に載せる。
@@ -56,13 +56,13 @@ description: DXForgeEX の PR を、CI の確認 → Codex レビュー → 指�
 
 これはもう一度レビューする。指摘がなければ `codex-review` を success にし、自動マージを予約する。指摘が出たら 2 に戻る。
 
-予約しただけではマージされない(必須のチェック `Merge approved` が失敗したまま)。ユーザーに「承認待ち」と報告する。報告には、PR の番号、CI・Codex・GUI 確認の結果、承認のしかた(GitHub の PR の画面で `merge-ok` ラベルを付ける、またはユーザー自身の端末で `gh pr edit <N> --add-label merge-ok`)を書く。承認されたら、マージされるまで待つ。
+予約したら、マージされるまで待つ。ブランチ保護が `Merge approved` も必須にしているとき(承認を必須に戻したとき)だけは、ユーザーに「承認待ち」と報告し、`merge-ok` を付けてもらう。報告には、PR の番号と、CI・Codex・GUI 確認の結果を書く。
 
 ```bash
 gh pr view <N> --json state --jq .state     # MERGED になるまで、gh pr checks <N> --watch で待つ
 ```
 
-承認のあとに push すると、`merge-ok` は外れる(`.github/workflows/pr-automation.yml`)。直したときは、レビューをやり直してから、もう一度承認を頼む。
+承認を必須にしているときは、承認のあとに push すると `merge-ok` が外れる(`.github/workflows/pr-automation.yml`)。直したときは、レビューをやり直してから、もう一度承認を頼む。
 
 ## 5. 後片付けと確認
 
