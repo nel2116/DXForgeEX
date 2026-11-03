@@ -28,6 +28,8 @@
 #      D3D12\D3D12Core.dll がないときは、警告を出して OS のランタイムで描画を続ける(source が "os" になり、理由が入る)。
 #      実行ファイル(隣の EngineTest.exe・DXForgeEngineDLL.dll も)が、D3D12GetInterface など古い d3d12.dll にない関数を
 #      静的にインポートしていない(インポートテーブルを読む。古い Windows でもローダーで落ちずに OS のランタイムに戻れる)。
+#      最大の機能レベルは、Agility SDK では ID3D12Device16::CheckFeatureSupport1 で調べ(#159)、デバッグレイヤーが
+#      非推奨の WARNING #989(CheckFeatureSupport is superseded)を出さない。WARP では Agility SDK でも OS のランタイムでも 12_1 になる。
 #   構成は --config か、--exe のフォルダ名(x64/<構成>/、build.ps1 -RunTests の渡し方)から決める。
 #
 # DXC(dxcompiler.dll)が実行ファイルの隣にないとき(packages/DirectXShaderCompiler なしで EngineUnitTests だけをビルドした場合、#61)は、
@@ -37,6 +39,7 @@ import ctypes
 import hashlib
 import json
 import os
+import re
 import shutil
 import stat
 import struct
@@ -309,6 +312,30 @@ def check_agility_runtime(r, name, result, exe):
             (expected_path, runtime))
 
 
+# WARP の最大の機能レベル(D3D_FEATURE_LEVEL_12_1)。#159 の修正の前後、Agility SDK と OS のランタイムの両方で確かめた値
+WARP_MAX_FEATURE_LEVEL = 0xc100
+FEATURE_LEVEL_LOG = re.compile(r"^\[D3D12\] max feature level: 0x([0-9a-f]+) \((\w+)\)\r?$", re.MULTILINE)
+
+
+def check_feature_level(r, name, stderr, adapter, agility):
+    """標準エラーの最大の機能レベルのログと、非推奨の API の WARNING #989 が出ていないことを確かめる(#159)
+
+    一時的なデバイスで出たデバッグレイヤーのメッセージも、無人実行では標準エラーに出る(Debug のみ)。
+    """
+    match = FEATURE_LEVEL_LOG.search(stderr)
+    r.check(f"{name}: max feature level is logged", match is not None, stderr)
+    if match is None:
+        return
+    level, api = int(match.group(1), 16), match.group(2)
+    if adapter == "warp":
+        r.check(f"{name}: max feature level", level == WARP_MAX_FEATURE_LEVEL, f"got 0x{level:x}, expected 0x{WARP_MAX_FEATURE_LEVEL:x}")
+    if agility:
+        r.check(f"{name}: CheckFeatureSupport1 is used", api == "CheckFeatureSupport1", match.group(0))
+    r.check(f"{name}: no deprecated CheckFeatureSupport warning (#989)",
+            "[#989]" not in stderr and "superseded by ID3D12Device16::CheckFeatureSupport1" not in stderr, stderr)
+    print(f"  {name}: max feature level 0x{level:x} via {api}")
+
+
 def render_ok(r, name, png, adapter="warp"):
     """描画して、成功したことと --json の内容を確かめる。結果(JSON)を返す(失敗ならNone)"""
     code, result, stderr = r.run_json(r.render_args(png, adapter))
@@ -325,6 +352,7 @@ def render_ok(r, name, png, adapter="warp"):
     r.check(f"{name}: logs go to stderr", "[render] adapter: " in stderr and "[render] wrote " in stderr, stderr)
     check_agility_runtime(r, name, result, r.exe)
     r.check(f"{name}: the runtime is logged", "[D3D12] runtime: Agility SDK " in stderr, stderr)
+    check_feature_level(r, name, stderr, adapter, agility=True)
     runtime = result.get("d3d12_runtime") or {}
     print(f"  {name}: adapter_name={result.get('adapter_name')!r} pixel_hash={result.get('pixel_hash')} "
           f"d3d12_runtime={runtime.get('source')} {runtime.get('sdk_version')} ({runtime.get('core_version')})")
@@ -710,6 +738,8 @@ def test_agility_sdk_missing(r):
     r.check(f"{name}: not the D3D12Core.dll of the build", "D3D12Core.dll" in (runtime.get("core_path") or "")
             and not os.path.normcase(runtime["core_path"]).startswith(os.path.normcase(folder)), runtime)
     r.check(f"{name}: warning on stderr", "[D3D12] warning: the Agility SDK " in stderr and "[D3D12] runtime: OS " in stderr, stderr)
+    # OS のランタイムに戻っても、最大の機能レベルは Agility SDK のときと同じに決まる(#159)
+    check_feature_level(r, name, stderr, "warp", agility=False)
     r.report(name)
 
 
