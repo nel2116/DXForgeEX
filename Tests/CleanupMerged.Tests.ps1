@@ -12,6 +12,7 @@
 	  ファイルは残る)とworktreeの登録を消し、さらに2秒後にブランチを消す(本物のOrcaの非同期の削除の再現)。
 	  DXFORGE_TEST_ORCA_MODE=keep なら何も消さない(上限まで待っても登録が残る場合の再現)。
 	  terminal list には、DXFORGE_TEST_ORCA_TERMINALS のパスのターミナルが開いていると答える(#133)。
+	  orchestration run-list と worker-list には、DXFORGE_TEST_ORCA_WORKERS の worker がいると答える(#166)。
 
 	ケース:
 	  orca-async    Orcaの削除が遅れても、警告なしにworktree、ブランチ、フォルダが消える
@@ -24,6 +25,8 @@
 	  live-terminal Orcaのターミナルが開いているworktreeは残し、ほかのマージ済みのworktreeは消す(#133)
 	  terminal-path-format  Orcaのパスの区切り・大文字小文字・末尾の区切りが違っても、同じworktreeとして残す
 	  terminal-unknown      terminal list が失敗したときと途中で切れたときは、残す
+	  live-worker   worker-list に解放されていないworkerがいるworktreeは残し、released だけのworktreeは消す(#166)
+	  worker-unknown        run-list か worker-list が失敗したときは、残す
 
 .PARAMETER ScriptPath
 	テストするスクリプト。既定はリポジトリの CleanupMerged.ps1。修正前のスクリプトで再現を確かめるときは、
@@ -95,6 +98,29 @@ if ($args[0] -eq "terminal" -and $args[1] -eq "list") {
 	ConvertTo-Json -Depth 5 -InputObject ([ordered]@{
 		ok = $true; result = [ordered]@{ terminals = $terminals; totalCount = $terminals.Count; truncated = ($mode -eq "truncated") }
 	})
+	exit 0
+}
+# DXFORGE_TEST_ORCA_WORKERS: worker の「terminalState|worktreeのパス」(;区切り)。run-list は2ページに分けて
+# run_a と run_b を返し、worker はすべて2ページ目の run_b にいる(ページをたどらないと見つからない)。
+# runs-fail なら run-list が、workers-fail なら worker-list が失敗する(#166)
+$workersMode = "$env:DXFORGE_TEST_ORCA_WORKERS"
+if ($args[0] -eq "orchestration" -and $args[1] -eq "run-list") {
+	if ($workersMode -eq "runs-fail") { Write-Output '{"ok": false, "error": {"code": "runtime_unavailable"}}'; exit 1 }
+	$cursor = if ($args -contains "--cursor") { $args[[array]::IndexOf($args, "--cursor") + 1] } else { $null }
+	$result = if ($cursor -eq "page2") { [ordered]@{ runs = @([ordered]@{ id = "run_b" }) } }
+	else { [ordered]@{ runs = @([ordered]@{ id = "run_a" }); nextCursor = "page2" } }
+	ConvertTo-Json -Depth 5 -InputObject ([ordered]@{ ok = $true; result = $result })
+	exit 0
+}
+if ($args[0] -eq "orchestration" -and $args[1] -eq "worker-list") {
+	if ($workersMode -eq "workers-fail") { Write-Output '{"ok": false, "error": {"code": "runtime_unavailable"}}'; exit 1 }
+	$run = $args[[array]::IndexOf($args, "--run") + 1]
+	$entries = @(if ($run -eq "run_b" -and $workersMode -notin "runs-fail", "workers-fail") { $workersMode -split ';' | Where-Object { $_ } })
+	$workers = @($entries | ForEach-Object {
+		$state, $path = $_ -split '\|', 2
+		[ordered]@{ dispatchId = "ctx_test"; terminal = "structworker_test"; terminalState = $state; workspace = "repo-id::$path" }
+	})
+	ConvertTo-Json -Depth 5 -InputObject ([ordered]@{ ok = $true; result = [ordered]@{ workers = $workers } })
 	exit 0
 }
 Add-Content -LiteralPath $env:DXFORGE_TEST_ORCA_LOG -Value "$args"
@@ -183,7 +209,7 @@ function New-Branch($sb, [string]$branch, [switch]$Worktree, [switch]$Merge) {
 }
 
 # テスト対象を実行する。-NoOrca なら本物も偽物もない PATH にする
-function Invoke-Cleanup($sb, [string[]]$arguments = @(), [switch]$NoOrca, [string]$OrcaMode = "async", [string]$Script, [switch]$InPlace, [string]$Terminals = "") {
+function Invoke-Cleanup($sb, [string[]]$arguments = @(), [switch]$NoOrca, [string]$OrcaMode = "async", [string]$Script, [switch]$InPlace, [string]$Terminals = "", [string]$Workers = "") {
 	$savedPath = $env:PATH
 	try {
 		$dirs = $env:PATH -split ';' | Where-Object { $_ }
@@ -210,6 +236,7 @@ function Invoke-Cleanup($sb, [string[]]$arguments = @(), [switch]$NoOrca, [strin
 		$env:DXFORGE_TEST_MERGED_PRS = ($sb.Prs.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ';'
 		$env:DXFORGE_TEST_ORCA_MODE = $OrcaMode
 		$env:DXFORGE_TEST_ORCA_TERMINALS = $Terminals
+		$env:DXFORGE_TEST_ORCA_WORKERS = $Workers
 		$env:DXFORGE_TEST_ORCA_LOG = $sb.OrcaLog
 		$env:DXFORGE_TEST_PIDS = $sb.Pids
 		# スクリプトは自分のフォルダ($PSScriptRoot)をリポジトリとして扱うので、ルートに置いて実行する
@@ -456,6 +483,39 @@ $cases["terminal-unknown"] = {
 		foreach ($mode in "fail", "truncated") {
 			$r = Invoke-Cleanup $sb -Terminals $mode
 			Check ($r.Text -match "残す: $([regex]::Escape($wt)) \[fix/unknown\]\(Orcaのターミナルを確認できない") "$mode : 確認できないので残すと表示する"
+			Check ((Test-Registered $sb $wt) -and (Test-BranchExists $sb "fix/unknown")) "$mode : worktreeとブランチは残っている"
+		}
+		Check ((Get-OrcaCalls $sb).Count -eq 0) "orca worktree rm は呼ばれない"
+	}
+	finally { Remove-Sandbox $sb }
+}
+
+$cases["live-worker"] = {
+	$sb = New-Sandbox
+	try {
+		# structured の worker は terminal list に出ず、worker-list にだけ出る(#166)。
+		# 解放されていない worker のworktreeは残し、released の worker しかいないworktreeは消す
+		$live = New-Branch $sb "fix/worker" -Worktree -Merge
+		$released = New-Branch $sb "fix/released" -Worktree -Merge
+		$r = Invoke-Cleanup $sb -Workers ("active|$($live -replace '\\', '/');released|$released")
+		Check ($r.ExitCode -eq 0) "終了コードが0"
+		Check ($r.Text -match "残す: $([regex]::Escape($live)) \[fix/worker\]\(Orcaのworkerがまだ解放されていない") "解放されていないworkerのworktreeを残すと表示する"
+		Check (-not ((Get-OrcaCalls $sb) | Where-Object { $_ -match [regex]::Escape($live) })) "そのworktreeに orca worktree rm を呼ばない"
+		Check ((Test-Registered $sb $live) -and (Test-BranchExists $sb "fix/worker")) "worktreeとブランチは残っている"
+		Check (-not (Test-Path -LiteralPath $released)) "released のworkerしかいないworktreeは消える"
+		Check (-not (Test-BranchExists $sb "fix/released")) "released のworkerしかいないブランチは消える"
+	}
+	finally { Remove-Sandbox $sb }
+}
+
+$cases["worker-unknown"] = {
+	$sb = New-Sandbox
+	try {
+		# workerを確かめられないときは、消しすぎないよう残す
+		$wt = New-Branch $sb "fix/unknown" -Worktree -Merge
+		foreach ($mode in "runs-fail", "workers-fail") {
+			$r = Invoke-Cleanup $sb -Workers $mode
+			Check ($r.Text -match "残す: $([regex]::Escape($wt)) \[fix/unknown\]\(Orcaのworkerを確認できない") "$mode : 確認できないので残すと表示する"
 			Check ((Test-Registered $sb $wt) -and (Test-BranchExists $sb "fix/unknown")) "$mode : worktreeとブランチは残っている"
 		}
 		Check ((Get-OrcaCalls $sb).Count -eq 0) "orca worktree rm は呼ばれない"
