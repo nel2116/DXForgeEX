@@ -6,6 +6,7 @@
 #   python EngineUnitTests/Tests/render_run_test.py --config Release
 #   python EngineUnitTests/Tests/render_run_test.py --exe <EngineUnitTests.exeのパス>
 #   python EngineUnitTests/Tests/render_run_test.py --update-baselines --config Release   # 基準画像を更新する(テストは実行しない)
+#   python EngineUnitTests/Tests/render_run_test.py --check-imports <exe/DLL>...  # 7. のインポートの確認だけ(engine_init_test.ps1 が DLL に使う)
 # すべて合格すれば終了コード0、不合格があれば1。
 #
 # 確かめること:
@@ -22,6 +23,11 @@
 #      %TEMP%\dxforge_render_diff\<構成>\(環境変数 DXFORGE_RENDER_DIFF_DIR で変更できる。CIで使う)に
 #      expected.png / actual.png / diff.png(基準|実際|差分を横に並べた画像)を書く。合格したときは何も残さない。
 #      --adapter hardware の結果は基準画像と比べない(GPUやドライバーで変わるため)。差を表示するだけにする。
+#   6. D3D12 Agility SDK(#155): 描画したとき --json の d3d12_runtime が、実行ファイルの隣の D3D12\D3D12Core.dll
+#      (DXForgeEngine/packages.config の Microsoft.Direct3D.D3D12 と同じバージョン)を使ったことを示す。
+#      D3D12\D3D12Core.dll がないときは、警告を出して OS のランタイムで描画を続ける(source が "os" になり、理由が入る)。
+#      実行ファイル(隣の EngineTest.exe・DXForgeEngineDLL.dll も)が、D3D12GetInterface など古い d3d12.dll にない関数を
+#      静的にインポートしていない(インポートテーブルを読む。古い Windows でもローダーで落ちずに OS のランタイムに戻れる)。
 #   構成は --config か、--exe のフォルダ名(x64/<構成>/、build.ps1 -RunTests の渡し方)から決める。
 #
 # DXC(dxcompiler.dll)が実行ファイルの隣にないとき(packages/DirectXShaderCompiler なしで EngineUnitTests だけをビルドした場合、#61)は、
@@ -38,6 +44,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import xml.etree.ElementTree as ElementTree
 import zlib
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -280,6 +287,28 @@ class Runner:
         self.report(name)
 
 
+def agility_sdk_package_version():
+    """DXForgeEngine/packages.config の Microsoft.Direct3D.D3D12 のバージョン(例 "1.620.1")"""
+    tree = ElementTree.parse(os.path.join(REPO_ROOT, "DXForgeEngine", "packages.config"))
+    for package in tree.getroot().iter("package"):
+        if package.get("id") == "Microsoft.Direct3D.D3D12":
+            return package.get("version")
+    raise RuntimeError("Microsoft.Direct3D.D3D12 is not in DXForgeEngine/packages.config")
+
+
+def check_agility_runtime(r, name, result, exe):
+    """--json の d3d12_runtime が、exe の隣の D3D12\\ の Agility SDK(packages.config と同じバージョン)を示すことを確かめる(#155)"""
+    version = agility_sdk_package_version()
+    runtime = result.get("d3d12_runtime") or {}
+    r.check(f"{name}: D3D12 runtime is the Agility SDK", runtime.get("source") == "agility" and runtime.get("fallback_reason") is None, runtime)
+    # パッケージ 1.620.1 の d3d12.h の D3D12_SDK_VERSION は 620、D3D12Core.dll のファイルバージョンは 1.620.1.0
+    r.check(f"{name}: Agility SDK version", runtime.get("sdk_version") == int(version.split(".")[1]), (version, runtime))
+    r.check(f"{name}: D3D12Core.dll version", (runtime.get("core_version") or "").startswith(version + "."), (version, runtime))
+    expected_path = os.path.join(os.path.dirname(os.path.abspath(exe)), "D3D12", "D3D12Core.dll")
+    r.check(f"{name}: D3D12Core.dll next to the exe", os.path.normcase(runtime.get("core_path") or "") == os.path.normcase(expected_path),
+            (expected_path, runtime))
+
+
 def render_ok(r, name, png, adapter="warp"):
     """描画して、成功したことと --json の内容を確かめる。結果(JSON)を返す(失敗ならNone)"""
     code, result, stderr = r.run_json(r.render_args(png, adapter))
@@ -294,7 +323,11 @@ def render_ok(r, name, png, adapter="warp"):
     r.check(f"{name}: adapter", result.get("adapter") == adapter and bool(result.get("adapter_name")), result)
     r.check(f"{name}: screenshot", os.path.normcase(result.get("screenshot", "")) == os.path.normcase(os.path.abspath(png)), result)
     r.check(f"{name}: logs go to stderr", "[render] adapter: " in stderr and "[render] wrote " in stderr, stderr)
-    print(f"  {name}: adapter_name={result.get('adapter_name')!r} pixel_hash={result.get('pixel_hash')}")
+    check_agility_runtime(r, name, result, r.exe)
+    r.check(f"{name}: the runtime is logged", "[D3D12] runtime: Agility SDK " in stderr, stderr)
+    runtime = result.get("d3d12_runtime") or {}
+    print(f"  {name}: adapter_name={result.get('adapter_name')!r} pixel_hash={result.get('pixel_hash')} "
+          f"d3d12_runtime={runtime.get('source')} {runtime.get('sdk_version')} ({runtime.get('core_version')})")
     return result if code == EXIT_SUCCESS else None
 
 
@@ -582,6 +615,104 @@ def test_engine_path_outside_repo(r):
     r.report(name)
 
 
+# 実行ファイルが静的にインポートしてよい d3d12.dll の関数(Agility SDK 対応前の Windows 10 1607 以降の d3d12.dll にもある)。
+# D3D12GetInterface などの新しい関数を静的にインポートすると、それがない d3d12.dll ではローダーがエクスポートを解決できず、
+# main に入る前に起動に失敗する(OS のランタイムに戻れない)。新しい関数は GetProcAddress で解決する(#155、Codex の指摘)。
+# d3d12.lib は D3D12CreateDevice を序数 101、D3D12GetDebugInterface を序数 102 でインポートする(Windows 10 の最初の d3d12.dll から同じ)。
+ALLOWED_D3D12_IMPORTS = {"#101", "#102", "D3D12CreateDevice", "D3D12GetDebugInterface", "D3D12SerializeVersionedRootSignature"}
+
+
+def pe_imports(path):
+    """PE32+ のインポートテーブル(遅延読み込みは含まない)を {DLL名(小文字): {関数名か "#序数"}} で返す(標準ライブラリだけで読む)"""
+    with open(path, "rb") as f:
+        data = f.read()
+    pe = struct.unpack_from("<I", data, 0x3C)[0]
+    if data[pe:pe + 4] != b"PE\0\0":
+        raise ValueError(f"not a PE file: {path}")
+    section_count, optional_size = struct.unpack_from("<H", data, pe + 6)[0], struct.unpack_from("<H", data, pe + 20)[0]
+    optional = pe + 24
+    if struct.unpack_from("<H", data, optional)[0] != 0x20B:
+        raise ValueError(f"not PE32+: {path}")
+    import_rva = struct.unpack_from("<I", data, optional + 112 + 8 * 1)[0]  # データディレクトリ 1 = インポート
+    sections = []
+    for i in range(section_count):
+        header = optional + optional_size + 40 * i
+        virtual_size, virtual_address, raw_size, raw_offset = struct.unpack_from("<IIII", data, header + 8)
+        sections.append((virtual_address, max(virtual_size, raw_size), raw_offset))
+
+    def offset(rva):
+        for virtual_address, size, raw_offset in sections:
+            if virtual_address <= rva < virtual_address + size:
+                return rva - virtual_address + raw_offset
+        raise ValueError(f"RVA 0x{rva:X} is not in any section: {path}")
+
+    def c_string(rva):
+        start = offset(rva)
+        return data[start:data.index(b"\0", start)].decode("ascii")
+
+    imports = {}
+    if import_rva == 0:
+        return imports
+    descriptor = offset(import_rva)
+    while True:
+        original_thunk, _, _, name_rva, first_thunk = struct.unpack_from("<IIIII", data, descriptor)
+        if name_rva == 0:
+            break
+        functions = imports.setdefault(c_string(name_rva).lower(), set())
+        thunk = offset(original_thunk or first_thunk)
+        while True:
+            entry = struct.unpack_from("<Q", data, thunk)[0]
+            if entry == 0:
+                break
+            functions.add(f"#{entry & 0xFFFF}" if entry & (1 << 63) else c_string((entry & 0x7FFFFFFF) + 2))
+            thunk += 8
+        descriptor += 20
+    return imports
+
+
+def test_no_static_import_of_new_d3d12_functions(r, binaries=None):
+    """エンジンを含む実行ファイル(隣にある EngineTest.exe・DXForgeEngineDLL.dll も)が、古い d3d12.dll にない関数を
+    静的にインポートしていない(Agility SDK を使えない古い Windows でも起動して OS のランタイムに戻れる、#155)"""
+    name = "no static import of new d3d12.dll functions"
+    if binaries is None:
+        folder = os.path.dirname(r.exe)
+        binaries = [r.exe] + [os.path.join(folder, other) for other in ("EngineTest.exe", "DXForgeEngineDLL.dll")
+                              if os.path.isfile(os.path.join(folder, other))]
+    for binary in binaries:
+        d3d12 = pe_imports(binary).get("d3d12.dll", set())
+        r.check(f"{name}: {os.path.basename(binary)}", d3d12 <= ALLOWED_D3D12_IMPORTS,
+                f"imports {sorted(d3d12 - ALLOWED_D3D12_IMPORTS)} from d3d12.dll; resolve them with GetProcAddress")
+    r.report(name)
+
+
+def test_agility_sdk_missing(r):
+    """D3D12\\D3D12Core.dll がないと、警告を出して OS の D3D12 のランタイムで描画を続ける(#155)
+
+    実行ファイルと DXC を一時フォルダにコピーし、D3D12\\ には d3d12SDKLayers.dll(Debug のとき)だけを置く。
+    """
+    name = "Agility SDK missing (no D3D12\\D3D12Core.dll)"
+    folder = os.path.join(r.work_dir, "no_agility", "x64", "Config")
+    os.makedirs(os.path.join(folder, "D3D12"))
+    exe = shutil.copy2(r.exe, folder)
+    for dll in ("dxcompiler.dll", "dxil.dll"):
+        shutil.copy2(os.path.join(os.path.dirname(r.exe), dll), folder)
+    layers = os.path.join(os.path.dirname(r.exe), "D3D12", "d3d12SDKLayers.dll")
+    if os.path.isfile(layers):
+        shutil.copy2(layers, os.path.join(folder, "D3D12"))
+    png = os.path.join(r.work_dir, "no_agility.png")
+    code, result, stderr = r.run_json(r.render_args(png) + ["--engine-path", REPO_ROOT + os.sep], exe)
+    r.check_no_crash(name, code, stderr)
+    r.check(f"{name}: exit code", code == EXIT_SUCCESS, f"got {code}; result: {result}; stderr: {stderr.strip()}")
+    r.check(f"{name}: png", os.path.isfile(png), png)
+    runtime = (result or {}).get("d3d12_runtime") or {}
+    r.check(f"{name}: OS runtime", runtime.get("source") == "os", runtime)
+    r.check(f"{name}: fallback reason", "CreateDeviceFactory" in (runtime.get("fallback_reason") or ""), runtime)
+    r.check(f"{name}: not the D3D12Core.dll of the build", "D3D12Core.dll" in (runtime.get("core_path") or "")
+            and not os.path.normcase(runtime["core_path"]).startswith(os.path.normcase(folder)), runtime)
+    r.check(f"{name}: warning on stderr", "[D3D12] warning: the Agility SDK " in stderr and "[D3D12] runtime: OS " in stderr, stderr)
+    r.report(name)
+
+
 # ACP(CI の 1252、日本語の Windows の 932)のどちらでも表せない文字を含むフォルダ名(日本語・ハングル・ő)
 NON_ACP_FOLDER_NAME = "開発_한글_ő"
 
@@ -808,9 +939,18 @@ def main():
     parser.add_argument("--config", choices=["Debug", "Release"],
                         help="構成(省略時は --exe のフォルダ名から決め、--exe もなければ Debug)")
     parser.add_argument("--exe", help="EngineUnitTests.exe のパス(省略時は x64/<config>/EngineUnitTests.exe)")
+    parser.add_argument("--check-imports", nargs="+", metavar="BINARY",
+                        help="指定した exe/DLL の d3d12.dll のインポートだけを確かめる(描画しない。#155)")
     parser.add_argument("--update-baselines", action="store_true",
                         help="WARPで描いた画像で baselines/ の基準画像を書き換える(--config か --exe が必要。テストは実行しない)")
     args = parser.parse_args()
+    if args.check_imports:
+        r = Runner(None, None)
+        missing = [binary for binary in args.check_imports if not os.path.isfile(binary)]
+        r.check("binaries exist", not missing, missing)
+        test_no_static_import_of_new_d3d12_functions(r, [os.path.abspath(binary) for binary in args.check_imports if os.path.isfile(binary)])
+        print(f"{r.passed} checks passed, {len(r.failures)} failed")
+        return 1 if r.failures else 0
     exe = os.path.abspath(args.exe or os.path.join(REPO_ROOT, "x64", args.config or "Debug", "EngineUnitTests.exe"))
     if not os.path.isfile(exe):
         print(f"EngineUnitTests.exe not found: {exe}", file=sys.stderr)
@@ -829,12 +969,14 @@ def main():
     try:
         r = Runner(exe, work_dir)
         test_clear_diff_dir(r)
+        test_no_static_import_of_new_d3d12_functions(r)
         test_usage_errors(r)
         test_shaders_unavailable(r, has_dxc)
         if has_dxc:
             test_graphics_init_failed(r)
             test_shader_compilation_throws(r)
             test_engine_path_outside_repo(r)
+            test_agility_sdk_missing(r)
             test_engine_path_with_non_acp_characters(r)
             test_engine_path_wins_over_default_include(r)
             test_shader_cache_follows_engine_path(r)

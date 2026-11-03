@@ -17,8 +17,12 @@
            ShaderCompilation が返る(グラフィックスは初期化しない)。そのあとの ShutdownEngine も落ちない。
          - 同じ作業フォルダで、エンジンのパスにこのリポジトリを渡すと、エンジンのシェーダーをコンパイルして作業フォルダに
            shaders.bin を書き、グラフィックスを初期化する(GPU がなければ Graphics)。ShutdownEngine を2回呼んで終える。
+         初期化できたときは、EngineAPI.GetGraphicsRuntimeDescription が、DLL の隣の D3D12\ の D3D12 Agility SDK
+         (DXForgeEngine/packages.config のバージョン)を使ったことを示す(#155)。DLL の隣と exe(pwsh.exe)の隣が違う場合の確認になる。
+         DLL が D3D12GetInterface など古い d3d12.dll にない関数を静的にインポートしていない(render_run_test.py --check-imports。
+         インポートすると Agility SDK 対応前の Windows 10 では DLL を読み込めず、OS のランタイムに戻れない、#155)。
          DLL がないとき: InitializeEngine が例外を投げずに Unknown を返し、
-         ShutdownEngine も例外を投げない。-RequireEngineDll を付けると、DLL がないときは失敗にする(ローカルでは付ける)。
+         ShutdownEngine も GetGraphicsRuntimeDescription も例外を投げない。-RequireEngineDll を付けると、DLL がないときは失敗にする(ローカルでは付ける)。
       初期化に成功する経路(シェーダーのコンパイル → Direct3D 12 の初期化 → リソースの作成・破棄 → 終了)は、DLL と同じ
       editor::initialize_engine を使う EngineUnitTests の --render(render_run_test.py、WARP)で確かめる。
 
@@ -62,6 +66,8 @@ if (-not $hasEngineDll)
 }
 else
 {
+	$importsOutput = & python (Join-Path $RepoRoot "EngineUnitTests\Tests\render_run_test.py") --check-imports $engineDllPath 2>&1
+	Check ($LASTEXITCODE -eq 0) "DXForgeEngineDLL.dll does not statically import new d3d12.dll functions: $($importsOutput -join ' / ')"
 	[void][System.Runtime.InteropServices.NativeLibrary]::Load($engineDllPath)
 }
 if ($hasEngineDll -and $Configuration -eq "DebugEditor")
@@ -85,6 +91,11 @@ $initialize = $engineApi.GetMethod("InitializeEngine", $flags, [Type[]]@([string
 Check ($null -ne $initialize) "EngineAPI.InitializeEngine takes the engine path (string)"
 $messageEnginePath = "C:\Engine\Path\"
 $shutdown = $engineApi.GetMethod("ShutdownEngine", $flags, [Type[]]@())
+$getRuntime = $engineApi.GetMethod("GetGraphicsRuntimeDescription", $flags)
+Check ($null -ne $getRuntime) "EngineAPI.GetGraphicsRuntimeDescription exists"
+# DXForgeEngine/packages.config の Microsoft.Direct3D.D3D12 のバージョン(例 1.620.1。D3D12_SDK_VERSION は 620)
+$agilityVersion = ([xml](Get-Content -Raw (Join-Path $RepoRoot "DXForgeEngine\packages.config"))).packages.package |
+	Where-Object { $_.id -eq "Microsoft.Direct3D.D3D12" } | ForEach-Object { $_.version }
 
 function ConvertTo-PascalCase([string]$name)
 {
@@ -200,6 +211,21 @@ try
 		$result = $initialize.Invoke($null, @([string]($RepoRoot + "\")))
 		Check ("$result" -eq "Succeeded" -or "$result" -eq "Graphics") "InitializeEngine with this repository as the engine path compiles the engine shaders: $result"
 		Check (Test-Path (Join-Path $cwd "shaders\d3d12\shaders.bin")) "shaders.bin is written in the working folder"
+		if ("$result" -eq "Succeeded")
+		{
+			# D3D12 のランタイムは、pwsh.exe の隣ではなく DXForgeEngineDLL.dll の隣の D3D12\ から読む(#155)
+			$runtimeArgs = [object[]]@($false)
+			$description = [string]$getRuntime.Invoke($null, $runtimeArgs)
+			Write-Host "    D3D12 runtime: $description"
+			$sdkVersion = $agilityVersion.Split(".")[1]
+			Check ($runtimeArgs[0] -eq $true) "GetGraphicsRuntimeDescription reports the Agility SDK: $description"
+			Check ($description.StartsWith("Agility SDK $sdkVersion (D3D12Core $agilityVersion.")) "the Agility SDK version matches packages.config ($agilityVersion): $description"
+			Check ($description.EndsWith((Join-Path $OutDir "D3D12\D3D12Core.dll") + ")")) "D3D12Core.dll is the one next to DXForgeEngineDLL.dll: $description"
+		}
+		else
+		{
+			Write-Host "    (graphics did not initialize here, so the D3D12 runtime is not checked)"
+		}
 		try
 		{
 			$shutdown.Invoke($null, @())
@@ -241,6 +267,9 @@ try
 			Check ("$result" -eq "Unknown") "without DXForgeEngineDLL.dll, InitializeEngine returns Unknown: $result"
 			$shutdown.Invoke($null, @())
 			Check $true "without DXForgeEngineDLL.dll, ShutdownEngine does not throw"
+			$runtimeArgs = [object[]]@($true)
+			$description = [string]$getRuntime.Invoke($null, $runtimeArgs)
+			Check ($description -eq "" -and $runtimeArgs[0] -eq $false) "without DXForgeEngineDLL.dll, GetGraphicsRuntimeDescription returns an empty string"
 		}
 		catch
 		{

@@ -16,6 +16,7 @@
     <ClCompile Include="Tests_ResourceUpload.cpp" />
     <ClCompile Include="..\DXForgeEngineDLL\EngineInit.cpp" />
     <ClCompile Include="Tests_EngineInit.cpp" />
+    <ClCompile Include="Tests_D3D12Runtime.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MicroTest.h" />

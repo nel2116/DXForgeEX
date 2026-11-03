@@ -14,7 +14,10 @@
       MSBuild DXForge.sln -t:restore -p:RestorePackagesConfig=true で復元する(nuget.exe は不要)。
       この1回で packages.config(ContentTools の DirectXTex、DXForgeEngineDLL の Microsoft.Direct3D.DXC)と
       PackageReference(C# のプロジェクト)がまとめて復元される。いずれも *Editor 構成にしかマッピングされて
-      いないため、Debug/Release 構成では何もしない。
+      いないため、Debug/Release 構成では見ない。
+    - NuGet(D3D12 Agility SDK): DXForgeEngine/packages.config の Microsoft.Direct3D.D3D12(#155)は、
+      DXForgeEngine がすべての構成でビルドされるため、Debug/Release 構成でも無ければ同じ方法で復元する。
+      DXForgeEngine のビルドが D3D12\D3D12Core.dll を出力フォルダ(x64\<構成>\D3D12\)にコピーする。
       DXForgeEngineDLL の DXC はエディタ側のシェーダのコンパイル(#29)に使い、版を固定している。ネイティブのビルドは /restore なしで DXForge.sln を呼ぶため、*Editor
       構成で project.assets.json が無いと(obj だけを消したときなど)、ソリューションに含まれる
       C# のプロジェクトが NETSDK1004 で失敗する(#61)。以前は DXForgeEditor だけを見ていたため、
@@ -56,12 +59,16 @@ $RepoRoot = $PSScriptRoot
 $PackagesDir = Join-Path $RepoRoot "packages"
 $Platform = "x64"
 
+# 構成によらずビルドされ、packages.config を持つプロジェクト(Debug/Release でも復元する、#155)
+$AllConfigurationPackageProjects = @("DXForgeEngine")
+
 function Get-MissingNuGetPackages
 {
+	param([string[]]$Projects)
 	# プロジェクトはすべてリポジトリ直下の1階層目にあるため、再帰的には探さない
 	# (packages/ や出力フォルダの中まで走査すると遅くなるため)
 	$configs = Get-ChildItem $RepoRoot -Directory |
-		Where-Object { $_.Name -ne "packages" } |
+		Where-Object { $_.Name -ne "packages" -and (-not $Projects -or $Projects -contains $_.Name) } |
 		ForEach-Object { Join-Path $_.FullName "packages.config" } |
 		Where-Object { Test-Path $_ }
 
@@ -110,28 +117,32 @@ if ($Configuration -like "*Editor")
 {
 	$missing = @(Get-MissingNuGetPackages)
 	$missing += @(Get-UnrestoredSdkProjects)
-	if ($missing.Count -gt 0)
+}
+else
+{
+	$missing = @(Get-MissingNuGetPackages -Projects $AllConfigurationPackageProjects)
+}
+if ($missing.Count -gt 0)
+{
+	if (-not $MSBuildPath)
 	{
-		if (-not $MSBuildPath)
+		$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+		if (Test-Path $vswhere)
 		{
-			$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-			if (Test-Path $vswhere)
-			{
-				$MSBuildPath = & $vswhere -latest -prerelease -products * -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
-			}
-			if (-not $MSBuildPath) { $MSBuildPath = Get-Command msbuild.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source }
-			if (-not $MSBuildPath) { throw 'MSBuild.exeが見つかりません。Visual Studio 2022以降をインストールしてください。' }
+			$MSBuildPath = & $vswhere -latest -prerelease -products * -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
 		}
-
-		Write-Host "  NuGetパッケージを復元します: $($missing -join ', ')"
-		$output = (& $MSBuildPath "$RepoRoot\DXForge.sln" /nologo /t:restore /p:RestorePackagesConfig=true "/p:Configuration=$Configuration" "/p:Platform=$Platform" /v:minimal 2>&1 | Out-String)
-		if ($LASTEXITCODE -ne 0)
-		{
-			Write-Host $output
-			throw "NuGetパッケージの復元に失敗しました(終了コード $LASTEXITCODE)。"
-		}
-		$restored = $true
+		if (-not $MSBuildPath) { $MSBuildPath = Get-Command msbuild.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source }
+		if (-not $MSBuildPath) { throw 'MSBuild.exeが見つかりません。Visual Studio 2022以降をインストールしてください。' }
 	}
+
+	Write-Host "  NuGetパッケージを復元します: $($missing -join ', ')"
+	$output = (& $MSBuildPath "$RepoRoot\DXForge.sln" /nologo /t:restore /p:RestorePackagesConfig=true "/p:Configuration=$Configuration" "/p:Platform=$Platform" /v:minimal 2>&1 | Out-String)
+	if ($LASTEXITCODE -ne 0)
+	{
+		Write-Host $output
+		throw "NuGetパッケージの復元に失敗しました(終了コード $LASTEXITCODE)。"
+	}
+	$restored = $true
 }
 
 $dxcDir = Join-Path $PackagesDir "DirectXShaderCompiler"
