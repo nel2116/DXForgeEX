@@ -185,6 +185,9 @@ namespace DXForgeEditor.Components
 
         public int ContentId => _geometry?.ContentId ?? ID.INVALID_ID;
 
+        /// <summary>ジオメトリをエンジンにアップロードしているか。</summary>
+        public bool IsLoaded => _geometry != null;
+
         public override bool CanWriteToBinary => false;
 
         /// <summary>
@@ -265,6 +268,16 @@ namespace DXForgeEditor.Components
         {
             Debug.Assert(_geometry == null && GeometryWithMaterials == null);
             if (_geometry != null) return;
+
+            // NOTE: エディタでプロジェクトを開くときは、デシリアライズ(Scene.OnDeserialized)のあとでアセットを登録する
+            //       (MainWindow.OpenProjectBrowserDialog の ContentWatcher.Reset)。登録がこのプロジェクトのものでなければ
+            //       ここでは何もせず、登録のあとの Project.LoadEntitiesWithAssets() でやり直す(Codexの指摘, #32)。
+            var contentFolder = Owner.ParentScene?.Project?.ContentPath;
+            if (contentFolder == null || !string.Equals(AssetRegistry.ContentFolder, contentFolder, StringComparison.OrdinalIgnoreCase))
+            {
+                Debug.WriteLine($"Deferred loading the geometry of {Owner.Name}: the assets of {contentFolder} are not registered yet.");
+                return;
+            }
 
             var assetInfo = GeometryGuid != Guid.Empty ? AssetRegistry.GetAssetInfo(GeometryGuid) : null;
             if (assetInfo?.Type != AssetType.Mesh)

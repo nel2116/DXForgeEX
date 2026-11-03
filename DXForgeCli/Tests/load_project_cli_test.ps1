@@ -313,6 +313,25 @@ namespace DXForgeCliTest
 		$reloaded = Get-GeometryState ($projectType.GetMethod("Load", $flags).Invoke($null, [object[]]@([string]$resaved)))
 		Check (($reloaded.Keys | ForEach-Object { $reloaded[$_] -eq $state[$_] }) -notcontains $false -and $reloaded.Count -eq $state.Count) "WithGeometry: saving and reloading keeps the geometry and materials" (($reloaded.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join "; ")
 
+		# アセットの登録(AssetRegistry.Reset)がこのプロジェクトのものでないうちは、Geometry.Load() は何もせず(エラーのログも出さず)、
+		# 登録のあとの Project.LoadEntitiesWithAssets() に任せる(Codexの指摘, #32)。エンジンにもアセットにも触らない。
+		$loggerType = $editor.GetType("DXForgeEditor.Utilities.Logger", $true)
+		$messageType = $editor.GetType("DXForgeEditor.Utilities.MessageType", $true)
+		$logged = [System.Collections.Generic.List[string]]::new()
+		$handler = { param($type, $message) $logged.Add("$($type): $message") }.GetNewClosure() -as ([Action`2].MakeGenericType($messageType, [string]))
+		$loggerType.GetEvent("MessageLogged").AddEventHandler($null, $handler)
+		try
+		{
+			$moved = @($geometryProject.ActiveScene.GameEntities | Where-Object { $_.Name -eq "Moved" })[0]
+			$movedGeometry = @($moved.Components | Where-Object { $_.GetType() -eq $geometryType })[0]
+			$null = $geometryType.GetMethod("Load", [Type[]]@()).Invoke($movedGeometry, @())
+			Check (-not $movedGeometry.IsLoaded -and $movedGeometry.ContentId -eq -1 -and $logged.Count -eq 0) "WithGeometry: Geometry.Load() waits for the project's assets to be registered (no upload, no error log)" ($logged -join "; ")
+		}
+		finally
+		{
+			$loggerType.GetEvent("MessageLogged").RemoveEventHandler($null, $handler)
+		}
+
 		Check ($assertRecorder.Failures.Count -eq 0) "no Debug.Assert fired in the editor code" ($assertRecorder.Failures -join "; ")
 	}
 	finally

@@ -165,6 +165,22 @@ namespace DXForgeEditor.GameProject
             _scenes.Remove(scene);
         }
 
+        /// <summary>
+        /// アセットを登録した(ContentWatcher.Reset)あとに呼ぶ。デシリアライズのときはまだ登録されていないので読み込めなかった
+        /// コンポーネント(Geometry)を持つ、アクティブなシーンのエンティティを作り直す(Codexの指摘, #32)。
+        /// </summary>
+        public void LoadEntitiesWithAssets()
+        {
+            var entities = ActiveScene.GameEntities
+                .Where(x => x.IsActive && x.GetComponent<Components.Geometry>() is Components.Geometry geometry && !geometry.IsLoaded)
+                .ToList();
+            foreach (var entity in entities)
+            {
+                entity.IsActive = false;
+                entity.IsActive = true;
+            }
+        }
+
         public static Project Load(string file)
         {
             Debug.Assert(File.Exists(file));
@@ -174,6 +190,9 @@ namespace DXForgeEditor.GameProject
         public void Unload()
         {
             UnloadGameCodeDLL();
+            // スクリプトのないエンティティもエンジンから消し、コンポーネントがアップロードしたもの(Geometry のメッシュと
+            // マテリアル)を外す(Codexの指摘, #32)。UnloadGameCodeDLL はゲームのコードの読み直しでも呼ぶので、そこでは消さない。
+            _scenes.SelectMany(x => x.GameEntities).ToList().ForEach(x => x.IsActive = false);
             VisualStudio.CloseVisualStudio();
             UndoRedo.Reset();
             Logger.Clear();
