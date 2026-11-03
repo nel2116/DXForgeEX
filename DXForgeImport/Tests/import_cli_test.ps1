@@ -28,6 +28,8 @@
        - FBXの埋め込みテクスチャ: box.fbx に Checker64.png を埋め込んだFBX(ASCII の Video オブジェクト)をテスト中に作ってインポートし、
          埋め込み画像が出力先の <名前>.fbm にコピーされ、テクスチャの Sources がそこを指し(CLI の一時フォルダは終了時に消える)、
          エディタのコードでそこから再インポートできることを確かめる。
+         エディタの経路(ImportEmbeddedFiles を設定しない ContentHelper.Import、Project.Current は Path だけのプロジェクト)でも同じFBXを
+         取り込み、Sources が出力先の <名前>.fbm を指し、プロジェクトの一時フォルダを消しても画像が残り、再インポートできることを確かめる(#111)。
        - エディタとの互換: CLI が書いた .asset を、エディタのコード(DXForgeEditor.dll の Texture.Load / Geometry.Load)を
          リフレクションで呼んで読み込める。
        - 同じ入力をエディタのインポートの経路(ContentHelper.Import、エディタのドラッグ&ドロップと同じ関数)で書き出し、
@@ -557,6 +559,63 @@ namespace DXForgeImportTest
 		Check ($status -eq "Failed") "壊れたFBX(エディタ): ImportingItem.Status が Failed (実際: $status)"
 		Check (@(Get-ChildItem $brokenEditorDir -ErrorAction SilentlyContinue).Count -eq 0) "壊れたFBX(エディタ): .asset を書かない"
 		Check (@($loggedErrors | Where-Object { $_ -like "*FBX*$brokenFbx*" }).Count -gt 0) "壊れたFBX(エディタ): FBX のインポートの失敗がエラーログに出る (実際: $($loggedErrors -join ' / '))"
+
+		# 埋め込みテクスチャ(エディタ、#111): エディタの経路(ImportEmbeddedFiles を設定しない ContentHelper.Import)で埋め込みテクスチャ付きの
+		# FBX を取り込むと、埋め込み画像が出力先の <FBXのアセット名>.fbm にコピーされ、テクスチャの Sources がそこを指す。
+		# エディタは FBX を Project.Current.TempFolder にコピーして読み、プロジェクトを閉じるとそのフォルダを消す(Project.Unload)ので、
+		# Sources が一時フォルダを指していると、開き直したあとに再インポートできない。
+		if ($embeddedFbx)
+		{
+			# Project.Current(MainWindow の DataContext)を、Path だけ設定したプロジェクトにする(ConfigureImportSettings が ContentPath を、
+			# Geometry が TempFolder を使う)。テクスチャは ConfigureImportSettings.Import が別のスレッドで取り込み、そのスレッドが
+			# Dispatcher.Invoke を呼ぶので、待つあいだ Dispatcher を回す。
+			$projectDir = (Join-Path $WorkDir "editor_project") + "\"
+			$projectContent = Join-Path $projectDir "Content"
+			New-Item -ItemType Directory -Path $projectContent | Out-Null
+			$project = [System.Runtime.CompilerServices.RuntimeHelpers]::GetUninitializedObject($editor.GetType("DXForgeEditor.GameProject.Project", $true))
+			$project.Path = $projectDir
+			$window = [System.Windows.Window]::new()
+			$window.DataContext = $project
+			$app.MainWindow = $window
+			$environment.GetProperty("TempFolder").SetValue($null, $null)
+			try
+			{
+				$settings = [Activator]::CreateInstance($geometrySettingsType)
+				$asset = $editorImport.Invoke($null, @([string]$embeddedFbx, $settings, [string]$projectContent))
+				$editorEmbeddedAsset = Join-Path $projectContent "embedded_checker.asset"
+				$expectedSource = Join-Path $projectContent "embedded_box.fbm\embedded_checker.png"
+				$watch = [System.Diagnostics.Stopwatch]::StartNew()
+				$done = $false
+				while (-not $done -and $watch.Elapsed.TotalSeconds -lt 60)
+				{
+					$app.Dispatcher.Invoke([Action] {}, [System.Windows.Threading.DispatcherPriority]::Background)
+					$item = @($importingItems | Where-Object { $_.Name -eq "embedded_checker" })
+					$done = $item.Count -eq 1 -and "$($item[0].Status)" -ne "Importing"
+					if (-not $done) { Start-Sleep -Milliseconds 50 }
+				}
+				$status = if ($item.Count -eq 1) { "$($item[0].Status)" } else { "(ImportingItem が $($item.Count) 個)" }
+				Check ($status -eq "Succeeded" -and (Test-Path $editorEmbeddedAsset)) "埋め込みテクスチャ(エディタ): $editorEmbeddedAsset ができる (実際: $status)"
+				$source = $null
+				if (Test-Path $editorEmbeddedAsset)
+				{
+					$loaded, $texture = Load-Asset $textureType $editorEmbeddedAsset
+					$source = if ($loaded) { $texture.ImportSettings.Sources[0] } else { $null }
+				}
+				Check ($source -eq $expectedSource) "埋め込みテクスチャ(エディタ): Sources が出力先の embedded_box.fbm の画像を指す (実際: $source)"
+				# プロジェクトを閉じたとき(Project.Unload の DeleteTmpFolder)と同じく、一時フォルダを消す
+				Remove-Item -Recurse -Force $project.TempFolder -ErrorAction SilentlyContinue
+				Check ($source -and (Test-Path $source)) "埋め込みテクスチャ(エディタ): 一時フォルダを消しても Sources の画像が残る"
+				if ($source -and (Test-Path $source))
+				{
+					Check ($textureType.GetMethod("Import").Invoke($texture, @([string]$texture.FullPath))) "埋め込みテクスチャ(エディタ): 一時フォルダを消したあとも Sources から再インポートできる"
+				}
+			}
+			finally
+			{
+				$app.MainWindow = $null
+				$window.Close()
+			}
+		}
 
 		Check-NoAssert "エディタとの互換" $assertsBeforeEditor
 

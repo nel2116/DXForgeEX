@@ -505,16 +505,26 @@ namespace DXForgeEditor.Content
                 if (Directory.Exists(embeddedMediaDir))
                 {
                     Debug.Assert(!string.IsNullOrEmpty(FullPath));
-                    var files = Directory.GetFiles(embeddedMediaDir);
                     var destinationFolder = Path.GetDirectoryName(FullPath);
                     Debug.Assert(destinationFolder != null);
+                    // 一時フォルダはプロジェクトを閉じると消える(Project.Unload)ので、出力先の <FBXのアセット名>.fbm にコピーしてから
+                    // そのコピーを取り込む(テクスチャの Sources がコピーを指し、開き直したあとも再インポートできる。#111)。
+                    var copies = ContentHelper.CopyEmbeddedMedia(Directory.GetFiles(embeddedMediaDir), file, destinationFolder);
                     if (ContentImportEnvironment.ImportEmbeddedFiles is { } importEmbeddedFiles)
                     {
-                        importEmbeddedFiles(files, destinationFolder);
+                        importEmbeddedFiles(copies, destinationFolder);
                     }
                     else
                     {
-                        new ConfigureImportSettings(files, destinationFolder).Import();
+                        foreach (var copy in copies)
+                        {
+                            if (copy.Error is { } error) Logger.Log(MessageType.Error, error);
+                        }
+                        var copied = copies.Where(c => c.Error == null).Select(c => c.Copy).ToArray();
+                        if (copied.Length > 0)
+                        {
+                            new ConfigureImportSettings(copied, destinationFolder).Import();
+                        }
                     }
                 }
             }
