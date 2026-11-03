@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DXForgeEditor.Content;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -12,6 +13,8 @@ namespace DXForgeEditor.Components
     {
         Transform,
         Script,
+        // NOTE: Geometry は game.bin に書かない(Component.CanWriteToBinary)ので、この値はファイルに出ない
+        Geometry,
     }
 
     static class ComponentFactory
@@ -21,6 +24,7 @@ namespace DXForgeEditor.Components
             {
                 (entity, data) => new Transform(entity),
                 (entity, data) => new Script(entity){ Name = (string)data},
+                (entity, data) => new Geometry(entity, (AssetInfo)data),
             };
 
         public static Func<GameEntity, object, Component> GetCreationFunction(ComponentType conponentType)
@@ -35,6 +39,7 @@ namespace DXForgeEditor.Components
             {
                 Transform _ => ComponentType.Transform,
                 Script _ => ComponentType.Script,
+                Geometry _ => ComponentType.Geometry,
                 _ => throw new ArgumentException("Unknown component type"),
             };
         }

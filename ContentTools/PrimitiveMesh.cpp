@@ -6,6 +6,7 @@
 //
 // 更新履歴
 // 2024/12/24 新規作成
+// 2026/11/04 立方体(create_cube)を作れるようにする(Primal Day 075、#32)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "PrimitiveMesh.h"
@@ -133,6 +134,102 @@ namespace dxforge::tools
 
 			// UVセット
 			for (u32 i{ 0 }; i < num_indices; ++i)
+			{
+				m.uv_sets[0].emplace_back(uvs[m.raw_indices[i]]);
+			}
+
+			return m;
+		}
+
+		/// @brief 立方体の面の頂点(Primal Day 075)
+		/// @param face 面の番号(0: X-, 1: X+, 2: Y+, 3: Y-, 4: Z+, 5: Z-)
+		/// @param x 面の中での横の位置(-1〜1)
+		/// @param y 面の中での縦の位置(-1〜1)
+		/// @return 頂点の位置(-1〜1の立方体の上)
+		constexpr v3 get_face_vertex(u32 face, f32 x, f32 y)
+		{
+			v3 face_vertex[6] = {
+				{ -1.0f, -y,     x     },	// X-
+				{  1.0f, -y,    -x     },	// X+
+				{  x,     1.0f,  y     },	// Y+
+				{  x,    -1.0f, -y     },	// Y-
+				{  x,    -y,     1.0f  },	// Z+
+				{ -x,    -y,    -1.0f  },	// Z-
+			};
+
+			return face_vertex[face];
+		}
+
+		/// @brief 立方体メッシュ生成(Primal Day 075)。面ごとに頂点を持つ(面の境目で頂点を共有しない)
+		/// @param info プリミティブ初期化情報(segments は 1〜10 に丸める。size は半分の大きさ)
+		/// @return 生成されたメッシュ
+		mesh create_cube(const primitive_init_info& info)
+		{
+			const u32* const segments{ &info.segments[0] };
+			// 面ごとの、横と縦に使うセグメントの軸(X の面は z と y、Y の面は x と z、Z の面は x と y)
+			constexpr u32v2 axes[3]{ { axis::z, axis::y }, { axis::x, axis::z }, { axis::x, axis::y } };
+			// 面ごとのUVの左上(展開図の配置)
+			constexpr f32 u_range[6]{ 0.0f, 0.5f, 0.25f, 0.25f, 0.25f, 0.75f };
+			constexpr f32 v_range[6]{ 0.375f, 0.375f, 0.125f, 0.625f, 0.375f, 0.375f };
+			mesh m{};
+			utl::vector<v2> uvs{};
+
+			for (u32 face{ 0 }; face < 6; ++face)
+			{
+				const u32 axes_index{ face >> 1 };
+				const u32v2& face_axis{ axes[axes_index] };
+				const u32 x_count{ clamp(segments[face_axis.x], 1u, 10u) };
+				const u32 y_count{ clamp(segments[face_axis.y], 1u, 10u) };
+				const f32 x_step{ 1.0f / x_count };
+				const f32 y_step{ 1.0f / y_count };
+				const f32 u_step{ 0.25f / x_count };
+				const f32 v_step{ 0.25f / y_count };
+
+				const u32 raw_index_offset{ (u32)m.positions.size() };
+
+				// 頂点生成
+				for (u32 y{ 0 }; y <= y_count; ++y)
+				{
+					for (u32 x{ 0 }; x <= x_count; ++x)
+					{
+						const v2 pos{ 2.0f * x * x_step - 1.0f, 2.0f * y * y_step - 1.0f };
+						const v3 position{ get_face_vertex(face, pos.x, pos.y) };
+						m.positions.emplace_back(position.x * info.size.x, position.y * info.size.y, position.z * info.size.z);
+
+						v2 uv{ u_range[face], 1.0f - v_range[face] };
+						uv.x += x * u_step;
+						uv.y -= y * v_step;
+						uvs.emplace_back(uv);
+					}
+				}
+
+				// インデックス生成
+				const u32 row_length{ x_count + 1 };	// 1行の頂点数
+				for (u32 y{ 0 }; y < y_count; ++y)
+				{
+					for (u32 x{ 0 }; x < x_count; ++x)
+					{
+						const u32 index[4]
+						{
+							raw_index_offset + x + y * row_length,
+							raw_index_offset + x + (y + 1) * row_length,
+							raw_index_offset + (x + 1) + y * row_length,
+							raw_index_offset + (x + 1) + (y + 1) * row_length
+						};
+
+						m.raw_indices.emplace_back(index[0]);
+						m.raw_indices.emplace_back(index[1]);
+						m.raw_indices.emplace_back(index[2]);
+
+						m.raw_indices.emplace_back(index[2]);
+						m.raw_indices.emplace_back(index[1]);
+						m.raw_indices.emplace_back(index[3]);
+					}
+				}
+			}
+
+			m.uv_sets.resize(1);	// UVセット
+			for (u32 i{ 0 }; i < m.raw_indices.size(); ++i)
 			{
 				m.uv_sets[0].emplace_back(uvs[m.raw_indices[i]]);
 			}
@@ -290,8 +387,12 @@ namespace dxforge::tools
 		}
 
 		// 立方体
-		void create_cube(scene& /*scene*/, const primitive_init_info& /*info*/)
+		void create_cube(scene& scene, const primitive_init_info& info)
 		{
+			lod_group lod{};
+			lod.name = "cube";
+			lod.meshes.emplace_back(create_cube(info));
+			scene.lod_groups.emplace_back(lod);
 		}
 
 		// UV球

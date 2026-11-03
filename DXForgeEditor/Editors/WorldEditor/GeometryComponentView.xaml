@@ -1,0 +1,234 @@
+﻿<UserControl x:Class="DXForgeEditor.Editors.GeometryComponentView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:DXForgeEditor.Editors"
+             xmlns:vm="clr-namespace:DXForgeEditor.Components"
+             mc:Ignorable="d"
+             d:DataContext="{d:DesignInstance Type={x:Type vm:MSGeometry}}"
+             d:DesignHeight="450" d:DesignWidth="400">
+    <!-- インスペクターの Geometry コンポーネントのビュー(Primal Day 080)。
+         ジオメトリのアセットをコンテンツブラウザからドロップすると差し替える(undo/redo あり)。
+         NOTE: Primal の「Applied Material」の仮置きの Expander(赤い枠)は移していない -->
+    <UserControl.Resources>
+        <Style TargetType="{x:Type TextBlock}" BasedOn="{StaticResource LightTextBlockStyle}"/>
+
+        <!-- V/I/T/M の表示 -->
+        <Style TargetType="{x:Type TextBlock}" x:Key="MeshInfoTextBlockStyle" BasedOn="{StaticResource LightTextBlockStyle}">
+            <Setter Property="FontFamily" Value="Consolas"/>
+            <Setter Property="Foreground" Value="Moccasin"/>
+            <Setter Property="Opacity" Value="0.6"/>
+        </Style>
+
+        <!-- サブメッシュ(LOD のタブの中の 1 行) -->
+        <DataTemplate DataType="{x:Type vm:MeshWithMaterial}">
+            <Border Margin="0,1,0,0" MinHeight="96" CornerRadius="5">
+                <Border.Style>
+                    <Style TargetType="{x:Type Border}">
+                        <Setter Property="Background" Value="{StaticResource Editor.Window.GrayBrush3}"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="{StaticResource Editor.Window.GrayBrush2}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <DockPanel>
+                    <!-- サブメッシュの番号と名前(サブメッシュが 1 つなら出さない) -->
+                    <Border Background="{StaticResource Editor.Window.GrayBrush1}" Margin="1" CornerRadius="5" DockPanel.Dock="Top">
+                        <Border.Style>
+                            <Style TargetType="{x:Type Border}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DataContext.Meshes.Count, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type ItemsControl}}}" Value="1">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <StackPanel HorizontalAlignment="Left" VerticalAlignment="Top" Orientation="Horizontal" Margin="5,2">
+                            <TextBlock Text="{Binding Path=(ItemsControl.AlternationIndex), RelativeSource={RelativeSource Mode=TemplatedParent}, StringFormat='{}{0}.'}"
+                                       Foreground="{StaticResource Editor.Disabled.FontBrush}"/>
+                            <TextBlock Margin="5,0,0,0" Text="{Binding MeshInfo.Name}" FontStyle="Italic" Foreground="{StaticResource Editor.Disabled.FontBrush}"/>
+                        </StackPanel>
+                    </Border>
+                    <StackPanel Orientation="Horizontal" Margin="5">
+                        <Border CornerRadius="5" BorderThickness="2" BorderBrush="{StaticResource Editor.Window.GrayBrush6}" ClipToBounds="True" Width="64" Height="64">
+                            <Border.Background>
+                                <VisualBrush Stretch="Fill">
+                                    <VisualBrush.Visual>
+                                        <Image Source="{Binding MeshInfo.Icon}"/>
+                                    </VisualBrush.Visual>
+                                </VisualBrush>
+                            </Border.Background>
+                        </Border>
+                        <StackPanel Margin="10,0">
+                            <TextBlock Style="{StaticResource MeshInfoTextBlockStyle}" Text="{Binding MeshInfo.VertexCount, StringFormat=V: {0}}"/>
+                            <TextBlock Style="{StaticResource MeshInfoTextBlockStyle}" Text="{Binding MeshInfo.IndexCount, StringFormat=I: {0}}"/>
+                            <TextBlock Style="{StaticResource MeshInfoTextBlockStyle}" Text="{Binding MeshInfo.TriangleCount, StringFormat=T: {0}}"/>
+                            <TextBlock Style="{StaticResource MeshInfoTextBlockStyle}" Text="{Binding MaterialName, StringFormat=M: {0}}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+        </DataTemplate>
+
+        <!-- LOD(タブの中身) -->
+        <DataTemplate DataType="{x:Type vm:LodWithMaterials}">
+            <Grid Background="{StaticResource Editor.Window.GrayBrush3}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition/>
+                </Grid.RowDefinitions>
+                <!-- LOD の名前としきい値(LOD が 1 つなら出さない) -->
+                <StackPanel>
+                    <StackPanel.Style>
+                        <Style TargetType="{x:Type StackPanel}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding DataContext.GeometryWithMaterials.LODs.Count, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type TabControl}}}" Value="1">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <StackPanel Orientation="Horizontal" Margin="5">
+                        <TextBlock Text="Name" Width="73"/>
+                        <TextBlock Text="{Binding Name}" d:Text="CharacterModel" Foreground="{StaticResource Editor.GreenBrush}"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="5,0,0,5">
+                        <TextBlock Text="Threshold" Width="73"/>
+                        <TextBlock Text="{Binding Threshold}" d:Text="12.34" Foreground="{StaticResource Editor.GreenBrush}"/>
+                    </StackPanel>
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding Meshes}" AlternationCount="{Binding Meshes.Count}" Grid.Row="1">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </Grid>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <local:ComponentView Header="Geometry">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition/>
+            </Grid.RowDefinitions>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,5" Grid.Row="0">
+                <TextBlock Text="Name" Width="78"/>
+                <TextBlock Text="{Binding GeometryWithMaterials.Name}" d:Text="CharacterModel" Foreground="Moccasin" Opacity="0.6"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Margin="0,5,0,0" Grid.Row="1">
+                <Grid>
+                    <!-- ジオメトリのアセットのドロップ先。ダブルクリックでジオメトリエディタを開く -->
+                    <Border Style="{StaticResource DropBorderStyle}" HorizontalAlignment="Left"
+                            ToolTip="コンテンツブラウザからジオメトリのアセットをドロップすると差し替えます"
+                            Drop="OnGeometry_Border_Drop" MouseLeftButtonDown="OnGeometry_Border_Mouse_LBD">
+                        <Border.Background>
+                            <ImageBrush ImageSource="{Binding GeometryWithMaterials.Icon}"/>
+                        </Border.Background>
+                    </Border>
+                    <!-- ジオメトリを読み込めていないとき(複数選択で違うとき、アセットが見つからないとき)は市松模様 -->
+                    <Border IsHitTestVisible="False" CornerRadius="5" BorderThickness="2">
+                        <Border.Background>
+                            <ImageBrush ImageSource="/Resources/TextureEditor/Checker64.png"/>
+                        </Border.Background>
+                        <Border.Style>
+                            <Style TargetType="{x:Type Border}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding GeometryWithMaterials}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <Border>
+                            <Border.Style>
+                                <Style TargetType="{x:Type Border}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMultiValue}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <Border.Background>
+                                <VisualBrush Viewport="0.1,0.2,0.8,0.6" Visual="{StaticResource MultivalueTextBlock}"/>
+                            </Border.Background>
+                        </Border>
+                    </Border>
+                </Grid>
+                <!-- LOD もサブメッシュも 1 つのときは、ここに V/I/T/M を出す(タブは出さない) -->
+                <StackPanel Margin="10,0,0,0" d:Visibility="Visible"
+                            DataContext="{Binding GeometryWithMaterials.LODs[0].Meshes[0]}">
+                    <StackPanel.Style>
+                        <Style TargetType="{x:Type StackPanel}">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding DataContext.GeometryWithMaterials.LODs.Count, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Grid}}}" Value="1"/>
+                                        <Condition Binding="{Binding DataContext.GeometryWithMaterials.LODs[0].Meshes.Count, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type Grid}}}" Value="1"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+                    <TextBlock Style="{StaticResource MeshInfoTextBlockStyle}" Text="{Binding MeshInfo.VertexCount, StringFormat=V: {0}}" d:Text="V: 24"/>
+                    <TextBlock Style="{StaticResource MeshInfoTextBlockStyle}" Text="{Binding MeshInfo.IndexCount, StringFormat=I: {0}}" d:Text="I: 36"/>
+                    <TextBlock Style="{StaticResource MeshInfoTextBlockStyle}" Text="{Binding MeshInfo.TriangleCount, StringFormat=T: {0}}" d:Text="T: 12"/>
+                    <TextBlock Style="{StaticResource MeshInfoTextBlockStyle}" Text="{Binding MaterialName, StringFormat=M: {0}}" d:Text="M: DefaultMaterial"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- LOD ごとのタブ(LOD が 1 つならタブの見出しを出さない。LOD もサブメッシュも 1 つなら全体を出さない) -->
+            <TabControl Background="Transparent" BorderThickness="0" SelectedIndex="0" Grid.Row="2" Margin="-2,10,-2,-2"
+                        ItemsSource="{Binding GeometryWithMaterials.LODs}" SelectionChanged="OnTabControl_SelectionChanged"
+                        AlternationCount="{Binding GeometryWithMaterials.LODs.Count}">
+                <TabControl.Style>
+                    <Style TargetType="{x:Type TabControl}">
+                        <Setter Property="ItemContainerStyle">
+                            <Setter.Value>
+                                <Style TargetType="{x:Type TabItem}" BasedOn="{StaticResource DXForgeTabItemStyle}"/>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding GeometryWithMaterials}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding GeometryWithMaterials.LODs.Count}" Value="1"/>
+                                    <Condition Binding="{Binding GeometryWithMaterials.LODs[0].Meshes.Count}" Value="1"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </MultiDataTrigger>
+                            <DataTrigger Binding="{Binding GeometryWithMaterials.LODs.Count}" Value="1">
+                                <Setter Property="ItemContainerStyle">
+                                    <Setter.Value>
+                                        <Style TargetType="{x:Type TabItem}" BasedOn="{StaticResource DXForgeTabItemStyle}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </Style>
+                                    </Setter.Value>
+                                </Setter>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TabControl.Style>
+                <TabControl.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Path=(ItemsControl.AlternationIndex), RelativeSource={RelativeSource AncestorType={x:Type TabItem}}, StringFormat='{}{0}'}" MinWidth="18"/>
+                    </DataTemplate>
+                </TabControl.ItemTemplate>
+            </TabControl>
+        </Grid>
+    </local:ComponentView>
+</UserControl>

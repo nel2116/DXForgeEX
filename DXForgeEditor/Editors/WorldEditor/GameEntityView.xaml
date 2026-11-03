@@ -16,12 +16,15 @@
         <DataTemplate DataType="{x:Type vm:MSScript}">
             <local:ScriptView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:MSGeometry}">
+            <local:GeometryComponentView/>
+        </DataTemplate>
 
         <ContextMenu x:Key="addComponentMenu"
                      IsOpen="{Binding Path=IsCheked,RelativeSource={RelativeSource Mode=FindAncestor,AncestorType={x:Type ToggleButton}}}">
-            <!-- TODO: Geometry/Rigidbodyはエディタ側のコンポーネントが未実装のため無効化している(#20) -->
-            <MenuItem Header="Geometry" IsEnabled="False"
-                      ToolTip="未実装" ToolTipService.ShowOnDisabled="True"/>
+            <!-- Geometry は既定のジオメトリ(DefaultCube)を付ける(Primal Day 080, #32) -->
+            <!-- TODO: Rigidbodyはエディタ側のコンポーネントが未実装のため無効化している(#20) -->
+            <MenuItem Header="Geometry" Click="OnAddGeometryComponent"/>
             <MenuItem Header="Physics" IsEnabled="False"
                       ToolTip="未実装(物理エンジンが未実装)" ToolTipService.ShowOnDisabled="True">
                 <MenuItem Header="Rigidbody" IsEnabled="False"/>

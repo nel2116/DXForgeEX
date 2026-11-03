@@ -688,6 +688,61 @@
         </Setter>
     </Style>
 
+    <!-- 複数のエンティティで値が違うときに出す「MULTI VALUE」(Primal Day 080) -->
+    <StackPanel x:Key="MultivalueTextBlock" Opacity="0.7">
+        <StackPanel.RenderTransform>
+            <TransformGroup>
+                <SkewTransform AngleX="-10"/>
+                <RotateTransform Angle="-10"/>
+            </TransformGroup>
+        </StackPanel.RenderTransform>
+        <TextBlock Text="MULTI" Width="32" Foreground="{StaticResource Editor.OrangeBrush}" FontFamily="Bahnschrift condensed"/>
+        <TextBlock Text="VALUE" Width="32" Foreground="{StaticResource Editor.OrangeBrush}" FontFamily="Bahnschrift condensed" Margin="0,-4"/>
+    </StackPanel>
+
+    <!-- アセットをドロップして受け取る枠(Primal Day 080)。ドラッグが入ると枠が緑になる -->
+    <Style x:Key="DropBorderStyle" TargetType="{x:Type Border}">
+        <Setter Property="BorderBrush" Value="{StaticResource Editor.Window.GrayBrush6}"/>
+        <Setter Property="AllowDrop" Value="True"/>
+        <Setter Property="CornerRadius" Value="5"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="Width" Value="{StaticResource AssetIconWidth}"/>
+        <Setter Property="Height" Value="{StaticResource AssetIconWidth}"/>
+        <Setter Property="ClipToBounds" Value="True"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="BorderBrush" Value="{StaticResource Editor.MouseOver.BorderBrush}"/>
+            </Trigger>
+            <EventTrigger RoutedEvent="PreviewDragEnter">
+                <BeginStoryboard>
+                    <Storyboard>
+                        <ColorAnimation Storyboard.TargetProperty="(Border.BorderBrush).(SolidColorBrush.Color)"
+                                        From="{StaticResource Editor.Window.GrayColor6}"
+                                        To="{StaticResource Editor.GreenColor}" Duration="0:0:0"/>
+                    </Storyboard>
+                </BeginStoryboard>
+            </EventTrigger>
+            <EventTrigger RoutedEvent="PreviewDragLeave">
+                <BeginStoryboard>
+                    <Storyboard>
+                        <ColorAnimation Storyboard.TargetProperty="(Border.BorderBrush).(SolidColorBrush.Color)"
+                                        From="{StaticResource Editor.GreenColor}"
+                                        To="{StaticResource Editor.Window.GrayColor6}" Duration="0:0:0"/>
+                    </Storyboard>
+                </BeginStoryboard>
+            </EventTrigger>
+            <EventTrigger RoutedEvent="Drop">
+                <BeginStoryboard>
+                    <Storyboard>
+                        <ColorAnimation Storyboard.TargetProperty="(Border.BorderBrush).(SolidColorBrush.Color)"
+                                        From="{StaticResource Editor.GreenColor}"
+                                        To="{StaticResource Editor.Window.GrayColor6}" Duration="0:0:0"/>
+                    </Storyboard>
+                </BeginStoryboard>
+            </EventTrigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- MenuItem のカスタムテンプレート -->
     <Style x:Key="CustomMenuItemStyle" TargetType="MenuItem">
         <Setter Property="Background" Value="{StaticResource Editor.Window.GrayBrush2}"/>

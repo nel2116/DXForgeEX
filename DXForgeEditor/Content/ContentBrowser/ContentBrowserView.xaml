@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:DXForgeEditor.Content"
+             xmlns:controls="clr-namespace:DXForgeEditor.Utilities.Controls"
              d:DataContext="{d:DesignInstance Type=local:ContentBrowser}"
              mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800">
@@ -182,6 +183,8 @@
             <EventSetter Event="MouseDoubleClick" Handler="OnContent_Item_MouseDoubleClick"/>
             <EventSetter Event="KeyDown" Handler="OnContent_Item_KeyDown"/>
         </Style>
+        <!-- NOTE: folderListView の項目は ListViewItemEx(Primal Day 080)。暗黙のスタイルは型ごとなので、両方に当てる -->
+        <Style TargetType="{x:Type controls:ListViewItemEx}" BasedOn="{StaticResource {x:Type ListViewItem}}"/>
 
         <GridView x:Key="gridView">
             <!-- Icon and file name -->
@@ -285,11 +288,11 @@
             <RowDefinition/>
         </Grid.RowDefinitions>
 
-        <ListView ItemsSource="{Binding FolderContent}" Grid.Row="1" x:Name="folderListView"
+        <controls:ListViewEx ItemsSource="{Binding FolderContent}" Grid.Row="1" x:Name="folderListView"
                   ContextMenu="{StaticResource contextMenu}" IsTextSearchEnabled="True"
                   TextSearch.TextPath="FileName">
-            <ListView.Style>
-                <Style TargetType="{x:Type ListView}">
+            <controls:ListViewEx.Style>
+                <Style TargetType="{x:Type controls:ListViewEx}">
                     <Setter Property="Background" Value="{StaticResource Editor.Window.GrayBrush2}"/>
                     <Setter Property="ListBox.BorderThickness" Value="0"/>
                     <Setter Property="AllowDrop" Value="{Binding Path=AllowImport, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:ContentBrowserView}}}"/>
@@ -297,14 +300,17 @@
                     <Setter Property="SelectionMode" Value="{Binding Path=SelectionMode, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type local:ContentBrowserView}}}"/>
                     <EventSetter Event="DragEnter" Handler="OnFolderContent_ListView_DragEnter"/>
                     <EventSetter Event="SelectionChanged" Handler="OnFolderContent_ListView_SelectionChanged"/>
+                    <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OnFolderContent_ListView_PreviewMouse_LBD"/>
+                    <EventSetter Event="PreviewMouseLeftButtonUp" Handler="OnFolderContent_ListView_PreviewMouse_LBU"/>
+                    <EventSetter Event="MouseMove" Handler="OnFolderContent_ListView_MouseMove"/>
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding Path=IsChecked, ElementName=listViewToggle}" Value="False">
                             <Setter Property="View" Value="{StaticResource tileView}"/>
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
-            </ListView.Style>
-        </ListView>
+            </controls:ListViewEx.Style>
+        </controls:ListViewEx>
 
         <Border Visibility="Collapsed" d:Visibility="Visible" Background="Transparent"
                 x:Name="dropBorder" AllowDrop="{Binding Path=AllowDrop, ElementName=folderListView}" Grid.Row="1"

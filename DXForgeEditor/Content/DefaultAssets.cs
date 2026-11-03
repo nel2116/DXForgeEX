@@ -1,4 +1,5 @@
-﻿using DXForgeEditor.DllWrappers;
+﻿using DXForgeEditor.ContentToolsAPIStructs;
+using DXForgeEditor.DllWrappers;
 using DXForgeEditor.Utilities;
 using System;
 using System.Collections.Generic;
@@ -13,6 +14,9 @@ namespace DXForgeEditor.Content
     /// Resources\DefaultAssets\ に置く。起動時になければ作る。
     /// 既定のマテリアル用シェーダー(Resources/MaterialEditor/DefaultMaterialShaders.hlsl)は起動時にコンパイルする(Primal Day 076)。
     /// 既定のマテリアル(DefaultMaterial.asset)は、そのシェーダーで作る(Primal Day 077)。
+    /// 既定のジオメトリ(DefaultCube.asset)は、Add Component → Geometry で付ける(Primal Day 077/080)。
+    /// NOTE: 既定アセットは、プロジェクトの AssetRegistry には登録しない(Primal Day 080 は登録する)。
+    ///       Geometry コンポーネントは、保存した GUID が既定アセットのものなら、探さずにそれを使う。
     /// </summary>
     static class DefaultAssets
     {
@@ -21,6 +25,11 @@ namespace DXForgeEditor.Content
         /// 作れなかった場合は null。
         /// </summary>
         public static AssetInfo? BrdfIntegrationLut { get; private set; }
+
+        /// <summary>
+        /// 既定のジオメトリ(DefaultCube.asset、ContentTools の立方体のプリミティブメッシュ)。作れなかった場合は null。
+        /// </summary>
+        public static AssetInfo? DefaultGeometry { get; private set; }
 
         /// <summary>
         /// 既定のマテリアル(DefaultMaterial.asset)。作れなかった場合は null。
@@ -42,6 +51,8 @@ namespace DXForgeEditor.Content
         public static string DefaultAssetsPath { get; } = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"Resources\DefaultAssets\");
 
         public static string BrdfIntegrationLutFile => Path.Combine(DefaultAssetsPath, $"BrdfIntegrationLut{Asset.AssetFileExtension}");
+
+        public static string DefaultGeometryFile => Path.Combine(DefaultAssetsPath, $"DefaultCube{Asset.AssetFileExtension}");
 
         public static string DefaultMaterialFile => Path.Combine(DefaultAssetsPath, $"DefaultMaterial{Asset.AssetFileExtension}");
 
@@ -70,6 +81,15 @@ namespace DXForgeEditor.Content
             // NOTE: Primalは作ったときだけ BrdfIntegrationLut を設定するので、2回目以降の起動では null のままになる。
             //       ここでは既存のファイルからも読む。
             BrdfIntegrationLut = File.Exists(brdfLutFile) ? Asset.TryGetAssetInfo(brdfLutFile) : null;
+
+            // NOTE: Primal と同じく、ないときだけ作る(GUID を変えないため。.dxproj は GUID で参照する)
+            var cubeFile = DefaultGeometryFile;
+            if (!File.Exists(cubeFile))
+            {
+                CreateDefaultCube(cubeFile);
+            }
+            DefaultGeometry = File.Exists(cubeFile) ? Asset.TryGetAssetInfo(cubeFile) : null;
+            if (DefaultGeometry?.Type != AssetType.Mesh) DefaultGeometry = null;
 
             CompileDefaultMaterialShaders();
 
@@ -204,6 +224,24 @@ namespace DXForgeEditor.Content
             {
                 Debug.WriteLine(ex.Message);
                 Logger.Log(MessageType.Error, "既定のマテリアル用シェーダーをコンパイルできませんでした。");
+            }
+        }
+
+        private static void CreateDefaultCube(string file)
+        {
+            try
+            {
+                var cube = new Geometry();
+                var info = new PrimitiveInitInfo() { Type = PrimitiveMeshType.Cube };
+                if (!ContentToolsAPI.CreatePrimitiveMesh(cube, info) || !cube.Save(file).Any())
+                {
+                    Logger.Log(MessageType.Error, $"既定のジオメトリを作れませんでした: {file}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                Logger.Log(MessageType.Error, $"既定のジオメトリを作れませんでした: {file}");
             }
         }
 
