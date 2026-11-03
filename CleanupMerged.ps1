@@ -12,10 +12,12 @@
 	- ブランチの先端が origin/develop に含まれている(マージ後に足したコミットがない)
 	- worktreeに未コミットの変更や追跡されていないファイルがない(無視されたビルド成果物は除く)
 	- worktreeでOrcaのターミナルが開いていない(orca terminal list。#133)
+	- worktreeに、解放されていない(terminalState が released でない)Orcaのworkerがいない
+	  (Runごとの orca orchestration worker-list。structured の形式のworkerは terminal list に出ないため。#166)
 	起点にしただけでまだコミットのない作業中のworktreeは、マージ済みのPRがないので消さない。
 	orca worktree rm はそのworktreeのターミナルも閉じるので、PRのマージ後に worker_done を送る前の
 	Orcaのworkerを止めてしまう。workerのworktreeは worker_done と worker-release のあとの実行で消える。
-	Orcaが入っているのにターミナルを確かめられないとき(Orcaが起動していないなど)は、消さずに残す。
+	Orcaが入っているのにターミナルやworkerを確かめられないとき(Orcaが起動していないなど)は、消さずに残す。
 
 	Orcaが管理するworktreeは orca worktree rm で消す(Orcaの記録とブランチも一緒に消える)。
 	それ以外、またはOrcaで消せなかったときは git worktree remove と git branch -D を使う。
@@ -117,6 +119,8 @@ try {
 			if ($dirty) { return "未コミットの変更か追跡されていないファイルがある" }
 			$terminals = Get-OrcaTerminalReason $path
 			if ($terminals) { return $terminals }
+			$workers = Get-OrcaWorkerReason $path
+			if ($workers) { return $workers }
 		}
 		return $null
 	}
@@ -125,8 +129,7 @@ try {
 		return [IO.Path]::GetFullPath($path.Replace('/', '\')).TrimEnd('\')
 	}
 
-	# worktreeでOrcaのターミナルが開いていれば、残す理由を返す(#133)。orca orchestration worker-list は
-	# Runを指定しないと呼び出したターミナルのRunしか返さないので、すべてのターミナルを返す terminal list で調べる。
+	# worktreeでOrcaのターミナルが開いていれば、残す理由を返す(#133)。
 	# 確かめられないときも残す(消し損ねても次の実行で消えるが、消しすぎるとworkerを止めてしまう)
 	function Get-OrcaTerminalReason([string]$path) {
 		if (-not $hasOrca) { return $null }
@@ -140,6 +143,63 @@ try {
 		$open = @($list.result.terminals | Where-Object { $_.worktreePath -and (Get-NormalizedPath $_.worktreePath) -eq $target })
 		if ($open.Count) {
 			return "Orcaのターミナルが $($open.Count) 個開いている。workerなら worker_done と worker-release のあとに消す"
+		}
+		return $null
+	}
+
+	# orca のページ付きの一覧(nextCursor)を最後まで読み、$property の要素を返す。読めなければ $null
+	function Read-OrcaPages([string[]]$arguments, [string]$property) {
+		$items = [System.Collections.Generic.List[object]]::new()
+		$cursor = $null
+		do {
+			$pageArgs = $arguments + @("--json")
+			if ($cursor) { $pageArgs += @("--cursor", $cursor) }
+			$json = orca @pageArgs 2>$null | Out-String
+			if ($LASTEXITCODE -ne 0) { return $null }
+			try { $page = $json | ConvertFrom-Json }
+			catch { return $null }
+			if (-not $page.ok -or $null -eq $page.result.$property) { return $null }
+			$page.result.$property | ForEach-Object { $items.Add($_) }
+			$cursor = $page.result.nextCursor
+		} while ($cursor)
+		return , $items
+	}
+
+	# released でない Orca の worker の worktree のパス。読めなければ $null(#166)
+	# structured の形式で起動した worker は terminal list に出ないので、worker-list でも調べる。
+	# worker-list は --run を付けないと呼び出したターミナルの Run しか返さないので、Run ごとに読む
+	$script:orcaWorkerPaths = $null
+	$script:orcaWorkersRead = $false
+	function Get-OrcaWorkerPaths {
+		# 空のリストが $null にならないよう、, を付けて返す
+		if ($script:orcaWorkersRead) {
+			if ($null -eq $script:orcaWorkerPaths) { return $null }
+			return , $script:orcaWorkerPaths
+		}
+		$script:orcaWorkersRead = $true
+		$runs = Read-OrcaPages @("orchestration", "run-list") "runs"
+		if ($null -eq $runs) { return $null }
+		$paths = [System.Collections.Generic.List[string]]::new()
+		foreach ($run in $runs) {
+			$workers = Read-OrcaPages @("orchestration", "worker-list", "--run", $run.id) "workers"
+			if ($null -eq $workers) { return $null }
+			foreach ($worker in $workers) {
+				if ($worker.terminalState -eq "released" -or -not $worker.workspace) { continue }
+				# workspace は <repoId>::<パス>
+				$paths.Add((Get-NormalizedPath ($worker.workspace -replace '^.*?::', '')))
+			}
+		}
+		$script:orcaWorkerPaths = $paths
+		return , $paths
+	}
+
+	# worktreeに released でない Orca の worker がいれば、残す理由を返す(#166)。確かめられないときも残す
+	function Get-OrcaWorkerReason([string]$path) {
+		if (-not $hasOrca) { return $null }
+		$paths = Get-OrcaWorkerPaths
+		if ($null -eq $paths) { return "Orcaのworkerを確認できない(Orcaを起動してから実行し直す)" }
+		if ((Get-NormalizedPath $path) -in $paths) {
+			return "Orcaのworkerがまだ解放されていない。worker_done と worker-release のあとに消す"
 		}
 		return $null
 	}
