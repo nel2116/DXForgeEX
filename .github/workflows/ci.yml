@@ -73,7 +73,8 @@ jobs:
           if-no-files-found: ignore
 
       # WARPで描画したPNGを、ランナーでWARPが使えたことの証拠として残す(#127)。ログにはアダプタ名と
-      # デバッグレイヤーの有無(Debug)が出る。基準画像との比較は render_run_test.py が行う。
+      # デバッグレイヤーの有無(Debug)、使ったD3D12のランタイム(--json の d3d12_runtime。Agility SDK とそのバージョン、#155)が出る。
+      # 基準画像との比較と、Agility SDK のランタイムを使ったことの確認は render_run_test.py が行う。
       - name: Render a screenshot with WARP
         if: success() || failure()
         shell: pwsh

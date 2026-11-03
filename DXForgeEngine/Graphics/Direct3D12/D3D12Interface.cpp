@@ -9,11 +9,13 @@
 // 2025/01/13 マテリアルの追加と削除の関数を追加
 // 2025/01/14 レンダーアイテムの追加と削除の関数を追加
 // 2026/10/29 画面外のサーフェスと読み戻しの関数を登録 (#127)
+// 2026/11/02 ランタイムの情報の関数を登録 (#155)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "CommonHeaders.h"
 #include "D3D12Interface.h"
 #include "D3D12Core.h"
+#include "D3D12Runtime.h"
 #include "D3D12Content.h"
 #include "D3D12Light.h"
 #include "D3D12Camera.h"
@@ -27,6 +29,7 @@ namespace dxforge::graphics::d3d12
 		pi.shutdown = core::shutdown;
 		pi.flush_debug_messages = core::flush_debug_messages;
 		pi.adapter_name = core::adapter_name;
+		pi.runtime = runtime::info;
 
 		pi.surface.create = core::create_surface;
 		pi.surface.remove = core::remove_surface;
