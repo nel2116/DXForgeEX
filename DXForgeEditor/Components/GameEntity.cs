@@ -131,6 +131,16 @@ namespace DXForgeEditor.Components
             }
         }
 
+        // DataContractのデシリアライズではコンストラクタもフィールド初期化子も実行されないため、ここで既定値を入れておく(#165)。
+        // NOTE: Primal は初期化子だけなので、読み込んだエンティティの EntityId が 0(有効な ID)になる。
+        //       IsEnabled は保存されていればこのあとその値で上書きされる(要素がない古いファイルでも有効にする)。
+        [OnDeserializing]
+        private void OnDeserializing(StreamingContext context)
+        {
+            _entityId = ID.INVALID_ID;
+            _isEnabled = true;
+        }
+
         [OnDeserialized]
         void OnDeserialized(StreamingContext context)
         {
