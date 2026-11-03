@@ -24,6 +24,7 @@ C++によるプラットフォーム非依存のエンジンコア、C ABIのDLL
 | `ContentTools` | DLL | FBX/テクスチャのオフラインインポートパイプライン(エディタから使用) |
 | `DXForgeEditor` | WPFアプリ (.NET 8) | レベルエディタ |
 | `DXForgeImport` | コンソールアプリ (.NET 8) | GUIなしでアセットをインポートするCLI。エディタと同じ`.asset`を書き出す(`*Editor`構成のみ) |
+| `DXForgeCli` | コンソールアプリ (.NET 8) | `dxforge.exe`。GUIなしでプロジェクト(`.dxproj`)を読み込み、シーンを指定フレーム数だけ実行するCLI(`*Editor`構成のみ) |
 
 ## ビルド方法
 
@@ -227,13 +228,53 @@ pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1 -ArgumentsOnl
 | `14` | スクリプトが登録されていない |
 | `15` | エンティティを作成できなかった |
 
-制約: 描画はしません(Renderer/D3D12は初期化しない)。スクリプトはゲームのexeと同じく`REGISTER_SCRIPT`で実行ファイルに静的に登録されたものだけが使え、今は`EngineUnitTests`に入っているテスト用のスクリプト(`EngineUnitTests/HeadlessTestScripts.cpp`の`headless_test_mover`)だけです。ゲームのプロジェクト(`.dxproj`)の読み込み、スクリプトでの操作はまだありません。描画は別のモード(下の`--render`)で、固定のテストシーンだけを描けます。
+制約: 描画はしません(Renderer/D3D12は初期化しない)。スクリプトはゲームのexeと同じく`REGISTER_SCRIPT`で実行ファイルに静的に登録されたものだけが使え、今は`EngineUnitTests`に入っているテスト用のスクリプト(`EngineUnitTests/HeadlessTestScripts.cpp`の`headless_test_mover`)だけです。ゲームのプロジェクト(`.dxproj`)の読み込みは、下の`dxforge --load-project`が行います。スクリプトでの操作はまだありません。描画は別のモード(下の`--render`)で、固定のテストシーンだけを描けます。
 
 ヘッドレス実行の回帰テストは、`game.bin`を`%TEMP%`に作って実行ファイルを起動し、終了コードと`--json`を確かめます(`build.ps1 -RunTests`とCIからも実行されます)。
 
 ```powershell
 python EngineUnitTests/Tests/headless_run_test.py                  # x64/Debug/EngineUnitTests.exe
 python EngineUnitTests/Tests/headless_run_test.py --config Release
+```
+
+### プロジェクトの読み込みと実行 (`dxforge --load-project`)
+
+`dxforge.exe`(`DXForgeCli`)は、エディタを開かずにプロジェクト(`.dxproj`)を読み込み、シーンのエンティティを作って指定フレーム数だけ実行し、終了コードとJSONを返します(#11)。`.dxproj`の読み込みと`game.bin`の書き出しはエディタのコード(`Project.Load`と、`SaveToBinary`から切り出した`Project.WriteGameBinary`)をそのまま使うので、形式を別に実装していません。実行は上の`EngineUnitTests --game-bin`に任せます(`dxforge`は`game.bin`を一時フォルダに書いて、それを子プロセスで実行し、JSONにプロジェクトの情報とエンティティの名前を足します)。ウィンドウもGPUも使いません。
+
+```powershell
+./build.ps1 -Target editor -Configuration DebugEditor                       # dxforge.exe(x64/DebugEditor/)
+./build.ps1 -Target native -Configuration Debug -Project EngineUnitTests    # ランナー(x64/Debug/)
+./x64/DebugEditor/dxforge.exe --load-project path/to/MyGame.dxproj --frames 10 --json
+./x64/DebugEditor/dxforge.exe --load-project path/to/MyGame.dxproj --frames 10 --scene "Sample Scene" --dt 0.016
+./x64/DebugEditor/dxforge.exe --load-project path/to/MyGame.dxproj --export-game-bin out/game.bin   # 書き出すだけ
+./x64/DebugEditor/dxforge.exe --help
+```
+
+- シーンは既定でアクティブなシーン(エディタと同じ)。`--scene <名前>`で選べます。
+- ランナーは既定で`x64/<Debug|Release>/EngineUnitTests.exe`(`DebugEditor`の`dxforge`は`Debug`、`ReleaseEditor`は`Release`)。`--runner`で変えられます。
+- `--keep-game-bin <パス>`で実行に使った`game.bin`を残します。`--export-game-bin`はエディタがゲームの実行前に書くものと同じ`game.bin`を書くだけで、実行しません。
+- 標準出力は`--json`ならJSONだけで、ログ(ランナーのものも)は標準エラーに出ます。JSONは`--game-bin --json`と同じ項目に、`mode`(`load_project`)、`project`、`scene`、`game_bin`(`--keep-game-bin`のときだけ)、`runner`と、各エンティティの`name`を足したものです。
+- 今はスクリプト(`Script`コンポーネント)のあるシーンは実行できません(終了コード33。ゲームのコードのDLLの読み込みは今後)。
+
+| 終了コード | 意味 |
+|---|---|
+| `0` | 成功 |
+| `2` | 引数の誤り(`dxforge`は`error.code`が`invalid_arguments`、ランナーは`usage_error`) |
+| `3`, `10`〜`15` | ランナーの終了コードをそのまま返す(上の`--game-bin`の表) |
+| `30` | `.dxproj`がない |
+| `31` | `.dxproj`を読み込めない(XMLが壊れている、プロジェクトではない、シーンやエンティティの一覧がない) |
+| `32` | シーンがない(アクティブなシーンがない、`--scene`の名前のシーンがない) |
+| `33` | シーンにスクリプトがある |
+| `34` | ランナーがない |
+| `35` | ランナーを起動できない、またはランナーの結果を読めない |
+| `36` | `game.bin`を書き出せない |
+| `39` | 想定外のエラー |
+
+テストは`dxforge`を別のプロセスとして実行し、終了コードとJSON、`--export-game-bin`のバイト列がエディタの`SaveToBinary`のものと一致することを確かめます(ランナーがないと実行のケースはSKIP。`-RequireRunner`で失敗にする。CIは付ける)。
+
+```powershell
+pwsh -STA -NoProfile -File DXForgeCli/Tests/load_project_cli_test.ps1 -RequireRunner
+pwsh -STA -NoProfile -File DXForgeCli/Tests/load_project_cli_test.ps1 -Configuration ReleaseEditor -RequireRunner
 ```
 
 ### 描画のヘッドレス実行 (`--render`)
@@ -315,7 +356,7 @@ DXFORGE_TEST_CASE(my_new_test)
 
 - **ネイティブビルド + 自動テスト** — `Debug`と`Release`の両構成(`Release`では`NDEBUG`で`assert`が無効化され挙動が変わるため、両方を検証)。警告をエラーとして扱います。
 - **ファイル規約の検査** — `Tests/check_conventions.py`(下の「コーディング規約の自動化」)と、そのテスト。
-- **エディタビルド** — `dotnet build`で`DXForgeEditor`と`DXForgeImport`をビルドし、`DXForgeImport`の引数・異常系のテスト(`import_cli_test.ps1 -ArgumentsOnly`)を実行。
+- **エディタビルド** — `dotnet build`で`DXForgeEditor`と`DXForgeImport`と`dxforge`(`DXForgeCli`)をビルドし、`DXForgeImport`の引数・異常系のテスト(`import_cli_test.ps1 -ArgumentsOnly`)と、ランナー(`EngineUnitTests`の`Debug`)をビルドしたうえで`dxforge`のテスト(`load_project_cli_test.ps1 -RequireRunner`)を実行。
 
 CIの対象範囲は意図的に絞っています:
 
@@ -390,7 +431,7 @@ Codex CLIがインストール済みで、ログインしている必要があ�
 
 ## 今後の方向性
 
-将来的に、Unity CLI(`-batchmode`等)のように、エディタUIを介さずCLIからエンジンを操作・ビルドできる「AIフレンドリー」な構成を目指しています。`EngineUnitTests`はその最初の一歩(ウィンドウ/GPU無しでエンジンコードを動かすヘッドレスなCLIプログラム)という位置づけです。`--game-bin`による`game.bin`のヘッドレス実行(上の「ヘッドレス実行」)がその第一段で、ContentToolsのCLI化は`DXForgeImport`(#10)で始めました。今後、`--load-project`のような引数、スクリプトでの操作、描画とスクリーンショットなどを通じて拡張していく想定です。
+将来的に、Unity CLI(`-batchmode`等)のように、エディタUIを介さずCLIからエンジンを操作・ビルドできる「AIフレンドリー」な構成を目指しています。`EngineUnitTests`はその最初の一歩(ウィンドウ/GPU無しでエンジンコードを動かすヘッドレスなCLIプログラム)という位置づけです。`--game-bin`による`game.bin`のヘッドレス実行(上の「ヘッドレス実行」)がその第一段で、`dxforge --load-project`による`.dxproj`の読み込みと実行が続きます。ContentToolsのCLI化は`DXForgeImport`(#10)で始めました。今後、スクリプトでの操作、プロジェクトの描画とスクリーンショットなどを通じて拡張していく想定です。
 
 ## サードパーティライセンス
 

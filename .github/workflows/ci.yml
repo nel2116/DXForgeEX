@@ -145,6 +145,15 @@ jobs:
         shell: pwsh
         run: pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1 -Configuration DebugEditor -ArgumentsOnly
 
+      # dxforge --load-project(#11)のランナー。dxforge(DebugEditor)は x64\Debug\EngineUnitTests.exe を使う(build.ps1 の出力の配置)。
+      - name: Build headless runner (EngineUnitTests, Debug)
+        shell: pwsh
+        run: ./build.ps1 -Target native -Configuration Debug -Project EngineUnitTests -WarningsAsErrors
+
+      - name: Test dxforge --load-project
+        shell: pwsh
+        run: pwsh -STA -NoProfile -File DXForgeCli/Tests/load_project_cli_test.ps1 -Configuration DebugEditor -RequireRunner
+
       - name: Test editor engine path resolution
         shell: pwsh
         # ビルドしたエディタの EnginePath(#117)をリフレクションで呼び、worktree・リポジトリの外・DXFORGE_ENGINE と一致の

@@ -5,7 +5,7 @@
 .DESCRIPTION
     ネイティブ側(DXForgeEngine/EngineTest/ContentTools/EngineUnitTests)はvswhereで見つけた
     MSBuild.exeでDXForge.slnをビルドし、エディタ側(DXForgeEditorと、それを参照するコマンドラインの
-    インポーターDXForgeImport)はdotnet buildでビルドする。
+    インポーターDXForgeImportと、プロジェクトを読み込んで実行するdxforge(DXForgeCli))はdotnet buildでビルドする。
     -RunTestsを指定すると、ビルド後にヘッドレスのEngineUnitTests.exeを実行し、その終了コードを
     このスクリプト全体の終了コードに反映する。-Jsonを指定すると、最後に1行のJSON要約を標準出力
     に出す(将来、AIエージェントやCIがこのスクリプトを呼び出す前提)。
@@ -288,6 +288,14 @@ if ($Target -eq "editor" -or $Target -eq "all")
 
 	Write-Host "== Editor build (DXForgeEditor + DXForgeImport) [$editorConfiguration|$Platform] =="
 	$editorExit = Invoke-BuildStep -Command { & dotnet build $csproj -c $editorConfiguration --nologo -v:minimal @editorArgs } -ShowFullLog:$DetailedLog
+	if ($editorExit -eq 0)
+	{
+		# dxforge(DXForgeCli、#11)も DXForgeEditor を参照する。エディタは直前に同じ設定でビルドしたので、
+		# 参照先を作り直さず(BuildProjectReferences=false)、dxforge だけを同じ設定(警告のエラー化を含む)でビルドする。
+		$cliCsproj = "$RepoRoot\DXForgeCli\DXForgeCli.csproj"
+		Write-Host "== Editor build (dxforge) [$editorConfiguration|$Platform] =="
+		$editorExit = Invoke-BuildStep -Command { & dotnet build $cliCsproj -c $editorConfiguration --nologo -v:minimal -p:BuildProjectReferences=false @editorArgs } -ShowFullLog:$DetailedLog
+	}
 	$summary.editor = [ordered]@{ exitCode = $editorExit; configuration = $editorConfiguration; warningsAsErrors = [bool]$WarningsAsErrors }
 	if ($editorExit -ne 0 -and $exitCode -eq 0) { $exitCode = $editorExit }
 }

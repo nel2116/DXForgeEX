@@ -26,6 +26,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EngineUnitTests", "EngineUn
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DXForgeImport", "DXForgeImport\DXForgeImport.csproj", "{5C6B1E2A-7D3F-4B8E-9A41-2F0D6C8E1B37}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DXForgeCli", "DXForgeCli\DXForgeCli.csproj", "{8E3A41C7-2B6D-4F1A-9C58-7D0E3B2A6F94}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -78,6 +80,12 @@ Global
 		{5C6B1E2A-7D3F-4B8E-9A41-2F0D6C8E1B37}.Release|x64.ActiveCfg = ReleaseEditor|x64
 		{5C6B1E2A-7D3F-4B8E-9A41-2F0D6C8E1B37}.ReleaseEditor|x64.ActiveCfg = ReleaseEditor|x64
 		{5C6B1E2A-7D3F-4B8E-9A41-2F0D6C8E1B37}.ReleaseEditor|x64.Build.0 = ReleaseEditor|x64
+		{8E3A41C7-2B6D-4F1A-9C58-7D0E3B2A6F94}.Debug|x64.ActiveCfg = DebugEditor|x64
+		{8E3A41C7-2B6D-4F1A-9C58-7D0E3B2A6F94}.DebugEditor|x64.ActiveCfg = DebugEditor|x64
+		{8E3A41C7-2B6D-4F1A-9C58-7D0E3B2A6F94}.DebugEditor|x64.Build.0 = DebugEditor|x64
+		{8E3A41C7-2B6D-4F1A-9C58-7D0E3B2A6F94}.Release|x64.ActiveCfg = ReleaseEditor|x64
+		{8E3A41C7-2B6D-4F1A-9C58-7D0E3B2A6F94}.ReleaseEditor|x64.ActiveCfg = ReleaseEditor|x64
+		{8E3A41C7-2B6D-4F1A-9C58-7D0E3B2A6F94}.ReleaseEditor|x64.Build.0 = ReleaseEditor|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -201,16 +201,25 @@ namespace DXForgeEditor.GameProject
 
             using (var bw = new BinaryWriter(File.Open(bin, FileMode.Create, FileAccess.Write)))
             {
-                bw.Write(ActiveScene.GameEntities.Count);
-                foreach (var entity in ActiveScene.GameEntities)
+                WriteGameBinary(ActiveScene, bw);
+            }
+        }
+
+        /// <summary>
+        /// シーンのエンティティを game.bin の形式(ゲームの exe とヘッドレスのランナーが content::load_game で読む)で書く。
+        /// エディタ(SaveToBinary)とコマンドラインの dxforge(Issue #11)が同じ形式で書くよう、ここだけで実装する。
+        /// </summary>
+        internal static void WriteGameBinary(Scene scene, BinaryWriter bw)
+        {
+            bw.Write(scene.GameEntities.Count);
+            foreach (var entity in scene.GameEntities)
+            {
+                bw.Write(0); // entity type (reserved for later)
+                bw.Write(entity.Components.Count);
+                foreach (var component in entity.Components)
                 {
-                    bw.Write(0); // entity type (reserved for later)
-                    bw.Write(entity.Components.Count);
-                    foreach (var component in entity.Components)
-                    {
-                        bw.Write((int)component.ToEnumType());
-                        component.WriteToBinary(bw);
-                    }
+                    bw.Write((int)component.ToEnumType());
+                    component.WriteToBinary(bw);
                 }
             }
         }
@@ -288,7 +297,11 @@ namespace DXForgeEditor.GameProject
             ActiveScene = _scenes.FirstOrDefault(x => x.IsActive)!;
             Debug.Assert(ActiveScene != null);
 
-            await BuildGameCodeDLL(false);
+            // コマンドラインの dxforge(Issue #11)は、Visual Studio でのビルドもエンジンの DLL も使わない
+            if (!ProjectLoadEnvironment.Headless)
+            {
+                await BuildGameCodeDLL(false);
+            }
 
             SetCommands();
         }
