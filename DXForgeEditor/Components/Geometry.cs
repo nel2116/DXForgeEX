@@ -111,7 +111,10 @@ namespace DXForgeEditor.Components
         /// </summary>
         public AppliedMaterial? ToAppliedMaterial()
         {
-            var assetInfo = AssetRegistry.GetAssetInfo(Material);
+            // NOTE: 既定のマテリアルはエディタの Resources\DefaultAssets\ にあり、プロジェクトの AssetRegistry には登録されないので、
+            //       保存した GUID が既定のマテリアルのものなら、探さずにそれを使う(GUI確認で見つかった誤った警告, #32)
+            var defaultMaterial = Content.Material.Default;
+            var assetInfo = defaultMaterial != null && defaultMaterial.Guid == Material ? defaultMaterial : AssetRegistry.GetAssetInfo(Material);
             if (assetInfo?.Type != AssetType.Material)
             {
                 Logger.Log(MessageType.Warning, $"マテリアル({Material})が見つからないので、既定のマテリアルを使います。");

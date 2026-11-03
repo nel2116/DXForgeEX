@@ -326,6 +326,33 @@ namespace DXForgeCliTest
 			$movedGeometry = @($moved.Components | Where-Object { $_.GetType() -eq $geometryType })[0]
 			$null = $geometryType.GetMethod("Load", [Type[]]@()).Invoke($movedGeometry, @())
 			Check (-not $movedGeometry.IsLoaded -and $movedGeometry.ContentId -eq -1 -and $logged.Count -eq 0) "WithGeometry: Geometry.Load() waits for the project's assets to be registered (no upload, no error log)" ($logged -join "; ")
+
+			# 既定のマテリアル(プロジェクトの AssetRegistry には登録されない)の GUID を保存したマテリアルは、
+			# 「見つからない」の警告を出さずに既定のマテリアルを使う(GUI確認で見つかったもの, #32)。見つからない GUID なら警告する。
+			$defaultMaterialProperty = $editor.GetType("DXForgeEditor.Content.DefaultAssets", $true).GetProperty("DefaultMaterial", $flags)
+			$previousDefaultMaterial = $defaultMaterialProperty.GetValue($null)
+			$defaultMaterial = [Activator]::CreateInstance($editor.GetType("DXForgeEditor.Content.AssetInfo", $true))
+			$defaultMaterial.Type = [Enum]::Parse($editor.GetType("DXForgeEditor.Content.AssetType", $true), "Material")
+			$defaultMaterial.Guid = [Guid]::NewGuid()
+			$defaultMaterial.FullPath = Join-Path $work "DefaultMaterial.asset"
+			$defaultMaterialProperty.SetValue($null, $defaultMaterial)
+			try
+			{
+				$dataType = $editor.GetType("DXForgeEditor.Components.AppliedMaterialData", $true)
+				foreach ($case in @(@{ Guid = $defaultMaterial.Guid; Warns = $false; Name = "the default material's GUID" }, @{ Guid = [Guid]::NewGuid(); Warns = $true; Name = "an unknown GUID" }))
+				{
+					$logged.Clear()
+					$data = [Activator]::CreateInstance($dataType)
+					$dataType.GetProperty("Material").SetValue($data, $case.Guid)
+					$material = $dataType.GetMethod("ToAppliedMaterial").Invoke($data, @())
+					$warned = @($logged | Where-Object { $_ -match "^Warning: .*$($case.Guid)" }).Count -gt 0
+					Check ($null -ne $material -and $material.MaterialGuid -eq $defaultMaterial.Guid -and $warned -eq $case.Warns) "AppliedMaterialData with $($case.Name) -> the default material, missing-material warning: $($case.Warns)" ($logged -join "; ")
+				}
+			}
+			finally
+			{
+				$defaultMaterialProperty.SetValue($null, $previousDefaultMaterial)
+			}
 		}
 		finally
 		{
