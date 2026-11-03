@@ -156,7 +156,7 @@ Build: DebugEditor configuration 成功
 
 - 「Script」のサブメニューに、手順3で追加したスクリプト(`SpinScript`)が出る。この一覧は、読み込んだゲームコードのDLLからエンジン側の`get_script_names`経由で取得したものです。DLLが読み込まれていないと「Script」が無効になります。
 - `SpinScript`を選ぶと、インスペクタにScriptコンポーネント(Name: `SpinScript`)が追加される。
-- Geometry/Physicsは未実装のため無効(#20)。
+- 「Geometry」を選ぶと、既定のジオメトリ(`DefaultCube`)のGeometryコンポーネントが追加される(#32)。Physicsは未実装のため無効(#20)。
 
 追加したエンティティのTransformは、Positionが`0, 0, 0`、Rotationが`0, 0, 0`、Scaleが`1, 1, 1`で表示される(#49で修正。それ以前はScaleも`0, 0, 0`だった)。
 

@@ -136,7 +136,7 @@
                     <!-- ジオメトリを読み込めていないとき(複数選択で違うとき、アセットが見つからないとき)は市松模様 -->
                     <Border IsHitTestVisible="False" CornerRadius="5" BorderThickness="2">
                         <Border.Background>
-                            <ImageBrush ImageSource="/Resources/TextureEditor/Checker64.png"/>
+                            <ImageBrush ImageSource="/DXForgeEditor;component/Resources/TextureEditor/Checker64.png"/>
                         </Border.Background>
                         <Border.Style>
                             <Style TargetType="{x:Type Border}">
