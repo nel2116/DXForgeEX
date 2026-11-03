@@ -76,6 +76,12 @@ namespace DXForgeEditor
         }
     }
 
+    /// <summary>
+    /// FBXの埋め込み画像のコピー(ContentHelper.CopyEmbeddedMedia)の結果。
+    /// Extracted は一時フォルダに取り出された画像、Copy はコピー先(取り込むファイル)、Error はコピーの失敗(成功なら null)。
+    /// </summary>
+    internal sealed record EmbeddedMediaCopy(string Extracted, string Copy, string? Error);
+
     public static class ContentHelper
     {
         public static string[] MeshFileExtensions { get; } = { ".fbx" };
@@ -232,6 +238,42 @@ namespace DXForgeEditor
             destination = destination.Trim();
             if (!destination.EndsWith(Path.DirectorySeparatorChar)) destination += Path.DirectorySeparatorChar;
             return destination + name + Asset.AssetFileExtension;
+        }
+
+        /// <summary>
+        /// FBXの埋め込み画像を置くフォルダ(出力先\&lt;FBXのアセット名&gt;.fbm)。FBX SDK が埋め込み画像を &lt;FBXのファイル名&gt;.fbm に
+        /// 取り出すのと同じ名前の付け方。
+        /// </summary>
+        internal static string GetEmbeddedMediaFolder(string fbxFile, string destination) =>
+            Path.Combine(destination.Trim(), GetAssetName(fbxFile) + ".fbm");
+
+        /// <summary>
+        /// FBX SDK が一時フォルダに取り出した埋め込みのファイルのうち、画像の拡張子のものを、出力先の &lt;FBXのアセット名&gt;.fbm
+        /// フォルダ(GetEmbeddedMediaFolder)へコピーする。一時フォルダはプロジェクトを閉じたとき(エディタ)や終了時(DXForgeImport)に
+        /// 消えるので、テクスチャのソース画像(Sources、再インポートが使う)にはコピーのほうを使う(#111)。
+        /// エディタ(Geometry.ImportFbx)とコマンドラインのインポーター(DXForgeImport)で共有する。
+        /// 失敗は例外にせず、その画像の Error に入れて返す(ログはこの関数では出さない。呼び出し側が出す)。
+        /// </summary>
+        internal static List<EmbeddedMediaCopy> CopyEmbeddedMedia(IEnumerable<string> extractedFiles, string fbxFile, string destination)
+        {
+            var mediaFolder = GetEmbeddedMediaFolder(fbxFile, destination);
+            var copies = new List<EmbeddedMediaCopy>();
+            foreach (var extracted in extractedFiles.Where(f => ImageFileExtensions.Contains(Path.GetExtension(f).ToLower())))
+            {
+                var copy = Path.Combine(mediaFolder, Path.GetFileName(extracted));
+                string? error = null;
+                try
+                {
+                    Directory.CreateDirectory(mediaFolder);
+                    File.Copy(extracted, copy, true);
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    error = $"埋め込みテクスチャを {mediaFolder} にコピーできませんでした: {ex.Message}";
+                }
+                copies.Add(new EmbeddedMediaCopy(extracted, copy, error));
+            }
+            return copies;
         }
 
         private static void Import(Asset asset, string name, string file, string destination)

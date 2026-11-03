@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace DXForgeEditor.Content
 {
@@ -15,9 +16,10 @@ namespace DXForgeEditor.Content
         public static string? TempFolder { get; set; }
 
         /// <summary>
-        /// FBXの埋め込みテクスチャ(引数: 画像ファイルの一覧, 出力先のフォルダ)を取り込む処理。
-        /// null ならエディタのインポート(ConfigureImportSettings.Import、非同期)を使う。
+        /// FBXの埋め込みテクスチャ(引数: 出力先の &lt;FBXのアセット名&gt;.fbm へのコピーの結果(ContentHelper.CopyEmbeddedMedia), 出力先のフォルダ)を
+        /// 取り込む処理。コピーはエディタと共通で、呼ぶ前に済んでいる。
+        /// null ならエディタのインポート(コピーできた画像を ConfigureImportSettings.Import、非同期)を使う。
         /// </summary>
-        public static Action<string[], string>? ImportEmbeddedFiles { get; set; }
+        public static Action<IReadOnlyList<EmbeddedMediaCopy>, string>? ImportEmbeddedFiles { get; set; }
     }
 }

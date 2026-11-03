@@ -289,29 +289,32 @@ namespace DXForgeImport
 
             var tempFolder = Path.Combine(Path.GetTempPath(), "DXForgeImport", Guid.NewGuid().ToString("N")) + Path.DirectorySeparatorChar;
             ContentImportEnvironment.TempFolder = tempFolder;
-            ContentImportEnvironment.ImportEmbeddedFiles = (files, destination) =>
+            ContentImportEnvironment.ImportEmbeddedFiles = (copies, destination) =>
             {
-                // エディタ(ConfigureImportSettings.AddFiles)と同じく、画像の拡張子のファイルだけを、既定のテクスチャ設定で取り込む。
-                // 埋め込み画像は一時フォルダに取り出されるが、一時フォルダは終了時に消すので、テクスチャのソース画像(Sources、
-                // エディタの再インポートが使う)が消えないよう、出力先の <FBXのアセット名>.fbm フォルダへコピーしてから取り込む
-                // (FBX SDK が埋め込み画像を <FBXのファイル名>.fbm に取り出すのと同じ名前の付け方)。
-                var mediaFolder = Path.Combine(destination, ContentHelper.GetAssetName(input) + ".fbm");
+                // 埋め込み画像は、エディタと同じ規則(ContentHelper.CopyEmbeddedMedia: 画像の拡張子のファイルだけを、出力先の
+                // <FBXのアセット名>.fbm フォルダへ)でコピー済み。一時フォルダは終了時に消すので、そのコピーを既定のテクスチャ設定で取り込む。
                 var previous = _currentResult;
-                foreach (var extracted in files.Where(f => ContentHelper.ImageFileExtensions.Contains(Path.GetExtension(f).ToLower())))
+                foreach (var copy in copies)
                 {
-                    var file = Path.Combine(mediaFolder, Path.GetFileName(extracted));
+                    var file = copy.Copy;
                     var embeddedResult = new ImportResult { Input = file, Type = TextureType };
                     _currentResult = embeddedResult;
-                    try
+                    if (copy.Error is { } error)
                     {
-                        Directory.CreateDirectory(mediaFolder);
-                        File.Copy(extracted, file, true);
-                        embeddedResult.Success = ImportAndSave(file, new TextureImportSettings(), destination, embeddedResult);
+                        embeddedResult.Errors.Add(error);
+                        WriteLog("error", error);
                     }
-                    catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                    else
                     {
-                        embeddedResult.Errors.Add($"埋め込みテクスチャを {mediaFolder} にコピーできませんでした: {ex.Message}");
-                        WriteLog("error", embeddedResult.Errors[^1]);
+                        try
+                        {
+                            embeddedResult.Success = ImportAndSave(file, new TextureImportSettings(), destination, embeddedResult);
+                        }
+                        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                        {
+                            embeddedResult.Errors.Add($"埋め込みテクスチャを取り込めませんでした: {file}: {ex.Message}");
+                            WriteLog("error", embeddedResult.Errors[^1]);
+                        }
                     }
                     embedded.Add(embeddedResult);
                     if (!embeddedResult.Success)
