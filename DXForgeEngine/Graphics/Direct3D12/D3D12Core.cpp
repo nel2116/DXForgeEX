@@ -14,6 +14,8 @@
 // 2026/10/29 初期化に失敗したときに、デバッグレイヤーのメッセージを出し、作る前のコマンドを待たないようにした (#128 のレビュー)
 // 2026/10/29 初期化の途中で失敗したとき、初期化できたモジュールだけを終了させるようにした (#128 のレビュー)
 // 2026/11/02 D3D12 Agility SDK のランタイム(D3D12Runtime)からデバイスを作るようにした (#155、Primal Day 079)
+// 2026/11/03 最大の機能レベルを、使えれば ID3D12Device16::CheckFeatureSupport1 で調べるようにした(デバッグレイヤーの WARNING #989 対応、#159)
+// 2026/11/03 無人実行では、一時的なデバイスのデバッグレイヤーのメッセージと最大の機能レベルも標準エラーに出すようにした (#159)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Core.h"
@@ -276,8 +278,44 @@ namespace dxforge::graphics::d3d12::core
 		// (初期化していないモジュールのshutdown()は、作っていないフェンスを待ってクラッシュする)。
 		u32 initialized_module_count{ 0 };
 		char main_adapter_name[256]{};													// 使っているアダプタの名前(UTF-8)
+		u32 pending_error_count{ 0 };													// 一時的なデバイスで出た ERROR・CORRUPTION の数(次の flush_debug_messages() で返す)
 
 		// ====== 関数 ======
+		/// @brief デバイスの info queue にたまったデバッグレイヤーのメッセージを標準エラーに出して消す
+		/// @param device デバイス(デバッグレイヤーがなければ何もしない)
+		/// @return u32 ERROR・CORRUPTION の数
+		u32 print_debug_messages([[maybe_unused]] ID3D12Device* device)
+		{
+			u32 error_count{ 0 };
+#ifdef _DEBUG
+			ComPtr<ID3D12InfoQueue> info_queue;
+			// デバッグレイヤーがなければ(Graphics Toolsがない)取れない
+			if (!device || FAILED(device->QueryInterface(IID_PPV_ARGS(&info_queue)))) return 0;
+
+			const u64 message_count{ info_queue->GetNumStoredMessages() };
+			for (u64 i{ 0 }; i < message_count; ++i)
+			{
+				SIZE_T length{ 0 };
+				if (FAILED(info_queue->GetMessage(i, nullptr, &length)) || !length) continue;
+				std::unique_ptr<u8[]> buffer{ std::make_unique<u8[]>(length) };
+				D3D12_MESSAGE* const message{ (D3D12_MESSAGE*)buffer.get() };
+				if (FAILED(info_queue->GetMessage(i, message, &length))) continue;
+
+				const char* severity{ nullptr };
+				switch (message->Severity)
+				{
+				case D3D12_MESSAGE_SEVERITY_CORRUPTION: severity = "CORRUPTION"; ++error_count; break;
+				case D3D12_MESSAGE_SEVERITY_ERROR: severity = "ERROR"; ++error_count; break;
+				case D3D12_MESSAGE_SEVERITY_WARNING: severity = "WARNING"; break;
+				default: break;
+				}
+				if (severity) std::fprintf(stderr, "[D3D12 %s] %s [#%d]\n", severity, message->pDescription, (int)message->ID);
+			}
+			info_queue->ClearStoredMessages();
+#endif // _DEBUG
+			return error_count;
+		}
+
 		/// @brief 初期化に失敗した場合の処理
 		/// @return bool 初期化に失敗した場合はfalseを返す
 		bool failed_init()
@@ -354,7 +392,26 @@ namespace dxforge::graphics::d3d12::core
 
 			ComPtr<ID3D12Device> device;
 			DXCall(runtime::create_device(adapter, minimum_feature_level, IID_PPV_ARGS(&device)));
-			DXCall(device->CheckFeatureSupport(D3D12_FEATURE_FEATURE_LEVELS, &feature_level_info, sizeof(feature_level_info)));
+			if (!device) return D3D_FEATURE_LEVEL_1_0_CORE;
+
+			// NOTE: Agility SDK のデバッグレイヤーは ID3D12Device::CheckFeatureSupport を非推奨として WARNING #989 を出す(#159)。
+			//		 ID3D12Device16 があれば、CheckFeatureSupport1 に Agility SDK のバージョンを渡して呼ぶ。
+			//		 ない(OS のランタイムに戻ったときなど)か失敗したときは、今までどおり CheckFeatureSupport を使う。
+			const char* api{ "CheckFeatureSupport1" };
+			ComPtr<ID3D12Device16> device16;
+			if (FAILED(device.As(&device16)) ||
+				FAILED(device16->CheckFeatureSupport1(D3D12_FEATURE_FEATURE_LEVELS, &feature_level_info, sizeof(feature_level_info), D3D12_SDK_VERSION)))
+			{
+				api = "CheckFeatureSupport";
+				DXCall(device->CheckFeatureSupport(D3D12_FEATURE_FEATURE_LEVELS, &feature_level_info, sizeof(feature_level_info)));
+			}
+
+			if (unattended_mode)
+			{
+				// 一時的なデバイスのデバッグレイヤーのメッセージは main_device の info queue に残らないので、解放する前に出す(#159)
+				pending_error_count += print_debug_messages(device.Get());
+				std::fprintf(stderr, "[D3D12] max feature level: 0x%x (%s)\n", (u32)feature_level_info.MaxSupportedFeatureLevel, api);
+			}
 			return feature_level_info.MaxSupportedFeatureLevel;
 		}
 
@@ -442,6 +499,7 @@ namespace dxforge::graphics::d3d12::core
 		if (main_device) shutdown();
 
 		unattended_mode = init_info.unattended;
+		pending_error_count = 0;
 
 		// 使うD3D12のランタイムを決める(Agility SDK。使えなければOSのランタイム、#155)。デバッグレイヤーより先に決める
 		runtime::initialize(unattended_mode);
@@ -630,31 +688,10 @@ namespace dxforge::graphics::d3d12::core
 	{
 		u32 error_count{ 0 };
 #ifdef _DEBUG
-		if (!main_device) return 0;
-		ComPtr<ID3D12InfoQueue> info_queue;
-		// デバッグレイヤーがなければ(Graphics Toolsがない)取れない
-		if (FAILED(main_device->QueryInterface(IID_PPV_ARGS(&info_queue)))) return 0;
-
-		const u64 message_count{ info_queue->GetNumStoredMessages() };
-		for (u64 i{ 0 }; i < message_count; ++i)
-		{
-			SIZE_T length{ 0 };
-			if (FAILED(info_queue->GetMessage(i, nullptr, &length)) || !length) continue;
-			std::unique_ptr<u8[]> buffer{ std::make_unique<u8[]>(length) };
-			D3D12_MESSAGE* const message{ (D3D12_MESSAGE*)buffer.get() };
-			if (FAILED(info_queue->GetMessage(i, message, &length))) continue;
-
-			const char* severity{ nullptr };
-			switch (message->Severity)
-			{
-			case D3D12_MESSAGE_SEVERITY_CORRUPTION: severity = "CORRUPTION"; ++error_count; break;
-			case D3D12_MESSAGE_SEVERITY_ERROR: severity = "ERROR"; ++error_count; break;
-			case D3D12_MESSAGE_SEVERITY_WARNING: severity = "WARNING"; break;
-			default: break;
-			}
-			if (severity) std::fprintf(stderr, "[D3D12 %s] %s\n", severity, message->pDescription);
-		}
-		info_queue->ClearStoredMessages();
+		// 一時的なデバイスで数えた ERROR・CORRUPTION も含める
+		error_count = pending_error_count;
+		pending_error_count = 0;
+		if (main_device) error_count += print_debug_messages(main_device);
 		std::fflush(stderr);
 #endif // _DEBUG
 		return error_count;
