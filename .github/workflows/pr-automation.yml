@@ -2,7 +2,8 @@
 #
 #   - hold: PRに hold ラベルが付いている間は失敗する。develop のブランチ保護で必須にしているため、
 #     CI・codex-review がそろっていても、hold を外すまで自動マージされない(人が止めるための手段)。
-#   - approval: PRに merge-ok ラベルが付いているときだけ成功する(人がマージを承認するための手段、#160)。
+#   - approval: PRに merge-ok ラベルが付いているときだけ成功する(人がマージを承認するための手段、#160。
+#     変数 REQUIRE_MERGE_APPROVAL が true のときだけ動く)。
 #     エージェントは codex-review を付けて自動マージを予約するところまでで、マージを確定するのは人が付ける
 #     merge-ok である。承認は head ごとに取るため、push(synchronize)されたらラベルを外して失敗する。
 #   - close-issues: develop にマージされたPRの本文にある "Closes #NN" のIssueを閉じる。
@@ -42,7 +43,10 @@ jobs:
 
   approval:
     name: Merge approved
-    if: github.event_name == 'pull_request'
+    # 承認を必須にするときだけ動かす(リポジトリの変数 REQUIRE_MERGE_APPROVAL を true にし、ブランチ保護でも
+    # 必須にする)。個人開発で速度を優先するため、今は動かしていない(2026/11/03)。必須のジョブがスキップされると
+    # 成功として扱われるので、変数を設定せずに保護だけで必須にしても、承認なしでマージされる
+    if: github.event_name == 'pull_request' && vars.REQUIRE_MERGE_APPROVAL == 'true'
     runs-on: ubuntu-latest
     permissions:
       actions: read
