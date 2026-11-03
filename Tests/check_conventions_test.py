@@ -50,6 +50,49 @@ class NarrowLiteralTest(unittest.TestCase):
         self.assertEqual(self.narrow("int n = 1'000'000; auto s = L\"あ\";"), [])
 
 
+class StringizeTest(unittest.TestCase):
+    # CHECK(x) などは #x で引数を文字列化する。結果はナロー文字列なので、L"..." でも C4566 になる(#149)
+    def stringized(self, body):
+        return [ln for ln, _ in cc.find_stringized_non_ascii(body)]
+
+    def test_detects_wide_literal_in_check(self):
+        self.assertEqual(self.stringized('int a;\nCHECK(name == L"カフェ");\n'), [2])
+        self.assertEqual(self.stringized('REQUIRE(u8"あ" == s);'), [1])
+        self.assertEqual(self.stringized("CHECK(c == L'あ');"), [1])
+
+    def test_constant_outside_macro_is_fine(self):
+        self.assertEqual(self.stringized('const wchar_t* cafe = L"カフェ";\nCHECK(name == cafe);\n'), [])
+        self.assertEqual(self.stringized('CHECK(name == L"cafe");'), [])
+
+    def test_nested_parens_and_multiline_arguments(self):
+        self.assertEqual(self.stringized('REQUIRE(f(a, g(b)) ==\n    h(L"あ"));\nauto s = L"い";\n'), [2])
+        self.assertEqual(self.stringized('CHECK(f(")") == L"あ");\nauto s = L"い";\n'), [1])
+
+    def test_other_stringizing_macros(self):
+        self.assertEqual(self.stringized('DXCall(f(L"あ"));'), [1])
+        self.assertEqual(self.stringized('DXC_CALL(f(L"あ"));'), [1])
+
+    def test_ignores_comments_strings_and_other_identifiers(self):
+        self.assertEqual(self.stringized('// CHECK(L"あ")\n/* CHECK(L"い") */\nauto s = L"CHECK(";\n'), [])
+        self.assertEqual(self.stringized('MY_CHECK(L"あ"); CHECKED(L"い"); s.CHECKS(L"う");'), [])
+
+    def test_macro_defined_in_same_file(self):
+        self.assertEqual(self.stringized('#define LOG(x) puts(#x)\nLOG(L"あ");\n'), [2])
+        self.assertEqual(self.stringized('#define LOG(a, b) puts(# b)\nLOG(L"あ", 1);\n'), [2])
+        # ## はトークンの連結で、文字列化ではない
+        self.assertEqual(self.stringized('#define CAT(x) x##_y\nCAT(L"あ");\n'), [])
+
+    def test_known_list_covers_repository_macros(self):
+        # リポジトリで #x を使うマクロが増えたら STRINGIZING_MACROS に足すこと(フックはほかのファイルの定義を読まない)
+        found = set()
+        for rel in cc.git_files():
+            if cc.is_target(rel) and cc.ext_of(rel) in cc.CPP_EXTS:
+                text = cc.read(os.path.join(cc.REPO_ROOT, rel)).decode("utf-8-sig", errors="replace")
+                found |= cc.stringizing_macros_defined(text)
+        self.assertIn("CHECK", found)
+        self.assertEqual(found - cc.STRINGIZING_MACROS, set())
+
+
 class CheckFileTest(unittest.TestCase):
     def test_clean_cpp(self):
         self.assertEqual(rules("DXForgeEngine/A.cpp", cpp('auto s = L"あ";\n')), [])
@@ -60,6 +103,9 @@ class CheckFileTest(unittest.TestCase):
         self.assertEqual(rules("DXForgeEngine/A.cpp", cpp('\nauto s = "あ";\n')), [("narrow", 5)])
         # CRLF のファイルで、行継続した文字列の次の行にある日本語
         self.assertEqual(rules("DXForgeEngine/A.cpp", cpp('auto s = "abc\\\r\n日本語";\r\n')), [("narrow", 4)])
+        # CHECK の中のリテラルは、ナローでもワイドでも stringize として 1 回だけ報告する
+        self.assertEqual(rules("EngineUnitTests/Tests_A.cpp", cpp('CHECK(a == L"あ");\nCHECK(b == "い");\n')),
+                         [("stringize", 4), ("stringize", 5)])
 
     def test_header_exemptions(self):
         self.assertEqual(rules("DXForgeEngineDLL/pch.h", cc.BOM + b"#pragma once\n"), [])

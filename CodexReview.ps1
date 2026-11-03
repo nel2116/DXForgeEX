@@ -28,10 +28,12 @@
 .PARAMETER SetStatus
 	マージの関門として、レビューしたコミットにコミットステータス codex-review を付ける。
 	Codexの出力に指摘("- [P0〜P3] ..." の行)がなければ success を付けて自動マージ(gh pr merge --auto --merge)を
-	予約し、指摘があれば重大度を問わず failure を付ける。向き先のブランチ保護が codex-review と No hold label を
-	必須にしていないPRには使えない(レビューの前に確かめて止まる)。developのブランチ保護はCI・hold・
-	codex-review の成功を必須にしているため、残りがそろった時点でGitHubがマージする。
+	予約し、指摘があれば重大度を問わず failure を付ける。向き先のブランチ保護が codex-review、No hold label、
+	Merge approved を必須にしていないPRには使えない(レビューの前に確かめて止まる)。developのブランチ保護は
+	CI・hold・codex-review・Merge approved の成功を必須にしているため、予約しただけではマージされず、
+	人がPRに merge-ok ラベルを付けて承認した時点でGitHubがマージする(#160)。エージェントは merge-ok を付けない。
 	ステータスはコミットに付くので、修正をpushすると外れ、再レビューで success になるまでマージされない。
+	merge-ok も push で外れる(.github/workflows/pr-automation.yml)。
 	PRの完了条件(GUIでの確認など)がそろってから、コーディネーターが指定すること。マージ済みのPRには使えない。
 
 .EXAMPLE
@@ -44,7 +46,8 @@
 
 .EXAMPLE
 	./CodexReview.ps1 -Pr 52 -Post -SetStatus
-	PR #52 をレビューしてコメントし、指摘がなければ codex-review を success にして自動マージを予約する。
+	PR #52 をレビューしてコメントし、指摘がなければ codex-review を success にして自動マージを予約する
+	(人が merge-ok ラベルを付けるとマージされる)。
 #>
 [CmdletBinding()]
 param(
@@ -107,7 +110,8 @@ if ($SetStatus -and $info.state -ne "OPEN") {
 }
 if ($SetStatus) {
 	# gh pr merge --auto は必須のチェックがないブランチでは即座にマージするため、向き先のブランチ保護が
-	# codex-review と hold のチェックを必須にしていることを確かめてから進む(レビューの前に確かめる)
+	# codex-review と hold と承認(merge-ok)のチェックを必須にしていることを確かめてから進む(レビューの前に確かめる)。
+	# 承認のチェックがない保護では、エージェントの予約だけでマージが確定してしまう(#160)
 	Push-Location $RepoRoot
 	try {
 		$required = @(gh api "repos/{owner}/{repo}/branches/$base/protection/required_status_checks" --jq '.contexts[]' 2>$null)
@@ -115,10 +119,10 @@ if ($SetStatus) {
 	finally {
 		Pop-Location
 	}
-	if ($LASTEXITCODE -ne 0 -or "codex-review" -notin $required -or "No hold label" -notin $required) {
+	if ($LASTEXITCODE -ne 0 -or "codex-review" -notin $required -or "No hold label" -notin $required -or "Merge approved" -notin $required) {
 		git -C $RepoRoot update-ref -d "$ref/base"
 		git -C $RepoRoot update-ref -d "$ref/head"
-		throw "向き先 $base のブランチ保護が codex-review と No hold label を必須にしていないため、-SetStatus(自動マージ)は使えません。"
+		throw "向き先 $base のブランチ保護が codex-review、No hold label、Merge approved を必須にしていないため、-SetStatus(自動マージ)は使えません。"
 	}
 }
 $currentSha = $baseSha
@@ -271,7 +275,7 @@ if ($SetStatus) {
 				# 必須のチェックがそろっていれば即座に、そうでなければそろった時点でGitHubがマージする
 				gh pr merge $Pr --auto --merge
 				if ($LASTEXITCODE -ne 0) { throw "自動マージの予約に失敗しました。" }
-				Write-Output "自動マージを予約しました(CI・hold・codex-review がそろうとマージされます)。"
+				Write-Output "自動マージを予約しました。承認待ちです: 人がPRに merge-ok ラベルを付けると、CI・hold・codex-review とそろった時点でマージされます。"
 			}
 		}
 	}
