@@ -12,6 +12,7 @@
 // 2026/10/18 set_orientation()が未実装である旨をTODOとして明記
 // 2026/10/18 set_orientation()を削除し、向きを回転から導出するローカルフレーム(right/up/front)で保持するよう変更 (#4)
 // 2026/10/19 update()のassertで、キャッシュの所有エンティティが生きている(世代が一致する)ことまで確かめるよう変更 (#78)
+// 2026/11/03 calculate_transform_matrices()のassertの範囲の誤り(>=)を > に修正 (Primal Day 079, #32)
 // /_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Transform.h"
@@ -62,9 +63,9 @@ namespace dxforge::transform
 		/// @param index 計算対象のエンティティインデックス
 		void calculate_transform_matrices(id::id_type index)
 		{
-			assert(rotations.size() >= index);
-			assert(positions.size() >= index);
-			assert(scales.size() >= index);
+			assert(rotations.size() > index);
+			assert(positions.size() > index);
+			assert(scales.size() > index);
 
 			using namespace DirectX;
 			// 回転、位置、スケールのDirectXベクターをロード

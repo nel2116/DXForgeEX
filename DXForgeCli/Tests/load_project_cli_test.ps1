@@ -15,6 +15,9 @@
       4. 実行(ランナー EngineUnitTests.exe が必要): 終了コード0、エンティティの数・名前・Transform(回転はクォータニオン)が
          期待どおり。--scene、--dt、--frames 0、--keep-game-bin、日本語のパスと名前、JSONなしの出力、一時フォルダの後始末。
       5. スクリプトのあるシーン(33)、ランナーがない(34)、ランナーを起動できない(35)。
+      6. Geometry コンポーネント(Primal Day 079, #32)のあるシーン: 読み込める(保存したジオメトリとマテリアルを読み、
+         保存し直しても変わらない)。game.bin には Geometry を書かない(同じエンティティで Geometry のない TransformOnly と
+         1 バイトも違わない)ので書き出しも実行も終了コード 0 で、標準エラーに飛ばした警告が出る。JSON の形は変わらない。
     どの場合も、標準出力は(--json なら)1つのJSONだけで、ConvertFrom-Json で読める。
 
 .PARAMETER Configuration
@@ -46,6 +49,9 @@ if (-not $Runner) { $Runner = Join-Path $RepoRoot "x64\$NativeConfiguration\Engi
 $Fixtures = Join-Path $PSScriptRoot "Projects"
 $TransformOnly = Join-Path $Fixtures "TransformOnly\TransformOnly.dxproj"
 $WithScript = Join-Path $Fixtures "WithScript\WithScript.dxproj"
+$WithGeometry = Join-Path $Fixtures "WithGeometry\WithGeometry.dxproj"
+# WithGeometry のアクティブなシーンは TransformOnly と同じエンティティで、Moved と Scaled に Geometry がある
+$GeometrySkippedWarning = "Moved.*Geometry.*game\.bin[\s\S]*Scaled.*Geometry.*game\.bin"
 $failures = [System.Collections.Generic.List[string]]::new()
 $skips = [System.Collections.Generic.List[string]]::new()
 
@@ -257,17 +263,56 @@ namespace DXForgeCliTest
 
 		foreach ($case in @(
 				@{ Name = "TransformOnly"; Path = $TransformOnly; Entities = $ActiveSceneEntities },
-				@{ Name = "WithScript"; Path = $WithScript; Entities = $WithScriptEntities }))
+				@{ Name = "WithScript"; Path = $WithScript; Entities = $WithScriptEntities },
+				@{ Name = "WithGeometry"; Path = $WithGeometry; Entities = $ActiveSceneEntities; GeometrySkipped = $true }))
 		{
 			$out = Join-Path $work "cli_$($case.Name)\sub\game.bin"
 			$r = Invoke-Cli @("--load-project", $case.Path, "--export-game-bin", $out) -Json
 			Check ($r.Code -eq 0 -and $r.Json.success -and $r.Json.mode -eq "export_game_bin" -and $r.Json.entity_count -eq $case.Entities.Count -and $r.Json.game_bin -eq $out) "$($case.Name): --export-game-bin succeeds (creates the folder)" $r.Stdout
+			if ($case.GeometrySkipped)
+			{
+				Check ($r.Stderr -match $GeometrySkippedWarning) "$($case.Name): stderr warns that the Geometry components are not written to game.bin" $r.Stderr
+				Check ($null -eq $r.Json.PSObject.Properties["skipped_components"] -and $null -eq $r.Json.PSObject.Properties["skippedComponents"]) "$($case.Name): the JSON has no extra field for the skipped components" $r.Stdout
+			}
+			else
+			{
+				Check (-not ($r.Stderr -match "game\.bin.*Geometry|Geometry.*game\.bin")) "$($case.Name): no Geometry warning" $r.Stderr
+			}
 			$cliBytes = if (Test-Path $out) { [System.IO.File]::ReadAllBytes($out) } else { $null }
 			$editorBytes = Get-EditorGameBin $case.Path $case.Name
 			$expected = New-GameBin $case.Entities
 			Check (Bytes-Equal $editorBytes $expected) "$($case.Name): the editor's SaveToBinary writes the game.bin format ($($expected.Length) bytes)"
 			Check (Bytes-Equal $cliBytes $editorBytes) "$($case.Name): CLI game.bin == editor SaveToBinary game.bin"
 		}
+
+		# Geometry コンポーネントの読み込みと、保存し直したときに中身が変わらないこと(エンジンにもアセットにも触らない)
+		$geometryType = $editor.GetType("DXForgeEditor.Components.Geometry", $true)
+		$materialsField = $geometryType.GetField("_materials", $flags)
+		function Get-GeometryState($project)
+		{
+			$state = @{}
+			foreach ($entity in @($project.ActiveScene.GameEntities))
+			{
+				$geometry = @($entity.Components | Where-Object { $_.GetType() -eq $geometryType })
+				if ($geometry.Count -eq 0) { $state[$entity.Name] = "none"; continue }
+				$materials = @($materialsField.GetValue($geometry[0]))
+				$state[$entity.Name] = "$($geometry[0].GeometryGuid)|$($geometry[0].ContentId)|" + (($materials | ForEach-Object {
+					"$($_.Material);$($_.BaseColor -join ',');$($_.EmissiveColor -join ',');$($_.EmissiveIntensity);$($_.Metallic);$($_.Roughness);$($_.Inputs -join ',');$($_.InputNames -join ',')" }) -join "/")
+			}
+			return $state
+		}
+		$geometryProject = $projectType.GetMethod("Load", $flags).Invoke($null, [object[]]@([string]$WithGeometry))
+		$state = Get-GeometryState $geometryProject
+		Check ($state["Origin"] -eq "none") "WithGeometry: Origin has no Geometry component" $state["Origin"]
+		Check ($state["Moved"] -eq "6f1c2b8e-3d4a-4e5f-9a0b-1c2d3e4f5a6b|-1|11111111-2222-4333-8444-555555555555;0.5,0.25,0.125,1;0,0,0,1;1;0.75;0.5;99999999-8888-4777-8666-555555555555;BaseColor") "WithGeometry: Moved has the saved geometry and per-submesh material" $state["Moved"]
+		Check ($state["Scaled"] -eq "0a9b8c7d-6e5f-4a3b-8c2d-1e0f9a8b7c6d|-1|") "WithGeometry: Scaled has the saved geometry and no saved materials" $state["Scaled"]
+		Check (@($geometryProject.ActiveScene.GameEntities | Where-Object { $_.IsActive }).Count -eq 0) "WithGeometry: headless loading creates no entity in the engine"
+		$resaved = Join-Path $work "resaved.dxproj"
+		$serializer = $editor.GetType("DXForgeEditor.Utilities.Serializer", $true)
+		$null = $serializer.GetMethod("ToFile", $flags).MakeGenericMethod($projectType).Invoke($null, [object[]]@($geometryProject.PSObject.BaseObject, [string]$resaved))
+		$reloaded = Get-GeometryState ($projectType.GetMethod("Load", $flags).Invoke($null, [object[]]@([string]$resaved)))
+		Check (($reloaded.Keys | ForEach-Object { $reloaded[$_] -eq $state[$_] }) -notcontains $false -and $reloaded.Count -eq $state.Count) "WithGeometry: saving and reloading keeps the geometry and materials" (($reloaded.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join "; ")
+
 		Check ($assertRecorder.Failures.Count -eq 0) "no Debug.Assert fired in the editor code" ($assertRecorder.Failures -join "; ")
 	}
 	finally
@@ -323,6 +368,12 @@ namespace DXForgeCliTest
 		[System.IO.File]::WriteAllText($jp, $xml.Replace("<a:Name>Scaled</a:Name>", "<a:Name>拡大したもの</a:Name>"))
 		$r = Invoke-Cli (@("--load-project", $jp, "--frames", "1") + $runnerArgs) -Json
 		Check ($r.Code -eq 0 -and $r.Json.project -eq $jp -and @($r.Json.entities)[2].name -eq "拡大したもの") "Japanese path and entity name" $r.Stdout
+
+		# Geometry のあるシーン: Geometry は game.bin に書かないので、TransformOnly と同じエンティティが動く
+		$r = Invoke-Cli (@("--load-project", $WithGeometry, "--frames", "1") + $runnerArgs) -Json
+		Check ($r.Code -eq 0 -and $r.Json.success -and $null -eq $r.Json.error -and $r.Json.frames_run -eq 1) "WithGeometry: runs -> exit code 0" "$($r.Stdout) $($r.Stderr)"
+		Check ($r.Stderr -match $GeometrySkippedWarning) "WithGeometry: stderr warns that the Geometry components are skipped" $r.Stderr
+		Check-Entities "WithGeometry" $r.Json $ActiveSceneEntities
 
 		$r = Invoke-Cli (@("--load-project", $TransformOnly, "--frames", "2") + $runnerArgs)
 		Check ($r.Code -eq 0 -and $r.Stdout -match "dxforge: OK, scene Sample Scene, 2 frames, 3 entities" -and $r.Stdout -match "\(Moved\)") "human-readable output" $r.Stdout

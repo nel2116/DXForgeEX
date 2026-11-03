@@ -260,6 +260,11 @@ namespace DXForgeEditor.Content
         private readonly ObservableCollection<AppliedMaterialInput> _inputs = [];
         public ReadOnlyObservableCollection<AppliedMaterialInput> Inputs { get; }
         public MaterialSurface MaterialSurface { get; init; }
+        /// <summary>
+        /// 作るときに渡したマテリアルのアセットのGUID。Geometry コンポーネントが、サブメッシュごとのマテリアルを保存するときに使う(Primal Day 079)。
+        /// NOTE: Guid(Asset.Guid)はアップロードした内容ごとに変わるので、マテリアルのアセットのGUIDとは別に持つ
+        /// </summary>
+        public Guid MaterialGuid { get; private init; }
 
         // ---- アップロードの状態 ----
         // このインスタンスが持ち続けるもの(アップロードしている間だけ。外すと全部戻す):
@@ -290,7 +295,7 @@ namespace DXForgeEditor.Content
         // NOTE: Primal は入力のアセットを複製しない(Codexの指摘, #145)
         public AppliedMaterial Clone()
         {
-            var clone = new AppliedMaterial(_loadedMaterial) { MaterialSurface = MaterialSurface.Clone() };
+            var clone = new AppliedMaterial(_loadedMaterial) { MaterialSurface = MaterialSurface.Clone(), MaterialGuid = MaterialGuid };
             Debug.Assert(clone._inputs.Count == _inputs.Count);
             for (int i = 0; i < Math.Min(clone._inputs.Count, _inputs.Count); ++i)
             {
@@ -558,7 +563,10 @@ namespace DXForgeEditor.Content
             return ((MemoryStream)writer.BaseStream).ToArray();
         }
 
-        public AppliedMaterial(AssetInfo materialAssetInfo) : this(GetLoadedMaterial(materialAssetInfo)) { }
+        public AppliedMaterial(AssetInfo materialAssetInfo) : this(GetLoadedMaterial(materialAssetInfo))
+        {
+            MaterialGuid = materialAssetInfo.Guid;
+        }
 
         private static RefCountedMaterial GetLoadedMaterial(AssetInfo materialAssetInfo)
         {
