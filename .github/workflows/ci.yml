@@ -114,6 +114,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python Tests/check_conventions.py
 
+      # エージェントが merge-ok(人のマージの承認)を付けるのを止める PreToolUse フックのテスト(#160)
+      - name: Merge approval guard tests
+        shell: pwsh
+        run: python Tests/guard_merge_approval_test.py
+
       # DXForgeEditor は net8.0-windows を対象にしている。ランナーに必要なバージョンの
       # SDKが同梱されているとは限らないため、SDKを明示的に用意する。
       - name: Setup .NET

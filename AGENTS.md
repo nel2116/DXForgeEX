@@ -63,7 +63,7 @@ These are checked by `Tests/check_conventions.py` (CI, and a Claude Code hook af
 
 - The change builds with `-WarningsAsErrors` in the configs it affects, and `EngineUnitTests` plus any test next to the touched code pass. Report the command and its result, not "tests pass".
 - New behavior that can run headless has a test. Rendering/GPU and editor GUI changes have no automated test: check them by running the app (see `docs/ManualVerification.md`) and say what you saw. Whenever the app was checked on screen, put before/after screenshots in the PR body (`gui-check` skill, `push-pr-assets.ps1`), not only in a comment.
-- PRs target `develop`. Merging is gated by CI plus a Codex review; see `docs/dev/ReviewAndMerge.md`. Never use `gh pr merge --auto` on a branch without that protection — it merges immediately.
+- PRs target `develop`. Merging is gated by CI, a Codex review and a human approval; see `docs/dev/ReviewAndMerge.md`. Agents go as far as scheduling the auto-merge and reporting "awaiting approval"; only the user adds the `merge-ok` label that lets it merge (issue #160, enforced by a hook). Never use `gh pr merge --auto` on a branch without that protection — it merges immediately.
 
 ## Keeping sessions cheap
 
