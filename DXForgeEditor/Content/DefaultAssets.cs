@@ -1,4 +1,5 @@
-﻿using DXForgeEditor.DllWrappers;
+﻿using DXForgeEditor.ContentToolsAPIStructs;
+using DXForgeEditor.DllWrappers;
 using DXForgeEditor.Utilities;
 using System;
 using System.Collections.Generic;
@@ -13,6 +14,9 @@ namespace DXForgeEditor.Content
     /// Resources\DefaultAssets\ に置く。起動時になければ作る。
     /// 既定のマテリアル用シェーダー(Resources/MaterialEditor/DefaultMaterialShaders.hlsl)は起動時にコンパイルする(Primal Day 076)。
     /// 既定のマテリアル(DefaultMaterial.asset)は、そのシェーダーで作る(Primal Day 077)。
+    /// 既定のジオメトリ(DefaultCube.asset)は、Add Component → Geometry で付ける(Primal Day 077/080)。
+    /// NOTE: 既定アセットは、プロジェクトの AssetRegistry には登録しない(Primal Day 080 は登録する)。
+    ///       Geometry コンポーネントは、保存した GUID が既定アセットのものなら、探さずにそれを使う。
     /// </summary>
     static class DefaultAssets
     {
@@ -21,6 +25,16 @@ namespace DXForgeEditor.Content
         /// 作れなかった場合は null。
         /// </summary>
         public static AssetInfo? BrdfIntegrationLut { get; private set; }
+
+        /// <summary>
+        /// 既定のジオメトリ(DefaultCube.asset、ContentTools の立方体のプリミティブメッシュ)。作れなかった場合は null。
+        /// </summary>
+        public static AssetInfo? DefaultGeometry { get; private set; }
+
+        /// <summary>
+        /// 既定のジオメトリの GUID。.dxproj は GUID で参照するので、エディタの配置先によらず同じ値にする(#32)。
+        /// </summary>
+        public static readonly Guid DefaultGeometryGuid = new("6c0f1b3e-8d2a-4f57-9e41-d5a7c3b20f19");
 
         /// <summary>
         /// 既定のマテリアル(DefaultMaterial.asset)。作れなかった場合は null。
@@ -42,6 +56,8 @@ namespace DXForgeEditor.Content
         public static string DefaultAssetsPath { get; } = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"Resources\DefaultAssets\");
 
         public static string BrdfIntegrationLutFile => Path.Combine(DefaultAssetsPath, $"BrdfIntegrationLut{Asset.AssetFileExtension}");
+
+        public static string DefaultGeometryFile => Path.Combine(DefaultAssetsPath, $"DefaultCube{Asset.AssetFileExtension}");
 
         public static string DefaultMaterialFile => Path.Combine(DefaultAssetsPath, $"DefaultMaterial{Asset.AssetFileExtension}");
 
@@ -70,6 +86,8 @@ namespace DXForgeEditor.Content
             // NOTE: Primalは作ったときだけ BrdfIntegrationLut を設定するので、2回目以降の起動では null のままになる。
             //       ここでは既存のファイルからも読む。
             BrdfIntegrationLut = File.Exists(brdfLutFile) ? Asset.TryGetAssetInfo(brdfLutFile) : null;
+
+            DefaultGeometry = EnsureDefaultCube(DefaultGeometryFile);
 
             CompileDefaultMaterialShaders();
 
@@ -204,6 +222,41 @@ namespace DXForgeEditor.Content
             {
                 Debug.WriteLine(ex.Message);
                 Logger.Log(MessageType.Error, "既定のマテリアル用シェーダーをコンパイルできませんでした。");
+            }
+        }
+
+        /// <summary>
+        /// file に既定のジオメトリ(GUID が DefaultGeometryGuid のキューブ)がなければ作り、その AssetInfo を返す。作れなければ null。
+        /// NOTE: Primal はファイルがないときだけ新しい GUID で作るので、エディタの配置先(構成や worktree)ごとに GUID が変わり、
+        ///       ある配置先のエディタで既定のキューブを付けて保存したプロジェクトを、別の配置先のエディタで開くと見つからない。
+        ///       ここでは固定の GUID を使い、GUID が違うもの(古いもの)は作り直す(Codexの指摘, #32)。
+        /// </summary>
+        public static AssetInfo? EnsureDefaultCube(string file)
+        {
+            var info = File.Exists(file) ? Asset.TryGetAssetInfo(file) : null;
+            if (info?.Type != AssetType.Mesh || info.Guid != DefaultGeometryGuid)
+            {
+                CreateDefaultCube(file);
+                info = File.Exists(file) ? Asset.TryGetAssetInfo(file) : null;
+            }
+            return info?.Type == AssetType.Mesh && info.Guid == DefaultGeometryGuid ? info : null;
+        }
+
+        private static void CreateDefaultCube(string file)
+        {
+            try
+            {
+                var cube = new Geometry() { FixedGuid = DefaultGeometryGuid };
+                var info = new PrimitiveInitInfo() { Type = PrimitiveMeshType.Cube };
+                if (!ContentToolsAPI.CreatePrimitiveMesh(cube, info) || !cube.Save(file).Any())
+                {
+                    Logger.Log(MessageType.Error, $"既定のジオメトリを作れませんでした: {file}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex.Message);
+                Logger.Log(MessageType.Error, $"既定のジオメトリを作れませんでした: {file}");
             }
         }
 

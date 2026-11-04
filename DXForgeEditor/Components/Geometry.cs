@@ -29,7 +29,23 @@ namespace DXForgeEditor.Components
                     _material.UnloadFromEngine();
                     _material = value;
                     OnPropertyChanged(nameof(Material));
+                    OnPropertyChanged(nameof(MaterialName));
                 }
+            }
+        }
+
+        /// <summary>
+        /// インスペクターに出すマテリアルの名前(マテリアルのアセットのファイル名)。
+        /// NOTE: Primal Day 080 は Material.Name を出すが、DXForgeEX の AppliedMaterial には名前がない
+        /// </summary>
+        public string MaterialName
+        {
+            get
+            {
+                var guid = _material.MaterialGuid;
+                var defaultMaterial = Content.Material.Default;
+                var info = defaultMaterial != null && defaultMaterial.Guid == guid ? defaultMaterial : AssetRegistry.GetAssetInfo(guid);
+                return info?.FullName ?? guid.ToString();
             }
         }
 
@@ -267,6 +283,17 @@ namespace DXForgeEditor.Components
         /// 失敗したとき(アセットがない、アップロードできない)は、ログを出して何もアップロードしない(エンティティは Geometry なしで作られる)。
         /// NOTE: Primal は見つからないジオメトリを既定のジオメトリにするが、DXForgeEX にはまだない
         /// </summary>
+        /// <summary>
+        /// ジオメトリのアセットを探す。既定のジオメトリ(DefaultAssets.DefaultGeometry)は AssetRegistry に登録されないので、
+        /// GUID がそれと同じなら探さずにそれを返す(既定のマテリアルと同じ, #32)。
+        /// </summary>
+        private static AssetInfo? FindGeometry(Guid guid)
+        {
+            if (guid == Guid.Empty) return null;
+            var defaultGeometry = DefaultAssets.DefaultGeometry;
+            return defaultGeometry != null && defaultGeometry.Guid == guid ? defaultGeometry : AssetRegistry.GetAssetInfo(guid);
+        }
+
         public override void Load()
         {
             Debug.Assert(_geometry == null && GeometryWithMaterials == null);
@@ -282,7 +309,7 @@ namespace DXForgeEditor.Components
                 return;
             }
 
-            var assetInfo = GeometryGuid != Guid.Empty ? AssetRegistry.GetAssetInfo(GeometryGuid) : null;
+            var assetInfo = FindGeometry(GeometryGuid);
             if (assetInfo?.Type != AssetType.Mesh)
             {
                 Logger.Log(MessageType.Error, $"エンティティ {Owner.Name} のジオメトリ({GeometryGuid})が見つかりません。");
@@ -306,9 +333,17 @@ namespace DXForgeEditor.Components
         }
 
         /// <summary>
-        /// ジオメトリを変える。マテリアルは新しいジオメトリの既定のマテリアルにする。
+        /// サブメッシュごとのマテリアルの今の値(undo で戻すために、SetGeometry の前に取っておく)。
         /// </summary>
-        public void SetGeometry(Guid guid)
+        public List<AppliedMaterialData> GetMaterialsData() =>
+            GeometryWithMaterials != null ? MaterialsList.Select(AppliedMaterialData.From).ToList() : [.. _materials];
+
+        /// <summary>
+        /// ジオメトリを変える。materials が null なら、マテリアルは新しいジオメトリの既定のマテリアルにする。
+        /// materials を渡すと、サブメッシュの順にそのマテリアルを使う(undo/redo で元に戻すとき)。
+        /// NOTE: Primal Day 080 は undo のときもマテリアルを戻さない(既定のマテリアルになる)
+        /// </summary>
+        public void SetGeometry(Guid guid, List<AppliedMaterialData>? materials = null)
         {
             if (GeometryGuid != guid)
             {
@@ -316,8 +351,9 @@ namespace DXForgeEditor.Components
                 var wasActive = Owner.IsActive;
                 Owner.IsActive = false;
                 GeometryGuid = guid;
-                _materials.Clear();
+                _materials = materials != null ? [.. materials] : [];
                 Owner.IsActive = wasActive;
+                OnPropertyChanged(nameof(GeometryGuid));
             }
         }
 
@@ -366,6 +402,21 @@ namespace DXForgeEditor.Components
             }
         }
 
+        private bool _isMultiValue;
+        /// <summary>選んだエンティティのジオメトリが同じでないか(ビューは MULTI VALUE と出す)。</summary>
+        public bool IsMultiValue
+        {
+            get => _isMultiValue;
+            private set
+            {
+                if (_isMultiValue != value)
+                {
+                    _isMultiValue = value;
+                    OnPropertyChanged(nameof(IsMultiValue));
+                }
+            }
+        }
+
         public Guid GeometryGuid => _geometryWithMaterials != null ? SelectedComponents.First().GeometryGuid : Guid.Empty;
 
         public void SetGeometry(Guid guid)
@@ -380,6 +431,9 @@ namespace DXForgeEditor.Components
         {
             var contentId = MSEntity.GetMixedValue(SelectedComponents, new Func<Geometry, int>(x => x.ContentId));
             GeometryWithMaterials = contentId.HasValue ? SelectedComponents.First().GeometryWithMaterials : null;
+            // NOTE: Primal は GeometryWithMaterials が null なら MULTI VALUE と出すが、どれもジオメトリを読み込めていない
+            //       (アセットが見つからないなど)ときは、同じ値なので MULTI VALUE とは出さない(#32)
+            IsMultiValue = !contentId.HasValue;
 
             return true;
         }

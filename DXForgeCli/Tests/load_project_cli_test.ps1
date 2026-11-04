@@ -371,6 +371,54 @@ namespace DXForgeCliTest
 			{
 				$defaultMaterialProperty.SetValue($null, $previousDefaultMaterial)
 			}
+
+			# Day 080(#32): ドロップでの差し替えの undo は、ジオメトリとサブメッシュごとのマテリアルを戻す
+			# (GetMaterialsData を取っておき、SetGeometry(guid, materials) で戻す)。ヘッドレスではエンティティがアクティブでないので、
+			# エンジンにもアセットにも触らない。
+			$logged.Clear()
+			$movedBefore = (Get-GeometryState $geometryProject)["Moved"]
+			$savedMaterials = $geometryType.GetMethod("GetMaterialsData").Invoke($movedGeometry, @())
+			$otherGuid = [Guid]::NewGuid()
+			$setGeometry = $geometryType.GetMethod("SetGeometry")
+			$null = $setGeometry.Invoke($movedGeometry, [object[]]@($otherGuid, $null))
+			Check ($movedGeometry.GeometryGuid -eq $otherGuid -and @($materialsField.GetValue($movedGeometry)).Count -eq 0 -and -not $moved.IsActive) "Geometry.SetGeometry(guid): the new geometry starts with the default materials (no saved data), the entity stays inactive" (Get-GeometryState $geometryProject)["Moved"]
+			$null = $setGeometry.Invoke($movedGeometry, [object[]]@([Guid]::Parse($movedBefore.Split("|")[0]), $savedMaterials))
+			Check ((Get-GeometryState $geometryProject)["Moved"] -eq $movedBefore -and $logged.Count -eq 0) "Geometry.SetGeometry(guid, materials) (undo) restores the geometry and the per-submesh materials" "$((Get-GeometryState $geometryProject)["Moved"]) / $($logged -join '; ')"
+
+			# 複数選択: どちらもジオメトリを読み込めていない(ContentId が同じ -1)ときは MULTI VALUE にしない(Primal と違う, #32)
+			$entityType = $editor.GetType("DXForgeEditor.Components.GameEntity", $true)
+			$selection = [Activator]::CreateInstance([System.Collections.Generic.List`1].MakeGenericType($entityType))
+			foreach ($name in @("Moved", "Scaled")) { $selection.Add(@($geometryProject.ActiveScene.GameEntities | Where-Object { $_.Name -eq $name })[0]) }
+			$msEntity = [Activator]::CreateInstance($editor.GetType("DXForgeEditor.Components.MSGameEntity", $true), $flags, $null, [object[]]@(, $selection), $null)
+			$msGeometry = $msEntity.GetType().GetMethod("GetMSComponent").MakeGenericMethod($editor.GetType("DXForgeEditor.Components.MSGeometry", $true)).Invoke($msEntity, @())
+			Check ($null -ne $msGeometry -and -not $msGeometry.IsMultiValue -and $null -eq $msGeometry.GeometryWithMaterials -and $msGeometry.GeometryGuid -eq [Guid]::Empty) "MSGeometry: two entities whose geometry is not loaded -> not MULTI VALUE, no geometry shown"
+
+			# 既定のジオメトリ(DefaultAssets.DefaultGeometry、AssetRegistry には登録されない)は、GUID が同じなら探さずに使う。
+			# Add Component → Geometry は、ComponentFactory でそれを付ける(Primal Day 080)。
+			$defaultGeometryProperty = $editor.GetType("DXForgeEditor.Content.DefaultAssets", $true).GetProperty("DefaultGeometry", $flags)
+			$previousDefaultGeometry = $defaultGeometryProperty.GetValue($null)
+			$defaultGeometry = [Activator]::CreateInstance($editor.GetType("DXForgeEditor.Content.AssetInfo", $true))
+			$defaultGeometry.Type = [Enum]::Parse($editor.GetType("DXForgeEditor.Content.AssetType", $true), "Mesh")
+			$defaultGeometry.Guid = [Guid]::NewGuid()
+			$defaultGeometry.FullPath = Join-Path $work "DefaultCube.asset"
+			$defaultGeometryProperty.SetValue($null, $defaultGeometry)
+			try
+			{
+				$findGeometry = $geometryType.GetMethod("FindGeometry", $flags)
+				Check ([object]::ReferenceEquals($findGeometry.Invoke($null, [object[]]@($defaultGeometry.Guid)), $defaultGeometry)) "Geometry.FindGeometry(the default geometry's GUID) -> DefaultAssets.DefaultGeometry"
+				Check ($null -eq $findGeometry.Invoke($null, [object[]]@([Guid]::Empty)) -and $null -eq $findGeometry.Invoke($null, [object[]]@([Guid]::NewGuid()))) "Geometry.FindGeometry(empty or unknown GUID) -> null"
+				$componentTypeEnum = $editor.GetType("DXForgeEditor.Components.ComponentType", $true)
+				$factory = $editor.GetType("DXForgeEditor.Components.ComponentFactory", $true)
+				$geometryKind = [Enum]::Parse($componentTypeEnum, "Geometry")
+				$origin = @($geometryProject.ActiveScene.GameEntities | Where-Object { $_.Name -eq "Origin" })[0]
+				$created = $factory.GetMethod("GetCreationFunction", $flags).Invoke($null, @($geometryKind)).Invoke($origin, $defaultGeometry)
+				$kind = $factory.GetMethod("ToEnumType", $flags).Invoke($null, @($created))
+				Check ($created.GetType() -eq $geometryType -and $created.GeometryGuid -eq $defaultGeometry.Guid -and "$kind" -eq "Geometry" -and [int]$geometryKind -eq 2 -and @($origin.Components | Where-Object { $_.GetType() -eq $geometryType }).Count -eq 0) "ComponentFactory creates a Geometry with the given asset (ComponentType.Geometry = 2)"
+			}
+			finally
+			{
+				$defaultGeometryProperty.SetValue($null, $previousDefaultGeometry)
+			}
 		}
 		finally
 		{

@@ -1,4 +1,5 @@
 ﻿using DXForgeEditor.Components;
+using DXForgeEditor.Content;
 using DXForgeEditor.GameProject;
 using DXForgeEditor.Utilities;
 using System;
@@ -143,6 +144,19 @@ namespace DXForgeEditor.Editors
         {
             // Header はスクリプト名 (string) にバインドされているため ToString() は null にならない
             AddComponent(ComponentType.Script, ((MenuItem)sender).Header.ToString()!);
+        }
+
+        private void OnAddGeometryComponent(object sender, RoutedEventArgs e)
+        {
+            // NOTE: Primal と同じく既定のジオメトリ(DefaultCube)を付ける。作れなかったとき(ContentTools がないなど)は
+            //       ログを出して何もしない(イベントハンドラなので例外を投げない)
+            var defaultGeometry = DefaultAssets.DefaultGeometry;
+            if (defaultGeometry == null)
+            {
+                Logger.Log(MessageType.Error, "既定のジオメトリがないので、Geometry コンポーネントを追加できません。");
+                return;
+            }
+            AddComponent(ComponentType.Geometry, defaultGeometry);
         }
     }
 }

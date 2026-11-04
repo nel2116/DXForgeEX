@@ -1,5 +1,6 @@
 ﻿using DXForgeEditor.Editors;
 using DXForgeEditor.GameProject;
+using DXForgeEditor.Utilities.Controls;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -105,6 +106,8 @@ namespace DXForgeEditor.Content
     {
         private string _sortedProperty = nameof(ContentInfo.FileName);
         private ListSortDirection _sortDirection;
+        private Point _clickPosition;
+        private bool _startDrag;
 
         public SelectionMode SelectionMode
         {
@@ -442,6 +445,51 @@ namespace DXForgeEditor.Content
             SelectedItem = item?.IsDirectory == true ? null : item;
         }
 
+        private void OnFolderContent_ListView_PreviewMouse_LBD(object sender, MouseButtonEventArgs e)
+        {
+            _clickPosition = e.GetPosition(this);
+
+            var item = (e.OriginalSource as DependencyObject)?.FindVisualParent<ListViewItemEx>();
+            _startDrag = item != null;
+        }
+
+        private void OnFolderContent_ListView_PreviewMouse_LBU(object sender, MouseButtonEventArgs e)
+        {
+            _startDrag = false;
+        }
+
+        /// <summary>
+        /// 選んだ項目を、ファイルのパス(DataFormats.FileDrop)としてドラッグし始める(Primal Day 080)。
+        /// インスペクターの Geometry のビューなどが受け取る。
+        /// </summary>
+        private void OnFolderContent_ListView_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed || !_startDrag) return;
+
+            var diff = e.GetPosition(this) - _clickPosition;
+            // NOTE: SystemParameters.MinimumHorizontalDragDistance などでは小さすぎる(Primal と同じ 10 ピクセル)
+            if (diff.LengthSquared <= 100.0) return;
+
+            var files = new List<string>();
+            foreach (ContentInfo item in folderListView.SelectedItems)
+            {
+                files.Add(item.FullPath);
+            }
+
+            if (files.Count > 0)
+            {
+                try
+                {
+                    var dataObj = new DataObject(DataFormats.FileDrop, files.ToArray());
+                    DragDrop.DoDragDrop(folderListView, dataObj, DragDropEffects.Copy | DragDropEffects.Move);
+                }
+                finally
+                {
+                    _startDrag = false;
+                }
+            }
+        }
+
         private void TryEdit(ListBoxItem item)
         {
             var textBox = item.FindVisualChild<TextBox>();
@@ -518,6 +566,9 @@ namespace DXForgeEditor.Content
 
         private void OnFolderContent_ListView_DragEnter(object sender, DragEventArgs e)
         {
+            // コンテンツブラウザから始めたドラッグでは、取り込みのドロップ先を出さない(Primal Day 080)
+            if (_startDrag) return;
+
             dropBorder.Opacity = 0;
             dropBorder.Visibility = Visibility.Visible;
             var fadeIn = new DoubleAnimation(0, 1, new Duration(TimeSpan.FromMilliseconds(100)));
