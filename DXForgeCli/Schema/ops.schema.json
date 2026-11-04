@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nel2116/DXForgeEX/DXForgeCli/Schema/ops.schema.json",
+  "title": "dxforge --ops",
+  "description": "dxforge --load-project <.dxproj> --ops <file> で実行する操作(Issue #183)。--op には $defs/op の 1 つを渡す。",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string" },
+    "ops": { "type": "array", "items": { "$ref": "#/$defs/op" } }
+  },
+  "required": ["ops"],
+  "additionalProperties": false,
+  "$defs": {
+    "selector": {
+      "description": "対象のエンティティ。guid:<GUID>、name:<名前>(1 つに決まらなければ終了コード 41)、index:<シーン名>/<番号>、$<別名>(この操作より前の create-entity の as)。",
+      "type": "string",
+      "pattern": "^(guid:.+|name:.+|index:.+/[0-9]+|\\$[A-Za-z0-9_-]+)$"
+    },
+    "asset": {
+      "description": "ジオメトリのアセット。guid:<GUID>、path:<Content からの相対パス>、default:cube(既定のキューブ)。",
+      "type": "string",
+      "pattern": "^(guid:.+|path:.+|default:cube)$"
+    },
+    "name": { "type": "string", "pattern": "\\S" },
+    "scene": { "description": "シーンの名前。", "type": "string", "pattern": "\\S" },
+    "vector3": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+    "componentType": { "enum": ["transform", "script", "geometry"] },
+    "op": {
+      "oneOf": [
+        { "$ref": "#/$defs/list-scenes" },
+        { "$ref": "#/$defs/list-entities" },
+        { "$ref": "#/$defs/get-entity" },
+        { "$ref": "#/$defs/create-entity" },
+        { "$ref": "#/$defs/remove-entity" },
+        { "$ref": "#/$defs/rename" },
+        { "$ref": "#/$defs/set-enabled" },
+        { "$ref": "#/$defs/set-transform" },
+        { "$ref": "#/$defs/add-component" },
+        { "$ref": "#/$defs/remove-component" },
+        { "$ref": "#/$defs/set-geometry" }
+      ]
+    },
+    "list-scenes": {
+      "type": "object",
+      "properties": { "op": { "const": "list-scenes" } },
+      "required": ["op"],
+      "additionalProperties": false
+    },
+    "list-entities": {
+      "description": "scene を省略すると、すべてのシーンのエンティティを返す。",
+      "type": "object",
+      "properties": { "op": { "const": "list-entities" }, "scene": { "$ref": "#/$defs/scene" } },
+      "required": ["op"],
+      "additionalProperties": false
+    },
+    "get-entity": {
+      "type": "object",
+      "properties": { "op": { "const": "get-entity" }, "target": { "$ref": "#/$defs/selector" } },
+      "required": ["op", "target"],
+      "additionalProperties": false
+    },
+    "create-entity": {
+      "description": "scene を省略するとアクティブなシーンに、name を省略すると Empty Entity の名前で作る。",
+      "type": "object",
+      "properties": {
+        "op": { "const": "create-entity" },
+        "name": { "$ref": "#/$defs/name" },
+        "scene": { "$ref": "#/$defs/scene" },
+        "as": { "description": "あとの操作から $<別名> で指す名前。", "type": "string", "pattern": "^[A-Za-z0-9_-]+$" }
+      },
+      "required": ["op"],
+      "additionalProperties": false
+    },
+    "remove-entity": {
+      "type": "object",
+      "properties": { "op": { "const": "remove-entity" }, "target": { "$ref": "#/$defs/selector" } },
+      "required": ["op", "target"],
+      "additionalProperties": false
+    },
+    "rename": {
+      "type": "object",
+      "properties": { "op": { "const": "rename" }, "target": { "$ref": "#/$defs/selector" }, "name": { "$ref": "#/$defs/name" } },
+      "required": ["op", "name", "target"],
+      "additionalProperties": false
+    },
+    "set-enabled": {
+      "type": "object",
+      "properties": { "op": { "const": "set-enabled" }, "target": { "$ref": "#/$defs/selector" }, "enabled": { "type": "boolean" } },
+      "required": ["enabled", "op", "target"],
+      "additionalProperties": false
+    },
+    "set-transform": {
+      "description": "position, rotation_deg か rotation_rad(どちらか一方), scale のうち、1 つ以上を指定する。",
+      "type": "object",
+      "properties": {
+        "op": { "const": "set-transform" },
+        "target": { "$ref": "#/$defs/selector" },
+        "position": { "$ref": "#/$defs/vector3" },
+        "rotation_deg": { "$ref": "#/$defs/vector3" },
+        "rotation_rad": { "$ref": "#/$defs/vector3" },
+        "scale": { "$ref": "#/$defs/vector3" }
+      },
+      "required": ["op", "target"],
+      "anyOf": [
+        { "required": ["position"] },
+        { "required": ["rotation_deg"] },
+        { "required": ["rotation_rad"] },
+        { "required": ["scale"] }
+      ],
+      "not": { "required": ["rotation_deg", "rotation_rad"] },
+      "additionalProperties": false
+    },
+    "add-component": {
+      "description": "script は name(スクリプトの名前。登録されているかは確かめず、結果に警告を出す)、geometry は asset が必要。",
+      "type": "object",
+      "properties": {
+        "op": { "const": "add-component" },
+        "target": { "$ref": "#/$defs/selector" },
+        "type": { "$ref": "#/$defs/componentType" },
+        "name": { "$ref": "#/$defs/name" },
+        "asset": { "$ref": "#/$defs/asset" }
+      },
+      "required": ["op", "target", "type"],
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "transform" } } },
+          "then": { "properties": { "name": false, "asset": false } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "script" } } },
+          "then": { "required": ["name"], "properties": { "asset": false } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "geometry" } } },
+          "then": { "required": ["asset"], "properties": { "name": false } }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "remove-component": {
+      "description": "transform は削除できない(終了コード 42)。",
+      "type": "object",
+      "properties": { "op": { "const": "remove-component" }, "target": { "$ref": "#/$defs/selector" }, "type": { "$ref": "#/$defs/componentType" } },
+      "required": ["op", "target", "type"],
+      "additionalProperties": false
+    },
+    "set-geometry": {
+      "type": "object",
+      "properties": { "op": { "const": "set-geometry" }, "target": { "$ref": "#/$defs/selector" }, "asset": { "$ref": "#/$defs/asset" } },
+      "required": ["asset", "op", "target"],
+      "additionalProperties": false
+    }
+  }
+}

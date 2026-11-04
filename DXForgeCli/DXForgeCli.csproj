@@ -32,4 +32,9 @@
   <ItemGroup>
     <ProjectReference Include="..\DXForgeEditor\DXForgeEditor.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- 操作の JSON Schema(Issue #183)。ヘルプの出力で場所を出す -->
+    <None Update="Schema\ops.schema.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

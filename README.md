@@ -277,6 +277,47 @@ pwsh -STA -NoProfile -File DXForgeCli/Tests/load_project_cli_test.ps1 -RequireRu
 pwsh -STA -NoProfile -File DXForgeCli/Tests/load_project_cli_test.ps1 -Configuration ReleaseEditor -RequireRunner
 ```
 
+### シーンの操作 (`dxforge --ops`)
+
+エディタのUIを使わずに、`.dxproj`のシーンを読んだり変えたりします(#183)。操作の本体はエディタのコード(`DXForgeEditor/Automation/`)で、`dxforge`はそれを呼ぶだけです。操作の形はJSON Schema(`DXForgeCli/Schema/ops.schema.json`。ビルドすると`dxforge.exe`の隣の`Schema\`にもコピーされ、`--help`に場所が出ます)で定義しています。
+
+```powershell
+./x64/DebugEditor/dxforge.exe --load-project path/to/MyGame.dxproj --ops ops.json --json
+./x64/DebugEditor/dxforge.exe --load-project path/to/MyGame.dxproj --op '{"op":"list-entities"}' --json   # 1つだけ
+./x64/DebugEditor/dxforge.exe --load-project path/to/MyGame.dxproj --ops ops.json --dry-run --json        # 検証だけで保存しない
+```
+
+```json
+{"ops":[
+  {"op":"create-entity","as":"box","name":"Box"},
+  {"op":"set-transform","target":"$box","position":[0,1,0],"rotation_deg":[0,90,0]},
+  {"op":"add-component","target":"$box","type":"geometry","asset":"default:cube"}
+]}
+```
+
+| 種類 | 操作 |
+|---|---|
+| 読む | `list-scenes`、`list-entities`(`scene`は省略可)、`get-entity`(`target`) |
+| 変える | `create-entity`(`name`、`scene`、`as`は省略可)、`remove-entity`、`rename`(`name`)、`set-enabled`(`enabled`)、`set-transform`(`position`、`rotation_deg`か`rotation_rad`、`scale`)、`add-component`(`type`が`transform`/`script`(`name`)/`geometry`(`asset`))、`remove-component`(`type`)、`set-geometry`(`asset`) |
+
+- 対象(`target`)は`guid:<GUID>`、`name:<名前>`(1つに決まらなければエラー)、`index:<シーン名>/<番号>`、`$<別名>`(同じopsの中の`create-entity`の`as`)。`create-entity`の結果にGUIDが入ります。
+- アセット(`asset`)は`guid:<GUID>`、`path:<Contentからの相対パス>`、`default:cube`(既定のキューブ)。スクリプトは名前が登録されているかを確かめられないので、付けるのは許し、結果に警告を出します。
+- 変更があり、すべて成功したときだけ、最後に1回保存します(一時ファイルに書いてから置き換える)。途中で失敗したら何も保存しません。結果のJSONには必ず`changed`と`saved`が入り、操作ごとの結果は`results`に、失敗の場所は`error.op_index`と`error.key`に入ります。
+- エディタがそのプロジェクトを開いている間は、変更の操作を含むものは`--dry-run`でも断ります(44)。読むだけの操作はできます。
+- `GameEntity`のGUIDは`.dxproj`に保存します(Primalにはありません。`game.bin`には書きません)。GUIDのない`.dxproj`は読むときに作るので、保存するまでは起動のたびに変わります。
+
+| 終了コード | 意味 |
+|---|---|
+| `40` | opsの形式の誤り(何も実行しない) |
+| `41` | 対象(エンティティ、シーン、アセット)が見つからない、1つに決まらない |
+| `42` | 操作の失敗(すでに持つコンポーネントの追加、Transformの削除など) |
+| `43` | `.dxproj`を保存できない |
+| `44` | エディタがそのプロジェクトを開いている |
+
+```powershell
+pwsh -STA -NoProfile -File DXForgeCli/Tests/ops_cli_test.ps1 -RequireRunner
+```
+
 ### 描画のヘッドレス実行 (`--render`)
 
 `EngineUnitTests.exe`に`--render`を付けると、ウィンドウを作らずに、コードで組み立てた固定のテストシーン(球と床、平行光源と点光源、カメラ。IBLなし)を画面外のテクスチャに描画し、読み戻してPNGに書き出します(#127の前半)。アダプタは既定でWARP(ソフトウェアのラスタライザ)を使うので、GPUのない環境でも動き、同じ実行ファイルなら何度実行しても同じ画素になります。
