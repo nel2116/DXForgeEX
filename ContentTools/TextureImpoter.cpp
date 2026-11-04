@@ -11,6 +11,7 @@
 // 2026/10/18 拡散光のIBL用の事前フィルタ(PrefilterDiffuseIBL)を追加し、プリフィルタするキューブマップの圧縮をフィルタの後に回すよう変更 (Primal Day 073)
 // 2026/10/19 鏡面反射のIBL用の事前フィルタ(PrefilterSpecularIBL)で、ラフネスごとのミップへのフィルタを行うよう変更 (Primal Day 074)
 // 2026/10/19 鏡面反射のIBL用のBRDF LUTを作る ComputeBrdfIntegrationLut を追加 (Primal Day 075)
+// 2026/11/04 ないソース画像とD3D11デバイスの作成の失敗で、エラーの経路の前にassertしないよう修正 (#176)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "ToolsCommon.h"
@@ -183,11 +184,10 @@ namespace dxforge::tools
 			{
 				ID3D11Device** device{ &devices[i] };
 				D3D_FEATURE_LEVEL feature_level;
-				[[maybe_unused]]
-				HRESULT hr{ d3d11_create_device(adapters[i].Get(), adapters[i] ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE,
-											   nullptr, create_device_flags, feature_levels, _countof(feature_levels),
-											   D3D11_SDK_VERSION, device, &feature_level, nullptr) };
-				assert(SUCCEEDED(hr));
+				// NOTE: 失敗したアダプタはdevices[i]が空のままになり、次のループで飛ばす。失敗するのは環境の状態なのでassertしない(#176)。
+				d3d11_create_device(adapters[i].Get(), adapters[i] ? D3D_DRIVER_TYPE_UNKNOWN : D3D_DRIVER_TYPE_HARDWARE,
+									nullptr, create_device_flags, feature_levels, _countof(feature_levels),
+									D3D11_SDK_VERSION, device, &feature_level, nullptr);
 			}
 
 			for (u32 i{ 0 }; i < devices.size(); ++i)
@@ -438,8 +438,8 @@ namespace dxforge::tools
 		[[nodiscard]] ScratchImage load_from_file(texture_data* const data, const char* file_name)
 		{
 			using namespace dxforge::content;
-			assert(file_exists(file_name));
-
+			// NOTE: Primalはここでassertもしているが、ソース画像がないのは利用者のデータの状態でプログラムの誤りではないので、
+			//       file_not_foundを返すだけにする(#176)。
 			if (!file_exists(file_name))
 			{
 				data->info.import_error = import_error::file_not_found;
