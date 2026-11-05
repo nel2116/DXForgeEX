@@ -55,7 +55,7 @@ Issue #N を<直す/実装する>: https://github.com/nel2116/DXForgeEX/issues/N
 1. 直さなかった指摘があれば、理由が正しいかを確かめる。正しくなければ、直すように `send --to dispatch:<id>` で返す。
 2. CI の成功と PASS を確かめたら:
    - <GUI 確認が要らない場合: `./CodexReview.ps1 -Pr <N> -Post -SetStatus` を実行する。同じ head の PASS があるので Codex は実行されず、`codex-review` を success にして自動マージを予約する。>
-   - <GUI 確認が要る場合: `./.claude/skills/gui-check/start-gui-check.ps1 -Pr <N>` で GUI 確認のワーカーを起動する。`worker_done` の要約が PASS なら、worker-release と `-Cleanup` のあと、`-SetStatus` に進む。NG なら実装者のワーカーに直してもらい、やり直す。>
+   - <GUI 確認が要る場合: `./.claude/skills/gui-check/start-gui-check.ps1 -Pr <N>` で GUI 確認のワーカーを起動する。`worker_done` の要約が PASS なら、`worker_done` の `head:` が今の PR の head と同じことを確かめる。違えば(確認のあとに push された)確認をやり直す。同じなら、worker-release と `-Cleanup` のあと、`-SetStatus` に進む。NG なら実装者のワーカーに直してもらい、やり直す。>
    - CI と `codex-review` がそろえばマージされる(人の承認は必須にしていない)。コーディネーターも worker も `merge-ok` を付けない(#160)。ワーカーの会話での `-SetStatus` はフックが止める(#195)。
 3. マージされたら `./CleanupMerged.ps1` を実行し、develop の CI を確かめる。<並行の場合: 片方が先にマージされて develop が進んだら、もう片方には develop をマージさせ、CI とレビューをやり直させる。>
 
