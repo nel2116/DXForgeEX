@@ -191,6 +191,8 @@ namespace DXForgeEditor
 
         private void OpenProjectBrowserDialog()
         {
+            // NOTE: 新しいプロジェクトは Project.Load が Project.Current にするので、ダイアログの前に閉じる(Primal Day 081)
+            Project.Current?.Unload();
             var projectBrowser = new ProjectBrowserDialog();
             if (projectBrowser.ShowDialog() == false || projectBrowser.DataContext == null)
             {
@@ -199,11 +201,7 @@ namespace DXForgeEditor
             }
             else
             {
-                Project.Current?.Unload();
-                var project = projectBrowser.DataContext as Project;
-                Debug.Assert(project != null);
-                ContentWatcher.Reset(project.ContentPath, project.Path);
-                project.LoadEntitiesWithAssets();
+                Debug.Assert(projectBrowser.DataContext is Project);
                 DataContext = projectBrowser.DataContext;
             }
         }

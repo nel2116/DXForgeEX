@@ -21,11 +21,13 @@ namespace DXForgeEditor.Editors
     /// </summary>
     public partial class GeometryView : UserControl
     {
-        private static readonly GeometryView _geometryView = new() { Background = (Brush)Application.Current.FindResource("Editor.Window.GrayBrush4") };
+        // アイコンの生成(Content.Geometry.GenerateIcons)が別々のスレッドでこのビューを作る(Primal Day 081)
+        private static readonly object _lock = new();
         private Point _clickedPosition;
         private bool _capturedLeft;
         private bool _capturedRight;
 
+        /// <param name="index">描くメッシュ(-1ならすべて。Primal Day 077)</param>
         public void SetGeometry(int index = -1)
         {
             if (!(DataContext is MeshRenderer vm)) return;
@@ -154,26 +156,13 @@ namespace DXForgeEditor.Editors
             vm.CameraPosition = new Point3D(v.X, v.Y, v.Z);
         }
 
-        /// <param name="index">描くメッシュ(-1ならすべて。Primal Day 077)</param>
-        internal static BitmapSource RenderToBitmap(MeshRenderer mesh, int width, int height, int index = -1)
-        {
-            var bmp = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Default);
-
-            _geometryView.DataContext = mesh;
-            _geometryView.SetGeometry(index);
-            _geometryView.Width = width;
-            _geometryView.Height = height;
-            _geometryView.Measure(new Size(width, height));
-            _geometryView.Arrange(new Rect(0, 0, width, height));
-            _geometryView.UpdateLayout();
-
-            bmp.Render(_geometryView);
-            return bmp;
-        }
-
         public GeometryView()
         {
-            InitializeComponent();
+            lock (_lock)
+            {
+                InitializeComponent();
+            }
+
             DataContextChanged += (s, e) => SetGeometry();
         }
     }

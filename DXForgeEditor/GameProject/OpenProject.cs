@@ -65,7 +65,8 @@ namespace DXForgeEditor.GameProject
             Serializer.ToFile(new ProjectDataList() { Projects = projects }, _projectDataPath);
         }
 
-        public static Project Open(ProjectData data)
+        /// <returns>読み込めなければ null(Project.Load)</returns>
+        public static Project? Open(ProjectData data)
         {
             ReadProjectData();
             var project = _projects.FirstOrDefault(x => x.FullPath == data.FullPath);

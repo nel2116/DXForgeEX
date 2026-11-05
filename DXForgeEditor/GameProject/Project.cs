@@ -1,4 +1,5 @@
 ﻿using DXForgeEditor.Components;
+using DXForgeEditor.Content;
 using DXForgeEditor.DllWrappers;
 using DXForgeEditor.GameDev;
 using DXForgeEditor.Utilities;
@@ -9,7 +10,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.Serialization;
 using System.Text;
-using System.Windows;
 using System.Windows.Input;
 
 namespace DXForgeEditor.GameProject
@@ -91,7 +91,11 @@ namespace DXForgeEditor.GameProject
             }
         }
 
-        public static Project? Current => Application.Current.MainWindow?.DataContext as Project;
+        /// <summary>
+        /// エディタで開いているプロジェクト。Load で設定し、Unload で null に戻す(Primal Day 081)。
+        /// ヘッドレスの読み込み(ProjectLoadEnvironment.Headless)では設定しない。
+        /// </summary>
+        public static Project? Current { get; private set; }
 
         public static UndoRedo UndoRedo { get; } = new UndoRedo();
 
@@ -166,10 +170,11 @@ namespace DXForgeEditor.GameProject
         }
 
         /// <summary>
-        /// アセットを登録した(ContentWatcher.Reset)あとに呼ぶ。デシリアライズのときはまだ登録されていないので読み込めなかった
-        /// コンポーネント(Geometry)を持つ、アクティブなシーンのエンティティを作り直す(Codexの指摘, #32)。
+        /// Load の最後に呼ぶ。デシリアライズのときに読み込めなかったコンポーネント(Geometry)を持つ、アクティブなシーンの
+        /// エンティティを作り直す(Codexの指摘, #32)。.dxproj の Path が今の場所と違う(フォルダを移した)プロジェクトは、
+        /// Path を直すまで登録したアセットのフォルダと一致しないので、Geometry.Load() が遅らせる。
         /// </summary>
-        public void LoadEntitiesWithAssets()
+        private void LoadEntitiesWithAssets()
         {
             var entities = ActiveScene.GameEntities
                 .Where(x => x.IsActive && x.GetComponent<Components.Geometry>() is Components.Geometry geometry && !geometry.IsLoaded)
@@ -181,10 +186,38 @@ namespace DXForgeEditor.GameProject
             }
         }
 
-        public static Project Load(string file)
+        /// <returns>読み込んだプロジェクト。エディタでは、読み込めなければ null(ヘッドレスでは例外を投げる)</returns>
+        public static Project? Load(string file)
         {
             Debug.Assert(File.Exists(file));
-            return Serializer.FromFile<Project>(file);
+
+            // コマンドラインの dxforge(Issue #11)はアセットを使わず、読み込めなければ例外で終了コードを決める
+            if (ProjectLoadEnvironment.Headless) return Serializer.FromFile<Project>(file);
+
+            var path = System.IO.Path.GetDirectoryName(file) ?? string.Empty;
+            if (!path.EndsWith(System.IO.Path.DirectorySeparatorChar)) path += System.IO.Path.DirectorySeparatorChar;
+
+            try
+            {
+                // エンティティ(Geometry)がデシリアライズの中でアセットを探すので、先に登録する(Primal Day 081)
+                // NOTE: Geometry.Load() は AssetRegistry.ContentFolder と ContentPath を比べるので、ContentPath と同じ形(末尾の区切り文字あり)で渡す
+                ContentWatcher.Reset($@"{path}Content\", path);
+
+                var project = Serializer.FromFile<Project>(file);
+                Debug.Assert(project != null);
+                project.Path = path;
+                Current = project;
+                project.LoadEntitiesWithAssets();
+                return project;
+            }
+            catch (Exception ex)
+            {
+                // NOTE: OpenProjectView の経路で例外を投げるとエディタが落ちる。null を返し、呼び出し元がダイアログに残す
+                Debug.WriteLine(ex.Message);
+                Logger.Log(MessageType.Error, $"プロジェクトを読み込めませんでした: {file}");
+                Current = null;
+                return null;
+            }
         }
 
         public void Unload()
@@ -197,6 +230,7 @@ namespace DXForgeEditor.GameProject
             UndoRedo.Reset();
             Logger.Clear();
             DeleteTmpFolder();
+            if (Current == this) Current = null;
         }
 
         private void DeleteTmpFolder()
@@ -326,14 +360,14 @@ namespace DXForgeEditor.GameProject
             // 呼び出し元(OpenProjectView)で捕捉されずエディタが落ちるため、従来どおりthrowしない
             ActiveScene = _scenes.FirstOrDefault(x => x.IsActive)!;
             Debug.Assert(ActiveScene != null);
+            // ビルドの間もメニューのコマンドを使えるよう、ビルドを待つ前に設定する(Primal Day 081)
+            SetCommands();
 
             // コマンドラインの dxforge(Issue #11)は、Visual Studio でのビルドもエンジンの DLL も使わない
             if (!ProjectLoadEnvironment.Headless)
             {
                 await BuildGameCodeDLL(false);
             }
-
-            SetCommands();
         }
 
 

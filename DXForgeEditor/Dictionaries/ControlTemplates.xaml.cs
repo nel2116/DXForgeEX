@@ -5,35 +5,52 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace DXForgeEditor.Dictionaries
 {
     public partial class ControlTemplates : ResourceDictionary
     {
+        // フォーカスを親のフォーカスできる要素に移す(Primal Day 081)。ClearFocus と違い、Hierarchy の ListBox などにキーの入力が残る
+        private static void MoveUpFocus(UIElement element)
+        {
+            DependencyObject parent = element;
+            while ((parent = VisualTreeHelper.GetParent(parent)) != null && Keyboard.Focus(parent as UIElement) == element) ;
+        }
+
+        private static void UpdateTextBoxSource(TextBox textBox, BindingExpression exp)
+        {
+            if (textBox.Tag is ICommand command && command.CanExecute(textBox.Text))
+            {
+                command.Execute(textBox.Text);
+            }
+            else
+            {
+                exp.UpdateSource();
+            }
+        }
+
         private void OnTextBox_KeyDown(object sender, KeyEventArgs e)
         {
             var textBox = (TextBox)sender;
             var exp = textBox.GetBindingExpression(TextBox.TextProperty);
             if (exp == null) return;
 
-            if (e.Key == Key.Enter)
+            if (e.Key is Key.Enter or Key.Tab)
             {
-                if (textBox.Tag is ICommand command && command.CanExecute(textBox.Text))
+                UpdateTextBoxSource(textBox, exp);
+                if (e.Key is Key.Enter)
                 {
-                    command.Execute(textBox.Text);
+                    MoveUpFocus(textBox);
+                    e.Handled = true;
                 }
-                else
-                {
-                    exp.UpdateSource();
-                }
-                Keyboard.ClearFocus();
-                e.Handled = true;
             }
             else if (e.Key == Key.Escape)
             {
                 exp.UpdateTarget();
-                Keyboard.ClearFocus();
+                MoveUpFocus(textBox);
             }
         }
 
@@ -46,33 +63,33 @@ namespace DXForgeEditor.Dictionaries
             ((TextBox)sender).SelectAll();
         }
 
+        // 別の場所をクリックしても、入力した値を確定する(Primal Day 081)
+        private void OnTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            var textBox = (TextBox)sender;
+            if (!textBox.IsVisible) return;
+            var exp = textBox.GetBindingExpression(TextBox.TextProperty);
+            if (exp != null)
+            {
+                UpdateTextBoxSource(textBox, exp);
+            }
+        }
+
         private void OnTextBoxRename_KeyDown(object sender, KeyEventArgs e)
         {
             var textBox = (TextBox)sender;
             var exp = textBox.GetBindingExpression(TextBox.TextProperty);
             if (exp == null) return;
 
-            void updateSource()
-            {
-                if (textBox.Tag is ICommand command && command.CanExecute(textBox.Text))
-                {
-                    command.Execute(textBox.Text);
-                }
-                else
-                {
-                    exp.UpdateSource();
-                }
-            }
-
             if (e.Key == Key.Enter)
             {
-                updateSource();
+                UpdateTextBoxSource(textBox, exp);
                 textBox.Visibility = Visibility.Collapsed;
                 e.Handled = true;
             }
             else if (e.Key == Key.Tab)
             {
-                updateSource();
+                UpdateTextBoxSource(textBox, exp);
             }
             else if (e.Key == Key.Escape)
             {

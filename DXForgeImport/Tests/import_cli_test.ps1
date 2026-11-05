@@ -566,7 +566,7 @@ namespace DXForgeImportTest
 		# Sources が一時フォルダを指していると、開き直したあとに再インポートできない。
 		if ($embeddedFbx)
 		{
-			# Project.Current(MainWindow の DataContext)を、Path だけ設定したプロジェクトにする(ConfigureImportSettings が ContentPath を、
+			# Project.Current を、Path だけ設定したプロジェクトにする(ConfigureImportSettings が ContentPath を、
 			# Geometry が TempFolder を使う)。テクスチャは ConfigureImportSettings.Import が別のスレッドで取り込み、そのスレッドが
 			# Dispatcher.Invoke を呼ぶので、待つあいだ Dispatcher を回す。
 			$projectDir = (Join-Path $WorkDir "editor_project") + "\"
@@ -574,9 +574,7 @@ namespace DXForgeImportTest
 			New-Item -ItemType Directory -Path $projectContent | Out-Null
 			$project = [System.Runtime.CompilerServices.RuntimeHelpers]::GetUninitializedObject($editor.GetType("DXForgeEditor.GameProject.Project", $true))
 			$project.Path = $projectDir
-			$window = [System.Windows.Window]::new()
-			$window.DataContext = $project
-			$app.MainWindow = $window
+			$project.GetType().GetProperty("Current", [System.Reflection.BindingFlags]"Public,NonPublic,Static").SetValue($null, $project)
 			$environment.GetProperty("TempFolder").SetValue($null, $null)
 			try
 			{
@@ -612,8 +610,7 @@ namespace DXForgeImportTest
 			}
 			finally
 			{
-				$app.MainWindow = $null
-				$window.Close()
+				$project.GetType().GetProperty("Current", [System.Reflection.BindingFlags]"Public,NonPublic,Static").SetValue($null, $null)
 			}
 		}
 

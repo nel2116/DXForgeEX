@@ -42,7 +42,7 @@ namespace DXForgeEditor.GameProject
                 return;
             }
 
-            Project project;
+            Project? project;
             try
             {
                 project = OpenProject.Open(new ProjectData() { ProjectName = vm.ProjectName, ProjectPath = projectPath });
@@ -52,6 +52,11 @@ namespace DXForgeEditor.GameProject
                 // UIのボタンから呼ばれるので、例外でエディタを落とさない
                 Debug.WriteLine(ex.Message);
                 MessageBox.Show($"作成したプロジェクトを開けませんでした: {ex.Message}", "プロジェクトを開けません", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+            if (project == null)
+            {
+                MessageBox.Show($"作成したプロジェクトを読み込めませんでした: {projectPath}", "プロジェクトを開けません", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
             var win = Window.GetWindow(this);
