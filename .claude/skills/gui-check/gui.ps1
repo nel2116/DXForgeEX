@@ -120,7 +120,7 @@ function Stop-Usage([string]$Message) {
 	exit 2
 }
 
-function Test-GuiCheckName([string]$Name) { return $Name -cmatch '^GuiCheck[A-Za-z0-9_-]*$' }
+function Test-GuiCheckName([string]$Name) { return $Name -cmatch '^GuiCheck[A-Za-z0-9_]*$' }
 
 function Get-ProjectsRoot {
 	if ($ProjectsRoot) { return $ProjectsRoot }
@@ -538,7 +538,7 @@ switch ($Action) {
 	}
 	"open" { if (-not $Project) { Stop-Usage "open には -Project が要ります。" } }
 	"create" {
-		if (-not (Test-GuiCheckName $Project)) { Stop-Usage "create の -Project は GuiCheck で始まる名前にしてください(英数字、_、-): '$Project'" }
+		if (-not (Test-GuiCheckName $Project)) { Stop-Usage "create の -Project は GuiCheck で始まる名前にしてください(英数字と _。エディタの規則と同じ): '$Project'" }
 	}
 	"switch" { if (-not $Project -or -not $ProcId) { Stop-Usage "switch には -ProcId と -Project が要ります。" } }
 	"keys" { if (-not $Keys) { Stop-Usage "keys には -Keys が要ります。" } }

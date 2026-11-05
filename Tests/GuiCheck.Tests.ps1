@@ -92,6 +92,7 @@ try {
 			@("-Action", "create"),
 			@("-Action", "create", "-Project", "MyGame"),
 			@("-Action", "create", "-Project", "GuiCheck 1"),
+			@("-Action", "create", "-Project", "GuiCheck200-test"),
 			@("-Action", "switch", "-Project", "GuiCheck1"),
 			@("-Action", "close"),
 			@("-Action", "click", "-ProcId", "1"),
