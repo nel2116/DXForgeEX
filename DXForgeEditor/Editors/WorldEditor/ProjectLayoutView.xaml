@@ -14,7 +14,8 @@
             <RowDefinition/>
         </Grid.RowDefinitions>
         <TextBlock Text="Hierarchy" Foreground="{StaticResource Editor.FontBrush}" FontSize="14"/>
-        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+        <!-- 横にはスクロールしない。長い名前は省略して、ヘッダーのボタンと項目の削除ボタンがいつも幅の中に入るようにする -->
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
             <ItemsControl ItemsSource="{Binding Scenes}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -26,18 +27,23 @@
                         <Expander Style="{StaticResource CustomExpanderStyle}" IsExpanded="{Binding IsActive, Mode=OneWay}">
                             <Expander.Header>
                                 <Grid>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,10,0">
-                                        <Grid VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding Name}" Style="{StaticResource LightTextBlockStyle}" VerticalAlignment="Center"/>
-                                            <TextBox x:Name="renameTextBox" Text="{Binding Name, UpdateSourceTrigger=Explicit}"
-                                                     Style="{StaticResource TextBoxStyle_WithRename}" Tag="{Binding RenameCommand}" Visibility="Collapsed"/>
-                                        </Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}" ToolTip="{Binding Name}" Style="{StaticResource LightTextBlockStyle}"
+                                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                        <TextBox x:Name="renameTextBox" Text="{Binding Name, UpdateSourceTrigger=Explicit}"
+                                                 Style="{StaticResource TextBoxStyle_WithRename}" Tag="{Binding RenameCommand}" Visibility="Collapsed"/>
+                                    </Grid>
+                                    <StackPanel Orientation="Horizontal" Grid.Column="1" Margin="4,0,2,0">
                                         <Button Content="Remove"
                                                 Command="{Binding DataContext.RemoveSceneCommand,RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}" Margin="10,0" Focusable="false"/>
-                                        <Button Content="Rename" Click="OnRenameScene_Button_Click" Tag="{Binding ElementName=renameTextBox}"/>
+                                                CommandParameter="{Binding}" Focusable="false"/>
+                                        <Button Content="Rename" Click="OnRenameScene_Button_Click" Tag="{Binding ElementName=renameTextBox}" Margin="3,0"/>
                                         <Button Content="+" IsEnabled="{Binding IsActive}"
-                                                Click="OnAddGameEntity_Button_Click" Margin="10,0"/>
+                                                Click="OnAddGameEntity_Button_Click"/>
                                     </StackPanel>
                                 </Grid>
                             </Expander.Header>
@@ -48,7 +54,7 @@
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <Grid Background="Transparent" MinHeight="24">
-                                            <TextBlock Text="{Binding Name}" Margin="4,0" FontWeight="Medium" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Name}" ToolTip="{Binding Name}" Margin="4,0" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                             <Button Style="{StaticResource RemoveButtonStyle}"
                                                     x:Name="removeButton" Visibility="Collapsed" Margin="5,0" VerticalAlignment="Center"
                                                     Command="{Binding ParentScene.RemoveGameEntityCommand}"

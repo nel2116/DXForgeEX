@@ -13,6 +13,7 @@
       3. シーンごとの Rename ボタンで、名前の入力欄が開く。
       4. 空のシーンのプロジェクトに切り替えると、インスペクターが空になる(#178)。
       5. 共通にした RemoveButtonStyle を使う、インポート設定のビューを作れる。
+      3b. Hierarchy の既定の幅(約 222px)で、シーンの + と項目の削除ボタンが幅の中に入る。名前が長くても同じ。
       6. VisualStudio.IsDebugging と CanStart は、ビルドの lock が取られていても待たずに false を返す(コマンドの CanExecute で UI スレッドを止めない)。
 
 .PARAMETER Configuration
@@ -170,6 +171,35 @@ try
 	$rename[0].RaiseEvent([System.Windows.RoutedEventArgs]::new([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent)); Pump
 	Check ($box.Visibility -eq "Visible") "Rename shows the box"
 	$box.Visibility = "Collapsed"
+
+	Write-Host "3b. the Hierarchy fits its default width (about 222 px)"
+	$view.Width = 222; Pump
+	$scroll = @(Find $view ([System.Windows.Controls.ScrollViewer]))[0]
+	function Right-Edge($element) { return $element.TransformToAncestor($scroll).Transform([System.Windows.Point]::new($element.ActualWidth, 0)).X }
+	function Check-Fits([string]$when)
+	{
+		$plus = @(Find $view ([System.Windows.Controls.Button]) | Where-Object { $_.Content -eq "+" })
+		$activeList = @(Find $view ([System.Windows.Controls.ListBox]) | Where-Object { $_.IsEnabled })[0]
+		$removeStyle = $app.FindResource("RemoveButtonStyle")
+		$removes = @(Find $activeList ([System.Windows.Controls.Button]) | Where-Object { $_.Style -eq $removeStyle })
+		$removes | ForEach-Object { $_.Visibility = "Visible" }
+		Pump
+		$rights = @($plus + $removes | ForEach-Object { Right-Edge $_ })
+		$widest = ($rights | Measure-Object -Maximum).Maximum
+		$removes | ForEach-Object { $_.ClearValue([System.Windows.UIElement]::VisibilityProperty) }
+		Check ($plus.Count -eq 2 -and $removes.Count -ge 1 -and $scroll.ScrollableWidth -eq 0 -and $widest -le $scroll.ViewportWidth) "$when`: + and the remove buttons are inside the viewport (right edge $widest, viewport $($scroll.ViewportWidth))"
+	}
+	Check-Fits "default names"
+	$sceneName = $scene.Name
+	$scene.Name = "A very long scene name that does not fit in the Hierarchy at all, not even close"
+	$longEntity = $scene.GameEntities[0]
+	$entityName = $longEntity.Name
+	$longEntity.Name = "A very long entity name that does not fit in the Hierarchy at all, not even close"
+	Pump
+	Check-Fits "long names"
+	$scene.Name = $sceneName
+	$longEntity.Name = $entityName
+	$view.ClearValue([System.Windows.FrameworkElement]::WidthProperty); Pump
 
 	Write-Host "4. switching projects (#178)"
 	$xml = [System.IO.File]::ReadAllText($fixture)
