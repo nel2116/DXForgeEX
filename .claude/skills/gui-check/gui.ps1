@@ -129,7 +129,11 @@ function Get-ProjectsRoot {
 	if ($value -and $value.Trim()) {
 		$path = [Environment]::ExpandEnvironmentVariables($value.Trim())
 		try {
-			if ([System.IO.Path]::IsPathFullyQualified($path) -and (Test-Path -LiteralPath ([System.IO.Path]::GetPathRoot($path)))) { return $path }
+			if ($path.IndexOfAny([System.IO.Path]::GetInvalidPathChars()) -lt 0 -and [System.IO.Path]::IsPathFullyQualified($path)) {
+				$driveRoot = [System.IO.Path]::GetPathRoot($path)
+				$invalidNameChars = [char[]]@('"', '<', '>', '|', '*', '?', ':')
+				if ($path.Substring($driveRoot.Length).IndexOfAny($invalidNameChars) -lt 0 -and [System.IO.Directory]::Exists($driveRoot)) { return $path }
+			}
 		}
 		catch { Write-Verbose $_.Exception.Message }
 	}
