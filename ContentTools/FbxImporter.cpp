@@ -7,6 +7,7 @@
 // 更新履歴
 // 2025/01/11 新規作成
 // 2026/10/18 FBX SDKのライブラリ指定を絶対パスの#pragma commentからFbxSdk.propsに移動
+// 2026/11/04 頂点のないメッシュで、falseを返す前にassertしないよう修正 (#176)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "FbxImporter.h"
@@ -257,7 +258,7 @@ namespace dxforge::tools
 		const s32 num_indices{ fbx_mesh->GetPolygonVertexCount() };
 		s32* indices{ fbx_mesh->GetPolygonVertices() };
 
-		assert(num_vertices > 0 && vertices && num_indices > 0 && indices);
+		// NOTE: 頂点のないメッシュはFBXファイルの中身の問題でプログラムの誤りではないので、assertせずに飛ばす(#176)。
 		if (!(num_vertices > 0 && vertices && num_indices > 0 && indices)) return false;
 
 		m.raw_indices.resize(num_indices);
