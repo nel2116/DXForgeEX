@@ -73,6 +73,16 @@ class UsageReport(unittest.TestCase):
         self.assertEqual(row["tools"], {"PowerShell": 1, "Read": 1})
         self.assertEqual(data["total"]["turns"], 4)
 
+    def test_last_usage_of_a_message_wins(self):
+        # ストリーミングで同じ ID の行が続き、output_tokens が増える記録(PR #196 の Codex の指摘)
+        self.write("streaming-DXForgeEX", "dddddddd-4", [
+            assistant("s1", "2026-11-04T10:00:00Z", 100, 1),
+            assistant("s1", "2026-11-04T10:00:01Z", 100, 100),
+            assistant("s2", "2026-11-04T10:00:02Z", 50, 3),
+        ])
+        row = self.report_json("--since", "2026-11-01", "--until", "2026-11-05", "--session", "dddddddd")["sessions"][0]
+        self.assertEqual((row["turns"], row["output"], row["cache_read"]), (2, 103, 150))
+
     def test_until_excludes_and_since_includes(self):
         data = self.report_json("--since", "2026-11-05", "--session", "aaaaaaaa")
         self.assertEqual([r["turns"] for r in data["sessions"]], [1])

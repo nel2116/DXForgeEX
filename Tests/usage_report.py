@@ -6,7 +6,8 @@
 #   python Tests/usage_report.py --session 15175afe --json
 #
 # 期間は各ターンの timestamp(UTC)で判定する。記録は ~/.claude/projects/<プロジェクト>/*.jsonl と、その下の
-# サブエージェントの記録。同じメッセージの ID は 1 ターンとして数える(ストリーミングで複数の行になるため)。
+# サブエージェントの記録。同じメッセージの ID は 1 ターンとして数え、最後の行の usage を使う
+# (ストリーミングで複数の行になり、後の行で output_tokens が増えることがあるため)。
 import argparse
 import collections
 import datetime
@@ -38,7 +39,7 @@ def summarize_file(path, since=None, until=None):
     """1 つの記録を集計する。期間内のターンがなければ None。"""
     row = collections.Counter()
     tools = collections.Counter()
-    seen = set()
+    usages = {}
     with open(path, encoding="utf-8", errors="replace") as file:
         for line in file:
             try:
@@ -56,13 +57,8 @@ def summarize_file(path, since=None, until=None):
             if entry.get("type") == "assistant":
                 usage = message.get("usage") if isinstance(message, dict) else None
                 message_id = message.get("id") if isinstance(message, dict) else None
-                if usage and message_id not in seen:
-                    seen.add(message_id)
-                    row["turns"] += 1
-                    row["input"] += usage.get("input_tokens") or 0
-                    row["output"] += usage.get("output_tokens") or 0
-                    row["cache_read"] += usage.get("cache_read_input_tokens") or 0
-                    row["cache_write"] += usage.get("cache_creation_input_tokens") or 0
+                if usage:
+                    usages[message_id if message_id is not None else object()] = usage
                 for block in blocks:
                     if isinstance(block, dict) and block.get("type") == "tool_use":
                         tools[block.get("name")] += 1
@@ -81,8 +77,14 @@ def summarize_file(path, since=None, until=None):
                                 row["tool_result_chars"] += len(item.get("text") or "")
                             elif item.get("type") == "image":
                                 row["images"] += 1
-    if not row["turns"]:
+    if not usages:
         return None
+    for usage in usages.values():
+        row["turns"] += 1
+        row["input"] += usage.get("input_tokens") or 0
+        row["output"] += usage.get("output_tokens") or 0
+        row["cache_read"] += usage.get("cache_read_input_tokens") or 0
+        row["cache_write"] += usage.get("cache_creation_input_tokens") or 0
     return {
         "project": os.path.basename(os.path.dirname(path)),
         "session": os.path.splitext(os.path.basename(path))[0],

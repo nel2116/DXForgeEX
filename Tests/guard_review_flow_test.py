@@ -64,6 +64,39 @@ class RunsSetStatus(unittest.TestCase):
                 self.assertFalse(guard.runs_set_status(command))
 
 
+class OrcaMessages(unittest.TestCase):
+    # orca orchestration の本文に文字列があるだけでは止めない(PR #196 で ask の本文が止まった)
+    def test_message_bodies_are_not_commands(self):
+        for command in [
+            'orca orchestration ask --from x --question "CodexReview.ps1 -SetStatus はコーディネーターが実行します"',
+            "orca orchestration send --type status --body 'CodexReview.ps1 -SetStatus'",
+            'orca.exe orchestration reply --id m --body "it\'s CodexReview.ps1 -SetStatus"',
+            'orca orchestration send --body "a `" CodexReview.ps1 -SetStatus"',
+            "$q = @'\nCodexReview.ps1 -SetStatus\n'@\norca orchestration ask --question $q",
+            '$q = @"\nCodexReview.ps1 -SetStatus\n"@\norca orchestration ask --question $q',
+            "cat <<'EOF' | orca orchestration ask --question -\nCodexReview.ps1 -SetStatus\nEOF",
+        ]:
+            with self.subTest(command=command):
+                self.assertFalse(guard.runs_set_status(command))
+        self.assertFalse(guard.creates_pr('orca orchestration ask --question "gh pr create の前に確かめます"'))
+
+    def test_real_commands_next_to_a_message_are_still_detected(self):
+        for command in [
+            'orca orchestration ask --question "done"; ./CodexReview.ps1 -Pr 1 -SetStatus',
+            "./CodexReview.ps1 -Pr 1 -SetStatus\norca orchestration check",
+            "& 'C:/w/CodexReview.ps1' -Pr 1 -SetStatus; orca orchestration check",
+            "$q = @'\ntext\n'@\n./CodexReview.ps1 -SetStatus; orca orchestration ask --question $q",
+        ]:
+            with self.subTest(command=command):
+                self.assertTrue(guard.runs_set_status(command))
+        self.assertTrue(guard.creates_pr('orca orchestration check; gh pr create --title "t"'))
+
+    def test_other_commands_stay_conservative(self):
+        # orca 以外では、これまでどおり引用符の中でも止める
+        self.assertTrue(guard.runs_set_status('git commit -m "CodexReview.ps1 -SetStatus"'))
+        self.assertTrue(guard.creates_pr('git commit -m "gh pr create"'))
+
+
 class CreatesPr(unittest.TestCase):
     def test_detects_pr_create(self):
         for command in [
@@ -145,6 +178,10 @@ class Hook(TempDir):
         self.assertEqual(result.returncode, 2)
         self.assertIn("#195", result.stderr.decode("utf-8"))
         self.assertEqual(self.run_hook("./CodexReview.ps1 -Pr 1 -Post", self.worker).returncode, 0)
+
+    def test_worker_can_mention_it_in_a_message(self):
+        result = self.run_hook('orca orchestration ask --question "CodexReview.ps1 -SetStatus を待ちます"', self.worker)
+        self.assertEqual((result.returncode, result.stderr), (0, b""))
 
     def test_coordinator_and_unknown_can_set_status(self):
         self.assertEqual(self.run_hook("./CodexReview.ps1 -Pr 1 -Post -SetStatus", self.coordinator).returncode, 0)

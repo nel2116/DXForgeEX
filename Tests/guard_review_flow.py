@@ -13,6 +13,9 @@
 # 指摘が続いた)。同じコマンドの文字列に CodexReview と -SetStatus があれば止める。commit のメッセージや PR の本文に
 # 書くときは、-F や --body-file でファイルから渡せば止まらない。スクリプトのファイルを経由したものや splatting は
 # 見えない。安全の境界ではなく、うっかり実行することを防ぐためのもの。
+# 例外は orca orchestration のコマンドで、本文を --body-file で渡せないものがある(ask など)。そのため orca orchestration を
+# 含むコマンドだけは、空白を含む引用符の中とヒアドキュメントの本文を除いて判定する(PR #196)。同じコマンドの本物の呼び出しは止まる。
+# 空白を含む引用符のパスで呼ぶ CodexReview と orca orchestration を 1 つのコマンドに並べたものは見えない。
 #
 # ワーカーの見分け方: 会話の記録(transcript_path)の最初のユーザーメッセージが、Orca の worker-start の前書き
 # 「You are a dispatched worker.」で始まること。環境変数では見分けられない。ORCA_TERMINAL_HANDLE は Orca の
@@ -37,17 +40,35 @@ _DASH_S = re.compile(r"(?<![\w-])-s[a-z]*", re.IGNORECASE)
 _PR_CREATE = re.compile(
     r"(?<![\w.-])gh(?:\.exe)?(?:\s+(?:-R|--repo)[\s=]\S+)?\s+pr\s+create(?![\w-])", re.IGNORECASE
 )
+_ORCA_ORCHESTRATION = re.compile(r"(?<![\w.-])orca(?:\.exe)?\s+orchestration(?![\w-])", re.IGNORECASE)
+# 左から順に、PowerShell のヒア文字列、シェルのヒアドキュメント、二重引用符、単一引用符を読み飛ばす
+_QUOTED = re.compile(
+    r"""@'.*?\n'@|@".*?\n"@|<<-?\s*['"]?(\w+)['"]?[^\n]*\n.*?\n\s*\1(?!\w)|"(?:[^"\\`]|[\\`].)*"|'(?:[^']|'')*'""",
+    re.DOTALL,
+)
+
+
+def _without_message_bodies(command: str) -> str:
+    """orca orchestration のコマンドなら、本文(空白を含む引用符の中とヒアドキュメント)を除く。"""
+    def blank(match):
+        if match.group(1):  # ヒアドキュメント: 1 行目はコマンドなので残す
+            return match.group(0).split("\n", 1)[0]
+        return match.group(0) if not re.search(r"\s", match.group(0)) else " "
+
+    visible = _QUOTED.sub(blank, command)
+    return visible if _ORCA_ORCHESTRATION.search(visible) else command
 
 
 def runs_set_status(command: str) -> bool:
     """CodexReview と -SetStatus(省略形を含む)が同じコマンドにあれば True。"""
+    command = _without_message_bodies(command)
     if not _CODEX_REVIEW.search(command):
         return False
     return any("-setstatus".startswith(match.group(0).lower()) for match in _DASH_S.finditer(command))
 
 
 def creates_pr(command: str) -> bool:
-    return _PR_CREATE.search(command) is not None
+    return _PR_CREATE.search(_without_message_bodies(command)) is not None
 
 
 def _first_user_text(transcript_path: str) -> str:
