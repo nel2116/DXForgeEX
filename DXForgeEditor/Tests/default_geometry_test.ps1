@@ -16,6 +16,8 @@
       3. エンジンにアップロードする形(Geometry.PackForEngine())が作れる。
       4. 既定のキューブの GUID は固定(DefaultAssets.DefaultGeometryGuid)。2 つの別のフォルダで作っても同じ GUID になり、
          正しい GUID のものは書き直さず、GUID の違う古いものは作り直す(Codex の指摘)。
+      5. サブメッシュのアイコン(Primal Day 081, #185。手順 2b): 最初はアセット全体のもので、別のスレッドで描いて UI スレッドで置き換える。
+         描けなければ、例外をスレッドの外に出さず、アイコンを変えない。
 
 .PARAMETER Configuration
     DebugEditor(既定)か ReleaseEditor。
@@ -88,6 +90,46 @@ try
 	Check ($lods.Count -eq 1 -and $meshes.Count -eq 1) "one LOD with one mesh (LODs $($lods.Count), meshes $($meshes.Count))"
 	Check ($meshes.Count -eq 1 -and $meshes[0].VertexCount -eq 24 -and $meshes[0].IndexCount -eq 36 -and $meshes[0].TriangleCount -eq 12) "24 vertices, 36 indices, 12 triangles (V $($meshes[0].VertexCount), I $($meshes[0].IndexCount), T $($meshes[0].TriangleCount))"
 	Check ($metadata.Name -eq "cube") "the LOD group is named cube ($($metadata.Name))"
+
+	# Primal Day 081(#185): サブメッシュのアイコンは最初はアセット全体のもので、別のスレッドで描いて UI スレッドで置き換える
+	Write-Host "2b. icons are generated in the background"
+	$mesh = $meshes[0]
+	$placeholder = $mesh.Icon
+	Check ([Convert]::ToBase64String($placeholder) -eq [Convert]::ToBase64String($info.Icon)) "the submesh starts with the icon of the asset"
+	$iconThreads = [System.Collections.Generic.List[int]]::new()
+	$mesh.add_PropertyChanged({ param($s, $e) if ($e.PropertyName -eq "Icon") { $iconThreads.Add([Environment]::CurrentManagedThreadId) } }.GetNewClosure())
+	$dispatcher = [System.Windows.Application]::Current.Dispatcher
+	$watch = [System.Diagnostics.Stopwatch]::StartNew()
+	while ($iconThreads.Count -eq 0 -and $watch.Elapsed.TotalSeconds -lt 30)
+	{
+		$dispatcher.Invoke([Action] {}, [System.Windows.Threading.DispatcherPriority]::Background)
+		Start-Sleep -Milliseconds 20
+	}
+	Check ($iconThreads.Count -eq 1 -and $iconThreads[0] -eq [Environment]::CurrentManagedThreadId) "PropertyChanged(Icon) is raised once, on the UI thread ($($iconThreads -join ','), UI $([Environment]::CurrentManagedThreadId))"
+	$iconBytes = $mesh.Icon
+	Check ($iconBytes.Length -gt 8 -and $iconBytes[0] -eq 0x89 -and $iconBytes[1] -eq 0x50 -and -not [object]::ReferenceEquals($iconBytes, $placeholder)) "the icon is replaced by a new PNG ($($iconBytes.Length) bytes)"
+
+	$generateIcons = $geometryType.GetMethod("GenerateIcons", $flags)
+	$lod = $geometry.GetLODGroup(0).LODs[0]
+	Check (@($generateIcons.Invoke($null, @($lod, $true))).Count -eq 1 -and @($generateIcons.Invoke($null, @($lod, $false))).Count -eq 1) "GenerateIcons: one icon per submesh, or one for the whole LOD"
+
+	# 描けないとき: GenerateIcons は呼び出し元に例外を渡す(そのスレッドの未処理の例外にしない)。GenerateAndSetIcons はログに出して、アイコンを変えない
+	$badLod = [Activator]::CreateInstance($editor.GetType("DXForgeEditor.Content.MeshLOD", $true))
+	$badMesh = [Activator]::CreateInstance($editor.GetType("DXForgeEditor.Content.Mesh", $true))
+	$badMesh.VertexCount = 1
+	$badLod.Name = "broken"
+	$badLod.Meshes.Add($badMesh)
+	$threw = $false
+	try { $null = $generateIcons.Invoke($null, @($badLod, $true)) } catch { $threw = "$($_.Exception.InnerException.Message)" -match "broken" }
+	Check $threw "GenerateIcons of a broken LOD throws to the caller"
+	$meshInfoType = $editor.GetType("DXForgeEditor.Content.MeshInfo", $true)
+	$badInfos = [Activator]::CreateInstance([System.Collections.Generic.List`1].MakeGenericType($meshInfoType))
+	$badInfo = [Activator]::CreateInstance($meshInfoType)
+	$badInfos.Add($badInfo)
+	$threw = $false
+	try { $null = $geometryType.GetMethod("GenerateAndSetIcons", $flags).Invoke($null, @($badInfos, $badLod)) } catch { $threw = $true }
+	$dispatcher.Invoke([Action] {}, [System.Windows.Threading.DispatcherPriority]::Background)
+	Check (-not $threw -and $badInfo.Icon.Length -eq 0) "GenerateAndSetIcons of a broken LOD does not throw and keeps the icon"
 
 	Write-Host "3. PackForEngine"
 	$packed = if ($geometry) { $geometry.PackForEngine() } else { $null }

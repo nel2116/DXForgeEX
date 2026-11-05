@@ -9,8 +9,12 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 
 namespace DXForgeEditor.Content
 {
@@ -42,10 +46,27 @@ namespace DXForgeEditor.Content
         TriangleStrip,
     }
 
-    class MeshInfo
+    class MeshInfo : ViewModelBase
     {
         public string Name { get; init; } = string.Empty;
-        public byte[] Icon { get; init; } = [];
+
+        private byte[] _icon = [];
+        /// <summary>
+        /// サブメッシュのアイコン。最初はアセット全体のアイコンで、生成が終わると置き換わる(Primal Day 081)。UI スレッドで設定する。
+        /// </summary>
+        public byte[] Icon
+        {
+            get => _icon;
+            set
+            {
+                if (_icon != value)
+                {
+                    _icon = value;
+                    OnPropertyChanged(nameof(Icon));
+                }
+            }
+        }
+
         public int IndexCount { get; init; }
         public int VertexCount { get; init; }
         public int TriangleCount { get; init; }
@@ -572,10 +593,6 @@ namespace DXForgeEditor.Content
                     _lodGroups.Add(lodGroup);
                 }
 
-                // For Testing. Remove later!
-                WriteForEngineTest("model.model", PackForEngine);
-                // For Testing. Remove later!
-
                 return true;
             }
             catch (Exception ex)
@@ -622,7 +639,7 @@ namespace DXForgeEditor.Content
 
                         Hash = ContentHelper.ComputeHash(hashes.ToArray());
                         data = ((MemoryStream)writer.BaseStream).ToArray();
-                        Icon = GenerateIcon(lodGroup.LODs[0]);
+                        Icon = GenerateIcons(lodGroup.LODs[0])[0];
                     }
 
                     Debug.Assert(data?.Length > 0);
@@ -768,25 +785,106 @@ namespace DXForgeEditor.Content
             return lod;
         }
 
-        private static byte[] GenerateIcon(MeshLOD lod, int index = -1)
+        /// <summary>
+        /// LOD のアイコンを、専用の STA スレッドで描く(Primal Day 081)。終わるまで呼び出し元を止める。
+        /// createIconPerSubmesh が false ならすべてのメッシュを描いた 1 枚、true ならサブメッシュごとに 1 枚を返す。
+        /// NOTE: ビューも MeshRenderer もこのスレッドで作るので、UI スレッドの Dispatcher を使わず、結果の PNG のバイト列だけを返す。
+        ///       描けなければ例外を投げる(呼び出し元が失敗として扱う)。
+        /// </summary>
+        internal static List<byte[]> GenerateIcons(MeshLOD lod, bool createIconPerSubmesh = false)
         {
             var width = ContentInfo.IconWidth * 4;
-            byte[]? icon = null;
-            // NOTE: ViewModelでWPFコントロール（ビュー）を使用するのは良い習慣ではありません。
-            // しかし、スクリーンショットに使えるグラフィック・レンダラーがない限り、このケースは例外とする必要がある。
-            Application.Current.Dispatcher.Invoke(() =>
+            var iconList = new List<byte[]>();
+            var color = Application.Current?.TryFindResource("Editor.Window.GrayColor1") is Color resource ? resource : Colors.Black;
+            Exception? failure = null;
+
+            var thread = new Thread(() =>
             {
-                // 4倍の大きさの画像を作成し、縮小したときにソフトになるようにする。
-                var bmp = Editors.GeometryView.RenderToBitmap(new Editors.MeshRenderer(lod, null), width, width, index);
-                icon = BitmapHelper.CreateThumbnail(bmp, ContentInfo.IconWidth, ContentInfo.IconWidth);
+                try
+                {
+                    // NOTE: ViewModelでWPFコントロール（ビュー）を使用するのは良い習慣ではありません。
+                    // しかし、スクリーンショットに使えるグラフィック・レンダラーがない限り、このケースは例外とする必要がある。
+                    var view = new Editors.GeometryView()
+                    {
+                        Background = new SolidColorBrush(color),
+                        DataContext = new Editors.MeshRenderer(lod, null),
+                        Width = width,
+                        Height = width,
+                    };
+
+                    for (int i = createIconPerSubmesh ? 0 : -1; i < lod.Meshes.Count; ++i)
+                    {
+                        view.SetGeometry(i);
+                        view.Measure(new Size(width, width));
+                        view.Arrange(new Rect(0, 0, width, width));
+                        view.UpdateLayout();
+                        // 4倍の大きさの画像を作成し、縮小したときにソフトになるようにする。
+                        var bmp = new RenderTargetBitmap(width, width, 96, 96, PixelFormats.Default);
+                        bmp.Render(view);
+                        iconList.Add(BitmapHelper.CreateThumbnail(bmp, ContentInfo.IconWidth, ContentInfo.IconWidth));
+                        if (i == -1) break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // NOTE: Primal はここで投げ直すが、このスレッドの未処理の例外はエディタを落とす。呼び出し元に渡す
+                    failure = ex;
+                }
+                finally
+                {
+                    // このスレッドの Dispatcher(WPF のオブジェクトが作る)を止めて、リソースを残さない
+                    Dispatcher.CurrentDispatcher.InvokeShutdown();
+                }
             });
 
-            Debug.Assert(icon != null);
-            return icon;
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.IsBackground = true; // 生成の途中でも、エディタの終了を妨げない
+            thread.Start();
+            thread.Join();
+
+            if (failure != null) throw new InvalidOperationException($"LOD {lod.Name} のアイコンを描けませんでした: {failure.Message}", failure);
+            return iconList;
         }
 
         /// <summary>
-        /// LODとメッシュごとの情報(メッシュごとのアイコンを含む)。アイコンを描くため、WPFの Application が要る。
+        /// サブメッシュごとのアイコンを描いて、MeshInfo に設定する(スレッドプールから呼ぶ。Primal Day 081)。
+        /// NOTE: 読む MeshLOD は UploadAssetToEngine が読み込んだアセットのもので、ほかから書き換えられない。結果を書くのは、
+        ///       このアップロードのために作った MeshInfo だけ。再インポートや Unload のあとのアップロードは別の MeshInfo を作るので、
+        ///       遅れて終わった結果が新しいものを上書きすることはない(使われなくなった MeshInfo に書くだけ)。
+        /// </summary>
+        private static void GenerateAndSetIcons(List<MeshInfo> meshes, MeshLOD lod)
+        {
+            try
+            {
+                var icons = GenerateIcons(lod, true);
+                Debug.Assert(icons.Count == meshes.Count);
+                // エディタの終了後は Dispatcher に積めない(積んでも実行されない)ので、何もしない
+                var dispatcher = Application.Current?.Dispatcher;
+                if (dispatcher == null || dispatcher.HasShutdownStarted) return;
+                dispatcher.BeginInvoke(() =>
+                {
+                    for (int i = 0; i < meshes.Count && i < icons.Count; ++i)
+                    {
+                        meshes[i].Icon = icons[i];
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                // 失敗してもアセット全体のアイコンのままで使える。未処理の例外でエディタを落とさない
+                Debug.WriteLine(ex.Message);
+                // NOTE: Logger.Log は止めた Dispatcher に積むとプロセスを落とすので、終了の途中なら出さない
+                var dispatcher = Application.Current?.Dispatcher;
+                if (dispatcher != null && !dispatcher.HasShutdownStarted)
+                {
+                    Logger.Log(MessageType.Warning, ex.Message);
+                }
+            }
+        }
+
+        /// <summary>
+        /// LODとメッシュごとの情報。メッシュのアイコンは最初はアセット全体のアイコンで、別のスレッドで描いて置き換える(Primal Day 081)。
+        /// NOTE: アイコンの生成はアセットの登録にもエンジンにも触らないので、ロック(#171)がなくても別のスレッドで動かせる。
         /// </summary>
         public override GeometryMetadata GetMetadata()
         {
@@ -806,12 +904,14 @@ namespace DXForgeEditor.Content
                     lodInfo.Meshes.Add(new()
                     {
                         Name = mesh.Name,
-                        Icon = GenerateIcon(lod, i),
+                        Icon = Icon ?? [],
                         IndexCount = mesh.IndexCount,
                         TriangleCount = mesh.IndexCount / 3,
                         VertexCount = mesh.VertexCount
                     });
                 }
+
+                _ = Task.Run(() => GenerateAndSetIcons(lodInfo.Meshes, lod));
             }
 
             return metadata;

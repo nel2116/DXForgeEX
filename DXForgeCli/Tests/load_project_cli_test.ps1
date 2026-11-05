@@ -19,6 +19,8 @@
       6. Geometry コンポーネント(Primal Day 079, #32)のあるシーン: 読み込める(保存したジオメトリとマテリアルを読み、
          保存し直しても変わらない)。game.bin には Geometry を書かない(同じエンティティで Geometry のない TransformOnly と
          1 バイトも違わない)ので書き出しも実行も終了コード 0 で、標準エラーに飛ばした警告が出る。JSON の形は変わらない。
+      7. Primal Day 081(#185): シーンの名前の変更の undo/redo。メッシュのアセットのドロップでのエンティティの作成(メッシュでないもの・
+         プロジェクトの外のものは作らない。undo/redo)。エディタの経路の Project.Load は、読めないファイルで例外を投げず null を返す。
     どの場合も、標準出力は(--json なら)1つのJSONだけで、ConvertFrom-Json で読める。
 
 .PARAMETER Configuration
@@ -418,6 +420,117 @@ namespace DXForgeCliTest
 			finally
 			{
 				$defaultGeometryProperty.SetValue($null, $previousDefaultGeometry)
+			}
+
+			# Day 081(#185): シーンの名前の変更と、メッシュのアセットのドロップでのエンティティの作成(undo/redo あり)。
+			# アクティブでないシーンを使うので、エンジンには触らない。
+			$undoRedo = $projectType.GetProperty("UndoRedo", $flags).GetValue($null)
+			$currentProperty = $projectType.GetProperty("Current", $flags)
+			$layoutProject = $projectType.GetMethod("Load", $flags).Invoke($null, [object[]]@([string]$TransformOnly))
+			Check ($null -eq $currentProperty.GetValue($null)) "Project.Current stays null after a headless load"
+			Check ($null -ne $layoutProject.UndoCommand -and $null -ne $layoutProject.SaveCommand) "the project commands are set after the load"
+			$second = @($layoutProject.Scenes | Where-Object { $_.Name -eq "Second Scene" })[0]
+			$rename = $second.RenameCommand
+			Check (-not $rename.CanExecute("Second Scene") -and $rename.CanExecute("Renamed")) "Scene.RenameCommand: the same name cannot be executed"
+			$rename.Execute("Renamed")
+			Check ($second.Name -eq "Renamed" -and $undoRedo.UndoList[$undoRedo.UndoList.Count - 1].Name -eq "Rename scene 'Second Scene' to 'Renamed'") "Scene.RenameCommand renames the scene and adds an undo entry" $second.Name
+			$undoRedo.Undo()
+			Check ($second.Name -eq "Second Scene") "undo restores the scene name" $second.Name
+			$undoRedo.Redo()
+			Check ($second.Name -eq "Renamed") "redo renames the scene again" $second.Name
+			$renamedFile = Join-Path $work "renamed.dxproj"
+			$null = $serializer.GetMethod("ToFile", $flags).MakeGenericMethod($projectType).Invoke($null, [object[]]@($layoutProject.PSObject.BaseObject, [string]$renamedFile))
+			$renamedProject = $projectType.GetMethod("Load", $flags).Invoke($null, [object[]]@([string]$renamedFile))
+			Check (@($renamedProject.Scenes | Where-Object { $_.Name -eq "Renamed" }).Count -eq 1) "the new scene name survives saving and reloading"
+
+			function New-AssetFile([string]$path, [int]$type, [Guid]$guid)
+			{
+				$bw = [System.IO.BinaryWriter]::new([System.IO.File]::Create($path))
+				$id = $guid.ToByteArray()
+				$bw.Write($type); $bw.Write($id.Length); $bw.Write($id); $bw.Write([long]0); $bw.Write(0); $bw.Write(0)
+				$bw.Dispose()
+			}
+			$assetKind = $editor.GetType("DXForgeEditor.Content.AssetType", $true)
+			$meshKind = [int][Enum]::Parse($assetKind, "Mesh")
+			$content = Join-Path $work "layout_content"
+			$null = New-Item -ItemType Directory -Force $content
+			$rockGuid = [Guid]::NewGuid()
+			$treeGuid = [Guid]::NewGuid()
+			New-AssetFile (Join-Path $content "Rock.asset") $meshKind $rockGuid
+			New-AssetFile (Join-Path $content "Tree.asset") $meshKind $treeGuid
+			New-AssetFile (Join-Path $content "Checker.asset") ([int][Enum]::Parse($assetKind, "Texture")) ([Guid]::NewGuid())
+			[System.IO.File]::WriteAllText((Join-Path $content "notes.txt"), "not an asset")
+			New-AssetFile (Join-Path $work "Outside.asset") $meshKind ([Guid]::NewGuid())
+			$null = $editor.GetType("DXForgeEditor.Content.AssetRegistry", $true).GetMethod("Reset", $flags).Invoke($null, [object[]]@([string]"$content\"))
+
+			$addGeometryEntities = $second.GetType().GetMethod("AddGeometryEntities", $flags)
+			$countBefore = $second.GameEntities.Count
+			$logged.Clear()
+			[string[]]$noMesh = @((Join-Path $content "Checker.asset"), (Join-Path $content "notes.txt"), (Join-Path $content "Gone.asset"))
+			$added = $addGeometryEntities.Invoke($second, [object[]]@(, $noMesh))
+			Check ($added.Count -eq 0 -and $second.GameEntities.Count -eq $countBefore -and @($logged | Where-Object { $_ -match "^Warning: " }).Count -eq 1) "AddGeometryEntities: a texture, a text file and a missing file create nothing and warn once" ($logged -join "; ")
+			$logged.Clear()
+			[string[]]$outside = @((Join-Path $work "Outside.asset"))
+			$added = $addGeometryEntities.Invoke($second, [object[]]@(, $outside))
+			Check ($added.Count -eq 0 -and $second.GameEntities.Count -eq $countBefore -and @($logged | Where-Object { $_ -match "^Warning: .*Outside" }).Count -eq 1) "AddGeometryEntities: a mesh asset outside the project creates nothing and warns" ($logged -join "; ")
+			$logged.Clear()
+			[string[]]$meshes = @((Join-Path $content "Rock.asset"), (Join-Path $content "Checker.asset"), (Join-Path $content "Tree.asset"))
+			$added = $addGeometryEntities.Invoke($second, [object[]]@(, $meshes))
+			$names = @($second.GameEntities | Select-Object -Skip $countBefore | ForEach-Object { $_.Name })
+			$addedGuids = @($second.GameEntities | Select-Object -Skip $countBefore | ForEach-Object { $entity = $_; @($entity.Components | Where-Object { $_.GetType() -eq $geometryType })[0].GeometryGuid })
+			Check ($added.Count -eq 2 -and ($names -join ",") -eq "Rock,Tree" -and $addedGuids[0] -eq $rockGuid -and $addedGuids[1] -eq $treeGuid) "AddGeometryEntities: one entity per mesh asset, named after the asset, with the Geometry" "$($names -join ',') / $($addedGuids -join ',')"
+			Check (@($second.GameEntities | Where-Object { $_.IsActive }).Count -eq 0 -and $logged.Count -eq 0) "AddGeometryEntities in an inactive scene creates nothing in the engine, without logging" ($logged -join "; ")
+			$undoRedo.Undo()
+			Check (($second.GameEntities.Count -eq $countBefore + 1) -and $second.GameEntities[$countBefore].Name -eq "Rock") "undo removes the last dropped entity" "$($second.GameEntities.Count)"
+			$undoRedo.Undo()
+			Check ($second.GameEntities.Count -eq $countBefore) "a second undo removes the first dropped entity" "$($second.GameEntities.Count)"
+			$undoRedo.Redo(); $undoRedo.Redo()
+			$names = @($second.GameEntities | Select-Object -Skip $countBefore | ForEach-Object { $_.Name })
+			Check (($names -join ",") -eq "Rock,Tree") "redo adds both entities back in order" ($names -join ",")
+			$undoRedo.Reset()
+
+			# エディタの経路(Headless ではない): 読めない .dxproj は例外を投げず、エラーのログを出して null を返す(OpenProjectView の経路で落ちないように)。
+			$brokenFolder = Join-Path $work "broken_project"
+			$null = New-Item -ItemType Directory -Force (Join-Path $brokenFolder "Content")
+			$brokenFile = Join-Path $brokenFolder "broken.dxproj"
+			[System.IO.File]::WriteAllText($brokenFile, "<Game><not valid")
+			$logged.Clear()
+			$environment.SetValue($null, $false)
+			try
+			{
+				$brokenResult = $projectType.GetMethod("Load", $flags).Invoke($null, [object[]]@([string]$brokenFile))
+				Check ($null -eq $brokenResult -and $null -eq $currentProperty.GetValue($null) -and @($logged | Where-Object { $_ -match "^Error: .*broken\.dxproj" }).Count -ge 1) "editor path: Project.Load of a broken file returns null and logs an error, Project.Current stays null" ($logged -join "; ")
+				# Components.Geometry.Load は AssetRegistry.ContentFolder と Project.ContentPath(末尾の区切り文字あり)を比べる。違うとジオメトリを読み込めない
+				$registeredFolder = $editor.GetType("DXForgeEditor.Content.AssetRegistry", $true).GetProperty("ContentFolder", $flags).GetValue($null)
+				Check ($registeredFolder -ceq "$brokenFolder\Content\") "editor path: Project.Load registers the assets with the same form as Project.ContentPath" "$registeredFolder"
+				$watcher = $editor.GetType("DXForgeEditor.Content.ContentWatcher", $true).GetField("_contentWatcher", $flags).GetValue($null)
+				Check (-not $watcher.EnableRaisingEvents) "editor path: after a failed load the content folder is not watched"
+
+				# ルートが nil のファイル: Serializer.FromFile は例外を投げず null を返す。Debug のエディタのプロセスを assert で落とさず、失敗として扱う
+				$nilFile = Join-Path $brokenFolder "nil.dxproj"
+				[System.IO.File]::WriteAllText($nilFile, '<Game i:nil="true" xmlns="http://schemas.datacontract.org/2004/07/DXForgeEditor.GameProject" xmlns:i="http://www.w3.org/2001/XMLSchema-instance"/>')
+				$logged.Clear()
+				$nilResult = $projectType.GetMethod("Load", $flags).Invoke($null, [object[]]@([string]$nilFile))
+				Check ($null -eq $nilResult -and $null -eq $currentProperty.GetValue($null) -and -not $watcher.EnableRaisingEvents -and @($logged | Where-Object { $_ -match "^Error: .*nil\.dxproj" }).Count -eq 1) "editor path: Project.Load of a nil root returns null and logs an error, Project.Current stays null" ($logged -join "; ")
+
+				# 先頭のシーンは正常で、2 番目のシーンの値が壊れているファイル: エンティティをエンジンに作らずに失敗する(Codex の指摘)。
+				# エンジンの DLL は最初の P/Invoke で読み込まれるので、読み込まれていないことで、エンジンを呼んでいないことを確かめる
+				$secondSceneValue = "<b:X>7</b:X>"
+				$validXml = [System.IO.File]::ReadAllText($TransformOnly)
+				$valueIndex = $validXml.LastIndexOf($secondSceneValue)
+				Check ($valueIndex -gt $validXml.IndexOf("OnlyInSecond") - 1000 -and $valueIndex -gt 0) "the fixture has the value to break in the second scene"
+				$badSceneFile = Join-Path $brokenFolder "bad_second_scene.dxproj"
+				[System.IO.File]::WriteAllText($badSceneFile, $validXml.Remove($valueIndex, $secondSceneValue.Length).Insert($valueIndex, "<b:X>not a number</b:X>"))
+				$logged.Clear()
+				$badSceneResult = $projectType.GetMethod("Load", $flags).Invoke($null, [object[]]@([string]$badSceneFile))
+				$engineLoaded = @([System.Diagnostics.Process]::GetCurrentProcess().Modules | Where-Object { $_.ModuleName -eq "DXForgeEngineDLL.dll" }).Count -gt 0
+				Check ($null -eq $badSceneResult -and $null -eq $currentProperty.GetValue($null) -and @($logged | Where-Object { $_ -match "^Error: .*bad_second_scene\.dxproj" }).Count -ge 1) "editor path: Project.Load of a project with a broken second scene returns null and logs an error" ($logged -join "; ")
+				Check (-not $engineLoaded) "editor path: the broken second scene creates no entity in the engine (the engine DLL is not even loaded)"
+			}
+			finally
+			{
+				$environment.SetValue($null, $true)
+				$null = $editor.GetType("DXForgeEditor.Content.ContentWatcher", $true).GetMethod("Reset", $flags).Invoke($null, [object[]]@([string]"", [string]$brokenFolder))
 			}
 		}
 		finally

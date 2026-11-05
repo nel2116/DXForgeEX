@@ -299,9 +299,9 @@ namespace DXForgeEditor.Components
             Debug.Assert(_geometry == null && GeometryWithMaterials == null);
             if (_geometry != null) return;
 
-            // NOTE: エディタでプロジェクトを開くときは、デシリアライズ(Scene.OnDeserialized)のあとでアセットを登録する
-            //       (MainWindow.OpenProjectBrowserDialog の ContentWatcher.Reset)。登録がこのプロジェクトのものでなければ
-            //       ここでは何もせず、登録のあとの Project.LoadEntitiesWithAssets() でやり直す(Codexの指摘, #32)。
+            // NOTE: エディタは Project.Load の中で、デシリアライズの前にアセットを登録する(Primal Day 081)。それでも
+            //       登録がこのプロジェクトのものでなければ(.dxproj の Path が古い)、ここでは何もせず、Path を直したあとの
+            //       Project.LoadEntitiesWithAssets() でやり直す(Codexの指摘, #32)。
             var contentFolder = Owner.ParentScene?.Project?.ContentPath;
             if (contentFolder == null || !string.Equals(AssetRegistry.ContentFolder, contentFolder, StringComparison.OrdinalIgnoreCase))
             {

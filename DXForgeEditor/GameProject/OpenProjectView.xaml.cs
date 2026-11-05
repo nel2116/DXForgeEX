@@ -42,14 +42,15 @@ namespace DXForgeEditor.GameProject
             // The recent-project list can be empty, leaving nothing to open.
             if (projectListBox.SelectedItem is not ProjectData data) return;
             var project = OpenProject.Open(data);
-            bool dialogResult = false;
-            var win = Window.GetWindow(this);
-            if (project != null)
+            if (project == null)
             {
-                dialogResult = true;
-                win.DataContext = project;
+                // 画面を閉じるとエディタが終了するので、理由を表示して別のプロジェクトを選べるようにする
+                MessageBox.Show($"プロジェクトを読み込めませんでした: {data.FullPath}", "プロジェクトを開けません", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
             }
-            win.DialogResult = dialogResult;
+            var win = Window.GetWindow(this);
+            win.DataContext = project;
+            win.DialogResult = true;
             win.Close();
         }
 

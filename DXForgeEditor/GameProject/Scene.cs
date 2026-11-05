@@ -1,4 +1,5 @@
 ﻿using DXForgeEditor.Components;
+using DXForgeEditor.Content;
 using DXForgeEditor.Utilities;
 using System;
 using System.CodeDom;
@@ -6,6 +7,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Configuration;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Windows.Input;
@@ -52,7 +55,8 @@ namespace DXForgeEditor.GameProject
         // Initialized synchronously by OnDeserialized during construction/loading.
         public ReadOnlyObservableCollection<GameEntity> GameEntities { get; private set; } = null!;
 
-        // Both commands are initialized synchronously by OnDeserialized.
+        // The commands are initialized synchronously by OnDeserialized.
+        public ICommand RenameCommand { get; private set; } = null!;
         public ICommand AddGameEntityCommand { get; private set; } = null!;
         public ICommand RemoveGameEntityCommand { get; private set; } = null!;
 
@@ -77,6 +81,42 @@ namespace DXForgeEditor.GameProject
             _gameEntities.Remove(entity);
         }
 
+        /// <summary>
+        /// ドロップしたファイルのうち、このプロジェクトのジオメトリのアセットごとに、その名前のエンティティを Geometry 付きで作る
+        /// (Primal Day 081)。エンティティごとに undo の履歴が 1 件増える。作ったエンティティを返す。
+        /// NOTE: Primal は Task.Run で IsActive = true と AddComponent をするが、DXForgeEX はアセットとエンジンの呼び出しに
+        ///       ロックがない(#171)ので、UI スレッドで作る。エンジンに作るのは AddGameEntity の IsActive = IsActive に任せる。
+        /// </summary>
+        internal List<GameEntity> AddGeometryEntities(IEnumerable<string> files)
+        {
+            var assets = files
+                .Where(x => string.Equals(Path.GetExtension(x), Asset.AssetFileExtension, StringComparison.OrdinalIgnoreCase))
+                .Select(Asset.TryGetAssetInfo)
+                .Where(x => x?.Type == AssetType.Mesh)
+                .ToList();
+            if (assets.Count == 0)
+            {
+                Logger.Log(MessageType.Warning, "ドロップしたファイルに、ジオメトリのアセットがありません。");
+            }
+
+            var entities = new List<GameEntity>();
+            foreach (var assetInfo in assets)
+            {
+                // NOTE: Geometry が使うのはプロジェクトに登録したアセット(GUID で探す)。プロジェクトの外のファイルは使えない
+                if (AssetRegistry.GetAssetInfo(assetInfo!.Guid) == null)
+                {
+                    Logger.Log(MessageType.Warning, $"ジオメトリ {assetInfo.FullName} はこのプロジェクトのアセットではないので、使えません。");
+                    continue;
+                }
+
+                var entity = new GameEntity(this) { Name = assetInfo.FullName.Trim() };
+                entity.AddComponent(new Components.Geometry(entity, assetInfo));
+                AddGameEntityCommand.Execute(entity);
+                entities.Add(entity);
+            }
+            return entities;
+        }
+
         [OnDeserialized]
         private void OnDeserialized(StreamingContext context)
         {
@@ -87,14 +127,16 @@ namespace DXForgeEditor.GameProject
             }
 
             Debug.Assert(_gameEntities != null);
-            // コマンドラインの dxforge(Issue #11)は、エンティティをエンジン(DXForgeEngineDLL)に作らない
-            if (!ProjectLoadEnvironment.Headless)
+            // NOTE: エンティティをエンジンに作るのは Project.OnDeserialized(ファイル全体を読めたあと)。Primal はここで作る
+
+            RenameCommand = new RelayCommand<string>(x =>
             {
-                foreach (var entity in _gameEntities)
-                {
-                    entity.IsActive = IsActive;
-                }
-            }
+                var oldName = _name;
+                Name = x;
+
+                Project.UndoRedo.Add(new UndoRedoAction(nameof(Name), this,
+                    oldName, x, $"Rename scene '{oldName}' to '{x}'"));
+            }, x => x != _name);
 
             AddGameEntityCommand = new RelayCommand<GameEntity>(x =>
             {
