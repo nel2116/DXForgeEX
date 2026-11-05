@@ -251,12 +251,18 @@ Closes #7
 	Check ($r.Exit -eq 1 -and -not $r.Log) "a failed gh is an error"
 
 	Set-Pr "## GUI の確認手順`n`n1. 起動の確認。`n`nCloses #7"
+	# 並行して動く本物の起動の一時ファイルを数えないよう、この実行の一時フォルダを分ける
+	$specTemp = Join-Path $root "temp"
+	New-Item -ItemType Directory -Path $specTemp | Out-Null
+	$savedTmp = $env:TMP
+	$env:TMP = $specTemp
 	$r = Invoke-Script $Start @("-Pr", "7", "-Size", "normal", "-Run", "run_x")
+	$env:TMP = $savedTmp
 	$sent = Get-Content -Raw -Encoding utf8 (Join-Path $state "spec.md")
 	Check ($r.Exit -eq 0 -and $r.Log -match "--run run_x" -and $r.Log -notmatch "--model") "normal size and the Run are passed"
 	Check ($sent -match "1\. 起動の確認" -and $sent -match "worker 共通のルール") "the spec reaches the worker"
 	Check ($r.Output -match "-Pr 7 -Cleanup") "tells how to clean up"
-	$leftovers = @(Get-ChildItem ([System.IO.Path]::GetTempPath()) -Filter "dxforge_gui_check_spec_*")
+	$leftovers = @(Get-ChildItem $specTemp -Filter "dxforge_gui_check_spec_*")
 	Check ($leftovers.Count -eq 0) "no temporary spec is left"
 
 	Write-Host "== start-gui-check.ps1 の排他 =="
