@@ -13,7 +13,7 @@
 
 ## worker の起動
 - 下のタスク仕様をファイルに書き、`./StartWorker.ps1 -SpecFile <ファイル> -Name <issue-N-短い名前>` で起動する。共通のルール(`docs/dev/WorkerRules.md`)はスクリプトが必ず連結する。小さな仕事は `-Size small` を付ける。
-- 起動が agent_readiness でタイムアウトしたら、受け取った recovery の手順に従い、同じ worktree で `-Worktree path:<パス> -RetryOf <dispatch>` で起動し直す。新しい worktree は作らない。
+- 起動が agent_readiness でタイムアウトしたら、受け取った recovery の手順に従い、同じ worktree で `./StartWorker.ps1 -Task <task> -RetryOf <dispatch> -Worktree path:<パス>` で起動し直す。新しい worktree は作らない。
 - ワーカーの応答がなければ `./WorkerStatus.ps1` で確かめる(`send` は終了したワーカーにも `ok` を返す)。`exited` なら引き継ぎを書いて起動し直す。
 - 全員を起動してから待つ(`check --wait --types "worker_done,escalation,question"`)。
 - 質問(question)には仕様の範囲で答える。<方式の承認が要るなら: 「worker が方式を ask で提案してきたら、下の『方式の判断基準』に照らして承認するか、直してほしい点を返す」> 仕様の範囲を超える判断は、<ユーザーに確認してから答える / ユーザーが不在なら範囲を縮める方向で決め、理由を最後の報告に書く>。

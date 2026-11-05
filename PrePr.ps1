@@ -59,7 +59,8 @@ function Get-PrePrPlan([string[]]$ChangedFiles) {
 	$material = Editor "material_asset_test"
 	$dialog = Editor "primitive_mesh_dialog_test"
 	$geometry = Editor "default_geometry_test"
-	$define = "pwsh -NoProfile -File DXForgeEditor/Tests/debug_define_test.ps1"
+	# -STA を付けないテストにも付ける。変更されたテストと同じコマンドにして、1 つのステップにまとめるため
+	$define = Editor "debug_define_test"
 	$loadProject = "pwsh -STA -NoProfile -File DXForgeCli/Tests/load_project_cli_test.ps1"
 	$ops = "pwsh -STA -NoProfile -File DXForgeCli/Tests/ops_cli_test.ps1"
 	$importCli = "pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1 -ArgumentsOnly"
@@ -71,8 +72,8 @@ function Get-PrePrPlan([string[]]$ChangedFiles) {
 		"Content"     = @($material, $geometry, $dialog)
 		"DllWrappers" = @((Editor "engine_init_test"), $material, "pwsh -STA -NoProfile -File DXForgeEngineDLL/Tests/editor_shader_compilation_test.ps1")
 		"Editors"     = @($layout, $dialog)
-		"GameDev"     = @($layout, "pwsh -NoProfile -File DXForgeEditor/Tests/engine_path_test.ps1")
-		"GameProject" = @($layout, "pwsh -NoProfile -File DXForgeEditor/Tests/projects_path_test.ps1", $loadProject)
+		"GameDev"     = @($layout, (Editor "engine_path_test"))
+		"GameProject" = @($layout, (Editor "projects_path_test"), $loadProject)
 	}
 	# リポジトリ直下などのスクリプト -> そのテスト
 	$scriptTests = @{
@@ -99,7 +100,10 @@ function Get-PrePrPlan([string[]]$ChangedFiles) {
 		# ContentTools.dll が要るテストは、ここで決める(変更されたテストとして渡されても同じ)
 		$needs = @($requires | Where-Object { $_ })
 		if ($command -match "default_geometry_test|primitive_mesh_dialog_test|ContentTools/Tests/") { $needs += $toolsDll }
-		if ($command -notin $tests.Command) { $tests.Add([pscustomobject]@{ Command = $command; Requires = $needs }) }
+		# 同じテストが表と「変更されたテスト」の両方から来たら、条件をまとめる(削除したテストを起動しない)
+		$existing = @($tests | Where-Object { $_.Command -eq $command })
+		if ($existing.Count -gt 0) { $existing[0].Requires = @(@($existing[0].Requires) + $needs | Select-Object -Unique) }
+		else { $tests.Add([pscustomobject]@{ Command = $command; Requires = @($needs | Select-Object -Unique) }) }
 	}
 
 	foreach ($file in $ChangedFiles) {

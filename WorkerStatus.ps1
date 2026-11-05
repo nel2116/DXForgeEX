@@ -99,6 +99,6 @@ $attention = @($rows | Where-Object NeedsAttention)
 $exited = @($rows | Where-Object Exited)
 Write-Host "ワーカー $($rows.Count) 件、exited $($exited.Count) 件、未完了で動いていないもの $($attention.Count) 件"
 foreach ($row in $attention) {
-	Write-Host "要対応: $($row.Dispatch)(terminal=$($row.Terminal))。send は届きません。引き継ぎを書いて起動し直してください(./StartWorker.ps1 -RetryOf)。" -ForegroundColor Red
+	Write-Host "要対応: $($row.Dispatch)(terminal=$($row.Terminal))。send は届きません。引き継ぎを書いて、同じ worktree で起動し直してください(./StartWorker.ps1 -SpecFile <引き継ぎ> -Worktree path:<パス>)。" -ForegroundColor Red
 }
 exit 0

@@ -133,6 +133,23 @@ $plan = Get-Plan @("DXForgeEditor/Tests/default_geometry_test.ps1")
 $geometry = @($plan.steps | Where-Object { $_.Command -match "default_geometry_test" })[0]
 Check (@($geometry.Requires) -contains "x64/DebugEditor/ContentTools.dll" -and @($geometry.Requires) -contains "DXForgeEditor/Tests/default_geometry_test.ps1") "a changed test keeps both conditions"
 
+# 表から選ばれたテストを同じ差分で削除しても、飛ばせる(PR #196 の Codex の指摘)。順序は問わない
+foreach ($files in @(
+		@("DXForgeEditor/Content/M.cs", "DXForgeEditor/Tests/material_asset_test.ps1"),
+		@("DXForgeEditor/Tests/material_asset_test.ps1", "DXForgeEditor/Content/M.cs"),
+		@("DXForgeEditor/GameDev/EnginePath.cs", "DXForgeEditor/Tests/engine_path_test.ps1"),
+		@("DXForgeEditor/GameProject/A.cs", "DXForgeEditor/Tests/projects_path_test.ps1"),
+		@("DXForgeEditor/DXForgeEditor.csproj", "DXForgeEditor/Tests/debug_define_test.ps1")
+	)) {
+	$plan = Get-Plan $files
+	$test = $files -match '/Tests/' | Select-Object -First 1
+	$matching = @($plan.steps | Where-Object { $_.Command -match [regex]::Escape($test) })
+	Check ($matching.Count -eq 1 -and @($matching[0].Requires) -contains $test) "$($files -join ' + '): one step, skipped when the test was deleted"
+}
+$plan = Get-Plan @("DXForgeEditor/Content/M.cs", "DXForgeEditor/Tests/default_geometry_test.ps1")
+$geometry = @($plan.steps | Where-Object { $_.Command -match "default_geometry_test" })
+Check ($geometry.Count -eq 1 -and @($geometry[0].Requires).Count -eq 2) "the conditions are merged without repeating"
+
 $plan = Get-Plan @("foo/bar.xyz")
 Check (@($plan.steps).Count -eq 1 -and @($plan.unclassified)[0] -eq "foo/bar.xyz") "an unknown file is reported and builds nothing"
 

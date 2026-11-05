@@ -37,6 +37,8 @@
 	merge-ok も push で外れる(.github/workflows/pr-automation.yml)。
 	PRの完了条件(GUIでの確認など)がそろってから、コーディネーターが指定すること。マージ済みのPRには使えない。
 	今のheadのPASSの目印(下の -Post)がPRにあれば、Codexを実行せずにステータスを設定する(#195)。
+	ただし、そのheadの codex-review がすでに failure か、読めないときはレビューする(-Post なしのレビューは
+	目印を残さないので、そのfailureを古いPASSで上書きしない)。
 
 .PARAMETER ForceReview
 	-SetStatus で、PASSの目印があってもレビューをやり直す。
@@ -118,6 +120,19 @@ function Find-ReusablePass($Comments, [string]$Viewer, [string]$Sha, [string]$Ba
 
 function Get-FindingsCount($Comments, [string]$Viewer) {
 	return @(Get-ReviewMarkers $Comments $Viewer | Where-Object { $_.Verdict -eq "findings" }).Count
+}
+
+# このheadの codex-review が failure でなければ true。読めないときは false(PASSを使わない側に倒す)
+function Test-ReviewStatusAllowsReuse([string]$Sha) {
+	Push-Location $RepoRoot
+	try {
+		$current = gh api "repos/{owner}/{repo}/commits/$Sha/status" --jq '.statuses[] | select(.context == "codex-review") | .state' 2>$null
+		if ($LASTEXITCODE -ne 0) { return $false }
+		return "$current".Trim() -ne "failure"
+	}
+	finally {
+		Pop-Location
+	}
 }
 
 # PRのコメントとログイン名を読む。読めなければ $null を返す(目印がないものとして扱う)
@@ -244,6 +259,10 @@ if ($SetStatus) {
 	if (-not $ForceReview) {
 		$read = Read-ReviewComments $Pr
 		$reusable = if ($read) { Find-ReusablePass $read.Comments $read.Viewer $head $base } else { $null }
+		if ($reusable -and -not (Test-ReviewStatusAllowsReuse $head)) {
+			Write-Output "$($head.Substring(0, 7)) のPASSがありますが、codex-review が failure か読めないので、レビューします。"
+			$reusable = $null
+		}
 		if ($reusable) {
 			git -C $RepoRoot update-ref -d "$ref/base"
 			git -C $RepoRoot update-ref -d "$ref/head"

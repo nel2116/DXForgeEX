@@ -49,6 +49,12 @@ if ($args[1] -eq "worker-read") {
 	ConvertTo-Json -Depth 5 -InputObject ([pscustomobject]@{ ok = $true; result = [pscustomobject]@{ status = [pscustomobject]@{ worker = "ready"; terminal = $terminal; liveness = "live" } } })
 	exit 0
 }
+if ($args[1] -eq "worker-start" -and $args -contains "--retry-of") {
+	# 本物と同じく、再試行には --task が要り、仕様は渡せない
+	if ($args -notcontains "--task" -or $args -contains "--spec-file") { Write-Output "--retry-of needs --task"; exit 3 }
+	Write-Output "retried"
+	exit 0
+}
 if ($args[1] -eq "worker-start") {
 	$spec = $args[[array]::IndexOf($args, "--spec-file") + 1]
 	Copy-Item -LiteralPath $spec -Destination (Join-Path $env:DXFORGE_TEST_STATE "spec.md")
@@ -117,8 +123,22 @@ try {
 	$r = Invoke-Tool "StartWorker.ps1" @("-SpecFile", $specFile, "-Name", "issue-1-x", "-Size", "small", "-Run", "run_x")
 	Check ($r.Log -match "--model claude-sonnet-5-5" -and $r.Log -match "--run run_x") "small adds the model; the Run is passed"
 
-	$r = Invoke-Tool "StartWorker.ps1" @("-SpecFile", $specFile, "-Worktree", "path:C:/w", "-RetryOf", "ctx_1")
-	Check ($r.Log -match "--worktree path:C:/w" -and $r.Log -match "--retry-of ctx_1" -and $r.Log -notmatch "--name|--setup") "an existing worktree takes no creation flags"
+	$r = Invoke-Tool "StartWorker.ps1" @("-SpecFile", $specFile, "-Worktree", "path:C:/w")
+	Check ($r.Exit -eq 0 -and $r.Log -match "--worktree path:C:/w" -and $r.Log -notmatch "--name|--setup") "an existing worktree takes no creation flags"
+
+	$r = Invoke-Tool "StartWorker.ps1" @("-Task", "task_1", "-RetryOf", "ctx_1", "-Worktree", "path:C:/w")
+	Check ($r.Exit -eq 0 -and $r.Output -match "retried" -and $r.Log -match "--task task_1" -and $r.Log -match "--retry-of ctx_1" -and $r.Log -match "--agent claude" -and $r.Log -notmatch "--spec-file") "a retry names the failed Task instead of a spec (Orca: --retry-of needs --task)"
+
+	foreach ($bad in @(
+			@("-RetryOf", "ctx_1", "-Worktree", "path:C:/w"),
+			@("-Task", "task_1", "-Worktree", "path:C:/w"),
+			@("-SpecFile", $specFile, "-Task", "task_1", "-RetryOf", "ctx_1", "-Worktree", "path:C:/w"),
+			@("-Task", "task_1", "-RetryOf", "ctx_1"),
+			@()
+		)) {
+		$r = Invoke-Tool "StartWorker.ps1" $bad
+		Check ($r.Exit -eq 2 -and -not $r.Log) "refused before orca: $($bad -join ' ')"
+	}
 
 	$r = Invoke-Tool "StartWorker.ps1" @("-SpecFile", $specFile)
 	Check ($r.Exit -eq 2 -and -not $r.Log) "a new worktree needs -Name"

@@ -95,6 +95,14 @@ if ($args[0] -eq "api" -and "$args" -match "protection/required_status_checks") 
 	if ($env:DXFORGE_TEST_UNPROTECTED -eq "1") { exit 1 }
 	Write-Output "codex-review"; Write-Output "No hold label"; exit 0
 }
+# codex-review のステータスを覚える。DXFORGE_TEST_STATUS_UNREADABLE=1 なら読めない
+$statusFile = Join-Path $env:DXFORGE_TEST_STATE "status.txt"
+if ($args[0] -eq "api" -and "$args" -match "commits/\S+/status") {
+	if ($env:DXFORGE_TEST_STATUS_UNREADABLE -eq "1") { exit 1 }
+	if (Test-Path $statusFile) { Get-Content -Raw $statusFile }
+	exit 0
+}
+if ($args[0] -eq "api" -and "$args" -match "statuses/\S+ .*state=(\w+)") { Set-Content -NoNewline -LiteralPath $statusFile -Value $Matches[1]; exit 0 }
 if ($args[0] -eq "api") { exit 0 }
 if ($args[0] -eq "pr" -and $args[1] -eq "merge") { exit 0 }
 if ($args[0] -eq "pr" -and $args[1] -eq "comment") {
@@ -169,7 +177,10 @@ try {
 	}
 	$script = Join-Path $repo "CodexReview.ps1"
 
-	function Set-Comments($list) { ConvertTo-Json -Depth 5 -InputObject @($list) | Set-Content -Encoding utf8 (Join-Path $state "comments.json") }
+	function Set-Comments($list) {
+		ConvertTo-Json -Depth 5 -InputObject @($list) | Set-Content -Encoding utf8 (Join-Path $state "comments.json")
+		Remove-Item -ErrorAction SilentlyContinue (Join-Path $state "status.txt")
+	}
 	function Invoke-Review([string[]]$Arguments, [string]$Review) {
 		Remove-Item -ErrorAction SilentlyContinue (Join-Path $state "gh.log"), (Join-Path $state "codex.log")
 		$env:DXFORGE_TEST_REVIEW = $Review
@@ -235,6 +246,24 @@ try {
 	$r = Invoke-Review @("-Post", "-ForceReview") $findingsText
 	$r = Invoke-Review @("-SetStatus") $findingsText
 	Check ($r.Codex -and $r.Failure -and -not $r.Merge) "a later FINDINGS on this head means a new review"
+
+	# -Post なしのレビューは目印を残さず、failure のステータスだけを残す。これを古い PASS で上書きしない(PR #196 の Codex の指摘)
+	Set-Comments @()
+	Invoke-Review @("-Post") $passText | Out-Null
+	$r = Invoke-Review @("-SetStatus", "-ForceReview") $findingsText
+	Check ($r.Failure -and -not $r.Merge) "a forced review without -Post sets failure"
+	$r = Invoke-Review @("-SetStatus") $findingsText
+	Check ($r.Codex -and $r.Failure -and -not $r.Merge) "a failure status on this head is not overwritten by an older PASS"
+	$r = Invoke-Review @("-SetStatus") $passText
+	Check ($r.Codex -and $r.Success -and $r.Merge) "a new review can clear the failure"
+	$r = Invoke-Review @("-SetStatus") "this must not be read"
+	Check (-not $r.Codex -and $r.Merge) "the PASS is reused again after the failure is cleared"
+
+	# ステータスを読めないときは、PASS を使わない
+	$env:DXFORGE_TEST_STATUS_UNREADABLE = "1"
+	$r = Invoke-Review @("-SetStatus") $passText
+	$env:DXFORGE_TEST_STATUS_UNREADABLE = ""
+	Check ($r.Codex -and $r.Merge) "an unreadable status means a new review"
 
 	# 他人が書いた PASS の目印では通らない(public のリポジトリでは誰でもコメントできる)
 	$forged = [pscustomobject]@{ author = [pscustomobject]@{ login = "someone" }; url = "x"; body = "## Codex レビュー`n`n" + (Get-ReviewMarker "PASS" $head "develop") }
