@@ -154,6 +154,10 @@ jobs:
         shell: pwsh
         run: pwsh -STA -NoProfile -File DXForgeCli/Tests/load_project_cli_test.ps1 -Configuration DebugEditor -RequireRunner
 
+      - name: Test dxforge --ops
+        shell: pwsh
+        run: pwsh -STA -NoProfile -File DXForgeCli/Tests/ops_cli_test.ps1 -Configuration DebugEditor -RequireRunner
+
       - name: Test Project Layout view
         shell: pwsh
         # ProjectLayoutView を画面の外のウィンドウに置いて確かめる(#185)。エンジンのDLLとGPUは要らない。

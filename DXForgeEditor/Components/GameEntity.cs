@@ -93,6 +93,14 @@ namespace DXForgeEditor.Components
         [DataMember]
         public Scene ParentScene { get; private set; }
 
+        /// <summary>
+        /// .dxproj に保存される、エンティティの変わらない ID(dxforge のセレクター guid:、Issue #183)。名前は重複し、EntityId は
+        /// エンジンでの番号で保存されない。game.bin には書かない。
+        /// NOTE: Primal にはない。要素がない .dxproj は読むときに作るので、保存するまでは読むたびに変わる。
+        /// </summary>
+        [DataMember(Name = "Guid")]
+        public Guid EntityGuid { get; private set; }
+
         [DataMember(Name = "Components")]
         private readonly ObservableCollection<Component> _components = new();
         // OnDeserialized() で設定される (コンストラクタからも呼び出される)
@@ -131,6 +139,16 @@ namespace DXForgeEditor.Components
             }
         }
 
+        /// <summary>
+        /// エンジンに触らずにコンポーネントを外す(dxforge の操作, #183)。RemoveComponent は外したあとで IsActive = true にするので、
+        /// エンジンのないヘッドレスでは使えない。
+        /// </summary>
+        internal void RemoveComponentWithoutEngine(Component component)
+        {
+            Debug.Assert(!IsActive && component is not Transform && _components.Contains(component));
+            _components.Remove(component);
+        }
+
         // DataContractのデシリアライズではコンストラクタもフィールド初期化子も実行されないため、ここで既定値を入れておく(#165)。
         // NOTE: Primal は初期化子だけなので、読み込んだエンティティの EntityId が 0(有効な ID)になる。
         //       IsEnabled は保存されていればこのあとその値で上書きされる(要素がない古いファイルでも有効にする)。
@@ -144,6 +162,7 @@ namespace DXForgeEditor.Components
         [OnDeserialized]
         void OnDeserialized(StreamingContext context)
         {
+            if (EntityGuid == Guid.Empty) EntityGuid = Guid.NewGuid();
             if (_components != null)
             {
                 Components = new ReadOnlyObservableCollection<Component>(_components);

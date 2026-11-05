@@ -168,5 +168,19 @@ namespace DXForgeEditor.GameProject
             Name = name;
             OnDeserialized(new StreamingContext());
         }
+
+        /// <summary>エンジンに触らず、undo も積まずにエンティティを足す(dxforge の操作, #183)。</summary>
+        internal void AddEntityWithoutEngine(GameEntity entity)
+        {
+            Debug.Assert(!_gameEntities.Contains(entity) && !entity.IsActive);
+            _gameEntities.Add(entity);
+        }
+
+        /// <summary>エンジンに触らず、undo も積まずにエンティティを消す(dxforge の操作, #183)。</summary>
+        internal void RemoveEntityWithoutEngine(GameEntity entity)
+        {
+            Debug.Assert(_gameEntities.Contains(entity) && !entity.IsActive);
+            _gameEntities.Remove(entity);
+        }
     }
 }
