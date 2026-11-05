@@ -512,6 +512,20 @@ namespace DXForgeCliTest
 				$logged.Clear()
 				$nilResult = $projectType.GetMethod("Load", $flags).Invoke($null, [object[]]@([string]$nilFile))
 				Check ($null -eq $nilResult -and $null -eq $currentProperty.GetValue($null) -and -not $watcher.EnableRaisingEvents -and @($logged | Where-Object { $_ -match "^Error: .*nil\.dxproj" }).Count -eq 1) "editor path: Project.Load of a nil root returns null and logs an error, Project.Current stays null" ($logged -join "; ")
+
+				# 先頭のシーンは正常で、2 番目のシーンの値が壊れているファイル: エンティティをエンジンに作らずに失敗する(Codex の指摘)。
+				# エンジンの DLL は最初の P/Invoke で読み込まれるので、読み込まれていないことで、エンジンを呼んでいないことを確かめる
+				$secondSceneValue = "<b:X>7</b:X>"
+				$validXml = [System.IO.File]::ReadAllText($TransformOnly)
+				$valueIndex = $validXml.LastIndexOf($secondSceneValue)
+				Check ($valueIndex -gt $validXml.IndexOf("OnlyInSecond") - 1000 -and $valueIndex -gt 0) "the fixture has the value to break in the second scene"
+				$badSceneFile = Join-Path $brokenFolder "bad_second_scene.dxproj"
+				[System.IO.File]::WriteAllText($badSceneFile, $validXml.Remove($valueIndex, $secondSceneValue.Length).Insert($valueIndex, "<b:X>not a number</b:X>"))
+				$logged.Clear()
+				$badSceneResult = $projectType.GetMethod("Load", $flags).Invoke($null, [object[]]@([string]$badSceneFile))
+				$engineLoaded = @([System.Diagnostics.Process]::GetCurrentProcess().Modules | Where-Object { $_.ModuleName -eq "DXForgeEngineDLL.dll" }).Count -gt 0
+				Check ($null -eq $badSceneResult -and $null -eq $currentProperty.GetValue($null) -and @($logged | Where-Object { $_ -match "^Error: .*bad_second_scene\.dxproj" }).Count -ge 1) "editor path: Project.Load of a project with a broken second scene returns null and logs an error" ($logged -join "; ")
+				Check (-not $engineLoaded) "editor path: the broken second scene creates no entity in the engine (the engine DLL is not even loaded)"
 			}
 			finally
 			{

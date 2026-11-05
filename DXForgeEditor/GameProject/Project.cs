@@ -348,8 +348,35 @@ namespace DXForgeEditor.GameProject
             }
         }
 
+        /// <summary>
+        /// 読み込んだシーンのエンティティをエンジンに作る。途中で失敗したら、作ったものを消して例外を Project.Load に渡す。
+        /// NOTE: Primal は Scene.OnDeserialized で作るが、デシリアライズがあとのシーンで失敗すると、作ったものへの参照がなくなりエンジンに残る
+        ///       (Codexの指摘, #185)。ファイル全体を読めてから作る。
+        /// </summary>
+        private void ActivateEntities()
+        {
+            try
+            {
+                foreach (var scene in _scenes)
+                {
+                    foreach (var entity in scene.GameEntities)
+                    {
+                        entity.IsActive = scene.IsActive;
+                    }
+                }
+            }
+            catch
+            {
+                _scenes.SelectMany(x => x.GameEntities).ToList().ForEach(x => x.IsActive = false);
+                throw;
+            }
+        }
+
+        private async void BuildGameCodeDLLAfterLoad() => await BuildGameCodeDLL(false);
+
+        // NOTE: async void にしない。ActivateEntities の例外を Project.Load の catch に渡すため(async void だと捕まらずエディタが落ちる)
         [OnDeserialized]
-        private async void OnDeserialized(StreamingContext context)
+        private void OnDeserialized(StreamingContext context)
         {
             if (_scenes != null)
             {
@@ -358,6 +385,13 @@ namespace DXForgeEditor.GameProject
             }
 
             Debug.Assert(_scenes != null);
+            // コマンドラインの dxforge(Issue #11)は、エンティティをエンジン(DXForgeEngineDLL)に作らない
+            // NOTE: ビルド(UnloadGameCodeDLL と LoadGameCodeDLL がスクリプトのエンティティを作り直す)の前に作る
+            if (!ProjectLoadEnvironment.Headless)
+            {
+                ActivateEntities();
+            }
+
             // アクティブなシーンは必ず存在する前提(直後のDebug.Assertで検証)。ロード中にthrowすると
             // 呼び出し元(OpenProjectView)で捕捉されずエディタが落ちるため、従来どおりthrowしない
             ActiveScene = _scenes.FirstOrDefault(x => x.IsActive)!;
@@ -368,7 +402,7 @@ namespace DXForgeEditor.GameProject
             // コマンドラインの dxforge(Issue #11)は、Visual Studio でのビルドもエンジンの DLL も使わない
             if (!ProjectLoadEnvironment.Headless)
             {
-                await BuildGameCodeDLL(false);
+                BuildGameCodeDLLAfterLoad();
             }
         }
 

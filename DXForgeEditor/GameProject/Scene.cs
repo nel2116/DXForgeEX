@@ -127,14 +127,7 @@ namespace DXForgeEditor.GameProject
             }
 
             Debug.Assert(_gameEntities != null);
-            // コマンドラインの dxforge(Issue #11)は、エンティティをエンジン(DXForgeEngineDLL)に作らない
-            if (!ProjectLoadEnvironment.Headless)
-            {
-                foreach (var entity in _gameEntities)
-                {
-                    entity.IsActive = IsActive;
-                }
-            }
+            // NOTE: エンティティをエンジンに作るのは Project.OnDeserialized(ファイル全体を読めたあと)。Primal はここで作る
 
             RenameCommand = new RelayCommand<string>(x =>
             {
