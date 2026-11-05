@@ -35,9 +35,17 @@ namespace DXForgeEditor.Content
 
         private void OnScalarBox_ValueChanged(object sender, RoutedEventArgs e) => UpdatePrimitive();
 
+        private void OnTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdatePrimitive();
+
         private float Value(ScalarBox scalarBox, float min)
         {
             float.TryParse(scalarBox.Value, out var result);
+            return Math.Max(result, min);
+        }
+
+        private int Value(TextBox textBox, int min)
+        {
+            int.TryParse(textBox.Text, out var result);
             return Math.Max(result, min);
         }
 
@@ -60,7 +68,16 @@ namespace DXForgeEditor.Content
                         break;
                     }
                 case PrimitiveMeshType.Cube:
-                    return;
+                    {
+                        info.SegmentsX = (int)xSliderCube.Value;
+                        info.SegmentsY = (int)ySliderCube.Value;
+                        info.SegmentsZ = (int)zSliderCube.Value;
+                        info.Size.X = Value(xScalarBoxCube, 0.001f);
+                        info.Size.Y = Value(yScalarBoxCube, 0.001f);
+                        info.Size.Z = Value(zScalarBoxCube, 0.001f);
+                        info.LOD = Value(lodTextBoxCube, 0);
+                        break;
+                    }
                 case PrimitiveMeshType.UvSphere:
                     {
                         info.SegmentsX = (int)xSliderUvSphere.Value;
