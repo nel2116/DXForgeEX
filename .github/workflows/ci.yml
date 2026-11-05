@@ -120,6 +120,29 @@ jobs:
         shell: pwsh
         run: python Tests/guard_merge_approval_test.py
 
+      # レビューの流れのフックと集計のテスト(#195)。使い捨てのリポジトリと偽の記録で動き、GitHub は呼ばない。
+      - name: Review flow guard, context warning and usage report tests
+        shell: pwsh
+        run: |
+          foreach ($test in "guard_review_flow_test", "context_size_warning_test", "usage_report_test") {
+            python "Tests/$test.py"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      # CodexReview.ps1(目印と -SetStatus の省略)、PrePr.ps1(対応表とスタンプ)、ワーカーの管理のスクリプト(#195)。
+      # 偽の gh / codex / orca を PATH の先頭に置くので、本物の GitHub、Codex、Orca は呼ばない。
+      - name: CodexReview.ps1 tests
+        shell: pwsh
+        run: ./Tests/CodexReview.Tests.ps1
+
+      - name: PrePr.ps1 tests
+        shell: pwsh
+        run: ./Tests/PrePr.Tests.ps1
+
+      - name: Worker tools tests
+        shell: pwsh
+        run: ./Tests/WorkerTools.Tests.ps1
+
       # DXForgeEditor は net8.0-windows を対象にしている。ランナーに必要なバージョンの
       # SDKが同梱されているとは限らないため、SDKを明示的に用意する。
       - name: Setup .NET

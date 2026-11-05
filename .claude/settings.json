@@ -8,6 +8,11 @@
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/Tests/guard_merge_approval.py\" --hook",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/Tests/guard_review_flow.py\" --hook",
+            "timeout": 15
           }
         ]
       }
@@ -20,6 +25,16 @@
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/Tests/check_conventions.py\" --hook",
             "timeout": 20
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/Tests/context_size_warning.py\" --hook",
+            "timeout": 5
           }
         ]
       }
