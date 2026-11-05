@@ -46,7 +46,7 @@ $p = [int](($out | Select-Object -Last 1) -replace 'PID ', '')
 
 部品が解決していること: タブや一覧は実際のマウスで押す。ALT による前面化は対象が前面でないときだけ行うので、開いたメニューは閉じない。Hierarchy の行は左端を押すので Remove を誤って押さない。空のリストは `EntityDrop` に落とす。
 
-- 判定はテキストと数値を優先する。撮影は領域を絞る(`-Region` の名前か `x,y,w,h`、`-Target` の要素。幅は既定で 1000 まで)。座標はウィンドウの左上からの物理座標で、名前付きの座標は既定の大きさのウィンドウのもの。
+- 判定はテキストと数値を優先する。撮影は領域を絞る(`-Region` の名前か `x,y,w,h`、`-Target` の要素。幅は既定で 1000 まで)。座標はウィンドウの左上からの物理座標で、名前付きの座標は既定の大きさのウィンドウのもので、表示倍率に合わせて変換する。
 - ダイアログは `-Title <タイトルの一部>` で指定する。`window.ps1 -Action list -ProcId <PID>` で一覧を見られる。
 - デバッグ出力(`[DXForge] ...`、D3D12 のデバッグレイヤー)は `capture-debug-output.ps1` で取り込む(使い方はスクリプトの先頭)。
 
@@ -54,7 +54,7 @@ $p = [int](($out | Select-Object -Last 1) -replace 'PID ', '')
 
 - PR の worktree をビルドする: `./build.ps1 -Configuration DebugEditor -Target all` と `./build.ps1 -Configuration Debug -Target native -Project DXForgeEngine`(ゲームは Debug でリンクする)。
 - エディタは、自分の実行ファイルがあるリポジトリのエンジンでゲームをビルドする(#117)。ユーザー環境変数 `DXFORGE_ENGINE` は切り替えない。
-- 確認用のプロジェクトは `GuiCheck<N>` の名前で新しく作り、既存のものは使わない。場所は `DXFORGE_PROJECTS`、なければ `%USERPROFILE%\DXForgeProjects\`(#141)。
+- 確認用のプロジェクトは `GuiCheck<N>` の名前で新しく作り、既存のものは使わない。場所はユーザー環境変数 `DXFORGE_PROJECTS`、なければ `%USERPROFILE%\DXForgeProjects\`(#141)。
 - ソースファイルがないと、ゲームの exe も DLL も作られない(#118)。New Script でスクリプトを足す。スクリプトが動いたかは、`begin_play`/`update` で目印のファイルを書かせて判定する。
 - EngineTest は `..\..\x64\*.model` と `*.texture`(git の管理外)を読むので、`x64\Debug` を作業フォルダにして起動する。新しい worktree では、ルートのチェックアウトの `x64` からコピーし、終わったら消す。
 

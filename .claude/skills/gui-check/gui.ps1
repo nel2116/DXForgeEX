@@ -21,7 +21,7 @@
 	  open            エディタを起動し、-Project を開く。最後の行が PID <n>
 	  create          Empty Project から -Project(GuiCheck で始まる名前)を作る。-ProcId を渡すと File > New Project から
 	  switch          開いているエディタ(-ProcId)で File > Open Project から -Project に切り替える
-	  close           WM_CLOSE で閉じる。Project Browser が残ったら続けて閉じ、終了を確かめる
+	  close           WM_CLOSE で閉じる。Project Browser が残ったら続けて閉じ、終了を確かめる。ゲームや VS の PID も渡せる
 	  click           -Target を押す([-Clicks n])
 	  drag            -Target から -To へドラッグする
 	  keys            -Keys を SendKeys で送る(-ProcId を渡すと先に前面に出す)
@@ -72,6 +72,7 @@ param(
 	[string]$Ops,
 	[string]$Op,
 	[string]$ToolDir,
+	[string]$ProjectsRoot,
 	[string]$Dir
 )
 
@@ -86,11 +87,12 @@ $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
 $EditorTitle = "DXForge Editor"
 $BrowserTitle = "Project Browser"
 
-# 既定の大きさ(1280x720)のウィンドウでの位置。open と create は既定の大きさのまま開く。動かしたら座標ではなく el: を使う
+# 表示倍率 100%、既定の大きさ(1280x720)のウィンドウでの位置。ウィンドウの DPI に合わせて変換する(WPF は倍率に合わせて拡大される)。
+# open と create は既定の大きさのまま開く。大きさを変えたら el: を使う
 $Named = [ordered]@{
 	File             = @{ Window = $EditorTitle; Point = 21, 40 }
 	OpenTab          = @{ Window = $BrowserTitle; Element = "Button:^Open Project$" }
-	CreateTab        = @{ Window = $BrowserTitle; Point = 492, 63 }
+	CreateTab        = @{ Window = $BrowserTitle; Element = "Button:^Create Project$" }
 	NewScript        = @{ Window = $EditorTitle; Element = "Button:^New Script$" }
 	Build            = @{ Window = $EditorTitle; Element = "Button:^Build$" }
 	PrimitiveMesh    = @{ Window = $EditorTitle; Element = "Button:^Primitive mesh$" }
@@ -121,10 +123,16 @@ function Stop-Usage([string]$Message) {
 function Test-GuiCheckName([string]$Name) { return $Name -cmatch '^GuiCheck[A-Za-z0-9_-]*$' }
 
 function Get-ProjectsRoot {
-	# エディタ(ProjectsPath.cs)と同じ順番。プロセスの値がなければユーザー環境変数を読む(読むだけ)
-	$value = $env:DXFORGE_PROJECTS
-	if (-not $value) { $value = [Environment]::GetEnvironmentVariable("DXFORGE_PROJECTS", "User") }
-	if ($value) { return $value }
+	if ($ProjectsRoot) { return $ProjectsRoot }
+	# エディタ(NewProject.GetDefaultProjectPath、ProjectsPath.Resolve)と同じく、プロセスの値ではなくユーザー環境変数を読む(読むだけ)
+	$value = [Environment]::GetEnvironmentVariable("DXFORGE_PROJECTS", "User")
+	if ($value -and $value.Trim()) {
+		$path = [Environment]::ExpandEnvironmentVariables($value.Trim())
+		try {
+			if ([System.IO.Path]::IsPathFullyQualified($path) -and (Test-Path -LiteralPath ([System.IO.Path]::GetPathRoot($path)))) { return $path }
+		}
+		catch { Write-Verbose $_.Exception.Message }
+	}
 	return (Join-Path $env:USERPROFILE "DXForgeProjects")
 }
 
@@ -157,6 +165,9 @@ public static class DXForgeGui {
 	[DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
 	[DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr c);
 	[DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr c);
+	[DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
+	[DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+	[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int command);
 	public static List<IntPtr> Find(uint target) {
 		var list = new List<IntPtr>();
 		EnumWindows((h, l) => { uint p; GetWindowThreadProcessId(h, out p); if (p == target && IsWindowVisible(h)) list.Add(h); return true; }, IntPtr.Zero);
@@ -185,7 +196,19 @@ function Get-Windows([int]$Id, [string]$TitlePart) {
 function Get-Window([int]$Id, [string]$TitlePart) {
 	$found = @(Get-Windows $Id $TitlePart | Sort-Object { $r = Get-Rect $_; ($r.R - $r.L) * ($r.B - $r.T) } -Descending)
 	if ($found.Count -eq 0) { throw "ウィンドウが見つかりません(PID $Id, タイトル '$TitlePart')。今あるもの: $(Get-WindowSummary $Id)" }
+	# 最小化されていると矩形が画面の外になる(SW_RESTORE)
+	if ([DXForgeGui]::IsIconic($found[0])) {
+		[void][DXForgeGui]::ShowWindow($found[0], 9)
+		Start-Sleep -Milliseconds 500
+	}
 	return $found[0]
+}
+
+# 名前付きの座標(倍率 100% の値)を、ウィンドウの DPI の物理座標にする
+function Get-DpiScaled([IntPtr]$Handle, [int[]]$Values) {
+	$dpi = [DXForgeGui]::GetDpiForWindow($Handle)
+	$scale = if ($dpi -gt 0) { $dpi / 96.0 } else { 1.0 }
+	return @($Values | ForEach-Object { [int][Math]::Round($_ * $scale) })
 }
 
 function Get-WindowSummary([int]$Id) {
@@ -252,7 +275,10 @@ function Resolve-Target([int]$Id, [string]$Spec) {
 		$entry = $Named[$Spec]
 		if (-not $titlePart) { $titlePart = $entry.Window }
 		if ($entry.Contains("Element")) { $Spec = "el:" + $entry.Element }
-		else { $Spec = "$($entry.Point[0]),$($entry.Point[1])" }
+		else {
+			$scaled = Get-DpiScaled (Get-Window $Id $titlePart) $entry.Point
+			$Spec = "$($scaled[0]),$($scaled[1])"
+		}
 	}
 	if ($Spec -match '^(-?\d+),(-?\d+)$') {
 		$handle = Get-Window $Id $titlePart
@@ -383,8 +409,18 @@ function Invoke-FileMenu([int]$Id, [string]$Item) {
 function Close-Editor([int]$Id) {
 	$process = Get-Process -Id $Id -ErrorAction SilentlyContinue
 	if (-not $process) { Write-Output "すでに終了しています: PID $Id"; return }
+	$sent = $false
 	foreach ($titlePart in $EditorTitle, $BrowserTitle) {
-		foreach ($handle in Get-Windows $Id $titlePart) { [void][DXForgeGui]::PostMessage($handle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) }
+		$handles = @(Get-Windows $Id $titlePart)
+		if ($handles.Count -eq 0) { continue }
+		$sent = $true
+		foreach ($handle in $handles) { [void][DXForgeGui]::PostMessage($handle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) }
+		if ($process.WaitForExit(8000)) { Write-Output "終了しました: PID $Id"; return }
+	}
+	# エディタでないプロセス(ゲーム、VS)は、見えているウィンドウをすべて閉じる。
+	# エディタのときは行わない(assert のダイアログを閉じると、止まった理由が分からなくなる)
+	if (-not $sent) {
+		foreach ($handle in Get-Windows $Id "") { [void][DXForgeGui]::PostMessage($handle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) }
 		if ($process.WaitForExit(8000)) { Write-Output "終了しました: PID $Id"; return }
 	}
 	throw "終了しません: PID $Id。今あるウィンドウ: $(Get-WindowSummary $Id)(assert のダイアログなら内容を報告してください)"
@@ -555,7 +591,7 @@ try {
 			if ($Region -and $Regions.Contains($Region)) {
 				$entry = $Regions[$Region]
 				$handle = Get-Window $ProcId $(if ($Title) { $Title } else { $entry.Window })
-				$rect = $entry.Rect
+				$rect = Get-DpiScaled $handle $entry.Rect
 			}
 			elseif ($Region) {
 				if ($Region -notmatch '^-?\d+,-?\d+,\d+,\d+$') { Stop-Usage "領域は名前か x,y,w,h です: $Region" }

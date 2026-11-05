@@ -47,7 +47,6 @@ $root = Join-Path ([System.IO.Path]::GetTempPath()) ("dxforge_guicheck_test_" + 
 $bin = Join-Path $root "bin"
 $state = Join-Path $root "state"
 $savedPath = $env:PATH
-$savedProjects = $env:DXFORGE_PROJECTS
 try {
 	New-Item -ItemType Directory -Path $bin, $state | Out-Null
 	Set-Content -LiteralPath (Join-Path $bin "gh.ps1") -Value $fakeGh -Encoding utf8
@@ -78,7 +77,7 @@ try {
 
 	Write-Host "== gui.ps1 の引数(ウィンドウに触らない)=="
 	$r = Invoke-Script $Gui @("-Action", "names")
-	Check ($r.Exit -eq 0 -and $r.Output -match "CreateTab \[Project Browser\] 492,63" -and $r.Output -match "region Hierarchy") "names lists the named targets and regions"
+	Check ($r.Exit -eq 0 -and $r.Output -match "File \[DXForge Editor\] 21,40" -and $r.Output -match "CreateTab \[Project Browser\] el:Button" -and $r.Output -match "region Hierarchy") "names lists the named targets and regions"
 	foreach ($bad in @(
 			@("-Action", "open"),
 			@("-Action", "create"),
@@ -108,34 +107,46 @@ try {
 	Write-Host "== gui.ps1 -Action remove-project =="
 	$projects = Join-Path $root "projects"
 	New-Item -ItemType Directory -Path (Join-Path $projects "GuiCheck1\.DXForge"), (Join-Path $projects "MyGame") | Out-Null
-	$env:DXFORGE_PROJECTS = $projects
+	$rootArgs = @("-ProjectsRoot", $projects)
 	$lock = Join-Path $projects "GuiCheck1\.DXForge\editor.lock"
 	Set-Content -LiteralPath $lock -Value "" -Encoding utf8
 	$held = [System.IO.File]::Open($lock, "Open", "ReadWrite", "ReadWrite")
-	$r = Invoke-Script $Gui @("-Action", "remove-project", "-Project", "GuiCheck1")
+	$r = Invoke-Script $Gui (@("-Action", "remove-project", "-Project", "GuiCheck1") + $rootArgs)
 	$held.Dispose()
 	Check ($r.Exit -eq 1 -and (Test-Path (Join-Path $projects "GuiCheck1"))) "a project with a held lock stays"
-	$r = Invoke-Script $Gui @("-Action", "remove-project", "-Project", "GuiCheck1")
+	$r = Invoke-Script $Gui (@("-Action", "remove-project", "-Project", "GuiCheck1") + $rootArgs)
 	Check ($r.Exit -eq 0 -and -not (Test-Path (Join-Path $projects "GuiCheck1")) -and (Test-Path (Join-Path $projects "MyGame"))) "removes only the named project"
-	$r = Invoke-Script $Gui @("-Action", "remove-project", "-Project", "GuiCheck1")
+	$r = Invoke-Script $Gui (@("-Action", "remove-project", "-Project", "GuiCheck1") + $rootArgs)
 	Check ($r.Exit -eq 0) "a missing project is not an error"
 
 	Write-Host "== gui.ps1 -Action prepare =="
 	$cli = Join-Path $RepoRoot "x64\DebugEditor\dxforge.exe"
-	$r = Invoke-Script $Gui @("-Action", "prepare", "-Project", "GuiCheckNone", "-Op", '{"op":"list-entities"}')
+	$r = Invoke-Script $Gui (@("-Action", "prepare", "-Project", "GuiCheckNone", "-Op", '{"op":"list-entities"}') + $rootArgs)
 	Check ($r.Exit -eq 2 -and $r.Output -match "プロジェクトがありません") "a missing project stops before the tools"
 	if (Test-Path -LiteralPath $cli) {
 		$copy = Join-Path $projects "GuiCheckOps"
 		New-Item -ItemType Directory -Path $copy | Out-Null
 		$dxproj = Join-Path $copy "GuiCheckOps.dxproj"
 		Copy-Item -LiteralPath (Join-Path $RepoRoot "DXForgeCli\Tests\Projects\TransformOnly\TransformOnly.dxproj") -Destination $dxproj
-		$r = Invoke-Script $Gui @("-Action", "prepare", "-Project", "GuiCheckOps", "-Op", '{"op":"create-entity","name":"Box"}')
+		$r = Invoke-Script $Gui (@("-Action", "prepare", "-Project", "GuiCheckOps", "-Op", '{"op":"create-entity","name":"Box"}') + $rootArgs)
 		Check ($r.Exit -eq 0 -and $r.Output -match '"changed":true,"saved":true' -and (Get-Content -Raw -LiteralPath $dxproj) -match "Box") "prepare runs dxforge --op and saves"
-		$r = Invoke-Script $Gui @("-Action", "prepare", "-Project", "GuiCheckOps", "-Op", '{"op":"rename","target":"name:NoSuch","name":"X"}')
+		$r = Invoke-Script $Gui (@("-Action", "prepare", "-Project", "GuiCheckOps", "-Op", '{"op":"rename","target":"name:NoSuch","name":"X"}') + $rootArgs)
 		Check ($r.Exit -eq 41) "prepare returns the exit code of dxforge (実際: $($r.Exit))"
 	}
 	elseif ($RequireCli) { Check $false "dxforge.exe is required: $cli" }
 	else { Write-Host "  SKIP: $cli がありません" }
+
+	Write-Host "== gui.ps1 -Action close(エディタでないウィンドウ)=="
+	$form = Start-Process pwsh -PassThru -ArgumentList @("-NoProfile", "-Command", "Add-Type -AssemblyName System.Windows.Forms; `$f = New-Object System.Windows.Forms.Form; `$f.Text = 'DXForge Game'; [System.Windows.Forms.Application]::Run(`$f)")
+	try {
+		$deadline = (Get-Date).AddSeconds(30)
+		while ((Get-Process -Id $form.Id).MainWindowHandle -eq [IntPtr]::Zero -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
+		$r = Invoke-Script $Gui @("-Action", "close", "-ProcId", "$($form.Id)")
+		Check ($r.Exit -eq 0 -and $r.Output -match "終了しました" -and $form.HasExited) "closes a game window that is not titled like the editor (実際: $($r.Exit) $($r.Output))"
+	}
+	finally {
+		if (-not $form.HasExited) { Stop-Process -Id $form.Id -Force }
+	}
 
 	Write-Host "== pixdiff.py =="
 	$images = Join-Path $root "images"
@@ -251,7 +262,6 @@ Closes #7
 }
 finally {
 	$env:PATH = $savedPath
-	$env:DXFORGE_PROJECTS = $savedProjects
 	Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
 }
 
