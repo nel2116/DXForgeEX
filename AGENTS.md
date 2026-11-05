@@ -16,6 +16,7 @@ DXForgeEX is a from-scratch 3D game engine + WPF level editor that follows the "
 | PR review, merging, `CodexReview.ps1`, `PrePr.ps1`, `CleanupMerged.ps1` | `docs/dev/ReviewAndMerge.md` |
 | orchestrated workers, `StartWorker.ps1`, `WorkerStatus.ps1` | `docs/dev/WorkerRules.md`, `docs/dev/ReviewAndMerge.md` |
 | editor behavior that needs a manual GUI check | `docs/ManualVerification.md` |
+| operating the editor for a GUI check, `start-gui-check.ps1` | `.claude/skills/gui-check/SKILL.md` |
 | `build.ps1` parameters, human-facing overview | `README.md` |
 
 ## Commands

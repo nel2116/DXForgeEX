@@ -117,14 +117,20 @@ try {
 	Check ($r.Exit -eq 0 -and $r.Output -match "started") "starts the worker"
 	Check ($sent.StartsWith($rulesFirstLine) -and $sent -match "タスク: テストの仕様") "the spec is the common rules followed by the task"
 	Check ($sent.IndexOf("PrePr.ps1") -ge 0 -and $sent.IndexOf("CodexReview.ps1 -Pr <N> -Post") -ge 0) "the rules contain the new review flow"
-	Check ($r.Log -match "--agent claude --worktree new-top-level --name issue-1-x --setup run" -and $r.Log -notmatch "--model") "normal: a new worktree, no model override"
+	Check ($r.Log -match "--agent claude --worktree new-top-level --name issue-1-x --base-branch origin/develop --setup run" -and $r.Log -notmatch "--model") "normal: a new worktree from origin/develop, no model override"
 	Check (-not (Test-Path -LiteralPath (Get-Content -Encoding utf8 (Join-Path $state "spec-path.txt")))) "the temporary spec is deleted"
 
 	$r = Invoke-Tool "StartWorker.ps1" @("-SpecFile", $specFile, "-Name", "issue-1-x", "-Size", "small", "-Run", "run_x")
 	Check ($r.Log -match "--model claude-sonnet-5-5" -and $r.Log -match "--run run_x") "small adds the model; the Run is passed"
 
 	$r = Invoke-Tool "StartWorker.ps1" @("-SpecFile", $specFile, "-Worktree", "path:C:/w")
-	Check ($r.Exit -eq 0 -and $r.Log -match "--worktree path:C:/w" -and $r.Log -notmatch "--name|--setup") "an existing worktree takes no creation flags"
+	Check ($r.Exit -eq 0 -and $r.Log -match "--worktree path:C:/w" -and $r.Log -notmatch "--name|--setup|--base-branch") "an existing worktree takes no creation flags"
+
+	$r = Invoke-Tool "StartWorker.ps1" @("-SpecFile", $specFile, "-Name", "issue-1-x", "-BaseBranch", "origin/feature/x")
+	Check ($r.Exit -eq 0 -and $r.Log -match "--base-branch origin/feature/x") "-BaseBranch overrides the base"
+
+	$r = Invoke-Tool "StartWorker.ps1" @("-SpecFile", $specFile, "-Worktree", "path:C:/w", "-BaseBranch", "origin/feature/x")
+	Check ($r.Exit -eq 2 -and -not $r.Log) "-BaseBranch is refused for an existing worktree"
 
 	$r = Invoke-Tool "StartWorker.ps1" @("-Task", "task_1", "-RetryOf", "ctx_1", "-Worktree", "path:C:/w")
 	Check ($r.Exit -eq 0 -and $r.Output -match "retried" -and $r.Log -match "--task task_1" -and $r.Log -match "--retry-of ctx_1" -and $r.Log -match "--agent claude" -and $r.Log -notmatch "--spec-file") "a retry names the failed Task instead of a spec (Orca: --retry-of needs --task)"

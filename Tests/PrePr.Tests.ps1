@@ -103,6 +103,9 @@ $cases = @(
 	@("build.ps1", @("Tests/BuildConfiguration.Tests.ps1"), @($anyBuild)),
 	@("Restore.ps1", @("Tests/Restore.Tests.ps1"), @($anyBuild)),
 	@("WorkerStatus.ps1", @("Tests/WorkerTools.Tests.ps1"), @($anyBuild)),
+	@(".claude/skills/gui-check/gui.ps1", @("Tests/GuiCheck.Tests.ps1"), @($anyBuild)),
+	@(".claude/skills/gui-check/start-gui-check.ps1", @("Tests/GuiCheck.Tests.ps1"), @($anyBuild)),
+	@("Tests/guard_gui_images.py", @("Tests/guard_gui_images_test.py"), @($anyBuild)),
 	@("Directory.Build.props", @($native, $editor), @())
 )
 foreach ($case in $cases) {
