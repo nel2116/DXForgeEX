@@ -239,6 +239,8 @@ try {
 	Check ($r.Output -match "FINDINGSの回数: 3" -and $r.Output -notmatch "相談") "3 FINDINGS do not ask to consult yet"
 	$r = Invoke-Review @("-Post") $findingsText
 	Check ($r.Output -match "FINDINGSの回数: 4" -and $r.Output -match "コーディネーターに ask で相談") "over 3 FINDINGS asks to consult the coordinator"
+	$r = Invoke-Review @("-Post", "-ForceReview") $passText
+	Check ($r.Output -match "FINDINGSの回数: 4" -and $r.Output -notmatch "相談") "a PASS does not ask to consult, however many FINDINGS came before"
 
 	# あとから出た FINDINGS があれば、前の PASS を使わない
 	Set-Comments @()

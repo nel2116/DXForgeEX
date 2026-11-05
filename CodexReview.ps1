@@ -393,7 +393,8 @@ $review
 	if ($read) {
 		$findingsCount = Get-FindingsCount $read.Comments $read.Viewer
 		Write-Output "このPRのFINDINGSの回数: $findingsCount"
-		if ($findingsCount -gt $FindingsConsultLimit) {
+		# PASS したなら収束しているので、相談は要らない
+		if ($verdict -ne "PASS" -and $findingsCount -gt $FindingsConsultLimit) {
 			Write-Output "FINDINGSが $FindingsConsultLimit 回を超えました。直し続けず、コーディネーターに ask で相談してください(方式の問題を疑う。ship-pr スキルの「指摘が収束しないとき」)。"
 		}
 	}

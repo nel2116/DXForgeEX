@@ -124,7 +124,7 @@ jobs:
       - name: Review flow guard, context warning and usage report tests
         shell: pwsh
         run: |
-          foreach ($test in "guard_review_flow_test", "context_size_warning_test", "usage_report_test") {
+          foreach ($test in "guard_review_flow_test", "guard_gui_images_test", "context_size_warning_test", "usage_report_test") {
             python "Tests/$test.py"
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
@@ -180,6 +180,11 @@ jobs:
       - name: Test dxforge --ops
         shell: pwsh
         run: pwsh -STA -NoProfile -File DXForgeCli/Tests/ops_cli_test.ps1 -Configuration DebugEditor -RequireRunner
+
+      # gui-check スキルのスクリプトのうち GUI なしで動く部分(#195)。偽の gh / orca を使う。prepare は上でビルドした dxforge で確かめる
+      - name: GUI check tools tests
+        shell: pwsh
+        run: ./Tests/GuiCheck.Tests.ps1 -RequireCli
 
       - name: Test Project Layout view
         shell: pwsh

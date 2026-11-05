@@ -22,7 +22,11 @@
 
 .PARAMETER Worktree
 	--worktree に渡す値。既定は new-top-level。既存の worktree(path:...、current など)を選ぶと、
-	worktree を作るときの引数(--name、--setup)は付けない。
+	worktree を作るときの引数(--name、--setup、--base-branch)は付けない。
+
+.PARAMETER BaseBranch
+	新しい worktree の起点(--base-branch)。既定は origin/develop。渡さないと Orca はリポジトリの既定のブランチ
+	(main)から作るので、ワーカーの最初の確認(develop を含むか)が失敗する。
 
 .PARAMETER Run
 	Run の ID。省略すると、このコーディネーターに結び付いている Run。
@@ -50,6 +54,8 @@ param(
 
 	[string]$Worktree = "new-top-level",
 
+	[string]$BaseBranch = "origin/develop",
+
 	[string]$Run,
 
 	[string]$Task,
@@ -71,6 +77,10 @@ if ([bool]$Task -ne $isRetry -or ($isRetry -and $SpecFile) -or (-not $isRetry -a
 	exit 2
 }
 $isNewWorktree = $Worktree -like "new-*"
+if ($PSBoundParameters.ContainsKey("BaseBranch") -and -not $isNewWorktree) {
+	Write-Host "-BaseBranch は新しい worktree のときだけ指定できます。"
+	exit 2
+}
 if ($isRetry -and $isNewWorktree) {
 	Write-Host "再試行は worktree を引き継がないので、-Worktree path:<パス> で前の worktree を指定してください。"
 	exit 2
@@ -97,7 +107,7 @@ if ($isNewWorktree -and -not $Name) {
 }
 
 $arguments = @("orchestration", "worker-start", "--agent", "claude", "--worktree", $Worktree)
-if ($isNewWorktree) { $arguments += @("--name", $Name, "--setup", "run") }
+if ($isNewWorktree) { $arguments += @("--name", $Name, "--base-branch", $BaseBranch, "--setup", "run") }
 if ($Size -eq "small") { $arguments += @("--model", $SmallModel) }
 if ($Run) { $arguments += @("--run", $Run) }
 if ($isRetry) { $arguments += @("--task", $Task, "--retry-of", $RetryOf) }

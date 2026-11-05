@@ -259,7 +259,7 @@ if (Test-Path variable:origEngine) { [Environment]::SetEnvironmentVariable("DXFO
 
 ### 2026/10/18(Issue #43)
 
-#44・#45・#46をマージした状態(`origin/develop` + 3ブランチをローカルでマージ)で、新しいworktreeから上の手順を最後まで通しました。GUIの操作はOrcaの`orca computer`(UI Automation)で行い、F5/Ctrl+F5/Shift+F5は`WScript.Shell`の`SendKeys`で送りました。
+#44・#45・#46をマージした状態(`origin/develop` + 3ブランチをローカルでマージ)で、新しいworktreeから上の手順を最後まで通しました。GUIの操作はOrcaの`orca computer`(UI Automation)で行い、F5/Ctrl+F5/Shift+F5は`WScript.Shell`の`SendKeys`で送りました。今の手順は`gui-check`スキルの`gui.ps1`です(#195)。
 
 | 手順 | 結果 | 確認したこと |
 |---|---|---|
