@@ -52,4 +52,4 @@ description: DXForgeEX のエディタやゲームを起動し、GUI で動作�
 
 - 確認が終わったら、ゲーム、DTE で開いた VS、エディタを `WM_CLOSE` で閉じる。worktree の DLL を掴んだままだと、`CleanupMerged.ps1` が worktree を消せない。
 - Debug ビルドの assert ダイアログで止まったプロセスが残っていないかを確かめる。
-- 確認用プロジェクト(`GuiCheck<N>`)は、ユーザーに聞いてから消す。
+- 確認用に自分で作ったプロジェクト(`GuiCheck<N>`)は、エディタを閉じたあと、ユーザーに聞かずに消す。名前を指定して消す。ほかのプロジェクトは消さない。
