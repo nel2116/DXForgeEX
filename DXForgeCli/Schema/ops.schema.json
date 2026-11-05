@@ -12,7 +12,7 @@
   "additionalProperties": false,
   "$defs": {
     "selector": {
-      "description": "対象のエンティティ。guid:<GUID>、name:<名前>(1 つに決まらなければ終了コード 41)、index:<シーン名>/<番号>、$<別名>(この操作より前の create-entity の as)。",
+      "description": "対象のエンティティ。guid:<GUID>、name:<名前>(1 つに決まらなければ終了コード 41)、index:<シーン名>/<番号>(同じ名前のシーンが複数あれば終了コード 41)、$<別名>(この操作より前の create-entity の as)。",
       "type": "string",
       "pattern": "^(guid:.+|name:.+|index:.+/[0-9]+|\\$[A-Za-z0-9_-]+)$"
     },

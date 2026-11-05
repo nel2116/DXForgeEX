@@ -3,17 +3,21 @@ using DXForgeEditor.Utilities;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Threading;
 
 namespace DXForgeEditor.Automation
 {
     /// <summary>
     /// エディタがプロジェクトを開いていることを、dxforge に知らせるロックファイル(Issue #183)。
-    /// エディタはプロジェクトを開いている間 &lt;プロジェクトのフォルダ&gt;\.DXForge\editor.lock を排他で開いたままにする。
-    /// エディタが落ちても OS が閉じて消すので、残骸で「開いている」と誤判定しない。
+    /// エディタはプロジェクトを開いている間 &lt;プロジェクトのフォルダ&gt;\.DXForge\editor.lock を開いたままにする。
+    /// 同じプロジェクトを複数のエディタが開けるので、ハンドルは共有で持つ。dxforge は共有なしで開けるかどうかで、
+    /// どれか 1 つでも開いているかを確かめる。エディタが落ちると OS がハンドルを閉じ、ファイルが残っても「開いている」とは判定しない。
     /// </summary>
     static class ProjectEditorLock
     {
         private const int ErrorSharingViolation = 32;
+        private const int AcquireAttempts = 5; // IsHeld や ReleaseHandle が共有なしで開いている一瞬を待つ
+        private const int AcquireRetryMilliseconds = 20;
         private static FileStream? _held;
 
         private static string LockFile(string projectFolder) => Path.Combine(projectFolder, ".DXForge", "editor.lock");
@@ -24,7 +28,7 @@ namespace DXForgeEditor.Automation
         /// </summary>
         internal static void OnProjectChanged(Project? project)
         {
-            _held?.Dispose();
+            if (_held != null) ReleaseHandle(_held);
             _held = null;
             if (project == null) return;
 
@@ -36,16 +40,48 @@ namespace DXForgeEditor.Automation
                     Logger.Log(MessageType.Warning, $"プロジェクトのフォルダがないので、エディタが開いていることを dxforge に知らせられません: {project.Path}");
                     return;
                 }
-                var file = LockFile(project.Path);
-                var folder = Path.GetDirectoryName(file);
-                Debug.Assert(folder != null);
-                Directory.CreateDirectory(folder);
-                _held = new FileStream(file, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
+                _held = AcquireHandle(project.Path);
             }
             catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException)
             {
                 Debug.WriteLine(ex.Message);
-                Logger.Log(MessageType.Warning, $"エディタが開いていることを dxforge に知らせられません(別のエディタが開いているかもしれません): {ex.Message}");
+                Logger.Log(MessageType.Warning, $"エディタが開いていることを dxforge に知らせられません: {ex.Message}");
+            }
+        }
+
+        /// <summary>ロックのハンドルを取る。ほかのエディタのハンドルとは共存する。</summary>
+        internal static FileStream AcquireHandle(string projectFolder)
+        {
+            var file = LockFile(projectFolder);
+            var folder = Path.GetDirectoryName(file);
+            Debug.Assert(folder != null);
+            Directory.CreateDirectory(folder);
+            for (var attempt = 1; ; ++attempt)
+            {
+                try
+                {
+                    return new FileStream(file, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite);
+                }
+                catch (Exception ex) when (attempt < AcquireAttempts && (ex is IOException || ex is UnauthorizedAccessException))
+                {
+                    Thread.Sleep(AcquireRetryMilliseconds);
+                }
+            }
+        }
+
+        /// <summary>ハンドルを閉じる。ほかのエディタが持っていなければ、ファイルも消す。</summary>
+        internal static void ReleaseHandle(FileStream handle)
+        {
+            var file = handle.Name;
+            handle.Dispose();
+            try
+            {
+                // NOTE: 共有なしで開けるのは誰も持っていないときだけ。持っているエディタがあれば、閉じるときにそちらが消す
+                using var last = new FileStream(file, FileMode.Open, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                Debug.WriteLine(ex.Message);
             }
         }
 

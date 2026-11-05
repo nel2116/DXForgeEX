@@ -300,7 +300,7 @@ pwsh -STA -NoProfile -File DXForgeCli/Tests/load_project_cli_test.ps1 -Configura
 | 読む | `list-scenes`、`list-entities`(`scene`は省略可)、`get-entity`(`target`) |
 | 変える | `create-entity`(`name`、`scene`、`as`は省略可)、`remove-entity`、`rename`(`name`)、`set-enabled`(`enabled`)、`set-transform`(`position`、`rotation_deg`か`rotation_rad`、`scale`)、`add-component`(`type`が`transform`/`script`(`name`)/`geometry`(`asset`))、`remove-component`(`type`)、`set-geometry`(`asset`) |
 
-- 対象(`target`)は`guid:<GUID>`、`name:<名前>`(1つに決まらなければエラー)、`index:<シーン名>/<番号>`、`$<別名>`(同じopsの中の`create-entity`の`as`)。`create-entity`の結果にGUIDが入ります。
+- 対象(`target`)は`guid:<GUID>`、`name:<名前>`(1つに決まらなければエラー)、`index:<シーン名>/<番号>`(同じ名前のシーンが複数あればエラー)、`$<別名>`(同じopsの中の`create-entity`の`as`)。`create-entity`の結果にGUIDが入ります。
 - アセット(`asset`)は`guid:<GUID>`、`path:<Contentからの相対パス>`、`default:cube`(既定のキューブ)。スクリプトは名前が登録されているかを確かめられないので、付けるのは許し、結果に警告を出します。
 - 変更があり、すべて成功したときだけ、最後に1回保存します(一時ファイルに書いてから置き換える)。途中で失敗したら何も保存しません。結果のJSONには必ず`changed`と`saved`が入り、操作ごとの結果は`results`に、失敗の場所は`error.op_index`と`error.key`に入ります。
 - エディタがそのプロジェクトを開いている間は、変更の操作を含むものは`--dry-run`でも断ります(44)。読むだけの操作はできます。

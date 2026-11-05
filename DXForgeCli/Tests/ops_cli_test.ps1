@@ -12,7 +12,7 @@
       3. すべての操作の成功(読むだけなら保存しない、値が変わらなければ保存しない)。セレクターとアセットの指定のすべて。
       4. 対象が見つからない(41)、操作の失敗(42)。
       5. --dry-run と途中の失敗で .dxproj が 1 バイトも変わらない。保存の失敗(43)。一時ファイルが残らない。
-      6. エディタが開いている(44): エディタと同じ ProjectEditorLock をテストのプロセスで持つ。読むだけなら通り、離す・切り替えると通る。
+      6. エディタが開いている(44): エディタと同じ ProjectEditorLock をテストのプロセスで持つ。読むだけなら通り、離す・切り替えると通る。2 つのエディタが持つなら、両方が離すまで断る。
       7. 空のプロジェクトに作って保存し、エディタのコード(Project.Load)で読むと同じ内容で、--frames で実行できる。
       8. GUID のない .dxproj。保存し直しても game.bin が変わらない。日本語の名前。
 
@@ -449,6 +449,23 @@ try
 	[System.IO.File]::WriteAllText($duplicateGuid, $xml)
 	$r = Invoke-Op $duplicateGuid "{`"op`":`"get-entity`",`"target`":`"guid:$OriginGuid`"}"
 	Expect-Failure "guid: matching two entities in the file" $r 41 "ambiguous_target"
+	# シーンの名前の重複は禁じられていない。index: や scene で先頭のシーンを選ばない
+	$duplicateScene = New-EmptyProject "DuplicateScene"
+	$sceneXml = [System.IO.File]::ReadAllText($duplicateScene)
+	$secondScene = '<Scene z:Id="i3"><GameEntities xmlns:a="http://schemas.datacontract.org/2004/07/DXForgeEditor.Components"/><IsActive>false</IsActive><Name>Sample Scene</Name><Project z:Ref="i1"/></Scene></Scenes>'
+	[System.IO.File]::WriteAllText($duplicateScene, $sceneXml.Replace("</Scenes>", $secondScene))
+	Expect-Saved "create in the active scene of a project with two scenes of one name" (Invoke-Op $duplicateScene '{"op":"create-entity","name":"Keep"}')
+	$duplicateBefore = Read-Bytes $duplicateScene
+	foreach ($case in @(
+			@{ Name = "index: with two scenes of one name"; Op = '{"op":"remove-entity","target":"index:Sample Scene/0"}'; Key = "scene" },
+			@{ Name = "list-entities with two scenes of one name"; Op = '{"op":"list-entities","scene":"Sample Scene"}'; Key = "scene" },
+			@{ Name = "create-entity with two scenes of one name"; Op = '{"op":"create-entity","scene":"Sample Scene"}'; Key = "scene" }))
+	{
+		$r = Expect-Unchanged $case.Name $duplicateScene $duplicateBefore 41 "ambiguous_target" { Invoke-Op $duplicateScene $case.Op }
+		Check ($r.Json.error.key -eq $case.Key) "$($case.Name) -> error.key" $r.Stdout
+	}
+	$r = Invoke-Op $duplicateScene '{"op":"get-entity","target":"name:Keep"}'
+	Check ($r.Code -eq 0 -and $r.Json.results[0].entity.name -eq "Keep") "name: still finds the entity when two scenes share a name" $r.Stdout
 	foreach ($case in @(
 			@{ Name = "add a Transform it already has"; Op = '{"op":"add-component","target":"name:Renamed","type":"transform"}'; Code = "component_exists" },
 			@{ Name = "add a Geometry it already has"; Op = '{"op":"add-component","target":"name:Renamed","type":"geometry","asset":"default:cube"}'; Code = "component_exists" },
@@ -528,6 +545,29 @@ try
 	[System.IO.File]::WriteAllText($lockFile, "")
 	$r = Invoke-Op $project $change
 	Expect-Saved "a leftover lock file that nobody holds is ignored" $r
+	# 同じプロジェクトを 2 つのエディタが開く。先に閉じたほうが、残っているエディタのロックを消さない
+	$lockFolder = Split-Path $project
+	function Is-Held { return [bool]$lockType.GetMethod("IsHeld", $flags).Invoke($null, [object[]]@([string]$lockFolder)) }
+	function Acquire-Lock { return $lockType.GetMethod("AcquireHandle", $flags).Invoke($null, [object[]]@([string]$lockFolder)).PSObject.BaseObject }
+	function Release-Lock($handle) { $null = $lockType.GetMethod("ReleaseHandle", $flags).Invoke($null, [object[]]@(, $handle)) }
+	$first = Acquire-Lock
+	$second = Acquire-Lock
+	Check (Is-Held) "two editors can hold the same project"
+	$before = Read-Bytes $project
+	Release-Lock $first
+	Check ((Is-Held) -and (Test-Path $lockFile)) "closing one of two editors keeps the lock"
+	$null = Expect-Unchanged "change while the second editor still has it open" $project $before 44 "editor_open" { Invoke-Op $project $change }
+	Release-Lock $second
+	Check (-not (Is-Held) -and -not (Test-Path $lockFile)) "closing both editors releases and deletes the lock"
+	$r = Invoke-Op $project $change
+	Expect-Saved "after closing both editors, the project can be changed" $r
+	# 片方が落ちても(ハンドルだけが閉じる)、残りのエディタのロックは効き続け、最後に閉じるほうが消す
+	$first = Acquire-Lock
+	$second = Acquire-Lock
+	$first.Dispose()
+	Check (Is-Held) "a crashed editor does not release the other editor's lock"
+	Release-Lock $second
+	Check (-not (Is-Held) -and -not (Test-Path $lockFile)) "the last editor deletes the lock after the other one crashed"
 	# .dxproj の Path のフォルダがなければ、エディタは古い場所にフォルダを作らない
 	$stale = (Load-Project $TransformOnly).PSObject.BaseObject
 	$stale.Path = Join-Path $work "does_not_exist\"

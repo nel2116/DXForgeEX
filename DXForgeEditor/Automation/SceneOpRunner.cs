@@ -200,9 +200,14 @@ namespace DXForgeEditor.Automation
             return changed;
         }
 
-        private Scene FindScene(string name) =>
-            _project.Scenes.FirstOrDefault(x => x.Name == name)
-                ?? throw new SceneOpException(SceneOpErrorKind.NotFound, "scene_not_found", $"シーン {name} がありません(シーン: {string.Join(", ", _project.Scenes.Select(x => x.Name))})", key: "scene");
+        private Scene FindScene(string name)
+        {
+            var matches = _project.Scenes.Where(x => x.Name == name).ToList();
+            if (matches.Count == 0) throw new SceneOpException(SceneOpErrorKind.NotFound, "scene_not_found", $"シーン {name} がありません(シーン: {string.Join(", ", _project.Scenes.Select(x => x.Name))})", key: "scene");
+            // NOTE: シーンの名前の重複は禁じられていない。先頭のシーンを選ぶと、別のシーンのエンティティを変えてしまう
+            if (matches.Count > 1) throw new SceneOpException(SceneOpErrorKind.NotFound, "ambiguous_target", $"シーン {name} が {matches.Count} 個あるので 1 つに決まりません(エンティティは guid: や name: でも指定できます)。", key: "scene");
+            return matches[0];
+        }
 
         private GameEntity Resolve(SceneOp op)
         {
