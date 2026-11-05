@@ -62,6 +62,8 @@ try {
 	Set-Content -LiteralPath (Join-Path $state "worktrees.txt") -Value "worktree C:/repo`nHEAD 0" -Encoding utf8
 	$env:PATH = "$bin;$savedPath"
 	$env:DXFORGE_TEST_STATE = $state
+	# 本物の start-gui-check.ps1 と Mutex を共有しない
+	$env:DXFORGE_GUI_CHECK_MUTEX = "Local\DXForgeEX_GuiCheckTest_" + [guid]::NewGuid().ToString("N")
 	foreach ($tool in "gh", "orca", "git") {
 		if ((Get-Command $tool).Source -notlike "$bin*") { throw "偽の $tool が解決されません" }
 	}
@@ -257,6 +259,29 @@ Closes #7
 	$leftovers = @(Get-ChildItem ([System.IO.Path]::GetTempPath()) -Filter "dxforge_gui_check_spec_*")
 	Check ($leftovers.Count -eq 0) "no temporary spec is left"
 
+	Write-Host "== start-gui-check.ps1 の排他 =="
+	$lock = [System.Threading.Mutex]::new($false, $env:DXFORGE_GUI_CHECK_MUTEX)
+	try {
+		[void]$lock.WaitOne(0)
+		$r = Invoke-Script $Start @("-Pr", "7")
+		Check ($r.Exit -eq 4 -and -not $r.Log -and $r.Output -match "起動の途中") "a second start does not wait or start while the lock is held (実際: $($r.Exit))"
+		$r = Invoke-Script $Start @("-Pr", "7", "-DryRun")
+		Check ($r.Exit -eq 0) "-DryRun does not need the lock (実際: $($r.Exit))"
+		$lock.ReleaseMutex()
+
+		# このプロセスがハンドルを持ち続けるので、Mutex は消えずに放棄された状態になる
+		& pwsh -NoProfile -Command '$m = [System.Threading.Mutex]::new($false, $env:DXFORGE_GUI_CHECK_MUTEX); if (-not $m.WaitOne(0)) { exit 9 }; exit 0'
+		Check ($LASTEXITCODE -eq 0) "a process took the lock and ended without releasing it"
+		$r = Invoke-Script $Start @("-Pr", "7")
+		Check ($r.Exit -eq 0 -and $r.Log -match "worker-start") "an abandoned lock counts as taken (実際: $($r.Exit) $($r.Output))"
+
+		Check $lock.WaitOne(0) "the lock is released after a start"
+		$lock.ReleaseMutex()
+	}
+	finally {
+		$lock.Dispose()
+	}
+
 	$r = Invoke-Script $Start @("-Pr", "999999", "-Cleanup")
 	Check ($r.Exit -eq 0 -and $r.Output -match "ありません: gui-check-pr-999999" -and -not $r.Log) "-Cleanup with no worktree does nothing"
 
@@ -268,6 +293,7 @@ Closes #7
 }
 finally {
 	$env:PATH = $savedPath
+	$env:DXFORGE_GUI_CHECK_MUTEX = $null
 	Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
 }
 

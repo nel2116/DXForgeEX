@@ -14,7 +14,7 @@ description: DXForgeEX のエディタやゲームを GUI で動かして確か�
 ./.claude/skills/gui-check/start-gui-check.ps1 -Pr <N> -Cleanup  # worker_done と worker-release のあとで worktree を消す
 ```
 
-PR の本文の `## GUI の確認手順`(番号付き)を読み、`worker-spec.md` と連結した仕様で新しいワーカーを起動する。ワーカーは PR の head をビルドして確かめ、画像を PR の本文に載せ、手順ごとの 1 行の結果だけを `worker_done` で返す(件名は `GUI 確認 PR #N: PASS|NG|未完了`)。マージの前に、`worker_done` の `head:` が今の PR の head と同じことを確かめる。違えば(確認のあとに push された)確認をやり直す。コーディネーターは自分で操作せず、画像も読まない(フックが止める)。マウスとキーの操作はデスクトップ全体に作用するので、GUI 確認は同時に 1 つだけにする(`gui-check-pr-*` の worktree が残っていれば終了コード 4 で起動しない)。
+PR の本文の `## GUI の確認手順`(番号付き)を読み、`worker-spec.md` と連結した仕様で新しいワーカーを起動する。ワーカーは PR の head をビルドして確かめ、画像を PR の本文に載せ、手順ごとの 1 行の結果だけを `worker_done` で返す(件名は `GUI 確認 PR #N: PASS|NG|未完了`)。マージの前に、`worker_done` の `head:` が今の PR の head と同じことを確かめる。違えば(確認のあとに push された)確認をやり直す。コーディネーターは自分で操作せず、画像も読まない(フックが止める)。マウスとキーの操作はデスクトップ全体に作用するので、GUI 確認は同時に 1 つだけにする(`gui-check-pr-*` の worktree が残っているか、別の起動の途中なら、終了コード 4 で起動しない)。
 
 ## ワーカーは `gui.ps1` を使う
 
