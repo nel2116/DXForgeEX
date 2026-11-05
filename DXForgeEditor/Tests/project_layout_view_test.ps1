@@ -100,6 +100,12 @@ try
 	Check (@(Find $list ([System.Windows.Controls.Button])).Count -ge 1) "an item has the remove button"
 
 	Write-Host "2. selection undo/redo"
+	# NOTE: アクティブなシーンでは、追加や Undo が GameEntity.IsActive からエンジンを呼ぶ。ここだけシーンをアクティブでなくして、エンジンを呼ばない
+	#       (リストは無効の表示になるが、選択の処理と SelectionChanged は同じ)
+	$scene.IsActive = $false
+	# アクティブでないシーンの Expander は閉じる(閉じていると、追加した項目の ListBoxItem が作られない)ので、開いておく
+	@(Find $view ([System.Windows.Controls.Expander]) | Where-Object { [object]::ReferenceEquals($_.DataContext, $scene.PSObject.BaseObject) })[0].IsExpanded = $true
+	Pump
 	$list.SelectedIndex = 2; Pump
 	Check ($inspector.DataContext.Name -eq "Scaled") "select Scaled"
 	$scene.RemoveGameEntityCommand.Execute($scene.GameEntities[2]); Pump
@@ -162,6 +168,8 @@ try
 	Check ($renamed.Name -eq $oldName) "undo restores the name ($($renamed.Name))"
 	$inspectorWindow.Content = $null
 	$inspectorWindow.Close()
+
+	$scene.IsActive = $true; Pump
 
 	Write-Host "3. Rename"
 	$rename = @(Find $view ([System.Windows.Controls.Button]) | Where-Object { $_.Content -eq "Rename" })
@@ -255,6 +263,9 @@ namespace DXForgeLayoutTest
 	$null = $holder.Join(11000)
 	Check ($watch.Elapsed.TotalSeconds -lt 5 -and -not $debuggingWhileBusy -and -not $canStartWhileBusy) "while the lock is held both return false without waiting ($($watch.ElapsedMilliseconds) ms)"
 	Check ($canStart.Invoke($null, @())) "after the lock is released, can start again"
+
+	# エンジンの DLL は最初の P/Invoke で読み込まれる。読み込まれていなければ、このテストはエンジンを呼んでいない
+	Check (@([System.Diagnostics.Process]::GetCurrentProcess().Modules | Where-Object { $_.ModuleName -eq "DXForgeEngineDLL.dll" }).Count -eq 0) "the test did not call the engine (DXForgeEngineDLL.dll is not loaded)"
 }
 finally
 {
