@@ -10,6 +10,9 @@
 	このブランチは PR に結び付かないので CleanupMerged.ps1 は消さない。worker_done のあと、worker-release してから
 	-Cleanup で消す。
 
+	マウスとキーの操作はデスクトップ全体に作用するので、GUI 確認は同時に 1 つだけにする。別の gui-check-pr-* の worktree が
+	残っていれば(確認中か片付けの前)、起動せずに終了コード 4 を返す。
+
 .PARAMETER Pr
 	PR の番号。
 
@@ -76,11 +79,15 @@ function Get-GuiCheckSteps([string]$Body) {
 	return (($collected -join "`n").Trim())
 }
 
-function Invoke-Cleanup {
+function Get-GuiCheckWorktrees {
 	$porcelain = git -C $RepoRoot worktree list --porcelain
 	if ($LASTEXITCODE -ne 0) { Write-Host "git worktree list に失敗しました。"; exit 1 }
-	$path = $porcelain | ForEach-Object { if ($_ -match '^worktree (.+)$') { $Matches[1] } } |
-		Where-Object { (Split-Path -Leaf $_) -eq $WorktreeName } | Select-Object -First 1
+	return @($porcelain | ForEach-Object { if ($_ -match '^worktree (.+)$') { $Matches[1] } } |
+			Where-Object { (Split-Path -Leaf $_) -match '^gui-check-pr-\d+$' })
+}
+
+function Invoke-Cleanup {
+	$path = Get-GuiCheckWorktrees | Where-Object { (Split-Path -Leaf $_) -eq $WorktreeName } | Select-Object -First 1
 	if (-not $path) { Write-Output "ありません: $WorktreeName"; exit 0 }
 	if ($DryRun) { Write-Output "orca worktree rm --worktree path:$path --delete-branch"; exit 0 }
 	if (-not (Get-Command orca -ErrorAction SilentlyContinue)) { Write-Host "orca が見つかりません。"; exit 1 }
@@ -115,6 +122,15 @@ $values = @{
 $template = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot "worker-spec.md"), [System.Text.Encoding]::UTF8)
 # 1 回の置き換えにする。手順の中に {{...}} があっても展開しない
 $spec = [regex]::Replace($template, '\{\{(\w+)\}\}', { param($m) $values[$m.Groups[1].Value] })
+
+if (-not $DryRun) {
+	$running = @(Get-GuiCheckWorktrees)
+	if ($running.Count -gt 0) {
+		Write-Host "GUI 確認の worktree が残っています: $($running -join ', ')"
+		Write-Host "GUI の操作はデスクトップ全体に作用するので、同時に 1 つだけにします。worker_done を待ち、worker-release と -Cleanup のあとで起動してください。"
+		exit 4
+	}
+}
 
 $specFile = Join-Path ([System.IO.Path]::GetTempPath()) ("dxforge_gui_check_spec_" + [guid]::NewGuid().ToString("N") + ".md")
 try {

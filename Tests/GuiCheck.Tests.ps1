@@ -252,6 +252,8 @@ Closes #7
 	$worktree = Join-Path $root "gui-check-pr-999998"
 	git -C $RepoRoot worktree add --quiet --detach $worktree HEAD
 	try {
+		$r = Invoke-Script $Start @("-Pr", "7")
+		Check ($r.Exit -eq 4 -and -not $r.Log -and $r.Output -match "gui-check-pr-999998") "a second GUI check does not start while another worktree remains (実際: $($r.Exit))"
 		$r = Invoke-Script $Start @("-Pr", "999998", "-Cleanup")
 		$selector = "path:" + (git -C $worktree rev-parse --show-toplevel)
 		Check ($r.Exit -eq 0 -and $r.Log -match "worktree rm --worktree" -and $r.Log -match "gui-check-pr-999998" -and $r.Log -match "--delete-branch" -and $r.Log -notmatch "--force") "-Cleanup removes the worktree through Orca, without --force ($selector)"
