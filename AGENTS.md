@@ -13,7 +13,8 @@ DXForgeEX is a from-scratch 3D game engine + WPF level editor that follows the "
 | engine/editor structure, renderer status, which project does what | `docs/dev/Architecture.md` |
 | build scripts, DXC, FBX SDK, warnings, encodings, tests, CI | `docs/dev/BuildAndTest.md` |
 | `DXForgeImport/` | `docs/dev/DXForgeImport.md` |
-| PR review, merging, `CodexReview.ps1`, `CleanupMerged.ps1` | `docs/dev/ReviewAndMerge.md` |
+| PR review, merging, `CodexReview.ps1`, `PrePr.ps1`, `CleanupMerged.ps1` | `docs/dev/ReviewAndMerge.md` |
+| orchestrated workers, `StartWorker.ps1`, `WorkerStatus.ps1` | `docs/dev/WorkerRules.md`, `docs/dev/ReviewAndMerge.md` |
 | editor behavior that needs a manual GUI check | `docs/ManualVerification.md` |
 | `build.ps1` parameters, human-facing overview | `README.md` |
 
@@ -24,6 +25,7 @@ DXForgeEX is a from-scratch 3D game engine + WPF level editor that follows the "
 ./build.ps1 -Target native -Configuration Release -RunTests -WarningsAsErrors
 ./build.ps1 -Target editor -WarningsAsErrors                       # editor + DXForgeImport
 python Tests/check_conventions.py                                  # BOM / literals / headers
+./PrePr.ps1                                                        # before gh pr create: runs what the diff needs
 ```
 
 - Iterate with the fast loop; a full `Debug`+`Release` sweep takes minutes and is only needed before pushing.
@@ -63,8 +65,9 @@ These are checked by `Tests/check_conventions.py` (CI, and a Claude Code hook af
 
 - The change builds with `-WarningsAsErrors` in the configs it affects, and `EngineUnitTests` plus any test next to the touched code pass. Report the command and its result, not "tests pass".
 - New behavior that can run headless has a test. Rendering/GPU and editor GUI changes have no automated test: check them by running the app (see `docs/ManualVerification.md`) and say what you saw. Whenever the app was checked on screen, put before/after screenshots in the PR body (`gui-check` skill, `push-pr-assets.ps1`), not only in a comment.
-- PRs target `develop`. Merging is gated by CI and a Codex review; see `docs/dev/ReviewAndMerge.md`. The coordinator runs the review and `-SetStatus`, which merges once CI and `codex-review` pass. A human-approval gate (`merge-ok`, issue #160) exists but is off; never add that label yourself (a hook blocks it). Never use `gh pr merge --auto` on a branch without that protection — it merges immediately.
+- Run `./PrePr.ps1` before `gh pr create` (a hook blocks the PR without a stamp of HEAD) and record its self-check items in a 「自己点検」 section of the PR body.
+- PRs target `develop`. Merging is gated by CI and a Codex review; see `docs/dev/ReviewAndMerge.md`. The worker runs the review with `-Post` and fixes the findings; only the coordinator runs `-SetStatus`, which merges once CI and `codex-review` pass, and verifies findings a worker chose not to fix. A human-approval gate (`merge-ok`, issue #160) exists but is off; never add that label yourself (a hook blocks it). Never use `gh pr merge --auto` on a branch without that protection — it merges immediately.
 
 ## Keeping sessions cheap
 
-Build output is the dominant token cost here. `build.ps1` summarizes it by default; pass `-DetailedLog` only when diagnosing a build failure, and never re-run a build just to see a log the summary already explained. Scope builds (`-Project EngineUnitTests`) rather than building everything. For CI, read `gh run view <id> --json conclusion,jobs` first and only then `--log-failed`, filtered through `tail`/`grep`.
+Build output is the dominant token cost here. `build.ps1` summarizes it by default; pass `-DetailedLog` only when diagnosing a build failure, and never re-run a build just to see a log the summary already explained. Scope builds (`-Project EngineUnitTests`) rather than building everything. A hook warns once when the context passes 150k tokens (`DXFORGE_CONTEXT_WARN_TOKENS`); hand over to a new conversation at the next good stopping point. `python Tests/usage_report.py` shows consumption per conversation. For CI, read `gh run view <id> --json conclusion,jobs` first and only then `--log-failed`, filtered through `tail`/`grep`.

@@ -36,6 +36,18 @@
 	ステータスはコミットに付くので、修正をpushすると外れ、再レビューで success になるまでマージされない。
 	merge-ok も push で外れる(.github/workflows/pr-automation.yml)。
 	PRの完了条件(GUIでの確認など)がそろってから、コーディネーターが指定すること。マージ済みのPRには使えない。
+	今のheadのPASSの目印(下の -Post)がPRにあれば、Codexを実行せずにステータスを設定する(#195)。
+	ただし、そのheadの codex-review がすでに failure か、読めないときはレビューする(-Post なしのレビューは
+	目印を残さないので、そのfailureを古いPASSで上書きしない)。
+
+.PARAMETER ForceReview
+	-SetStatus で、PASSの目印があってもレビューをやり直す。
+
+.NOTES
+	-Post は、PASSとFINDINGSのコメントの最後の行に目印を入れる(#195):
+	<!-- codex-review verdict=<pass|findings> sha=<40桁> base=<向き先> -->
+	目印として読むのは、gh でログインしているユーザーが書いた「## Codex レビュー」で始まるコメントの最後の行だけ
+	(ほかの人のコメントや、レビューの本文に引用された目印では通らない)。同じheadと向き先に複数あれば、最後のものを使う。
 
 .EXAMPLE
 	./CodexReview.ps1 -Pr 52
@@ -60,11 +72,126 @@ param(
 	[ValidateSet("low", "medium", "high", "xhigh")]
 	[string]$Effort = "high",
 
-	[switch]$SetStatus
+	[switch]$SetStatus,
+
+	[switch]$ForceReview
 )
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = $PSScriptRoot
+
+# FINDINGS がこの回数を超えたら、直し続けず相談するよう促す(ship-pr スキルの「指摘が収束しないとき」)
+$FindingsConsultLimit = 3
+
+# codex review の出力から判定する。
+# codex review は独自の出力形式に従い、カスタム指示で最後の行の書式を指定しても守らない。
+# 指摘は必ず "- [P1] 見出し — ファイル:行" の形の行で出る("Full review comments:" / 1件なら "Review comment:" の下)ので、
+# その行が1つでもあれば指摘あり(重大度を問わない)。指摘なしとするのは、その行がなく、かつ指示した
+# 「問題は見つかりませんでした」を含むときだけ(レビュー不能のメッセージなどを指摘なしと取り違えない)
+function Get-ReviewVerdict([string]$Review) {
+	if ($Review -match '(?m)^\s*-\s*\[P[0-3]\]' -or $Review -match '(?m)^(Full review comments|Review comments?):') { return "FINDINGS" }
+	if ($Review -match '問題は見つかりませんでした') { return "PASS" }
+	return "UNKNOWN"
+}
+
+# PRのコメントの最後の行に入れる、機械で読める目印
+function Get-ReviewMarker([string]$Verdict, [string]$Sha, [string]$Base) {
+	return "<!-- codex-review verdict=$($Verdict.ToLowerInvariant()) sha=$Sha base=$Base -->"
+}
+
+# gh pr view --json comments のコメントから、目印を時系列で取り出す。
+# ログインしているユーザーの、「## Codex レビュー」で始まるコメントの最後の行だけを読む
+function Get-ReviewMarkers($Comments, [string]$Viewer) {
+	foreach ($comment in @($Comments)) {
+		if (-not $comment -or -not $Viewer -or $comment.author.login -ne $Viewer) { continue }
+		$match = [regex]::Match([string]$comment.body, '\A## Codex レビュー\r?\n[\s\S]*\n<!-- codex-review verdict=(pass|findings) sha=([0-9a-f]{40}) base=(\S+) -->\s*\z')
+		if ($match.Success) {
+			[pscustomobject]@{ Verdict = $match.Groups[1].Value; Sha = $match.Groups[2].Value; Base = $match.Groups[3].Value; Url = $comment.url }
+		}
+	}
+}
+
+# このheadと向き先の最後の目印がPASSなら、その目印を返す。あとからFINDINGSが出ていれば通さない
+function Find-ReusablePass($Comments, [string]$Viewer, [string]$Sha, [string]$Base) {
+	$last = @(Get-ReviewMarkers $Comments $Viewer | Where-Object { $_.Sha -eq $Sha -and $_.Base -eq $Base }) | Select-Object -Last 1
+	if ($last -and $last.Verdict -eq "pass") { return $last }
+	return $null
+}
+
+function Get-FindingsCount($Comments, [string]$Viewer) {
+	return @(Get-ReviewMarkers $Comments $Viewer | Where-Object { $_.Verdict -eq "findings" }).Count
+}
+
+# このheadの codex-review が failure でなければ true。読めないときは false(PASSを使わない側に倒す)
+function Test-ReviewStatusAllowsReuse([string]$Sha) {
+	Push-Location $RepoRoot
+	try {
+		$current = gh api "repos/{owner}/{repo}/commits/$Sha/status" --jq '.statuses[] | select(.context == "codex-review") | .state' 2>$null
+		if ($LASTEXITCODE -ne 0) { return $false }
+		return "$current".Trim() -ne "failure"
+	}
+	finally {
+		Pop-Location
+	}
+}
+
+# PRのコメントとログイン名を読む。読めなければ $null を返す(目印がないものとして扱う)
+function Read-ReviewComments([int]$Number) {
+	Push-Location $RepoRoot
+	try {
+		$viewer = gh api user --jq .login
+		if ($LASTEXITCODE -ne 0 -or -not $viewer) { return $null }
+		$json = gh pr view $Number --json comments
+		if ($LASTEXITCODE -ne 0 -or -not $json) { return $null }
+		return [pscustomobject]@{ Viewer = "$viewer".Trim(); Comments = ($json | ConvertFrom-Json).comments }
+	}
+	catch {
+		return $null
+	}
+	finally {
+		Pop-Location
+	}
+}
+
+# レビューしたコミットにステータスを付け、PASSなら自動マージを予約する
+function Set-ReviewStatus([string]$Verdict, [string]$Description, [string]$TargetUrl) {
+	$state = if ($Verdict -eq "PASS") { "success" } else { "failure" }
+	Push-Location $RepoRoot
+	try {
+		# レビューしたコミット($head)に付ける。レビュー中にpushされていても、新しいheadは未レビューのまま残る
+		$statusArgs = @("api", "--silent", "repos/{owner}/{repo}/statuses/$head",
+			"-f", "state=$state", "-f", "context=codex-review", "-f", "description=$Description")
+		if ($TargetUrl) { $statusArgs += @("-f", "target_url=$TargetUrl") }
+		gh @statusArgs
+		if ($LASTEXITCODE -ne 0) { throw "コミットステータスの設定に失敗しました。" }
+		Write-Output "codex-review: $state ($($head.Substring(0, 7)))"
+
+		if ($Verdict -eq "PASS") {
+			$now = gh pr view $Pr --json headRefOid,baseRefName | ConvertFrom-Json
+			if ($now.headRefOid -ne $head) {
+				Write-Warning "レビュー中にPRのheadが $($now.headRefOid.Substring(0, 7)) に進みました。新しいheadは未レビューのため、自動マージは予約しません。"
+			}
+			elseif ($now.baseRefName -ne $base) {
+				# 保護を確かめたのはレビュー開始時の向き先なので、変わっていたら予約しない
+				Write-Warning "レビュー中にPRの向き先が $base から $($now.baseRefName) に変わりました。自動マージは予約しません。"
+			}
+			else {
+				# 必須のチェックがそろっていれば即座に、そうでなければそろった時点でGitHubがマージする
+				gh pr merge $Pr --auto --merge
+				if ($LASTEXITCODE -ne 0) { throw "自動マージの予約に失敗しました。" }
+				if ($needsApproval) {
+					Write-Output "自動マージを予約しました。承認待ちです: 人がPRに merge-ok ラベルを付けると、CI・hold・codex-review とそろった時点でマージされます。"
+				}
+				else {
+					Write-Output "自動マージを予約しました(CI・hold・codex-review がそろうとマージされます)。"
+				}
+			}
+		}
+	}
+	finally {
+		Pop-Location
+	}
+}
 
 foreach ($tool in "git", "gh", "codex") {
 	if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
@@ -127,6 +254,24 @@ if ($SetStatus) {
 		throw "向き先 $base のブランチ保護が codex-review と No hold label を必須にしていないため、-SetStatus(自動マージ)は使えません。"
 	}
 	$needsApproval = "Merge approved" -in $required
+
+	# 今のheadのPASSがすでにPRにあれば、同じ差分をもう一度Codexに見せない(#195)
+	if (-not $ForceReview) {
+		$read = Read-ReviewComments $Pr
+		$reusable = if ($read) { Find-ReusablePass $read.Comments $read.Viewer $head $base } else { $null }
+		if ($reusable -and -not (Test-ReviewStatusAllowsReuse $head)) {
+			Write-Output "$($head.Substring(0, 7)) のPASSがありますが、codex-review が failure か読めないので、レビューします。"
+			$reusable = $null
+		}
+		if ($reusable) {
+			git -C $RepoRoot update-ref -d "$ref/base"
+			git -C $RepoRoot update-ref -d "$ref/head"
+			Write-Output "$($head.Substring(0, 7)) のPASSがPRにあるので、レビューを省略します: $($reusable.Url)(やり直すときは -ForceReview)"
+			Write-Output "判定: PASS"
+			Set-ReviewStatus "PASS" "Codex review: no findings (PASS comment on this commit)" $reusable.Url
+			return
+		}
+	}
 }
 $currentSha = $baseSha
 if ($merged) {
@@ -207,13 +352,7 @@ finally {
 Remove-Item -ErrorAction SilentlyContinue $log
 Write-Output $review
 
-# codex review は独自の出力形式に従い、カスタム指示で最後の行の書式を指定しても守らない。
-# 指摘は必ず "- [P1] 見出し — ファイル:行" の形の行で出る("Full review comments:" / 1件なら "Review comment:" の下)ので、
-# その行が1つでもあれば指摘あり(重大度を問わない)。指摘なしとするのは、その行がなく、かつ指示した
-# 「問題は見つかりませんでした」を含むときだけ(レビュー不能のメッセージなどを指摘なしと取り違えない)
-$verdict = if ($review -match '(?m)^\s*-\s*\[P[0-3]\]' -or $review -match '(?m)^(Full review comments|Review comments?):') { "FINDINGS" }
-	elseif ($review -match '問題は見つかりませんでした') { "PASS" }
-	else { "UNKNOWN" }
+$verdict = Get-ReviewVerdict $review
 Write-Output "判定: $verdict"
 
 $commentUrl = $null
@@ -224,6 +363,8 @@ if ($Post) {
 	else {
 		"$($head.Substring(0, 7))(``$base`` の $($baseSha.Substring(0, 7)) との差分)"
 	}
+	# マージ済みのPRと判定できなかったレビューには目印を付けない
+	$marker = if (-not $merged -and $verdict -in "PASS", "FINDINGS") { "`n" + (Get-ReviewMarker $verdict $head $base) } else { "" }
 	$body = @"
 ## Codex レビュー
 
@@ -232,7 +373,7 @@ if ($Post) {
 $review
 
 ---
-``CodexReview.ps1`` による自動レビューです。ビルドやテストは行っていません。指摘は、修正するか、修正しない理由を返信してください。
+``CodexReview.ps1`` による自動レビューです。ビルドやテストは行っていません。指摘は、修正するか、修正しない理由を返信してください。$marker
 "@
 	$bodyFile = [System.IO.Path]::GetTempFileName()
 	Push-Location $RepoRoot
@@ -246,48 +387,26 @@ $review
 		Pop-Location
 		Remove-Item -ErrorAction SilentlyContinue $bodyFile
 	}
+
+	# コメントは投稿済みなので、回数を読めなくても失敗にしない
+	$read = Read-ReviewComments $Pr
+	if ($read) {
+		$findingsCount = Get-FindingsCount $read.Comments $read.Viewer
+		Write-Output "このPRのFINDINGSの回数: $findingsCount"
+		if ($findingsCount -gt $FindingsConsultLimit) {
+			Write-Output "FINDINGSが $FindingsConsultLimit 回を超えました。直し続けず、コーディネーターに ask で相談してください(方式の問題を疑う。ship-pr スキルの「指摘が収束しないとき」)。"
+		}
+	}
+	else {
+		Write-Warning "PRのコメントを読めず、FINDINGSの回数を数えられませんでした。"
+	}
 }
 
 if ($SetStatus) {
-	$state = if ($verdict -eq "PASS") { "success" } else { "failure" }
 	$description = switch ($verdict) {
 		"PASS" { "Codex review: no findings ($model, $Effort)" }
 		"FINDINGS" { "Codex review: findings to address ($model, $Effort)" }
 		default { "Codex review: could not confirm the review completed" }
 	}
-	Push-Location $RepoRoot
-	try {
-		# レビューしたコミット($head)に付ける。レビュー中にpushされていても、新しいheadは未レビューのまま残る
-		$statusArgs = @("api", "--silent", "repos/{owner}/{repo}/statuses/$head",
-			"-f", "state=$state", "-f", "context=codex-review", "-f", "description=$description")
-		if ($commentUrl) { $statusArgs += @("-f", "target_url=$commentUrl") }
-		gh @statusArgs
-		if ($LASTEXITCODE -ne 0) { throw "コミットステータスの設定に失敗しました。" }
-		Write-Output "codex-review: $state ($($head.Substring(0, 7)))"
-
-		if ($verdict -eq "PASS") {
-			$now = gh pr view $Pr --json headRefOid,baseRefName | ConvertFrom-Json
-			if ($now.headRefOid -ne $head) {
-				Write-Warning "レビュー中にPRのheadが $($now.headRefOid.Substring(0, 7)) に進みました。新しいheadは未レビューのため、自動マージは予約しません。"
-			}
-			elseif ($now.baseRefName -ne $base) {
-				# 保護を確かめたのはレビュー開始時の向き先なので、変わっていたら予約しない
-				Write-Warning "レビュー中にPRの向き先が $base から $($now.baseRefName) に変わりました。自動マージは予約しません。"
-			}
-			else {
-				# 必須のチェックがそろっていれば即座に、そうでなければそろった時点でGitHubがマージする
-				gh pr merge $Pr --auto --merge
-				if ($LASTEXITCODE -ne 0) { throw "自動マージの予約に失敗しました。" }
-				if ($needsApproval) {
-					Write-Output "自動マージを予約しました。承認待ちです: 人がPRに merge-ok ラベルを付けると、CI・hold・codex-review とそろった時点でマージされます。"
-				}
-				else {
-					Write-Output "自動マージを予約しました(CI・hold・codex-review がそろうとマージされます)。"
-				}
-			}
-		}
-	}
-	finally {
-		Pop-Location
-	}
+	Set-ReviewStatus $verdict $description $commentUrl
 }
