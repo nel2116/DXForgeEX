@@ -128,7 +128,10 @@ function Get-PrePrPlan([string[]]$ChangedFiles) {
 			# テストを変更したら、そのテストを実行する。エディタ側のテストにはエディタのビルドが要る
 			$command = if ($extension -eq ".py") { "python $file" } elseif ($top -eq "Tests") { "pwsh -NoProfile -File $file" } else { "pwsh -STA -NoProfile -File $file" }
 			if ($top -in "DXForgeEditor", "DXForgeCli", "DXForgeImport") { & $addBuild $editorBuild }
-			if ($top -eq "DXForgeEngineDLL") { & $addBuild $dllBuild }
+			if ($top -eq "DXForgeEngineDLL") {
+				& $addBuild $dllBuild
+				if ($extension -eq ".ps1") { & $addBuild $editorBuild }
+			}
 			if ($top -eq "ContentTools") { & $addBuild $toolsBuild }
 			& $addTest $command $file
 		}
@@ -136,6 +139,8 @@ function Get-PrePrPlan([string[]]$ChangedFiles) {
 			& $addBuild $editorBuild
 			if ($extension -eq ".csproj") { & $addTest $define $null; continue }
 			$folder = ($file -split "/")[1]
+			# 表の editor_shader_compilation_test は DXForgeEngineDLL.dll がないと失敗する
+			if ($folder -eq "DllWrappers") { & $addBuild $dllBuild }
 			foreach ($test in $(if ($editorTests.ContainsKey($folder)) { $editorTests[$folder] } else { @($layout) })) { & $addTest $test $null }
 		}
 		elseif ($top -eq "DXForgeCli" -and $isCSharp) {
@@ -151,6 +156,8 @@ function Get-PrePrPlan([string[]]$ChangedFiles) {
 		elseif ($top -eq "DXForgeEngineDLL" -and ($isCpp -or $isPackages)) {
 			& $addBuild $nativeBuild
 			& $addBuild $dllBuild
+			# editor_shader_compilation_test はエディタのラッパーを通す
+			& $addBuild $editorBuild
 			& $addTest "python DXForgeEngineDLL/Tests/shader_compilation_test.py" $null
 			& $addTest "pwsh -STA -NoProfile -File DXForgeEngineDLL/Tests/editor_shader_compilation_test.ps1" $null
 		}
@@ -252,7 +259,8 @@ try {
 			continue
 		}
 		$watch = [System.Diagnostics.Stopwatch]::StartNew()
-		$wrapped = "`$global:LASTEXITCODE = 0; $($step.Command); exit `$LASTEXITCODE"
+		# Stop: 起動できないコマンドは $LASTEXITCODE を変えないので、既定の Continue では exit 0 になってしまう
+		$wrapped = "`$ErrorActionPreference = 'Stop'; `$global:LASTEXITCODE = 0; $($step.Command); exit `$LASTEXITCODE"
 		# 出力は文脈を消費するので、ログに書いて、失敗したときだけ末尾を出す
 		$ErrorActionPreference = "Continue"
 		& pwsh -NoProfile -Command $wrapped 2>&1 | Out-File -LiteralPath $log -Encoding utf8

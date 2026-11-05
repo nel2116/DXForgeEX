@@ -68,14 +68,16 @@ $cases = @(
 	@("EngineUnitTests/Tests_A.cpp", @($native), @($editor)),
 	@("EngineUnitTests/Tests/headless_run_test.py", @($native), @("python EngineUnitTests")),
 	@("EngineTest/A.h", @($native), @($editor)),
-	@("DXForgeEngineDLL/A.cpp", @($native, $dll, "shader_compilation_test.py", "editor_shader_compilation_test.ps1"), @($editor)),
+	# editor_shader_compilation_test はエディタのラッパーを通すので、エディタのビルドも要る(PR #196 の Codex の指摘)
+	@("DXForgeEngineDLL/A.cpp", @($native, $dll, $editor, "shader_compilation_test.py", "editor_shader_compilation_test.ps1"), @()),
+	@("DXForgeEngineDLL/Tests/editor_shader_compilation_test.ps1", @($dll, $editor, "editor_shader_compilation_test.ps1"), @($native)),
 	@("ContentTools/A.cpp", @($tools, "missing_source_import_test.py", "primitive_mesh_cube_test.py"), @($editor, $native)),
 	@("DXForgeEditor/GameProject/A.cs", @($editor, "project_layout_view_test.ps1", "projects_path_test.ps1", "load_project_cli_test.ps1"), @($native)),
 	@("DXForgeEditor/Content/A.cs", @($editor, "material_asset_test.ps1", "default_geometry_test.ps1"), @($native)),
 	@("DXForgeEditor/Components/A.cs", @($editor, "material_asset_test.ps1"), @($native)),
 	@("DXForgeEditor/Automation/A.cs", @($editor, "ops_cli_test.ps1"), @($native)),
 	@("DXForgeEditor/Editors/A.xaml", @($editor, "project_layout_view_test.ps1"), @($native)),
-	@("DXForgeEditor/DllWrappers/A.cs", @($editor, "engine_init_test.ps1"), @($native)),
+	@("DXForgeEditor/DllWrappers/A.cs", @($editor, $dll, "engine_init_test.ps1", "editor_shader_compilation_test.ps1"), @($native)),
 	@("DXForgeEditor/GameDev/EnginePath.cs", @($editor, "engine_path_test.ps1", "project_layout_view_test.ps1"), @($native)),
 	@("DXForgeEditor/Utilities/A.cs", @($editor, "project_layout_view_test.ps1"), @($native)),
 	@("DXForgeEditor/MainWindow.xaml.cs", @($editor, "project_layout_view_test.ps1"), @($native)),
@@ -213,6 +215,20 @@ try {
 	Set-Content -LiteralPath $check -Value "$passing # changed" -Encoding utf8NoBOM
 	Invoke-Git -C $repo add . | Out-Null
 	Invoke-Git -C $repo commit -q -m "passing check" | Out-Null
+	# コマンドを起動できないときは、$LASTEXITCODE が 0 のままなので成功と取り違えやすい(PR #196 の Codex の指摘)
+	$savedPath = $env:PATH
+	$env:PATH = @((Split-Path (Get-Command pwsh).Source), (Split-Path (Get-Command git).Source)) -join ";"
+	try {
+		if (Get-Command python -ErrorAction SilentlyContinue) {
+			Check $false "python must not resolve in this case: $((Get-Command python).Source)"
+		}
+		$r = Invoke-PrePr
+	}
+	finally {
+		$env:PATH = $savedPath
+	}
+	Check ($r.Exit -eq 1 -and -not (Test-Path -LiteralPath $stampPath)) "a command that cannot start fails the run and leaves no stamp (実際: $($r.Exit))"
+
 	$r = Invoke-PrePr
 	Check ($r.Exit -eq 0 -and (Get-Content -Raw -LiteralPath $stampPath).Trim() -eq (Invoke-Git -C $repo rev-parse HEAD).Trim()) "a new commit gets a new stamp"
 	Check ($r.Output -match "ok   python Tests/check_conventions_test\.py") "changing the checker also runs its test"
