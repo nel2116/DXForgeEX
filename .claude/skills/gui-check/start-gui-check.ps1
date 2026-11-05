@@ -6,7 +6,8 @@
 	GUI 確認を文脈の大きいコーディネーターで行うと、画像と操作のターンで消費が増える。PR の本文の「GUI の確認手順」の節を
 	読み、worker-spec.md と連結した仕様で StartWorker.ps1 からワーカーを起動する。実装者のワーカーとは別にする。
 
-	worktree は gui-check-pr-<N> の名前で PR の head のブランチから新しく作る(ワーカーが head の sha を確かめる)。
+	worktree は gui-check-pr-<N> の名前で origin/develop から新しく作り、ワーカーが refs/pull/<N>/head を fetch して、
+	PR の head の sha と一致することを確かめてから切り替える(fork の PR でも同じ)。
 	このブランチは PR に結び付かないので CleanupMerged.ps1 は消さない。worker_done のあと、worker-release してから
 	-Cleanup で消す。
 
@@ -135,12 +136,7 @@ if (-not $DryRun) {
 $specFile = Join-Path ([System.IO.Path]::GetTempPath()) ("dxforge_gui_check_spec_" + [guid]::NewGuid().ToString("N") + ".md")
 try {
 	[System.IO.File]::WriteAllText($specFile, $spec, [System.Text.UTF8Encoding]::new($false))
-	# ワーカーの起点を最新にする。失敗しても、ワーカーが head の sha を確かめるので止めない
-	if (-not $DryRun) {
-		git -C $RepoRoot fetch --quiet --no-write-fetch-head origin $pull.headRefName 2>$null
-		if ($LASTEXITCODE -ne 0) { Write-Warning "origin/$($pull.headRefName) を fetch できませんでした。" }
-	}
-	$arguments = @{ SpecFile = $specFile; Name = $WorktreeName; BaseBranch = "origin/$($pull.headRefName)"; Size = $Size }
+	$arguments = @{ SpecFile = $specFile; Name = $WorktreeName; Size = $Size }
 	if ($Run) { $arguments.Run = $Run }
 	if ($DryRun) { $arguments.DryRun = $true }
 	& (Join-Path $RepoRoot "StartWorker.ps1") @arguments

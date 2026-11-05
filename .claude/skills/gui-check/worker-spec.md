@@ -1,4 +1,4 @@
-## タスク: PR #{{PR}} の GUI 確認(#195)
+﻿## タスク: PR #{{PR}} の GUI 確認(#195)
 
 PR: {{URL}}(「{{TITLE}}」)。確かめる head: `{{HEAD}}`(ブランチ `{{HEAD_REF}}`、向き先 `{{BASE_REF}}`)。
 
@@ -7,7 +7,7 @@ PR: {{URL}}(「{{TITLE}}」)。確かめる head: `{{HEAD}}`(ブランチ `{{HEA
 ### 共通のルールとの違い(こちらを優先する)
 
 - GUI を使う。操作は `.claude/skills/gui-check/gui.ps1`(使い方は `gui-check` スキルの `SKILL.md`)で行う。`orca computer` は使わない。
-- 最初の確認は「`origin/develop` を含むか」ではなく、`git fetch origin {{HEAD_REF}}` のあとで `git rev-parse HEAD` が上の head と同じか。違えば `git checkout --detach {{HEAD}}` にする。`origin/{{HEAD_REF}}` の先頭が上の head と違っていたら、確認せずに未完了として報告する。
+- 最初に PR の head に切り替える: `git fetch origin refs/pull/{{PR}}/head` のあと、`git rev-parse FETCH_HEAD` が上の head と一致することを確かめて `git checkout --detach {{HEAD}}` にする。一致しなければ(PR が更新された)、確認せずに未完了として報告する。
 - ブランチは付け直さない。コミット、push(`push-pr-assets.ps1` を除く)、PR の作成、`PrePr.ps1`、CI の待機、`CodexReview.ps1` は行わない。製品のコードを直さない。
 - `ask` で許可を待たない。終わったら下の形式で `worker_done` を 1 回送って終わる。
 - 手順どおりに進めない、または判断できないときだけ `ask` する。不具合を見つけても自分で直さず、Issue も立てず、NG として報告する。

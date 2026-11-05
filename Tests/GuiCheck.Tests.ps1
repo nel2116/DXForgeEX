@@ -43,6 +43,13 @@ if ($args[1] -eq "worker-start") {
 exit 0
 '@
 
+# start-gui-check.ps1 が git で読むのは worktree の一覧だけ。本物の一覧(並行して動く GUI 確認)の影響を受けないようにする
+$fakeGit = @'
+if ("$args" -notmatch "worktree list --porcelain") { exit 1 }
+Get-Content -Encoding utf8 (Join-Path $env:DXFORGE_TEST_STATE "worktrees.txt")
+exit 0
+'@
+
 $root = Join-Path ([System.IO.Path]::GetTempPath()) ("dxforge_guicheck_test_" + [guid]::NewGuid().ToString("N"))
 $bin = Join-Path $root "bin"
 $state = Join-Path $root "state"
@@ -51,9 +58,11 @@ try {
 	New-Item -ItemType Directory -Path $bin, $state | Out-Null
 	Set-Content -LiteralPath (Join-Path $bin "gh.ps1") -Value $fakeGh -Encoding utf8
 	Set-Content -LiteralPath (Join-Path $bin "orca.ps1") -Value $fakeOrca -Encoding utf8
+	Set-Content -LiteralPath (Join-Path $bin "git.ps1") -Value $fakeGit -Encoding utf8
+	Set-Content -LiteralPath (Join-Path $state "worktrees.txt") -Value "worktree C:/repo`nHEAD 0" -Encoding utf8
 	$env:PATH = "$bin;$savedPath"
 	$env:DXFORGE_TEST_STATE = $state
-	foreach ($tool in "gh", "orca") {
+	foreach ($tool in "gh", "orca", "git") {
 		if ((Get-Command $tool).Source -notlike "$bin*") { throw "偽の $tool が解決されません" }
 	}
 	$orcaLog = Join-Path $state "orca.log"
@@ -208,7 +217,8 @@ Closes #7
 	$r = Invoke-Script $Start @("-Pr", "7", "-DryRun")
 	$steps = $r.Output.Substring($r.Output.IndexOf("### 手順"))
 	Check ($r.Exit -eq 0 -and -not $r.Log) "-DryRun does not call orca"
-	Check ($r.Output -match "--worktree new-top-level --name gui-check-pr-7 --base-branch origin/fix/issue-7-x --setup run --model claude-sonnet-5-5") "a new worktree from the PR head, on the small model"
+	Check ($r.Output -match "--worktree new-top-level --name gui-check-pr-7 --base-branch origin/develop --setup run --model claude-sonnet-5-5") "a new worktree from origin/develop, on the small model"
+	Check ($r.Output -match "git fetch origin refs/pull/7/head" -and $r.Output -match ("git checkout --detach " + ("a" * 40))) "the worker fetches the PR ref and checks out the head"
 	Check ($steps -match "1\. エディタを開く" -and $steps -match "コードの中の見出しは節を閉じない" -and $steps -match "子の見出しは節に含む") "takes the section with code and sub-headings"
 	Check ($steps -notmatch "これは手順ではない|これも手順ではない|Closes|Generated") "does not take other sections"
 	Check ($steps -match "2\. \{\{HEAD\}\} はそのまま残す") "placeholders in the steps stay as written"
@@ -249,18 +259,11 @@ Closes #7
 	$r = Invoke-Script $Start @("-Pr", "999999", "-Cleanup")
 	Check ($r.Exit -eq 0 -and $r.Output -match "ありません: gui-check-pr-999999" -and -not $r.Log) "-Cleanup with no worktree does nothing"
 
-	$worktree = Join-Path $root "gui-check-pr-999998"
-	git -C $RepoRoot worktree add --quiet --detach $worktree HEAD
-	try {
-		$r = Invoke-Script $Start @("-Pr", "7")
-		Check ($r.Exit -eq 4 -and -not $r.Log -and $r.Output -match "gui-check-pr-999998") "a second GUI check does not start while another worktree remains (実際: $($r.Exit))"
-		$r = Invoke-Script $Start @("-Pr", "999998", "-Cleanup")
-		$selector = "path:" + (git -C $worktree rev-parse --show-toplevel)
-		Check ($r.Exit -eq 0 -and $r.Log -match "worktree rm --worktree" -and $r.Log -match "gui-check-pr-999998" -and $r.Log -match "--delete-branch" -and $r.Log -notmatch "--force") "-Cleanup removes the worktree through Orca, without --force ($selector)"
-	}
-	finally {
-		git -C $RepoRoot worktree remove --force $worktree
-	}
+	Set-Content -LiteralPath (Join-Path $state "worktrees.txt") -Value "worktree C:/repo`nHEAD 0`n`nworktree C:/w/gui-check-pr-999998`nHEAD 1" -Encoding utf8
+	$r = Invoke-Script $Start @("-Pr", "7")
+	Check ($r.Exit -eq 4 -and -not $r.Log -and $r.Output -match "gui-check-pr-999998") "a second GUI check does not start while another worktree remains (実際: $($r.Exit))"
+	$r = Invoke-Script $Start @("-Pr", "999998", "-Cleanup")
+	Check ($r.Exit -eq 0 -and $r.Log -match "worktree rm --worktree path:C:/w/gui-check-pr-999998 --delete-branch" -and $r.Log -notmatch "--force") "-Cleanup removes the worktree through Orca, without --force"
 }
 finally {
 	$env:PATH = $savedPath
