@@ -568,6 +568,42 @@ try
 	Check (Is-Held) "a crashed editor does not release the other editor's lock"
 	Release-Lock $second
 	Check (-not (Is-Held) -and -not (Test-Path $lockFile)) "the last editor deletes the lock after the other one crashed"
+	Check (-not (Is-Held)) "no lock file -> not held"
+	$noLockFolder = Join-Path $work "NoDXForgeFolder"
+	$null = New-Item -ItemType Directory -Force $noLockFolder
+	Check (-not [bool]$lockType.GetMethod("IsHeld", $flags).Invoke($null, [object[]]@([string]$noLockFolder))) "no .DXForge folder -> not held"
+	# 権限がなくて確かめられないときは、上書きを防ぐ側に倒す。File.Exists が false を返す形(フォルダの一覧とファイルの属性の拒否)で試す
+	[System.IO.File]::WriteAllText($lockFile, "")
+	$lockFileInfo = [System.IO.FileInfo]::new($lockFile)
+	$lockFolderInfo = [System.IO.DirectoryInfo]::new((Split-Path $lockFile))
+	$me = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+	$denyFile = [System.Security.AccessControl.FileSystemAccessRule]::new($me, [System.Security.AccessControl.FileSystemRights]"ReadData,ReadAttributes", "Deny")
+	$denyFolder = [System.Security.AccessControl.FileSystemAccessRule]::new($me, [System.Security.AccessControl.FileSystemRights]"ListDirectory", "Deny")
+	$before = Read-Bytes $project
+	try
+	{
+		$deniedFile = [System.IO.FileSystemAclExtensions]::GetAccessControl($lockFileInfo)
+		$deniedFile.AddAccessRule($denyFile)
+		[System.IO.FileSystemAclExtensions]::SetAccessControl($lockFileInfo, $deniedFile)
+		$deniedFolder = [System.IO.FileSystemAclExtensions]::GetAccessControl($lockFolderInfo)
+		$deniedFolder.AddAccessRule($denyFolder)
+		[System.IO.FileSystemAclExtensions]::SetAccessControl($lockFolderInfo, $deniedFolder)
+		Check (-not [System.IO.File]::Exists($lockFile)) "(the denied lock file is what File.Exists cannot see)"
+		Check (Is-Held) "a lock file that cannot be checked -> held"
+		$null = Expect-Unchanged "change when the lock file cannot be checked" $project $before 44 "editor_open" { Invoke-Op $project $change }
+	}
+	finally
+	{
+		# NOTE: SetAccessControl は変更のないオブジェクトを書き込まないので、取っておいた ACL では戻らない。付けた規則を外す
+		$restoredFolder = [System.IO.FileSystemAclExtensions]::GetAccessControl($lockFolderInfo)
+		$null = $restoredFolder.RemoveAccessRule($denyFolder)
+		[System.IO.FileSystemAclExtensions]::SetAccessControl($lockFolderInfo, $restoredFolder)
+		$restoredFile = [System.IO.FileSystemAclExtensions]::GetAccessControl($lockFileInfo)
+		$null = $restoredFile.RemoveAccessRule($denyFile)
+		[System.IO.FileSystemAclExtensions]::SetAccessControl($lockFileInfo, $restoredFile)
+	}
+	Check (-not (Is-Held)) "after the ACL is restored, the leftover lock file is not held"
+	[System.IO.File]::Delete($lockFile)
 	# .dxproj の Path のフォルダがなければ、エディタは古い場所にフォルダを作らない
 	$stale = (Load-Project $TransformOnly).PSObject.BaseObject
 	$stale.Path = Join-Path $work "does_not_exist\"

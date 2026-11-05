@@ -93,7 +93,7 @@ namespace DXForgeEditor.Automation
             try
             {
                 var file = LockFile(projectFolder);
-                if (!File.Exists(file)) return false;
+                // NOTE: File.Exists は権限がなくても false を返すので使わない。ないことは下の例外で判定する
                 using var probe = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None);
                 return false;
             }
