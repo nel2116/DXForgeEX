@@ -124,9 +124,9 @@ try {
 		git -C $RepoRoot fetch --quiet --no-write-fetch-head origin $pull.headRefName 2>$null
 		if ($LASTEXITCODE -ne 0) { Write-Warning "origin/$($pull.headRefName) を fetch できませんでした。" }
 	}
-	$arguments = @("-SpecFile", $specFile, "-Name", $WorktreeName, "-BaseBranch", "origin/$($pull.headRefName)", "-Size", $Size)
-	if ($Run) { $arguments += @("-Run", $Run) }
-	if ($DryRun) { $arguments += "-DryRun" }
+	$arguments = @{ SpecFile = $specFile; Name = $WorktreeName; BaseBranch = "origin/$($pull.headRefName)"; Size = $Size }
+	if ($Run) { $arguments.Run = $Run }
+	if ($DryRun) { $arguments.DryRun = $true }
 	& (Join-Path $RepoRoot "StartWorker.ps1") @arguments
 	$code = $LASTEXITCODE
 }

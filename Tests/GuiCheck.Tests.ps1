@@ -64,8 +64,8 @@ try {
 		$output = & pwsh -NoProfile -File $Script @Arguments 2>&1 | Out-String
 		[pscustomobject]@{ Exit = $LASTEXITCODE; Output = $output; Log = $(if (Test-Path $orcaLog) { Get-Content -Raw -Encoding utf8 $orcaLog } else { "" }) }
 	}
-	function Set-Pr([string]$Body, [string]$State = "OPEN") {
-		$pr = [pscustomobject]@{ url = "https://example.test/pull/7"; title = "Title {{HEAD}}"; state = $State; body = $Body; headRefName = "fix/issue-7-x"; headRefOid = "a" * 40; baseRefName = "develop" }
+	function Set-Pr([string]$Body, [string]$PrState = "OPEN") {
+		$pr = [pscustomobject]@{ url = "https://example.test/pull/7"; title = "Title {{HEAD}}"; state = $PrState; body = $Body; headRefName = "fix/issue-7-x"; headRefOid = "a" * 40; baseRefName = "develop" }
 		[System.IO.File]::WriteAllText((Join-Path $state "pr.json"), (ConvertTo-Json -InputObject $pr), [System.Text.UTF8Encoding]::new($false))
 	}
 
