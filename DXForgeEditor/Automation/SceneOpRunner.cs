@@ -338,12 +338,19 @@ namespace DXForgeEditor.Automation
     static class SceneOpProjectWriter
     {
         /// <summary>
+        /// 実行ごとに別の名前にする。同じ名前だと、並行で実行したほかの dxforge が書いた内容を置き換えてしまう。
+        /// File.Move が同じボリュームで済むように、同じフォルダに作る。
+        /// </summary>
+        internal static string TemporaryFile(string file) => $"{file}.{Guid.NewGuid():N}.dxforge-tmp";
+
+        /// <summary>
         /// 一時ファイルに書いてから置き換える。途中で落ちても元の .dxproj は壊れない。失敗したら元の .dxproj は変わらない。
         /// 保存先は渡されたファイルで、Project.FullPath(.dxproj に保存された Path は古いことがある)は使わない。
+        /// NOTE: 同じプロジェクトに並行で実行すると、あとから保存したものが勝つ(先の変更は消える)。これを防ぐ排他はしない。
         /// </summary>
         public static void Save(Project project, string file)
         {
-            var temp = file + ".dxforge-tmp";
+            var temp = TemporaryFile(file);
             try
             {
                 Serializer.ToFile(project, temp);

@@ -171,6 +171,8 @@ function Expect-Saved([string]$name, $r)
 	Check ($r.Code -eq 0 -and $r.Json.success -and $null -eq $r.Json.error -and $r.Json.changed -eq $true -and $r.Json.saved -eq $true) "$name -> exit 0, changed, saved" "$($r.Code) $($r.Stdout) $($r.Stderr)"
 }
 
+function Test-TemporaryFiles([string]$project) { return @(Get-ChildItem -LiteralPath (Split-Path $project) -Filter "*.dxforge-tmp").Count -gt 0 }
+
 function Get-Component($entity, [string]$type) { return @($entity.components | Where-Object { $_.type -eq $type })[0] }
 
 function New-Asset([string]$file, [int]$type, [Guid]$guid)
@@ -358,7 +360,7 @@ try
 	$r = Invoke-Op $project '{"op":"rename","target":"name:Origin","name":"Renamed"}'
 	Expect-Saved "rename" $r
 	Check ($r.Json.results[0].entity.name -eq "Renamed" -and $r.Json.results[0].entity.guid -eq $OriginGuid) "rename keeps the GUID" $r.Stdout
-	Check (-not (Test-Path "$project.dxforge-tmp")) "no temporary file is left after saving"
+	Check (-not (Test-TemporaryFiles $project)) "no temporary file is left after saving"
 	$r = Invoke-Op $project "{`"op`":`"get-entity`",`"target`":`"guid:$OriginGuid`"}"
 	Check ($r.Json.results[0].entity.name -eq "Renamed") "the rename is in the saved file" $r.Stdout
 
@@ -485,7 +487,7 @@ try
 	$r = Invoke-Ops $project @('{"op":"create-entity","as":"a","name":"DryRun"}', '{"op":"set-transform","target":"$a","position":[1,2,3]}', '{"op":"get-entity","target":"name:DryRun"}') -DryRun
 	Check ($r.Code -eq 0 -and $r.Json.dry_run -eq $true -and $r.Json.changed -eq $true -and $r.Json.saved -eq $false -and $r.Json.results[2].entity.name -eq "DryRun") "--dry-run runs the ops in memory -> changed, not saved" "$($r.Stdout) $($r.Stderr)"
 	Check ($r.Stderr -match "保存していません") "--dry-run with changes says on stderr that nothing was saved" $r.Stderr
-	Check ((Bytes-Equal (Read-Bytes $project) $before) -and [System.IO.File]::GetLastWriteTimeUtc($project) -eq $timeBefore -and -not (Test-Path "$project.dxforge-tmp")) "--dry-run does not touch the .dxproj"
+	Check ((Bytes-Equal (Read-Bytes $project) $before) -and [System.IO.File]::GetLastWriteTimeUtc($project) -eq $timeBefore -and -not (Test-TemporaryFiles $project)) "--dry-run does not touch the .dxproj"
 	$r = Invoke-Op $project '{"op":"list-scenes"}' -DryRun
 	Check ($r.Code -eq 0 -and $r.Json.changed -eq $false -and -not ($r.Stderr -match "保存していません")) "--dry-run of a read-only op has no notice" "$($r.Stdout) $($r.Stderr)"
 	$r = Invoke-Op $project '{"op":"rename","target":"name:Nope","name":"x"}' -DryRun
@@ -495,14 +497,56 @@ try
 	$results = @($r.Json.results)
 	Check ($results.Count -eq 3 -and $results[0].ok -and $results[1].ok -and $results[2].ok -eq $false -and $r.Json.error.op_index -eq 2 -and $r.Json.op_count -eq 4 -and $r.Json.error.message -match "ops\[2\]") "failure part way -> results stop at the failed op, with its number and reason" $r.Stdout
 	$r = Expect-Unchanged "failure part way (42)" $project $before 42 "transform_not_removable" { Invoke-Ops $project @('{"op":"rename","target":"name:Origin","name":"Y"}', '{"op":"remove-component","target":"name:Moved","type":"transform"}') }
-	Check (-not (Test-Path "$project.dxforge-tmp")) "a failure part way leaves no temporary file"
+	Check (-not (Test-TemporaryFiles $project)) "a failure part way leaves no temporary file"
 
-	# 一時ファイルの場所をフォルダで塞ぐと、保存できない
-	$null = New-Item -ItemType Directory "$project.dxforge-tmp"
-	$r = Expect-Unchanged "save failure" $project $before 43 "save_failed" { Invoke-Op $project '{"op":"rename","target":"name:Origin","name":"Y"}' }
-	Remove-Item "$project.dxforge-tmp"
+	# 削除の共有を許さずに開いておくと、読めるが置き換えられないので保存できない(Serializer は読むときも読み書きで開く)
+	$holder = [System.IO.FileStream]::new($project, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
+	try
+	{
+		$r = Expect-Unchanged "save failure" $project $before 43 "save_failed" { Invoke-Op $project '{"op":"rename","target":"name:Origin","name":"Y"}' }
+	}
+	finally
+	{
+		$holder.Dispose()
+	}
+	Check (-not (Test-TemporaryFiles $project)) "a save failure leaves no temporary file"
 	$r = Invoke-Op $project '{"op":"list-scenes"}'
 	Check ($r.Code -eq 0) "the project still loads after the save failure" $r.Stdout
+
+	# 一時ファイルの名前は実行ごとに分かれ、置き換えられるように同じフォルダにある
+	$temporaryFile = $editor.GetType("DXForgeEditor.Automation.SceneOpProjectWriter", $true).GetMethod("TemporaryFile", $flags)
+	$tempA = [string]$temporaryFile.Invoke($null, [object[]]@([string]$project))
+	$tempB = [string]$temporaryFile.Invoke($null, [object[]]@([string]$project))
+	Check ($tempA -ne $tempB -and (Split-Path $tempA) -eq (Split-Path $project) -and (Split-Path $tempB) -eq (Split-Path $project)) "each run has its own temporary file in the project's folder" "$tempA $tempB"
+
+	# 並行で実行する。あとから保存したものが勝つが、失敗したものの変更は保存されず、一時ファイルも残らない
+	$parallel = New-EmptyProject "Parallel"
+	$runs = @(0..7 | ForEach-Object {
+			$psi = [System.Diagnostics.ProcessStartInfo]::new($Cli)
+			$psi.UseShellExecute = $false
+			$psi.RedirectStandardOutput = $true
+			$psi.RedirectStandardError = $true
+			foreach ($a in @("--load-project", $parallel, "--op", "{`"op`":`"create-entity`",`"name`":`"Run$_`"}", "--json")) { $psi.ArgumentList.Add($a) }
+			[pscustomobject]@{ Name = "Run$_"; Process = [System.Diagnostics.Process]::Start($psi) }
+		})
+	foreach ($run in $runs)
+	{
+		$stderrTask = $run.Process.StandardError.ReadToEndAsync()
+		$null = $run.Process.StandardOutput.ReadToEnd()
+		if (-not $run.Process.WaitForExit(120000)) { $run.Process.Kill($true) }
+		$null = $stderrTask.Result
+		$run | Add-Member Code $run.Process.ExitCode
+		$run.Process.Dispose()
+	}
+	# NOTE: 読むときや置き換えるときに、ほかの実行と重なって失敗することはある(31、43)。失敗は許すが、その変更が残るのは許さない
+	$unexpected = @($runs | Where-Object { $_.Code -notin 0, 31, 43 })
+	Write-Host "       parallel exit codes: $(($runs | ForEach-Object { $_.Code }) -join ' ')"
+	Check ($unexpected.Count -eq 0) "parallel runs -> each one succeeds or fails cleanly" (($runs | ForEach-Object { "$($_.Name)=$($_.Code)" }) -join " ")
+	$r = Invoke-Op $parallel '{"op":"list-entities"}'
+	$savedNames = @($r.Json.results[0].entities | ForEach-Object { $_.name })
+	$succeeded = @($runs | Where-Object { $_.Code -eq 0 } | ForEach-Object { $_.Name })
+	Check ($r.Code -eq 0 -and $savedNames.Count -ge 1 -and @($savedNames | Where-Object { $_ -notin $succeeded }).Count -eq 0) "parallel runs -> only the changes of runs that succeeded are saved" "saved: $savedNames; succeeded: $succeeded"
+	Check (-not (Test-TemporaryFiles $parallel)) "parallel runs leave no temporary file"
 
 	Write-Host "6. editor has the project open (44)"
 	$project = New-EmptyProject "Locked"
