@@ -8,10 +8,12 @@
 
     確かめること:
       1. アクティブなシーンのリストが読み込まれると先頭のエンティティが選ばれ、インスペクターに出る。スクロールバーを持たない。
-      2. 選択の undo/redo は番号で覚える。選択したエンティティを削除・追加したあとで、履歴の最初まで undo し、最後まで redo しても落ちない。
+      2. 選択の undo/redo。選択したエンティティを削除・追加したあとで、履歴の最初まで undo し、最後まで redo しても落ちない。
+         選択したエンティティより前のものを消して番号がずれても、同じエンティティに戻る。
       3. シーンごとの Rename ボタンで、名前の入力欄が開く。
       4. 空のシーンのプロジェクトに切り替えると、インスペクターが空になる(#178)。
       5. 共通にした RemoveButtonStyle を使う、インポート設定のビューを作れる。
+      6. VisualStudio.IsDebugging と CanStart は、ビルドの lock が取られていても待たずに false を返す(コマンドの CanExecute で UI スレッドを止めない)。
 
 .PARAMETER Configuration
     DebugEditor(既定)か ReleaseEditor。
@@ -113,11 +115,21 @@ try
 	$undo.Undo(); Pump
 	Check ($scene.GameEntities.Count -eq 3 -and $scene.GameEntities[2].Name -eq "Scaled") "undoing the remove brings Scaled back"
 	$undo.Undo(); Pump
-	Check ((@($list.SelectedItems | ForEach-Object { $_.Name }) -join ",") -eq "Scaled") "after that, undo selects Scaled by its index"
+	Check ((@($list.SelectedItems | ForEach-Object { $_.Name }) -join ",") -eq "Scaled") "after that, undo selects Scaled again"
 	while ($undo.UndoList.Count -gt 0) { $undo.Undo(); Pump }
 	Check ($list.SelectedItems.Count -eq 0) "undoing everything does not throw and empties the selection"
 	while ($undo.RedoList.Count -gt 0) { $undo.Redo(); Pump }
 	Check ($scene.GameEntities.Count -eq 3 -and (@($list.SelectedItems | ForEach-Object { $_.Name }) -join ",") -eq "Moved") "redoing everything restores the entities and the selection"
+
+	# 選択したままその前のエンティティを消すと番号がずれる(SelectionChanged は来ない)。それでも同じエンティティに戻る(Codex の指摘)
+	$list.SelectedIndex = 2; Pump
+	$selected = $scene.GameEntities[2]
+	$scene.RemoveGameEntityCommand.Execute($scene.GameEntities[0]); Pump
+	$list.SelectedIndex = 0; Pump
+	$undo.Undo(); Pump
+	Check ($list.SelectedItems.Count -eq 1 -and [object]::ReferenceEquals($list.SelectedItems[0], $selected.PSObject.BaseObject)) "undo selects the same entity after an earlier entity was removed"
+	$undo.Undo(); Pump
+	Check ($scene.GameEntities.Count -eq 3 -and [object]::ReferenceEquals($scene.GameEntities[2], $selected.PSObject.BaseObject)) "undoing the remove restores the order"
 
 	Write-Host "3. Rename"
 	$rename = @(Find $view ([System.Windows.Controls.Button]) | Where-Object { $_.Content -eq "Rename" })
@@ -148,6 +160,40 @@ try
 	{
 		Check ($null -ne [Activator]::CreateInstance($editor.GetType("DXForgeEditor.Content.$type", $true))) "$type can be created"
 	}
+
+	Write-Host "6. VisualStudio.IsDebugging and CanStart do not wait for a running build"
+	$visualStudio = $editor.GetType("DXForgeEditor.GameDev.VisualStudio", $true)
+	$isDebugging = $visualStudio.GetMethod("IsDebugging", $flags)
+	$canStart = $visualStudio.GetMethod("CanStart", $flags)
+	Check (-not $isDebugging.Invoke($null, @()) -and $canStart.Invoke($null, @())) "with no build and no Visual Studio: not debugging, can start"
+	$buildLock = $visualStudio.GetField("_lock", $flags).GetValue($null)
+	Add-Type -TypeDefinition @"
+namespace DXForgeLayoutTest
+{
+	public static class LockHolder
+	{
+		// 別のスレッドで lock を持ち続ける(ビルドの代わり)。テストが止まらないよう、10 秒で放す
+		public static System.Threading.Thread Hold(object target, System.Threading.ManualResetEventSlim held, System.Threading.ManualResetEventSlim release)
+		{
+			var thread = new System.Threading.Thread(() => { lock (target) { held.Set(); release.Wait(10000); } }) { IsBackground = true };
+			thread.Start();
+			return thread;
+		}
+	}
+}
+"@
+	$held = [System.Threading.ManualResetEventSlim]::new($false)
+	$release = [System.Threading.ManualResetEventSlim]::new($false)
+	$holder = [DXForgeLayoutTest.LockHolder]::Hold($buildLock, $held, $release)
+	Check ($held.Wait(5000)) "another thread holds the build lock"
+	$watch = [System.Diagnostics.Stopwatch]::StartNew()
+	$debuggingWhileBusy = $isDebugging.Invoke($null, @())
+	$canStartWhileBusy = $canStart.Invoke($null, @())
+	$watch.Stop()
+	$release.Set()
+	$null = $holder.Join(11000)
+	Check ($watch.Elapsed.TotalSeconds -lt 5 -and -not $debuggingWhileBusy -and -not $canStartWhileBusy) "while the lock is held both return false without waiting ($($watch.ElapsedMilliseconds) ms)"
+	Check ($canStart.Invoke($null, @())) "after the lock is released, can start again"
 }
 finally
 {

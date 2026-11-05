@@ -23,9 +23,9 @@ namespace DXForgeEditor.Editors
     /// </summary>
     public partial class ProjectLayoutView : UserControl
     {
-        // NOTE: 選択の undo/redo はエンティティではなく番号で覚える(Primal Day 081)。エンティティを消したあとでも、
-        //       ContainerFromItem の null で落ちない
-        private List<int> _previousSelectedIndices = [];
+        // NOTE: Primal Day 081 は選択を番号で覚えるが、前のエンティティを消すと番号がずれて、違うものが選ばれる(Codexの指摘, #185)。
+        //       エンティティで覚え、リストにないもの(消したあとのもの)は飛ばす
+        private List<GameEntity> _previousSelection = [];
 
         public ProjectLayoutView()
         {
@@ -52,25 +52,24 @@ namespace DXForgeEditor.Editors
         {
             var listBox = (ListBox)sender;
             // プロジェクトを閉じる途中など、シーンから外れたリストは何もしない
-            if (listBox.DataContext is not Scene scene) return;
+            if (listBox.DataContext is not Scene) return;
 
             var newSelection = listBox.SelectedItems.Cast<GameEntity>().ToList();
-            var newSelectedIndices = newSelection.Select(x => scene.GameEntities.IndexOf(x)).ToList();
-            var previousSelectedIndices = _previousSelectedIndices;
-            _previousSelectedIndices = newSelectedIndices;
+            var previousSelection = _previousSelection;
+            _previousSelection = newSelection;
 
-            void select(List<int> indices)
+            void select(List<GameEntity> entities)
             {
                 listBox.UnselectAll();
-                indices.ForEach(x =>
+                entities.ForEach(x =>
                 {
-                    if (listBox.ItemContainerGenerator.ContainerFromIndex(x) is ListBoxItem item) item.IsSelected = true;
+                    if (listBox.ItemContainerGenerator.ContainerFromItem(x) is ListBoxItem item) item.IsSelected = true;
                 });
             }
 
             Project.UndoRedo.Add(new UndoRedoAction(
-                () => select(previousSelectedIndices),   // undo Action
-                () => select(newSelectedIndices),        // redo Action
+                () => select(previousSelection),   // undo Action
+                () => select(newSelection),        // redo Action
                 "Selection Changed"
             ));
 
@@ -116,7 +115,7 @@ namespace DXForgeEditor.Editors
             if (!listBox.IsEnabled) return;
 
             // 前のプロジェクトの選択を、undo の履歴に持ち込まない
-            _previousSelectedIndices = [];
+            _previousSelection = [];
             if (listBox.Items.Count > 0)
             {
                 listBox.SelectedIndex = 0;

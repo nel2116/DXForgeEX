@@ -324,9 +324,25 @@ $@"<?xml version=""1.0"" encoding=""utf-8""?>
             return result;
         }
 
+        /// <summary>
+        /// デバッグ中か。コマンドの CanExecute から UI スレッドで呼ばれるので、ビルドや VS の起動の間(_lock を持ち続ける)は待たずに false を返す。
+        /// </summary>
         public static bool IsDebugging()
         {
-            lock (_lock) { return IsDebugging_Internal(); }
+            if (!Monitor.TryEnter(_lock)) return false;
+            try { return IsDebugging_Internal(); }
+            finally { Monitor.Exit(_lock); }
+        }
+
+        /// <summary>
+        /// ビルドや実行を始められるか。IsDebugging と同じく待たない。ビルドや VS の起動の間は false を返す
+        /// (VS の起動の間は BuildDone がまだ true なので、IsDebugging と BuildDone だけでは判定できない。次のビルドが順番待ちになる)。
+        /// </summary>
+        public static bool CanStart()
+        {
+            if (!Monitor.TryEnter(_lock)) return false;
+            try { return !IsDebugging_Internal() && BuildDone; }
+            finally { Monitor.Exit(_lock); }
         }
 
         private static void BuildSolution_Internal(Project project, BuildConfiguration buildConfig, bool showWindow)
