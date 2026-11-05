@@ -131,6 +131,37 @@ try
 	$undo.Undo(); Pump
 	Check ($scene.GameEntities.Count -eq 3 -and [object]::ReferenceEquals($scene.GameEntities[2], $selected.PSObject.BaseObject)) "undoing the remove restores the order"
 
+	# インスペクターの Name: Enter を押さずにフォーカスを移しても確定し、Undo できる。WPF はキーボードのフォーカスのイベントを
+	# Preview → LostKeyboardFocus の順に出すので、その順に発生させる(Codex の指摘。実際のフォーカスの移動は GUI で確かめる)
+	Write-Host "2b. renaming in the inspector without pressing Enter"
+	$inspectorWindow = [System.Windows.Window]::new()
+	$inspectorWindow.WindowStartupLocation = "Manual"
+	$inspectorWindow.Left = -30000; $inspectorWindow.Top = -30000; $inspectorWindow.Width = 600; $inspectorWindow.Height = 600
+	$inspectorWindow.ShowInTaskbar = $false; $inspectorWindow.ShowActivated = $false
+	$inspectorWindow.Content = $inspector
+	$inspectorWindow.Show()
+	$list.SelectedIndex = 0; Pump
+	$renamed = $scene.GameEntities[0]
+	$oldName = $renamed.Name
+	$nameBox = @(Find $inspector ([System.Windows.Controls.TextBox]) | Where-Object { $_.IsVisible })[0]
+	function Raise-Focus($event)
+	{
+		$focusArgs = [System.Windows.Input.KeyboardFocusChangedEventArgs]::new([System.Windows.Input.Keyboard]::PrimaryDevice, 0, $null, $nameBox)
+		$focusArgs.RoutedEvent = $event
+		$nameBox.RaiseEvent($focusArgs)
+	}
+	Raise-Focus ([System.Windows.Input.Keyboard]::GotKeyboardFocusEvent)
+	$nameBox.Text = "Typed Name"
+	$undoCount = $undo.UndoList.Count
+	Raise-Focus ([System.Windows.Input.Keyboard]::PreviewLostKeyboardFocusEvent)
+	Raise-Focus ([System.Windows.Input.Keyboard]::LostKeyboardFocusEvent)
+	Pump
+	Check ($renamed.Name -eq "Typed Name" -and $undo.UndoList.Count -eq $undoCount + 1) "the name is committed and one undo entry is added ($($renamed.Name), $($undo.UndoList.Count - $undoCount))"
+	$undo.Undo(); Pump
+	Check ($renamed.Name -eq $oldName) "undo restores the name ($($renamed.Name))"
+	$inspectorWindow.Content = $null
+	$inspectorWindow.Close()
+
 	Write-Host "3. Rename"
 	$rename = @(Find $view ([System.Windows.Controls.Button]) | Where-Object { $_.Content -eq "Rename" })
 	Check ($rename.Count -eq 2) "one Rename button per scene ($($rename.Count))"

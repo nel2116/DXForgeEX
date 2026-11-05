@@ -64,7 +64,9 @@ namespace DXForgeEditor.Dictionaries
         }
 
         // 別の場所をクリックしても、入力した値を確定する(Primal Day 081)
-        private void OnTextBox_LostFocus(object sender, RoutedEventArgs e)
+        // NOTE: Primal は LostFocus で確定するが、LostFocus は LostKeyboardFocus より後なので、LostKeyboardFocus で Undo を記録する
+        //       インスペクターの Name(GameEntityView)が変更に気付かず、Undo できない(Codexの指摘, #185)。その前のこのイベントで確定する
+        private void OnTextBox_PreviewLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
         {
             var textBox = (TextBox)sender;
             if (!textBox.IsVisible) return;

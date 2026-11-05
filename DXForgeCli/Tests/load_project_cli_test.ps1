@@ -503,6 +503,15 @@ namespace DXForgeCliTest
 				# Components.Geometry.Load は AssetRegistry.ContentFolder と Project.ContentPath(末尾の区切り文字あり)を比べる。違うとジオメトリを読み込めない
 				$registeredFolder = $editor.GetType("DXForgeEditor.Content.AssetRegistry", $true).GetProperty("ContentFolder", $flags).GetValue($null)
 				Check ($registeredFolder -ceq "$brokenFolder\Content\") "editor path: Project.Load registers the assets with the same form as Project.ContentPath" "$registeredFolder"
+				$watcher = $editor.GetType("DXForgeEditor.Content.ContentWatcher", $true).GetField("_contentWatcher", $flags).GetValue($null)
+				Check (-not $watcher.EnableRaisingEvents) "editor path: after a failed load the content folder is not watched"
+
+				# ルートが nil のファイル: Serializer.FromFile は例外を投げず null を返す。Debug のエディタのプロセスを assert で落とさず、失敗として扱う
+				$nilFile = Join-Path $brokenFolder "nil.dxproj"
+				[System.IO.File]::WriteAllText($nilFile, '<Game i:nil="true" xmlns="http://schemas.datacontract.org/2004/07/DXForgeEditor.GameProject" xmlns:i="http://www.w3.org/2001/XMLSchema-instance"/>')
+				$logged.Clear()
+				$nilResult = $projectType.GetMethod("Load", $flags).Invoke($null, [object[]]@([string]$nilFile))
+				Check ($null -eq $nilResult -and $null -eq $currentProperty.GetValue($null) -and -not $watcher.EnableRaisingEvents -and @($logged | Where-Object { $_ -match "^Error: .*nil\.dxproj" }).Count -eq 1) "editor path: Project.Load of a nil root returns null and logs an error, Project.Current stays null" ($logged -join "; ")
 			}
 			finally
 			{

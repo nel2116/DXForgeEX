@@ -27,7 +27,7 @@
     <Style TargetType="{x:Type TextBox}" x:Key="{x:Type TextBox}" BasedOn="{StaticResource TextBoxStyle}">
         <EventSetter Event="KeyDown" Handler="OnTextBox_KeyDown"/>
         <EventSetter Event="GotFocus" Handler="OnTextBox_GotFocus"/>
-        <EventSetter Event="LostFocus" Handler="OnTextBox_LostFocus"/>
+        <EventSetter Event="PreviewLostKeyboardFocus" Handler="OnTextBox_PreviewLostKeyboardFocus"/>
     </Style>
 
     <Style TargetType="{x:Type TextBox}" x:Key="TextBoxStyle_WithRename" BasedOn="{StaticResource TextBoxStyle}">

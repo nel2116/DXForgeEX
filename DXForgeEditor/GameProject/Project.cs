@@ -203,8 +203,8 @@ namespace DXForgeEditor.GameProject
                 // NOTE: Geometry.Load() は AssetRegistry.ContentFolder と ContentPath を比べるので、ContentPath と同じ形(末尾の区切り文字あり)で渡す
                 ContentWatcher.Reset($@"{path}Content\", path);
 
-                var project = Serializer.FromFile<Project>(file);
-                Debug.Assert(project != null);
+                // NOTE: ルートが i:nil="true" のファイルでは、FromFile は例外を投げず null を返す
+                var project = Serializer.FromFile<Project>(file) ?? throw new InvalidDataException($"ルート要素が nil です: {file}");
                 project.Path = path;
                 Current = project;
                 project.LoadEntitiesWithAssets();
@@ -216,6 +216,8 @@ namespace DXForgeEditor.GameProject
                 Debug.WriteLine(ex.Message);
                 Logger.Log(MessageType.Error, $"プロジェクトを読み込めませんでした: {file}");
                 Current = null;
+                // 開けなかったプロジェクトのフォルダを見続けない(AssetRegistry は次の Load で登録し直す)
+                ContentWatcher.Reset(string.Empty, string.Empty);
                 return null;
             }
         }
