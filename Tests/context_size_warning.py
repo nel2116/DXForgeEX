@@ -50,7 +50,10 @@ def last_context_tokens(transcript_path):
             continue
         if not isinstance(entry, dict) or entry.get("type") != "assistant" or entry.get("isSidechain"):
             continue
-        usage = (entry.get("message") or {}).get("usage") or {}
+        message = entry.get("message")
+        usage = message.get("usage") if isinstance(message, dict) else None
+        if not isinstance(usage, dict):
+            continue
         total = sum(usage.get(key) or 0 for key in
                     ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
         # API を呼ばずに作られたメッセージ(usage がすべて 0)は測定値ではない

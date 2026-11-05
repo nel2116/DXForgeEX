@@ -45,7 +45,7 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = $PSScriptRoot
 $StampName = "dxforge-prepr-stamp"
 
-# 変更したファイルから、実行するビルドとテストを決める。ステップは { Command, Requires }。
+# 変更したファイルから、実行するビルドとテストを決める。ステップは { Command, Requires(ファイルの配列) }。
 # Requires のファイルがないステップは、理由を出して飛ばす(FBX SDK が要る ContentTools.dll、削除したテストなど)
 function Get-PrePrPlan([string[]]$ChangedFiles) {
 	$nativeBuild = "./build.ps1 -Target native -Configuration Release -RunTests -WarningsAsErrors"
@@ -96,9 +96,10 @@ function Get-PrePrPlan([string[]]$ChangedFiles) {
 	$addBuild = { param($command) if ($command -notin $builds) { $builds.Add($command) } }
 	$addTest = {
 		param($command, $requires)
-		# ContentTools.dll が要るテストは、ここで決める(テストの名前が表の外から渡されても同じ)
-		if (-not $requires -and ($command -match "default_geometry_test|primitive_mesh_dialog_test|ContentTools/Tests/")) { $requires = $toolsDll }
-		if ($command -notin $tests.Command) { $tests.Add([pscustomobject]@{ Command = $command; Requires = $requires }) }
+		# ContentTools.dll が要るテストは、ここで決める(変更されたテストとして渡されても同じ)
+		$needs = @($requires | Where-Object { $_ })
+		if ($command -match "default_geometry_test|primitive_mesh_dialog_test|ContentTools/Tests/") { $needs += $toolsDll }
+		if ($command -notin $tests.Command) { $tests.Add([pscustomobject]@{ Command = $command; Requires = $needs }) }
 	}
 
 	foreach ($file in $ChangedFiles) {
@@ -106,7 +107,7 @@ function Get-PrePrPlan([string[]]$ChangedFiles) {
 		$file = $file.Replace("\", "/")
 		$top = ($file -split "/")[0]
 		$extension = [System.IO.Path]::GetExtension($file).ToLowerInvariant()
-		$isCpp = $extension -in ".c", ".cpp", ".h", ".hpp", ".inl", ".hlsl", ".hlsli", ".vcxproj", ".filters", ".def", ".rc"
+		$isCpp = $extension -in ".c", ".cpp", ".h", ".hpp", ".inl", ".hlsl", ".hlsli", ".vcxproj", ".filters", ".props", ".def", ".rc"
 		$isPackages = [System.IO.Path]::GetFileName($file) -eq "packages.config"
 		$isCSharp = $extension -in ".cs", ".xaml", ".csproj", ".resx"
 
@@ -126,7 +127,13 @@ function Get-PrePrPlan([string[]]$ChangedFiles) {
 		}
 		elseif ($file -match '(^|/)Tests/[^/]+(_test\.(py|ps1)|\.Tests\.ps1)$') {
 			# テストを変更したら、そのテストを実行する。エディタ側のテストにはエディタのビルドが要る
-			$command = if ($extension -eq ".py") { "python $file" } elseif ($top -eq "Tests") { "pwsh -NoProfile -File $file" } else { "pwsh -STA -NoProfile -File $file" }
+			# ContentTools のテストは既定の構成がまちまちなので、ビルドする DebugEditor を指定する。
+			# import_cli_test は引数なしだと ContentTools.dll と FBX のサンプルが要るので、CI と同じ引数の検査だけにする
+			$command = if ($file -eq "DXForgeImport/Tests/import_cli_test.ps1") { $importCli }
+			elseif ($extension -eq ".py" -and $top -eq "ContentTools") { "python $file --config DebugEditor" }
+			elseif ($extension -eq ".py") { "python $file" }
+			elseif ($top -eq "Tests") { "pwsh -NoProfile -File $file" }
+			else { "pwsh -STA -NoProfile -File $file" }
 			if ($top -in "DXForgeEditor", "DXForgeCli", "DXForgeImport") { & $addBuild $editorBuild }
 			if ($top -eq "DXForgeEngineDLL") {
 				& $addBuild $dllBuild
@@ -163,8 +170,8 @@ function Get-PrePrPlan([string[]]$ChangedFiles) {
 		}
 		elseif ($top -eq "ContentTools" -and ($isCpp -or $isPackages)) {
 			& $addBuild $toolsBuild
-			& $addTest "python ContentTools/Tests/missing_source_import_test.py" $null
-			& $addTest "python ContentTools/Tests/primitive_mesh_cube_test.py" $null
+			& $addTest "python ContentTools/Tests/missing_source_import_test.py --config DebugEditor" $null
+			& $addTest "python ContentTools/Tests/primitive_mesh_cube_test.py --config DebugEditor" $null
 		}
 		elseif ($top -in "DXForgeEngine", "EngineUnitTests", "EngineTest" -and ($isCpp -or $isPackages)) {
 			& $addBuild $nativeBuild
@@ -178,8 +185,8 @@ function Get-PrePrPlan([string[]]$ChangedFiles) {
 
 # 実行する順: 規約の検査、ビルド、テスト
 function Get-PrePrSteps($Plan) {
-	$conventions = [pscustomobject]@{ Command = "python Tests/check_conventions.py"; Requires = $null }
-	return @($conventions) + @($Plan.Builds | ForEach-Object { [pscustomobject]@{ Command = $_; Requires = $null } }) + @($Plan.Tests)
+	$conventions = [pscustomobject]@{ Command = "python Tests/check_conventions.py"; Requires = @() }
+	return @($conventions) + @($Plan.Builds | ForEach-Object { [pscustomobject]@{ Command = $_; Requires = @() } }) + @($Plan.Tests)
 }
 
 # 差分の種類に応じた自己点検の項目(#190、#191 などの Codex の指摘から)
@@ -204,6 +211,12 @@ function Write-PrePrFailureTail([string]$Log) {
 	if (Test-Path -LiteralPath $Log) { Get-Content -LiteralPath $Log -Tail 40 -Encoding utf8 | ForEach-Object { Write-Host "    $_" } }
 }
 
+# 各ステップは pwsh で実行する。起動できないと終了コードが前の git のままになり、成功と取り違える
+if (-not $PlanOnly -and -not (Get-Command pwsh -ErrorAction SilentlyContinue)) {
+	Write-Host "pwsh が見つかりません。PowerShell 7 を入れてください。"
+	exit 2
+}
+
 if ($PlanOnly -and $PSBoundParameters.ContainsKey("Files")) {
 	$changed = @($Files)
 	$added = $AddedText
@@ -225,7 +238,8 @@ else {
 			git fetch --quiet --no-write-fetch-head origin develop 2>$null
 			if ($LASTEXITCODE -ne 0) { Write-Warning "git fetch に失敗しました。手元の $Base と比べます。" }
 		}
-		$changed = @(git diff --name-only "$Base...HEAD")
+		# quotepath: 日本語のファイル名を "\346..." の形にしない
+		$changed = @(git -c core.quotepath=false diff --name-only "$Base...HEAD")
 		if ($LASTEXITCODE -ne 0) { Write-Host "$Base との差分を読めませんでした。"; exit 2 }
 		$added = (@(git diff -U0 "$Base...HEAD") | Where-Object { $_ -match '^\+' -and $_ -notmatch '^\+\+\+' }) -join "`n"
 		if ($LASTEXITCODE -ne 0) { Write-Host "$Base との差分を読めませんでした。"; exit 2 }
@@ -254,8 +268,9 @@ try {
 
 	Write-Host "$Base との差分: $($changed.Count) ファイル、ステップ $($steps.Count) 個"
 	foreach ($step in $steps) {
-		if ($step.Requires -and -not (Test-Path -LiteralPath $step.Requires)) {
-			Write-Host "SKIP $($step.Command)($($step.Requires) がありません)"
+		$missing = @($step.Requires | Where-Object { $_ -and -not (Test-Path -LiteralPath $_) })
+		if ($missing.Count -gt 0) {
+			Write-Host "SKIP $($step.Command)($($missing -join '、') がありません)"
 			continue
 		}
 		$watch = [System.Diagnostics.Stopwatch]::StartNew()

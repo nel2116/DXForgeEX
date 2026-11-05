@@ -42,7 +42,8 @@ class LastContextTokens(TempDir):
         self.assertEqual(warning.last_context_tokens(self.path), 3210)
 
     def test_skips_sidechain_and_zero_usage_and_broken_lines(self):
-        self.write(assistant(5), assistant(9000, isSidechain=True), assistant(0), '{"type":"assistant", broken')
+        self.write(assistant(5), {"type": "assistant", "message": "text"}, assistant(9000, isSidechain=True),
+                   assistant(0), '{"type":"assistant", broken')
         self.assertEqual(warning.last_context_tokens(self.path), 5)
 
     def test_no_usage(self):

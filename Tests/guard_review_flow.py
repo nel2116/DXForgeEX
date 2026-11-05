@@ -60,7 +60,8 @@ def _first_user_text(transcript_path: str) -> str:
             continue
         if not isinstance(entry, dict) or entry.get("type") != "user" or entry.get("isSidechain"):
             continue
-        content = (entry.get("message") or {}).get("content")
+        message = entry.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
         if isinstance(content, str):
             return content
         if isinstance(content, list):
@@ -82,7 +83,8 @@ def is_orchestration_worker(transcript_path) -> bool:
 
 def _git(cwd, *args):
     try:
-        result = subprocess.run(["git", "-C", cwd, *args], capture_output=True, text=True, timeout=5)
+        # git はパスを UTF-8 で出す。既定のロケール(cp932)で読むと、日本語のパスで壊れる
+        result = subprocess.run(["git", "-C", cwd, *args], capture_output=True, encoding="utf-8", errors="replace", timeout=5)
     except (OSError, subprocess.SubprocessError):
         return None
     return result.stdout.strip() if result.returncode == 0 else None
@@ -118,6 +120,8 @@ def run_hook() -> int:
     try:
         payload = json.loads(sys.stdin.buffer.read())
     except ValueError:
+        return 0
+    if not isinstance(payload, dict):
         return 0
     command = (payload.get("tool_input") or {}).get("command") or ""
     if runs_set_status(command) and is_orchestration_worker(payload.get("transcript_path")):

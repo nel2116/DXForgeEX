@@ -99,6 +99,10 @@ class Worker(TempDir):
         path = write_transcript(self.dir, user_message(WORKER_TEXT, isSidechain=True), user_message("hello"))
         self.assertFalse(guard.is_orchestration_worker(path))
 
+    def test_unusual_message_shape_is_not_a_worker(self):
+        path = write_transcript(self.dir, {"type": "user", "message": WORKER_TEXT})
+        self.assertFalse(guard.is_orchestration_worker(path))
+
     def test_unknown_means_not_a_worker(self):
         self.assertFalse(guard.is_orchestration_worker(None))
         self.assertFalse(guard.is_orchestration_worker(os.path.join(self.dir, "missing.jsonl")))
@@ -165,6 +169,17 @@ class Hook(TempDir):
         self.git("worktree", "add", "-q", "--detach", other)
         self.assertEqual(self.run_hook("gh pr create", cwd=other).returncode, 2)
 
+    def test_stamp_in_a_repository_with_a_japanese_path(self):
+        repo = os.path.join(self.dir, "日本語のフォルダ")
+        subprocess.run(["git", "init", "-q", repo], check=True)
+        subprocess.run(["git", "-C", repo, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false",
+                        "commit", "-q", "--allow-empty", "-m", "first"], check=True)
+        self.assertEqual(self.run_hook("gh pr create", cwd=repo).returncode, 2, "no stamp")
+        head = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
+        with open(os.path.join(repo, ".git", guard.STAMP_NAME), "w", encoding="utf-8") as file:
+            file.write(head + "\n")
+        self.assertEqual(self.run_hook("gh pr create", cwd=repo).returncode, 0, "current stamp")
+
     def test_pr_create_outside_a_repository_is_not_blocked(self):
         outside = os.path.join(self.dir, "outside")
         os.mkdir(outside)
@@ -173,8 +188,9 @@ class Hook(TempDir):
     def test_other_commands_and_broken_input_pass_silently(self):
         result = self.run_hook("gh pr checks 1")
         self.assertEqual((result.returncode, result.stderr), (0, b""))
-        result = subprocess.run([sys.executable, SCRIPT, "--hook"], input=b"not json", capture_output=True)
-        self.assertEqual(result.returncode, 0)
+        for data in [b"not json", b"[1]"]:
+            result = subprocess.run([sys.executable, SCRIPT, "--hook"], input=data, capture_output=True)
+            self.assertEqual((result.returncode, result.stderr), (0, b""))
 
 
 if __name__ == "__main__":

@@ -71,7 +71,11 @@ $cases = @(
 	# editor_shader_compilation_test はエディタのラッパーを通すので、エディタのビルドも要る(PR #196 の Codex の指摘)
 	@("DXForgeEngineDLL/A.cpp", @($native, $dll, $editor, "shader_compilation_test.py", "editor_shader_compilation_test.ps1"), @()),
 	@("DXForgeEngineDLL/Tests/editor_shader_compilation_test.ps1", @($dll, $editor, "editor_shader_compilation_test.ps1"), @($native)),
-	@("ContentTools/A.cpp", @($tools, "missing_source_import_test.py", "primitive_mesh_cube_test.py"), @($editor, $native)),
+	# ビルドする DebugEditor と同じ構成でテストする(primitive_mesh_cube_test の既定は ReleaseEditor。PR #196 の Codex の指摘)
+	@("ContentTools/A.cpp", @($tools, "missing_source_import_test.py --config DebugEditor", "primitive_mesh_cube_test.py --config DebugEditor"), @($editor, $native)),
+	@("ContentTools/FbxSdk.props", @($tools), @($editor, $native)),
+	@("ContentTools/Tests/envmap_cpu_gpu_test.py", @($tools, "envmap_cpu_gpu_test.py --config DebugEditor"), @($native)),
+	@("DXForgeImport/Tests/import_cli_test.ps1", @($editor, "import_cli_test.ps1 -ArgumentsOnly"), @($native)),
 	@("DXForgeEditor/GameProject/A.cs", @($editor, "project_layout_view_test.ps1", "projects_path_test.ps1", "load_project_cli_test.ps1"), @($native)),
 	@("DXForgeEditor/Content/A.cs", @($editor, "material_asset_test.ps1", "default_geometry_test.ps1"), @($native)),
 	@("DXForgeEditor/Components/A.cs", @($editor, "material_asset_test.ps1"), @($native)),
@@ -88,7 +92,7 @@ $cases = @(
 	@("DXForgeEditor/Tests/engine_path_test.ps1", @($editor, "engine_path_test.ps1"), @($native)),
 	@("DXForgeCli/Tests/ops_cli_test.ps1", @($editor, "ops_cli_test.ps1"), @($native)),
 	@("DXForgeEngineDLL/Tests/shader_compilation_test.py", @($dll, "python DXForgeEngineDLL/Tests/shader_compilation_test.py"), @($native)),
-	@("ContentTools/Tests/primitive_mesh_cube_test.py", @($tools, "python ContentTools/Tests/primitive_mesh_cube_test.py"), @($native)),
+	@("ContentTools/Tests/primitive_mesh_cube_test.py", @($tools, "python ContentTools/Tests/primitive_mesh_cube_test.py --config DebugEditor"), @($native)),
 	@("Tests/check_conventions.py", @("python Tests/check_conventions_test.py"), @($anyBuild)),
 	@("Tests/guard_review_flow.py", @("python Tests/guard_review_flow_test.py"), @($anyBuild)),
 	@("Tests/guard_review_flow_test.py", @("python Tests/guard_review_flow_test.py"), @($anyBuild)),
@@ -121,9 +125,13 @@ Check ([array]::IndexOf($commands, $editor) -lt [array]::IndexOf(@($commands), (
 
 $plan = Get-Plan @("DXForgeEditor/Content/A.cs")
 $geometry = @($plan.steps | Where-Object { $_.Command -match "default_geometry_test" })[0]
-Check ($geometry.Requires -eq "x64/DebugEditor/ContentTools.dll") "a test that needs ContentTools.dll is skipped without it"
+Check (@($geometry.Requires) -contains "x64/DebugEditor/ContentTools.dll") "a test that needs ContentTools.dll is skipped without it"
 $plan = Get-Plan @("Tests/guard_review_flow_test.py")
-Check (@($plan.steps | Where-Object { $_.Requires -eq "Tests/guard_review_flow_test.py" }).Count -eq 1) "a changed test is skipped when it was deleted"
+Check (@($plan.steps | Where-Object { @($_.Requires) -contains "Tests/guard_review_flow_test.py" }).Count -eq 1) "a changed test is skipped when it was deleted"
+# 変更されたテストでも、DLL の条件を落とさない(PR #196 の Codex の指摘)
+$plan = Get-Plan @("DXForgeEditor/Tests/default_geometry_test.ps1")
+$geometry = @($plan.steps | Where-Object { $_.Command -match "default_geometry_test" })[0]
+Check (@($geometry.Requires) -contains "x64/DebugEditor/ContentTools.dll" -and @($geometry.Requires) -contains "DXForgeEditor/Tests/default_geometry_test.ps1") "a changed test keeps both conditions"
 
 $plan = Get-Plan @("foo/bar.xyz")
 Check (@($plan.steps).Count -eq 1 -and @($plan.unclassified)[0] -eq "foo/bar.xyz") "an unknown file is reported and builds nothing"
@@ -176,14 +184,17 @@ try {
 	Invoke-Git -C $repo commit -q -m first | Out-Null
 	Invoke-Git -C $repo branch base | Out-Null
 	Set-Content -LiteralPath (Join-Path $repo "doc.md") -Value "text" -Encoding utf8NoBOM
+	# 日本語のファイル名が git に引用されると、拡張子を読めず「分類できないファイル」になる
+	Set-Content -LiteralPath (Join-Path $repo "日本語.md") -Value "text" -Encoding utf8NoBOM
 	Invoke-Git -C $repo add . | Out-Null
 	Invoke-Git -C $repo commit -q -m doc | Out-Null
 
 	$stampPath = Join-Path $repo (Invoke-Git -C $repo rev-parse --git-path dxforge-prepr-stamp).Trim()
+	$pwshPath = (Get-Command pwsh).Source
 	function Invoke-PrePr {
 		Push-Location $repo
 		try {
-			$output = & pwsh -NoProfile -File (Join-Path $repo "PrePr.ps1") -Base base 2>&1 | Out-String
+			$output = & $pwshPath -NoProfile -File (Join-Path $repo "PrePr.ps1") -Base base 2>&1 | Out-String
 			[pscustomobject]@{ Exit = $LASTEXITCODE; Output = $output }
 		}
 		finally {
@@ -196,6 +207,7 @@ try {
 	Check ($r.Exit -eq 0) "a documentation-only diff passes (実際: $($r.Exit)、$($r.Output))"
 	Check ((Test-Path -LiteralPath $stampPath) -and (Get-Content -Raw -LiteralPath $stampPath).Trim() -eq $head) "the stamp holds the sha of HEAD"
 	Check ($r.Output -match "自己点検") "the output asks for the self-check section"
+	Check ($r.Output -notmatch "分類できないファイル") "a Japanese file name is classified"
 	Check ($r.Output -notmatch "this line must stay in the log") "the output of a passing step is not printed"
 
 	Set-Content -LiteralPath (Join-Path $repo "doc.md") -Value "changed" -Encoding utf8NoBOM
@@ -228,6 +240,21 @@ try {
 		$env:PATH = $savedPath
 	}
 	Check ($r.Exit -eq 1 -and -not (Test-Path -LiteralPath $stampPath)) "a command that cannot start fails the run and leaves no stamp (実際: $($r.Exit))"
+
+	# pwsh がなければ、どのステップも実行できないので止まる(PR #196 の Codex の指摘)。
+	# pwsh は起動時に自分のフォルダを PATH に足すので、Windows PowerShell から実行して再現する
+	$windowsPowerShell = (Get-Command powershell).Source
+	$env:PATH = Split-Path (Get-Command git).Source
+	Push-Location $repo
+	try {
+		$output = & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo "PrePr.ps1") -Base base 2>&1 | Out-String
+		$exit = $LASTEXITCODE
+	}
+	finally {
+		Pop-Location
+		$env:PATH = $savedPath
+	}
+	Check ($exit -eq 2 -and $output -match "pwsh" -and -not (Test-Path -LiteralPath $stampPath)) "no pwsh stops the run and leaves no stamp (実際: $exit、$output)"
 
 	$r = Invoke-PrePr
 	Check ($r.Exit -eq 0 -and (Get-Content -Raw -LiteralPath $stampPath).Trim() -eq (Invoke-Git -C $repo rev-parse HEAD).Trim()) "a new commit gets a new stamp"
