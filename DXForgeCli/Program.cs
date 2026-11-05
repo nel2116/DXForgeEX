@@ -6,6 +6,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Windows;
+using DXForgeEditor.Automation;
 using DXForgeEditor.Components;
 using DXForgeEditor.GameProject;
 using DXForgeEditor.Utilities;
@@ -14,7 +15,7 @@ namespace DXForgeCli
 {
     /// <summary>
     /// dxforge 自身の終了コード。ランナー(EngineUnitTests --game-bin)の終了コード(0, 2, 3, 10〜15)はそのまま返すので、
-    /// それと重ならない 30〜39 を使う(2 だけは共通。JSON の error.code で区別できる)。--help と README.md にも同じ一覧を書く。
+    /// それと重ならない 30〜39 と 40〜44(ops、#183)を使う(2 だけは共通。JSON の error.code で区別できる)。--help と README.md にも同じ一覧を書く。
     /// </summary>
     enum ExitCode
     {
@@ -29,6 +30,11 @@ namespace DXForgeCli
         RunnerFailed = 35,
         GameBinWriteFailed = 36,
         InternalError = 39,
+        OpsInvalid = 40,
+        OpsTargetNotFound = 41,
+        OpsFailed = 42,
+        OpsSaveFailed = 43,
+        OpsEditorOpen = 44,
     }
 
     class ExitException : Exception
@@ -53,8 +59,12 @@ namespace DXForgeCli
         public string? ExportGameBin { get; set; }
         public bool Json { get; set; }
         public bool Help { get; set; }
+        public string? OpsFile { get; set; }
+        public string? SingleOp { get; set; }
+        public bool DryRun { get; set; }
 
         public bool ExportOnly => ExportGameBin != null;
+        public bool OpsMode => OpsFile != null || SingleOp != null;
 
         /// <summary>
         /// 引数を読む。--json は、ほかの引数に誤りがあっても結果をJSONで出せるよう、誤りを報告する前に読み取っておく。
@@ -107,6 +117,9 @@ namespace DXForgeCli
                         case "--runner": options.Runner = NextValue(); break;
                         case "--keep-game-bin": options.KeepGameBin = NextValue(); break;
                         case "--export-game-bin": options.ExportGameBin = NextValue(); break;
+                        case "--ops": options.OpsFile = NextValue(); break;
+                        case "--op": options.SingleOp = NextValue(); break;
+                        case "--dry-run": options.DryRun = true; break;
                         default: throw new FormatException($"知らない引数です: {arg}");
                     }
                 }
@@ -120,6 +133,11 @@ namespace DXForgeCli
             if (options.Help) return options;
 
             if (string.IsNullOrWhiteSpace(options.Project)) error = "--load-project を指定してください。";
+            else if (options.OpsFile != null && options.SingleOp != null) error = "--ops と --op は一緒には使えません。";
+            else if (options.OpsMode && (options.Frames != null || options.ExportOnly || options.Runner != null || options.KeepGameBin != null || options.Scene != null || args.Contains("--dt")))
+                error = "--ops, --op は --frames, --dt, --scene, --runner, --keep-game-bin, --export-game-bin と一緒には使えません(シーンは操作の中で指定する)。";
+            else if (options.OpsMode) { }
+            else if (options.DryRun) error = "--dry-run は --ops か --op と一緒に使います。";
             else if (options.ExportOnly && (options.Frames != null || options.Runner != null || options.KeepGameBin != null))
                 error = "--export-game-bin は --frames, --runner, --keep-game-bin と一緒には使えません(書き出すだけで実行しない)。";
             else if (!options.ExportOnly && options.Frames == null) error = "--frames を指定してください(実行しないなら --export-game-bin)。";
@@ -141,6 +159,14 @@ namespace DXForgeCli
         public string? ErrorMessage { get; set; }
         /// <summary>ランナーが出したJSON(実行できたときだけ)。</summary>
         public JsonObject? RunnerJson { get; set; }
+        /// <summary>--ops, --op のときの、操作ごとの結果。</summary>
+        public JsonArray OpResults { get; set; } = new();
+        public int OpCount { get; set; }
+        public bool Changed { get; set; }
+        public bool Saved { get; set; }
+        /// <summary>ops の失敗の場所(error に入れる)。</summary>
+        public int? ErrorOpIndex { get; set; }
+        public string? ErrorKey { get; set; }
     }
 
     static class Program
@@ -152,8 +178,10 @@ namespace DXForgeCli
               dxforge --load-project <.dxproj> --frames <N> [--dt <秒>] [--scene <名前>]
                       [--runner <EngineUnitTests.exe>] [--keep-game-bin <パス>] [--json]
               dxforge --load-project <.dxproj> --export-game-bin <パス> [--scene <名前>] [--json]
+              dxforge --load-project <.dxproj> --ops <ops.json> [--dry-run] [--json]
+              dxforge --load-project <.dxproj> --op '<1 つの操作の JSON>' [--dry-run] [--json]
 
-                  --load-project     読み込むプロジェクトファイル(エディタが保存した .dxproj)。
+                  --load-project    読み込むプロジェクトファイル(エディタが保存した .dxproj)。
                   --frames           スクリプトの更新を回すフレーム数(0 以上)。
                   --dt               各フレームの経過時間(秒、既定 0.016)。
                   --scene            実行するシーンの名前(既定はアクティブなシーン。エディタと同じ)。
@@ -161,10 +189,23 @@ namespace DXForgeCli
                                      DebugEditor の dxforge は Debug、ReleaseEditor は Release)。
                   --keep-game-bin    実行に使った game.bin をこのパスに残す(既定は一時フォルダに書いて、実行後に消す)。
                   --export-game-bin  エディタがゲームの実行前に書くものと同じ game.bin を書き出すだけで、実行しない。
+                  --ops              シーンを操作する JSON({"ops":[...]})のファイルを順に実行する(Issue #183)。
+                  --op               1 つの操作の JSON を実行する(--ops の糖衣)。
+                  --dry-run          操作を検証して結果を返すが、保存しない。
                   --json             結果をJSONで標準出力に出す(ログは常に標準エラー)。
               -h, --help             この説明を出す。
 
             この版ではスクリプト(Script コンポーネント)のあるシーンは実行できない(終了コード 33)。--export-game-bin は書き出せる。
+
+            操作:
+              読む    list-scenes, list-entities, get-entity
+              変える  create-entity, remove-entity, rename, set-enabled, set-transform,
+                      add-component (transform/script/geometry), remove-component, set-geometry
+              対象    guid:<GUID> | name:<名前> | index:<シーン名>/<番号> | $<別名>(create-entity の "as")
+              アセット guid:<GUID> | path:<Content からの相対パス> | default:cube
+              回転    rotation_deg か rotation_rad(結果には両方)
+              保存    変更があり、すべて成功したときだけ最後に 1 回保存する(途中で失敗したら何も保存しない)。結果の changed と saved を見る。
+              エディタがそのプロジェクトを開いていると、--dry-run でも変更の操作は断る(44)。読むだけの操作は許す。
 
             終了コード:
               0  成功
@@ -179,6 +220,11 @@ namespace DXForgeCli
               35 ランナーを起動できない、またはランナーの結果を読めない
               36 game.bin を書き出せない
               39 想定外のエラー
+              40 ops の形式の誤り(何も実行しない。error に op_index と key)
+              41 対象(エンティティ、シーン、アセット)が見つからない、1 つに決まらない
+              42 操作の失敗(すでに持つコンポーネントの追加、Transform の削除など)
+              43 .dxproj を保存できない
+              44 エディタがそのプロジェクトを開いている
             """;
 
         private static readonly object _consoleLock = new();
@@ -193,6 +239,8 @@ namespace DXForgeCli
             if (options.Help && error == null)
             {
                 Console.WriteLine(HelpText);
+                Console.WriteLine();
+                Console.WriteLine($"操作の JSON Schema: {Path.Combine(AppContext.BaseDirectory, "Schema", "ops.schema.json")}(リポジトリでは DXForgeCli/Schema/ops.schema.json)");
                 return (int)ExitCode.Success;
             }
 
@@ -237,6 +285,12 @@ namespace DXForgeCli
             if (!File.Exists(projectPath))
             {
                 throw new ExitException(ExitCode.ProjectNotFound, "project_not_found", $".dxproj がありません: {projectPath}");
+            }
+
+            if (options.OpsMode)
+            {
+                RunOps(options, projectPath, result);
+                return;
             }
 
             // 実行しないときもランナーを先に探すと、ランナーがないだけで書き出せなくなるので、実行するときだけ探す
@@ -292,6 +346,92 @@ namespace DXForgeCli
             {
                 if (tempFolder != null) DeleteTempFolder(tempFolder);
             }
+        }
+
+        /// <summary>
+        /// 操作を実行する(Issue #183)。本体はエディタの DXForgeEditor.Automation で、ここは呼ぶだけ。
+        /// 判定の順番: 40(形式)→ 31(読み込み)→ 44(エディタ)→ 41/42(実行)→ 43(保存)。
+        /// </summary>
+        private static void RunOps(CommandLineOptions options, string projectPath, RunResult result)
+        {
+            try
+            {
+                var ops = ReadOps(options);
+                result.OpCount = ops.Count;
+
+                var project = LoadProject(projectPath);
+                // シーンを選ばないので、すべてのシーンの一覧を確かめる(SelectScene と同じ理由)
+                foreach (var scene in project.Scenes)
+                {
+                    if (scene.GameEntities == null || scene.GameEntities.Any(x => x.Components == null))
+                    {
+                        throw new ExitException(ExitCode.ProjectInvalid, "project_invalid", $"シーン {scene.Name} のエンティティかコンポーネントの一覧がありません");
+                    }
+                }
+
+                // .dxproj に保存された Path は古いことがあり、エディタのロックはその Path の下にできる。実際のフォルダも見る。
+                if (ops.Any(SceneOpDocument.ChangesProject)
+                    && (ProjectEditorLock.IsHeld(Path.GetDirectoryName(projectPath)!) || ProjectEditorLock.IsHeld(project.Path)))
+                {
+                    throw new SceneOpException(SceneOpErrorKind.EditorOpen, "editor_open",
+                        $"エディタがこのプロジェクトを開いているので、変更の操作はできません(読むだけの操作はできます): {projectPath}");
+                }
+
+                var run = new SceneOpRunner(project, projectPath).Run(ops);
+                result.OpResults = run.Results;
+                if (run.Error != null) throw run.Error;
+                result.Changed = run.Changed;
+
+                if (run.Changed)
+                {
+                    if (options.DryRun)
+                    {
+                        WriteLog("info", "--dry-run なので保存していません。");
+                    }
+                    else
+                    {
+                        SceneOpProjectWriter.Save(project, projectPath);
+                        result.Saved = true;
+                    }
+                }
+
+                foreach (var warning in run.Results.SelectMany(x => x?["warnings"]?.AsArray() ?? new JsonArray()))
+                {
+                    WriteLog("warning", warning?.ToString() ?? string.Empty);
+                }
+            }
+            catch (SceneOpException ex)
+            {
+                result.ErrorOpIndex = ex.OpIndex;
+                result.ErrorKey = ex.Key;
+                result.Changed = false;
+                result.Saved = false;
+                var code = ex.Kind switch
+                {
+                    SceneOpErrorKind.InvalidOps => ExitCode.OpsInvalid,
+                    SceneOpErrorKind.NotFound => ExitCode.OpsTargetNotFound,
+                    SceneOpErrorKind.OperationFailed => ExitCode.OpsFailed,
+                    SceneOpErrorKind.SaveFailed => ExitCode.OpsSaveFailed,
+                    _ => ExitCode.OpsEditorOpen,
+                };
+                throw new ExitException(code, ex.Code, ex.Message);
+            }
+        }
+
+        private static List<SceneOp> ReadOps(CommandLineOptions options)
+        {
+            if (options.SingleOp != null) return SceneOpDocument.ParseSingle(options.SingleOp);
+
+            string json;
+            try
+            {
+                json = File.ReadAllText(options.OpsFile!);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is ArgumentException || ex is NotSupportedException)
+            {
+                throw new SceneOpException(SceneOpErrorKind.InvalidOps, "ops_invalid", $"ops のファイルを読めません: {options.OpsFile}({ex.Message})");
+            }
+            return SceneOpDocument.ParseDocument(json);
         }
 
         private static string NativeConfiguration =>
@@ -473,6 +613,29 @@ namespace DXForgeCli
         /// </summary>
         private static JsonObject ToJson(CommandLineOptions options, RunResult result)
         {
+            if (options.OpsMode)
+            {
+                var error = ErrorJson(result);
+                if (error != null)
+                {
+                    error["op_index"] = result.ErrorOpIndex;
+                    error["key"] = result.ErrorKey;
+                }
+                return new JsonObject
+                {
+                    ["mode"] = "ops",
+                    ["project"] = result.ProjectPath ?? options.Project,
+                    ["dry_run"] = options.DryRun,
+                    ["success"] = result.ExitCode == 0,
+                    ["exit_code"] = result.ExitCode,
+                    ["error"] = error,
+                    ["changed"] = result.Changed,
+                    ["saved"] = result.Saved,
+                    ["op_count"] = result.OpCount,
+                    ["results"] = result.OpResults,
+                };
+            }
+
             var json = new JsonObject
             {
                 ["mode"] = options.ExportOnly ? "export_game_bin" : "load_project",
@@ -530,7 +693,7 @@ namespace DXForgeCli
             return json;
         }
 
-        private static JsonNode? ErrorJson(RunResult result) =>
+        private static JsonObject? ErrorJson(RunResult result) =>
             result.ExitCode == 0 ? null : new JsonObject { ["code"] = result.ErrorCode, ["message"] = result.ErrorMessage };
 
         private static void WriteHumanResult(CommandLineOptions options, RunResult result)
@@ -538,6 +701,12 @@ namespace DXForgeCli
             if (result.ExitCode != 0)
             {
                 Console.WriteLine($"dxforge: FAILED (exit code {result.ExitCode}) {result.ErrorCode}: {result.ErrorMessage}");
+                return;
+            }
+            if (options.OpsMode)
+            {
+                Console.WriteLine($"dxforge: OK, {result.OpCount} ops, changed: {result.Changed}, saved: {result.Saved}");
+                foreach (var op in result.OpResults) Console.WriteLine($"  {op?.ToJsonString(_jsonOptions)}");
                 return;
             }
             if (options.ExportOnly)

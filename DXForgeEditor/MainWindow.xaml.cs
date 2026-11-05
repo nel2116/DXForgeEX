@@ -29,6 +29,7 @@ namespace DXForgeEditor
             InitializeComponent();
             Loaded += OnMainWindowLoaded;
             Closing += OnMainWindowClosing;
+            DataContextChanged += (_, e) => Automation.ProjectEditorLock.OnProjectChanged(e.NewValue as Project); // dxforge に開いていることを知らせる(#183)
         }
 
         private void OnMainWindowLoaded(object sender, RoutedEventArgs e)
