@@ -1,4 +1,5 @@
-﻿using DXForgeEditor.Content;
+﻿using DXForgeEditor.Components;
+using DXForgeEditor.Content;
 using DXForgeEditor.GameDev;
 using DXForgeEditor.GameProject;
 using DXForgeEditor.Utilities;
@@ -6,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
+using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -111,6 +113,24 @@ namespace DXForgeEditor.Editors
             if (((FrameworkElement)sender).DataContext is ContentBrowser contentBrowser && string.IsNullOrEmpty(contentBrowser.SelectedFolder?.Trim()))
             {
                 contentBrowser.SelectedFolder = contentBrowser.ContentFolder;
+            }
+        }
+
+        // NOTE: Primal は 4 つのビューポートと MSEntity.CurrentSelection を使う。ここではビューポートが 1 つで、今のインスペクターの選択を使う。
+        private void OnProjectLayoutView_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.F && e.OriginalSource is not TextBox &&
+                GameEntityView.Instance.DataContext is MSEntity selection && selection.SelectedEntities.Count > 0)
+            {
+                var avgPos = Vector3.Zero;
+                foreach (var entity in selection.SelectedEntities)
+                {
+                    avgPos += entity.GetComponent<Components.Transform>()?.Position ?? Vector3.Zero;
+                }
+
+                avgPos /= selection.SelectedEntities.Count;
+
+                sv1.RenderSurfaceControl.FocusPosition(avgPos);
             }
         }
     }

@@ -6,15 +6,200 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace DXForgeEditor
 {
+    static class MouseHelper
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int X;
+            public int Y;
+
+            public POINT(int x, int y)
+            {
+                X = x;
+                Y = y;
+            }
+
+            public static implicit operator Point(POINT p) => new(p.X, p.Y);
+        }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetCursorPos(int x, int y);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetCursorPos(out POINT lpPoint);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool ClientToScreen(IntPtr hWnd, ref POINT point);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr SetCapture(IntPtr hwnd);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool ReleaseCapture();
+
+        public static void SetCursor(IntPtr hWnd, int x, int y)
+        {
+            var p = new POINT(x, y);
+            ClientToScreen(hWnd, ref p);
+            SetCursorPos(p.X, p.Y);
+        }
+
+        public static Point GetCursor()
+        {
+            GetCursorPos(out POINT p);
+            return p;
+        }
+    }
+
+    static class KeyboardHelper
+    {
+        public enum VKey : int
+        {
+            MouseLeft = 0x01,
+            MouseRight = 0x02,
+            MouseMiddle = 0x04,
+            Backspace = 0x08,
+            Tab = 0x09,
+            Enter = 0x0D,
+
+            Shift = 0x10,
+            Control = 0x11,
+            Alt = 0x12,
+            Pause = 0x13,
+            Capslock = 0x14,
+            Escape = 0x1B,
+
+            Space = 0x20,
+            PageUp = 0x21,
+            PageDown = 0x22,
+            End = 0x23,
+            Home = 0x24,
+            Left = 0x25,
+            Up = 0x26,
+            Right = 0x27,
+            Down = 0x28,
+            PrintScreen = 0x2C,
+            Insert = 0x2D,
+            Delete = 0x2E,
+
+            D0 = 0x30,
+            D1 = 0x31,
+            D2 = 0x32,
+            D3 = 0x33,
+            D4 = 0x34,
+            D5 = 0x35,
+            D6 = 0x36,
+            D7 = 0x37,
+            D8 = 0x38,
+            D9 = 0x39,
+
+            A = 0x41,
+            B = 0x42,
+            C = 0x43,
+            D = 0x44,
+            E = 0x45,
+            F = 0x46,
+            G = 0x47,
+            H = 0x48,
+            I = 0x49,
+            J = 0x4A,
+            K = 0x4B,
+            L = 0x4C,
+            M = 0x4D,
+            N = 0x4E,
+            O = 0x4F,
+
+            P = 0x50,
+            Q = 0x51,
+            R = 0x52,
+            S = 0x53,
+            T = 0x54,
+            U = 0x55,
+            V = 0x56,
+            W = 0x57,
+            X = 0x58,
+            Y = 0x59,
+            Z = 0x5A,
+
+            Numpad0 = 0x60,
+            Numpad1 = 0x61,
+            Numpad2 = 0x62,
+            Numpad3 = 0x63,
+            Numpad4 = 0x64,
+            Numpad5 = 0x65,
+            Numpad6 = 0x66,
+            Numpad7 = 0x67,
+            Numpad8 = 0x68,
+            Numpad9 = 0x69,
+            Multiply = 0x6A,
+            Add = 0x6B,
+
+            Subtract = 0x6D,
+            Decimal = 0x6E,
+            Divide = 0x6F,
+
+            F1 = 0x70,
+            F2 = 0x71,
+            F3 = 0x72,
+            F4 = 0x73,
+            F5 = 0x74,
+            F6 = 0x75,
+            F7 = 0x76,
+            F8 = 0x77,
+            F9 = 0x78,
+            F10 = 0x79,
+            F11 = 0x7A,
+            F12 = 0x7B,
+
+            Numlock = 0x90,
+            Scrollock = 0x91,
+
+            Colon = 0xBA,
+            Plus = 0xBB,
+            Comma = 0xBC,
+            Minus = 0xBD,
+            Period = 0xBE,
+            Question = 0xBF,
+
+            Tilde = 0xC0,
+
+            BracketOpen = 0xDB,
+            Pipe = 0xDC,
+            BracketClose = 0xDD,
+            Quote = 0xDE,
+        }
+
+        [DllImport("user32.dll")]
+        public static extern short GetAsyncKeyState(VKey vKey);
+
+        private static readonly Key[] _keys = Enum.GetValues<Key>();
+
+        public static IEnumerable<Key> KeyDown()
+        {
+            foreach (Key key in _keys)
+            {
+                if (key != Key.None && Keyboard.IsKeyDown(key))
+                    yield return key;
+            }
+        }
+    }
+
     static class EnumExtensions
     {
         public static string GetDescription(this Enum value)
