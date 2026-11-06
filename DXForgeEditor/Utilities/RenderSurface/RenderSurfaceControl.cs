@@ -29,27 +29,29 @@ namespace DXForgeEditor.Utilities
         private class FrameTimer
         {
             private long _timerStart = Stopwatch.GetTimestamp();
-            private int _timerCount = 1;
-            private float _avgFrameTimeMicroseconds = 0;
+            private long _intervalStart = Stopwatch.GetTimestamp();
+            private int _frameCount;
 
             public float AverageFrameTime { get; private set; } = 0.016667f;
             public int FPS { get; private set; }
             public float LastFrameTime { get; private set; } = 0.016667f;
 
+            // NOTE: Primal は前回の平均から更新の間隔を見積もり、フレーム数をそのまま FPS にする。描画を省いている間(サーフェスが小さい)に
+            //       平均が短くなると、元の大きさに戻したあとに更新が長く止まり、FPS も大きくずれる。ここでは実際の経過時間で決める。
             public bool MeasureFrameTime()
             {
                 var timerEnd = Stopwatch.GetTimestamp();
-                var elapsed = Stopwatch.GetElapsedTime(_timerStart, timerEnd);
-                LastFrameTime = (float)(elapsed.TotalMicroseconds * 1e-6);
+                LastFrameTime = (float)Stopwatch.GetElapsedTime(_timerStart, timerEnd).TotalSeconds;
                 _timerStart = timerEnd;
-                _avgFrameTimeMicroseconds += (float)(elapsed.TotalMicroseconds - _avgFrameTimeMicroseconds) / _timerCount++;
+                _frameCount++;
 
-                if (AverageFrameTime * _timerCount > 1)
+                var interval = Stopwatch.GetElapsedTime(_intervalStart, timerEnd).TotalSeconds;
+                if (interval >= 1.0)
                 {
-                    AverageFrameTime = _avgFrameTimeMicroseconds * 1e-6f;
-                    FPS = _timerCount;
-                    _timerCount = 1;
-                    _avgFrameTimeMicroseconds = 0;
+                    AverageFrameTime = (float)(interval / _frameCount);
+                    FPS = (int)Math.Round(_frameCount / interval);
+                    _intervalStart = timerEnd;
+                    _frameCount = 0;
                     return true;
                 }
 
@@ -344,7 +346,8 @@ namespace DXForgeEditor.Utilities
                     }
                     break;
                 case Win32Msg.WM_RBUTTONUP:
-                    if (_isXZLocked || Keyboard.Modifiers.HasFlag(ModifierKeys.Alt))
+                    // NOTE: Primal は修飾キーの今の状態で判断するので、Alt を先に離すとマウスキャプチャが残り、他のクリックが届かなくなる
+                    if (_capturedRight)
                     {
                         OnRenderHost_Mouse_RBU();
                     }
