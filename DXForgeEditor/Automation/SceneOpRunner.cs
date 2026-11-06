@@ -28,12 +28,13 @@ namespace DXForgeEditor.Automation
     /// エンジンには触らない: ヘッドレスではエンティティはアクティブにならず、IsActive を変える既存の入口(Scene.AddGameEntity、
     /// GameEntity.RemoveComponent)は使わない。
     /// </summary>
-    class SceneOpRunner(Project project, string projectFile)
+    class SceneOpRunner(Project project, string projectFile, SceneOpAssetStaging assets)
     {
         public const string DefaultCubeAsset = "default:cube";
 
         private readonly Project _project = project;
         private readonly string _contentFolder = Path.Combine(Path.GetDirectoryName(projectFile) ?? string.Empty, "Content");
+        private readonly SceneOpAssetStaging _assets = assets;
         private readonly Dictionary<string, GameEntity> _aliases = [];
         private Dictionary<Guid, AssetInfo>? _assetsByGuid;
 
@@ -70,12 +71,7 @@ namespace DXForgeEditor.Automation
             switch (op.Name)
             {
                 case "list-scenes":
-                    result["scenes"] = new JsonArray(_project.Scenes.Select(x => (JsonNode)new JsonObject
-                    {
-                        ["name"] = x.Name,
-                        ["active"] = x.IsActive,
-                        ["entity_count"] = x.GameEntities.Count,
-                    }).ToArray());
+                    result["scenes"] = new JsonArray(_project.Scenes.Select(x => (JsonNode)ToJson(x)).ToArray());
                     return false;
                 case "list-entities":
                     {
@@ -127,6 +123,15 @@ namespace DXForgeEditor.Automation
                     return RemoveComponent(op, result);
                 case "set-geometry":
                     return SetGeometry(op, result);
+                case "create-scene":
+                    return CreateScene(op, result);
+                case "remove-scene":
+                    return RemoveScene(op, result);
+                case "set-active-scene":
+                    return SetActiveScene(op, result);
+                case "import-asset":
+                    _assets.Import(op, result, warnings);
+                    return true;
                 default:
                     throw new InvalidOperationException($"Unknown op: {op.Name}"); // SceneOpDocument が断っている
             }
@@ -200,6 +205,50 @@ namespace DXForgeEditor.Automation
             return changed;
         }
 
+        private bool CreateScene(SceneOp op, JsonObject result)
+        {
+            // NOTE: 同じ名前のシーンは FindScene が 1 つに決められず、以後 scene で指せなくなる
+            if (_project.Scenes.Any(x => x.Name == op.EntityName))
+            {
+                throw new SceneOpException(SceneOpErrorKind.OperationFailed, "scene_exists", $"シーン {op.EntityName} はすでにあります。", key: "name");
+            }
+            _project.AddScene(op.EntityName!);
+            result["scene"] = ToJson(_project.Scenes.Last());
+            return true;
+        }
+
+        private bool RemoveScene(SceneOp op, JsonObject result)
+        {
+            var scene = FindScene(op.Scene!);
+            if (_project.Scenes.Count == 1)
+            {
+                throw new SceneOpException(SceneOpErrorKind.OperationFailed, "last_scene", $"最後のシーンは削除できません: {scene.Name}", key: "scene");
+            }
+            // エディタの RemoveSceneCommand も、アクティブなシーンの削除を禁じている
+            if (scene.IsActive || scene == _project.ActiveScene)
+            {
+                throw new SceneOpException(SceneOpErrorKind.OperationFailed, "scene_active", $"アクティブなシーンは削除できません(先に set-active-scene で別のシーンをアクティブにしてください): {scene.Name}", key: "scene");
+            }
+            result["scene"] = ToJson(scene);
+            _project.RemoveScene(scene);
+            return true;
+        }
+
+        private bool SetActiveScene(SceneOp op, JsonObject result)
+        {
+            var target = FindScene(op.Scene!);
+            var changed = false;
+            foreach (var scene in _project.Scenes)
+            {
+                var active = scene == target;
+                changed |= scene.IsActive != active;
+                scene.IsActive = active;
+            }
+            _project.ActiveScene = target;
+            result["scene"] = ToJson(target);
+            return changed;
+        }
+
         private Scene FindScene(string name)
         {
             var matches = _project.Scenes.Where(x => x.Name == name).ToList();
@@ -215,7 +264,8 @@ namespace DXForgeEditor.Automation
             if (selector.StartsWith('$'))
             {
                 var entity = _aliases[selector[1..]]; // 未定義の別名は SceneOpDocument が断っている
-                if (!entity.ParentScene.GameEntities.Contains(entity))
+                // シーンごと消したときは、シーンの一覧にまだエンティティが残っている
+                if (!_project.Scenes.Contains(entity.ParentScene) || !entity.ParentScene.GameEntities.Contains(entity))
                 {
                     throw NotFound($"別名 {selector} のエンティティは、この ops の中で削除されています。");
                 }
@@ -254,12 +304,12 @@ namespace DXForgeEditor.Automation
             else if (asset.StartsWith("guid:", StringComparison.Ordinal))
             {
                 var guid = Guid.Parse(asset["guid:".Length..]);
-                info = guid == DefaultAssets.DefaultGeometryGuid ? DefaultCube() : FindAssetByGuid(guid);
+                info = guid == DefaultAssets.DefaultGeometryGuid ? DefaultCube() : FindAssetByGuid(guid) ?? _assets.FindStaged(guid);
             }
             else
             {
                 var relative = asset["path:".Length..].Replace('/', '\\');
-                info = Content.Asset.TryGetAssetInfo(Path.Combine(_contentFolder, relative));
+                info = Content.Asset.TryGetAssetInfo(Path.Combine(_contentFolder, relative)) ?? _assets.FindStaged(relative);
             }
 
             if (info == null) throw new SceneOpException(SceneOpErrorKind.NotFound, "asset_not_found", $"アセットが見つかりません: {asset}({_contentFolder})", key: "asset");
@@ -289,6 +339,13 @@ namespace DXForgeEditor.Automation
             }
             return _assetsByGuid.GetValueOrDefault(guid);
         }
+
+        private static JsonObject ToJson(Scene scene) => new()
+        {
+            ["name"] = scene.Name,
+            ["active"] = scene.IsActive,
+            ["entity_count"] = scene.GameEntities.Count,
+        };
 
         /// <summary>エンティティの結果の形(get-entity など)。回転は、単位を取り違えないよう、ラジアンと度の両方を出す。</summary>
         private static JsonObject ToJson(GameEntity entity)

@@ -61,6 +61,7 @@ namespace DXForgeCli
         public bool Help { get; set; }
         public string? OpsFile { get; set; }
         public string? SingleOp { get; set; }
+        public string? Importer { get; set; }
         public bool DryRun { get; set; }
 
         public bool ExportOnly => ExportGameBin != null;
@@ -120,6 +121,7 @@ namespace DXForgeCli
                         case "--ops": options.OpsFile = NextValue(); break;
                         case "--op": options.SingleOp = NextValue(); break;
                         case "--dry-run": options.DryRun = true; break;
+                        case "--importer": options.Importer = NextValue(); break;
                         default: throw new FormatException($"知らない引数です: {arg}");
                     }
                 }
@@ -134,6 +136,7 @@ namespace DXForgeCli
 
             if (string.IsNullOrWhiteSpace(options.Project)) error = "--load-project を指定してください。";
             else if (options.OpsFile != null && options.SingleOp != null) error = "--ops と --op は一緒には使えません。";
+            else if (options.Importer != null && !options.OpsMode) error = "--importer は --ops か --op と一緒に使います。";
             else if (options.OpsMode && (options.Frames != null || options.ExportOnly || options.Runner != null || options.KeepGameBin != null || options.Scene != null || args.Contains("--dt")))
                 error = "--ops, --op は --frames, --dt, --scene, --runner, --keep-game-bin, --export-game-bin と一緒には使えません(シーンは操作の中で指定する)。";
             else if (options.OpsMode) { }
@@ -167,6 +170,8 @@ namespace DXForgeCli
         /// <summary>ops の失敗の場所(error に入れる)。</summary>
         public int? ErrorOpIndex { get; set; }
         public string? ErrorKey { get; set; }
+        /// <summary>取り込みの片付けで消せずに残ったパス。</summary>
+        public IReadOnlyList<string> LeftoverPaths { get; set; } = [];
     }
 
     static class Program
@@ -178,8 +183,8 @@ namespace DXForgeCli
               dxforge --load-project <.dxproj> --frames <N> [--dt <秒>] [--scene <名前>]
                       [--runner <EngineUnitTests.exe>] [--keep-game-bin <パス>] [--json]
               dxforge --load-project <.dxproj> --export-game-bin <パス> [--scene <名前>] [--json]
-              dxforge --load-project <.dxproj> --ops <ops.json> [--dry-run] [--json]
-              dxforge --load-project <.dxproj> --op '<1 つの操作の JSON>' [--dry-run] [--json]
+              dxforge --load-project <.dxproj> --ops <ops.json> [--dry-run] [--importer <DXForgeImport.exe>] [--json]
+              dxforge --load-project <.dxproj> --op '<1 つの操作の JSON>' [--dry-run] [--importer <DXForgeImport.exe>] [--json]
 
                   --load-project    読み込むプロジェクトファイル(エディタが保存した .dxproj)。
                   --frames           スクリプトの更新を回すフレーム数(0 以上)。
@@ -192,6 +197,7 @@ namespace DXForgeCli
                   --ops              シーンを操作する JSON({"ops":[...]})のファイルを順に実行する(Issue #183)。
                   --op               1 つの操作の JSON を実行する(--ops の糖衣)。
                   --dry-run          操作を検証して結果を返すが、保存しない。
+                  --importer         import-asset に使うインポーター(既定は <この exe のフォルダ>\DXForgeImport.exe)。
                   --json             結果をJSONで標準出力に出す(ログは常に標準エラー)。
               -h, --help             この説明を出す。
 
@@ -200,11 +206,15 @@ namespace DXForgeCli
             操作:
               読む    list-scenes, list-entities, get-entity
               変える  create-entity, remove-entity, rename, set-enabled, set-transform,
-                      add-component (transform/script/geometry), remove-component, set-geometry
+                      add-component (transform/script/geometry), remove-component, set-geometry,
+                      create-scene, remove-scene, set-active-scene,
+                      import-asset (source: 絶対パス, folder: Content からの相対フォルダ, settings: インポート設定)
               対象    guid:<GUID> | name:<名前> | index:<シーン名>/<番号> | $<別名>(create-entity の "as")
               アセット guid:<GUID> | path:<Content からの相対パス> | default:cube
               回転    rotation_deg か rotation_rad(結果には両方)
               保存    変更があり、すべて成功したときだけ最後に 1 回保存する(途中で失敗したら何も保存しない)。結果の changed と saved を見る。
+              取り込み 一時フォルダ(.dxforge-import-*)に書き、すべて成功したら Content へ移してから保存する。既存のファイルは上書きしない。
+                      消せずに残ったものは結果の leftover_paths に出す。
               エディタがそのプロジェクトを開いていると、--dry-run でも変更の操作は断る(44)。読むだけの操作は許す。
 
             終了コード:
@@ -221,9 +231,9 @@ namespace DXForgeCli
               36 game.bin を書き出せない
               39 想定外のエラー
               40 ops の形式の誤り(何も実行しない。error に op_index と key)
-              41 対象(エンティティ、シーン、アセット)が見つからない、1 つに決まらない
-              42 操作の失敗(すでに持つコンポーネントの追加、Transform の削除など)
-              43 .dxproj を保存できない
+              41 対象(エンティティ、シーン、アセット、取り込むファイル)が見つからない、1 つに決まらない
+              42 操作の失敗(すでに持つコンポーネントの追加、Transform の削除、最後のシーンやアクティブなシーンの削除、取り込みの失敗など)
+              43 .dxproj を保存できない、取り込んだファイルを Content へ移せない
               44 エディタがそのプロジェクトを開いている
             """;
 
@@ -377,25 +387,34 @@ namespace DXForgeCli
                         $"エディタがこのプロジェクトを開いているので、変更の操作はできません(読むだけの操作はできます): {projectPath}");
                 }
 
-                var run = new SceneOpRunner(project, projectPath).Run(ops);
-                result.OpResults = run.Results;
-                if (run.Error != null) throw run.Error;
-                result.Changed = run.Changed;
-
-                if (run.Changed)
+                var assets = new SceneOpAssetStaging(projectPath, Path.GetFullPath(options.Importer ?? SceneOpAssetStaging.DefaultImporterPath));
+                try
                 {
-                    if (options.DryRun)
+                    var run = new SceneOpRunner(project, projectPath, assets).Run(ops);
+                    result.OpResults = run.Results;
+                    if (run.Error != null) throw run.Error;
+                    result.Changed = run.Changed;
+
+                    if (run.Changed)
                     {
-                        WriteLog("info", "--dry-run なので保存していません。");
-                    }
-                    else
-                    {
-                        SceneOpProjectWriter.Save(project, projectPath);
-                        result.Saved = true;
+                        if (options.DryRun)
+                        {
+                            WriteLog("info", "--dry-run なので保存していません。");
+                        }
+                        else
+                        {
+                            assets.Commit(() => SceneOpProjectWriter.Save(project, projectPath));
+                            result.Saved = true;
+                        }
                     }
                 }
+                finally
+                {
+                    assets.Dispose();
+                    result.LeftoverPaths = assets.LeftoverPaths;
+                }
 
-                foreach (var warning in run.Results.SelectMany(x => x?["warnings"]?.AsArray() ?? new JsonArray()))
+                foreach (var warning in result.OpResults.SelectMany(x => x?["warnings"]?.AsArray() ?? new JsonArray()))
                 {
                     WriteLog("warning", warning?.ToString() ?? string.Empty);
                 }
@@ -631,6 +650,7 @@ namespace DXForgeCli
                     ["error"] = error,
                     ["changed"] = result.Changed,
                     ["saved"] = result.Saved,
+                    ["leftover_paths"] = new JsonArray(result.LeftoverPaths.Select(x => (JsonNode?)x).ToArray()),
                     ["op_count"] = result.OpCount,
                     ["results"] = result.OpResults,
                 };

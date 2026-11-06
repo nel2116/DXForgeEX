@@ -42,6 +42,10 @@ namespace DXForgeEditor.Automation
         public Vector3? Scale { get; init; }
         public string? ComponentType { get; init; }
         public string? Asset { get; init; }
+        public string? Source { get; init; }
+        public string? Folder { get; init; }
+        /// <summary>import-asset の settings を、DXForgeImport の --set の形(Name=Value)にしたもの。</summary>
+        public IReadOnlyList<string>? ImportAssignments { get; init; }
     }
 
     /// <summary>
@@ -64,6 +68,10 @@ namespace DXForgeEditor.Automation
             ["add-component"] = ["asset", "name", "target", "type"],
             ["remove-component"] = ["target", "type"],
             ["set-geometry"] = ["asset", "target"],
+            ["create-scene"] = ["name"],
+            ["remove-scene"] = ["scene"],
+            ["set-active-scene"] = ["scene"],
+            ["import-asset"] = ["folder", "settings", "source"],
         };
 
         /// <summary>操作の名前と、必須のキー(op を除く)。</summary>
@@ -80,10 +88,15 @@ namespace DXForgeEditor.Automation
             ["add-component"] = ["target", "type"],
             ["remove-component"] = ["target", "type"],
             ["set-geometry"] = ["asset", "target"],
+            ["create-scene"] = ["name"],
+            ["remove-scene"] = ["scene"],
+            ["set-active-scene"] = ["scene"],
+            ["import-asset"] = ["source"],
         };
 
         private static readonly HashSet<string> _readOnlyOps = ["list-scenes", "list-entities", "get-entity"];
         private static readonly Regex _aliasPattern = new("^[A-Za-z0-9_-]+$", RegexOptions.CultureInvariant);
+        private static readonly Regex _importSettingPattern = new("^[A-Za-z0-9_]+$", RegexOptions.CultureInvariant);
 
         public static bool ChangesProject(SceneOp op) => !_readOnlyOps.Contains(op.Name);
 
@@ -166,6 +179,9 @@ namespace DXForgeEditor.Automation
                 Scale = reader.Vector("scale"),
                 ComponentType = reader.ComponentType("type"),
                 Asset = reader.Asset("asset"),
+                Source = reader.AbsolutePath("source"),
+                Folder = reader.ContentFolder("folder"),
+                ImportAssignments = reader.ImportSettings("settings"),
             };
 
             switch (name)
@@ -299,6 +315,45 @@ namespace DXForgeEditor.Automation
                     return text;
                 }
                 throw Error(key, $"guid:<GUID>, path:<Content からの相対パス>, {SceneOpRunner.DefaultCubeAsset} のどれかです: {text}");
+            }
+
+            // NOTE: 相対パスを受け付けると、同じ JSON が現在のフォルダで別の意味になる(エディタの経路 #184 と共有できない)
+            public string? AbsolutePath(string key)
+            {
+                var text = NonEmptyString(key);
+                if (text != null && !Path.IsPathFullyQualified(text)) throw Error(key, $"絶対パスです: {text}");
+                return text;
+            }
+
+            public string? ContentFolder(string key)
+            {
+                var text = NonEmptyString(key);
+                if (text == null) return null;
+                var path = text.Replace('/', '\\');
+                if (Path.IsPathRooted(path) || path.Contains(':') || path.IndexOfAny(Path.GetInvalidPathChars()) >= 0 || path.Split('\\').Contains(".."))
+                {
+                    throw Error(key, $"Content フォルダからの相対パスです(.. や絶対パスは使えません): {text}");
+                }
+                return path;
+            }
+
+            public IReadOnlyList<string>? ImportSettings(string key)
+            {
+                if (!_element.TryGetProperty(key, out var value)) return null;
+                if (value.ValueKind != JsonValueKind.Object) throw Error(key, "項目名と値のオブジェクトです。");
+                CheckDuplicateKeys(value, _index);
+                var assignments = new List<string>();
+                foreach (var property in value.EnumerateObject())
+                {
+                    if (!_importSettingPattern.IsMatch(property.Name)) throw Error($"{key}.{property.Name}", "項目名に使えるのは英数字と _ です。");
+                    assignments.Add(property.Value.ValueKind switch
+                    {
+                        JsonValueKind.String => $"{property.Name}={property.Value.GetString()}",
+                        JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False => $"{property.Name}={property.Value.GetRawText()}",
+                        _ => throw Error($"{key}.{property.Name}", "値は文字列、数、true か false です。"),
+                    });
+                }
+                return assignments;
             }
 
             public string? Selector(string key, HashSet<string> aliases)
