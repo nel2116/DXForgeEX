@@ -284,7 +284,8 @@ EDITOR_INTERFACE u32 CreateRenderSurface(HWND host, s32 width, s32 height)
 	viewport_surface surface{};
 	surface.window = platform::create_window(&info);
 	assert(surface.window.is_valid());
-	create_viewport_graphics(surface);
+	// NOTE: create_window() は 0 を既定の大きさとして扱うので、大きさが 0 かどうかは引数で見る(次の Resize で作る)
+	if (width > 0 && height > 0) create_viewport_graphics(surface);
 	surfaces.emplace_back(surface);
 	return (u32)surfaces.size() - 1;
 }
