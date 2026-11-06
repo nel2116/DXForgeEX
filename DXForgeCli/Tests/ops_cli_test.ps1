@@ -538,8 +538,8 @@ try
 		$run | Add-Member Code $run.Process.ExitCode
 		$run.Process.Dispose()
 	}
-	# NOTE: 読むときや置き換えるときに、ほかの実行と重なって失敗することはある(31、43)。失敗は許すが、その変更が残るのは許さない
-	$unexpected = @($runs | Where-Object { $_.Code -notin 0, 31, 43 })
+	# NOTE: 読むときや置き換えるときに、ほかの実行と置き換えが読み込みと重なって失敗することはある(43)。読み込み同士は重ならない(#193)。失敗は許すが、その変更が残るのは許さない
+	$unexpected = @($runs | Where-Object { $_.Code -notin 0, 43 })
 	Write-Host "       parallel exit codes: $(($runs | ForEach-Object { $_.Code }) -join ' ')"
 	Check ($unexpected.Count -eq 0) "parallel runs -> each one succeeds or fails cleanly" (($runs | ForEach-Object { "$($_.Name)=$($_.Code)" }) -join " ")
 	$r = Invoke-Op $parallel '{"op":"list-entities"}'
@@ -547,6 +547,43 @@ try
 	$succeeded = @($runs | Where-Object { $_.Code -eq 0 } | ForEach-Object { $_.Name })
 	Check ($r.Code -eq 0 -and $savedNames.Count -ge 1 -and @($savedNames | Where-Object { $_ -notin $succeeded }).Count -eq 0) "parallel runs -> only the changes of runs that succeeded are saved" "saved: $savedNames; succeeded: $succeeded"
 	Check (-not (Test-TemporaryFiles $parallel)) "parallel runs leave no temporary file"
+
+	# 読むだけの操作は並行で実行しても競合しない(#193: 読み込みは FileAccess.Read と FileShare.Read で開く)
+	$readers = New-EmptyProject "ParallelRead"
+	$runs = @(0..7 | ForEach-Object {
+			$psi = [System.Diagnostics.ProcessStartInfo]::new($Cli)
+			$psi.UseShellExecute = $false
+			$psi.RedirectStandardOutput = $true
+			$psi.RedirectStandardError = $true
+			foreach ($a in @("--load-project", $readers, "--op", '{"op":"list-entities"}', "--json")) { $psi.ArgumentList.Add($a) }
+			[pscustomobject]@{ Name = "Read$_"; Process = [System.Diagnostics.Process]::Start($psi) }
+		})
+	foreach ($run in $runs)
+	{
+		$stderrTask = $run.Process.StandardError.ReadToEndAsync()
+		$null = $run.Process.StandardOutput.ReadToEnd()
+		if (-not $run.Process.WaitForExit(120000)) { $run.Process.Kill($true) }
+		$null = $stderrTask.Result
+		$run | Add-Member Code $run.Process.ExitCode
+		$run.Process.Dispose()
+	}
+	Write-Host "       parallel list-entities exit codes: $(($runs | ForEach-Object { $_.Code }) -join ' ')"
+	Check (@($runs | Where-Object { $_.Code -ne 0 }).Count -eq 0) "parallel list-entities on one project -> all exit 0" (($runs | ForEach-Object { "$($_.Name)=$($_.Code)" }) -join " ")
+
+	# 読み取り専用の .dxproj を読める
+	$readOnly = New-EmptyProject "ReadOnlyProject"
+	$beforeReadOnly = Read-Bytes $readOnly
+	Set-ItemProperty -LiteralPath $readOnly -Name IsReadOnly -Value $true
+	try
+	{
+		$r = Invoke-Op $readOnly '{"op":"list-entities"}'
+		Check ($r.Code -eq 0) "read-only .dxproj -> list-entities exit 0" $r.Stdout
+		Check (Bytes-Equal $beforeReadOnly (Read-Bytes $readOnly)) "read-only .dxproj is byte-identical after list-entities"
+	}
+	finally
+	{
+		Set-ItemProperty -LiteralPath $readOnly -Name IsReadOnly -Value $false
+	}
 
 	Write-Host "6. editor has the project open (44)"
 	$project = New-EmptyProject "Locked"
