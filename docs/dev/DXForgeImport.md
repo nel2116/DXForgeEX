@@ -3,7 +3,7 @@
 C#/.NET console app, built only in `DebugEditor`/`ReleaseEditor` (like the editor).
 
 ```
-DXForgeImport --input <file> --output <folder> [--type auto|geometry|texture] [--settings import.json] [--set Name=Value] [--json]
+DXForgeImport --input <file> --output <folder> [--type auto|geometry|texture] [--settings import.json] [--set Name=Value] [--sources-output <folder>] [--json]
 ```
 
 It writes the same `.asset` files as the editor's drag-and-drop import (FBX → geometry, images → texture; IBL prefiltering and primitive meshes are not exposed yet).
@@ -15,6 +15,7 @@ It writes the same `.asset` files as the editor's drag-and-drop import (FBX → 
 - WPF is still needed (logger dispatcher, geometry icon rendering via `GeometryView`): the CLI creates a plain `Application` on its STA main thread, merges only `DXForgeEditor;component/Dictionaries/EditorColors.xaml` (the editor's `App` is not used: its `App.xaml` dictionaries use `pack://application:,,,/...`, which resolves against the *entry* assembly, and it has `StartupUri`), never calls `Run()`, and never shuts the dispatcher down (`Logger.Log` is `async void` and awaits `BeginInvoke`; a stopped dispatcher would throw out of it).
 - No window, project or GPU window is needed (texture compression creates a windowless D3D11 device and falls back to the CPU).
 - Embedded FBX textures are copied from the temp `.fbm` into `<output>/<fbx asset name>.fbm/` before importing, so the texture `.asset`'s `Sources` (used by the editor's reimport) does not point into the deleted temp folder. The copy rule lives in one place, `ContentHelper.CopyEmbeddedMedia` (image extensions only; failures come back as `EmbeddedMediaCopy.Error`, not exceptions), and `Geometry.ImportFbx` runs it for both the editor and the CLI, so `ImportEmbeddedFiles` receives the copies (#111: the editor used to import straight from `Project.TempFolder`, which `Project.Unload` deletes).
+- `--sources-output <folder>` is for callers that use `--output` as a staging folder and move the files afterwards (`dxforge` `import-asset`, #183): before `Save()`, texture `Sources` under `--output` are rewritten to the same relative path under this folder (`Import()` has already read the real file). Sources outside `--output` stay as they are.
 - A geometry save is checked against `Geometry.LODGroupCount` and against errors logged during `Save()`, because `Geometry.Save()` catches its own exception and returns only the files written so far (partial save → exit 1, written files stay in `files`).
 - A failed FBX import (`ContentToolsAPI.ImportFbx` → `GeometryFromSceneData`) is reported as `false` from `Geometry.Import()`, not as an exception, since the editor reaches it from `async void` commands (#110); the CLI still also treats `LODGroupCount == 0` after `Import()` as a failure, as a safety net.
 - Needs `ContentTools.dll` in the same folder (`x64/<config>/`, so FBX SDK is needed to build it).

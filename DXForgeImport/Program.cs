@@ -36,6 +36,7 @@ namespace DXForgeImport
         public string? Output { get; set; }
         public string Type { get; set; } = "auto";
         public string? SettingsFile { get; set; }
+        public string? SourcesOutput { get; set; }
         public List<string> Assignments { get; } = new();
         public bool Json { get; set; }
         public bool Help { get; set; }
@@ -71,6 +72,7 @@ namespace DXForgeImport
                         case "-t": case "--type": options.Type = NextValue().ToLowerInvariant(); break;
                         case "-s": case "--settings": options.SettingsFile = NextValue(); break;
                         case "--set": options.Assignments.Add(NextValue()); break;
+                        case "--sources-output": options.SourcesOutput = NextValue(); break;
                         default: throw new ExitException(ExitCode.InvalidArguments, $"知らない引数です: {arg}");
                     }
                 }
@@ -113,7 +115,7 @@ namespace DXForgeImport
 
             使い方:
               DXForgeImport --input <ファイル> --output <フォルダ> [--type auto|geometry|texture]
-                            [--settings <import.json>] [--set Name=Value ...] [--json]
+                            [--settings <import.json>] [--set Name=Value ...] [--sources-output <フォルダ>] [--json]
 
               -i, --input     インポートするファイル。FBX(.fbx)はジオメトリ、画像
                               (.bmp .png .jpg .jpeg .tiff .tif .tga .dds .hdr)はテクスチャになる。
@@ -126,6 +128,8 @@ namespace DXForgeImport
                                         ImportEmbeddedTextures, ImportAnimations, CoalesceMeshes
                               texture:  Dimension, MipLevels, AlphaThreshold, PreferBC7, FormatIndex, Compress,
                                         CubeMapSize, MirrorCubeMap, PrefilterCubeMap
+                  --sources-output  --output を一時的な置き場として使い、あとでこのフォルダへ移すときに指定する。
+                              テクスチャの .asset の Sources に、--output の下のパスの代わりに、このフォルダの下のパスを書く。
                   --json      結果をJSONで標準出力に出す(ログは常に標準エラー)。
               -h, --help      この説明を出す。
 
@@ -215,6 +219,7 @@ namespace DXForgeImport
 
         private static Dictionary<string, object?>? _settingsForJson;
         private static string? _resolvedOutput;
+        private static string? _resolvedSourcesOutput;
 
         private static ExitCode Run(CommandLineOptions options, ImportResult result, List<ImportResult> embedded)
         {
@@ -276,6 +281,7 @@ namespace DXForgeImport
                 output = Path.GetFullPath(options.Output!);
                 Directory.CreateDirectory(output);
                 _resolvedOutput = output;
+                if (options.SourcesOutput != null) _resolvedSourcesOutput = Path.GetFullPath(options.SourcesOutput);
             }
             catch (Exception ex)
             {
@@ -387,6 +393,12 @@ namespace DXForgeImport
                 return false;
             }
 
+            // --sources-output: Import() は実際のファイルを読むので、Save() の前に、移したあとのパスに書き換える。
+            if (settings is TextureImportSettings sourcesSettings)
+            {
+                for (var i = 0; i < sourcesSettings.Sources.Count; ++i) sourcesSettings.Sources[i] = ToFinalSource(sourcesSettings.Sources[i]);
+            }
+
             // Geometry.Save() は LODグループごとに1つのファイルを書き、途中で失敗すると(例外をログに出して)書けた分だけを返す。
             // Texture.Save() は全部書くか何も書かない(対になるIBLのテクスチャがあれば2つ)。どちらも失敗はログのエラーとして出るので、
             // 書いたファイルの数と、保存中に出たエラーの両方で、一部だけ保存できた場合も失敗にする。書けたファイルは files に残す。
@@ -402,6 +414,15 @@ namespace DXForgeImport
             }
 
             return true;
+        }
+
+        /// <summary>--output の下のパスを --sources-output の下のパスにする。それ以外(出力先の外にある元の画像)はそのまま。</summary>
+        private static string ToFinalSource(string source)
+        {
+            if (_resolvedSourcesOutput == null || _resolvedOutput == null) return source;
+            var relative = Path.GetRelativePath(_resolvedOutput, source);
+            var outside = relative == ".." || relative.StartsWith(".." + Path.DirectorySeparatorChar) || Path.IsPathRooted(relative);
+            return outside ? source : Path.Combine(_resolvedSourcesOutput, relative);
         }
 
         private static void OnMessageLogged(MessageType type, string message)
