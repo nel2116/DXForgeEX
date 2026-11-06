@@ -127,6 +127,13 @@ namespace dxforge::graphics::d3d12
 	void descriptor_heap::free(descriptor_handle& handle)
 	{
 		if (!handle.is_valid()) return;
+
+		// NOTE: process_deferred_releases() は deferred_release_mutex を持ったままヒープのミューテックスを取るので、
+		//		 ここでは逆の順にならないよう、ヒープのミューテックスを取る前にフラグを立てる(Primal はロックの中で立てる)。
+		//		 先に立てれば、インデックスを積む前に処理が走っても、待ちの回数が足りないので解放されない。
+		const u32 frame_idx{ core::current_frame_index() };
+		core::set_deferred_releases_flag(frame_idx);
+
 		std::lock_guard lock{ _mutex };
 		assert(_heap && _size);
 		assert(handle.container == this);
@@ -136,9 +143,7 @@ namespace dxforge::graphics::d3d12
 		const u32 index{ (u32)(handle.cpu.ptr - _cpu_start.ptr) / _descriptor_size };
 		assert(handle.index == index);
 
-		const u32 frame_idx{ core::current_frame_index() };
 		_deferred_free_indices[frame_idx].push_back(index);
-		core::set_deferred_releases_flag(frame_idx);
 		handle = {};
 	}
 

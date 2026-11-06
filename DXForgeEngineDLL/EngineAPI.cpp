@@ -59,10 +59,10 @@ namespace
 	std::wstring graphics_runtime_description{};	// GetGraphicsRuntimeDescription が返す文字列の実体
 
 	void calculate_thresholds(const id::id_type* const geometry_ids, game_entity::entity_id* const entity_ids,
-		f32* const thresholds, u32 count, u32 surface_id)
+		f32* const thresholds, u32 count, const graphics::camera& view_camera)
 	{
 		geometry::get_entity_ids(geometry_ids, entity_ids, count);
-		const game_entity::entity camera{ game_entity::entity_id{ surfaces[surface_id].camera.entity_id() } };
+		const game_entity::entity camera{ game_entity::entity_id{ view_camera.entity_id() } };
 
 		using namespace DirectX;
 		math::v3 pos{ camera.position() };
@@ -527,17 +527,20 @@ EDITOR_INTERFACE void RenderFrame(u32 surface_id, id::id_type camera_id, u64 lig
 	f32* const thresholds{ (f32*)(frame_info_buffer.data() + item_id_buffer_size) };
 	game_entity::entity_id* const entity_ids{ (game_entity::entity_id*)(frame_info_buffer.data() + item_id_buffer_size + threshold_buffer_size) };
 
+	// NOTE: LOD の距離は、描画に使うカメラから測る(Primal は常にビューポートのカメラから測る)
+	const graphics::camera view_camera{ !id::is_valid(camera_id) ? surface.camera : graphics::camera{ graphics::camera_id{ camera_id } } };
+
 	if (count)
 	{
 		geometry::get_render_item_ids(surface.geometry_ids.data(), item_ids, count);
-		calculate_thresholds(surface.geometry_ids.data(), entity_ids, thresholds, count, surface_id);
+		calculate_thresholds(surface.geometry_ids.data(), entity_ids, thresholds, count, view_camera);
 	}
 
 	graphics::frame_info info{};
 	info.render_item_ids = item_ids;
 	info.render_item_count = count;
 	info.thresholds = thresholds;
-	info.camera_id = !id::is_valid(camera_id) ? surface.camera.get_id() : graphics::camera_id{ camera_id };
+	info.camera_id = view_camera.get_id();
 	info.light_set_key = light_set;
 
 	surface.surface.render(info);

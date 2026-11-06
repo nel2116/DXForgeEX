@@ -417,24 +417,19 @@ namespace dxforge::graphics::d3d12::core
 
 		void __declspec(noinline) process_deferred_releases(u32 frame_idx, bool force_release = false)
 		{
-			{
-				std::lock_guard lock{ deferred_release_mutex };
+			std::lock_guard lock{ deferred_release_mutex };
 
-				// NOTE: リソースは、前のフレームでまだ使われているかもしれないので、もう1周待ってから解放する(Primal Day 082)。
-				//		 force_release は終了のときに使う。そのときは待たなくてよい。
-				if (!force_release && ++deferred_releases_flag[frame_idx] < frame_buffer_count) return;
+			// NOTE: リソースは、前のフレームでまだ使われているかもしれないので、もう1周待ってから解放する(Primal Day 082)。
+			//		 force_release は終了のときに使う。そのときは待たなくてよい。
+			if (!force_release && ++deferred_releases_flag[frame_idx] < frame_buffer_count) return;
 
-				deferred_releases_flag[frame_idx] = 0;
-			}
+			deferred_releases_flag[frame_idx] = 0;
 
-			// NOTE: descriptor_heap::free() は、ヒープのミューテックスを持ったまま set_deferred_releases_flag() で
-			//		 deferred_release_mutex を取る。逆の順で取るとデッドロックするので、ここでは持たずに呼ぶ(Primal はこの順のまま)。
 			rtv_desc_heap.process_deferred_free(frame_idx);
 			dsv_desc_heap.process_deferred_free(frame_idx);
 			srv_desc_heap.process_deferred_free(frame_idx);
 			uav_desc_heap.process_deferred_free(frame_idx);
 
-			std::lock_guard lock{ deferred_release_mutex };
 			utl::vector<IUnknown*>& resources{ deferred_releases[frame_idx] };
 			if (!resources.empty())
 			{
