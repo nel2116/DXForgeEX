@@ -295,3 +295,5 @@ GUIが本質的に必要なのは、エディタのUI(Project Browser、イン�
 - **ゲームコードのDLLの読み込みとスクリプト名の取得**: エンジンのDLLの`LoadGameCodeDll`/`GetScriptNames`(ゲームコードのDLLがエクスポートする`get_script_names`を呼ぶ)を、テスト用のプロジェクトのDLLに対して呼ぶだけで確認できる。
 - **`game.bin`の読み込みとスクリプトの実行**: `content::load_game()` → `script::update()`を数フレーム回し、`begin_play()`/`update()`の呼ばれ方を確認する(#47の再発防止にもなる)。`game.bin`の形式はエディタの`SaveToBinary`と対になっているので、固定の`game.bin`をテストデータとして持てば、エディタなしで検証できる。
 - **ゲームのプロジェクトのビルド**: テンプレートから生成したプロジェクトを`MSBuild`で`DebugEditor`/`Debug`構成でビルドする部分は、DTEを使わずにCLIだけで確認できる(Visual Studioの起動が不要になる)。ただし、テンプレートの展開はエディタの`NewProject.cs`にあるため、CLIからの呼び出し口が必要。
+
+<!-- #195 のマージ後の確認のための行(検証用の PR、マージしない) -->
