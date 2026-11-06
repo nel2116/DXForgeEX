@@ -6,6 +6,7 @@
 // GPassのソースファイル
 // 更新履歴
 // 2025/01/07 新規作成
+// 2026/11/06 キャッシュのバッファを縮小し、描画アイテムが0件のフレームを許す (Primal Day 082, #201)
 // // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12GPass.h"
@@ -117,13 +118,10 @@ namespace dxforge::graphics::d3d12::gpass
 				const u64 items_count{ d3d12_render_item_ids.size() };
 				const u64 new_buffer_size{ items_count * struct_size };
 				const u64 old_buffer_size{ _buffer.size() };
-				if (new_buffer_size > old_buffer_size)
-				{
-					_buffer.resize(new_buffer_size);
-				}
-
 				if (new_buffer_size != old_buffer_size)
 				{
+					_buffer.resize(new_buffer_size);
+
 					entity_ids = (id::id_type*)_buffer.data();
 					submesh_gpu_ids = (id::id_type*)&entity_ids[items_count];
 					material_ids = (id::id_type*)&submesh_gpu_ids[items_count];
@@ -281,9 +279,10 @@ namespace dxforge::graphics::d3d12::gpass
 		void prepare_render_frame(const d3d12_frame_info& d3d12_info)
 		{
 			assert(d3d12_info.info && d3d12_info.camera);
-			assert(d3d12_info.info->render_item_ids && d3d12_info.info->render_item_count);
 			gpass_cache& cache{ frame_cache };
 			cache.clear();
+			// NOTE: エディタのビューポートは、描くものがなくても RenderFrame を呼ぶ(Primal Day 083 の修正を先に入れた)
+			if (!d3d12_info.info->render_item_ids || !d3d12_info.info->render_item_count) return;
 
 			using namespace content;
 			render_item::get_d3d12_render_item_ids(*d3d12_info.info, cache.d3d12_render_item_ids);

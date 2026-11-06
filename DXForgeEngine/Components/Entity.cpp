@@ -6,6 +6,7 @@
 // 	エンティティを実装したファイル
 // 更新履歴
 // 2024/08/12 新規作成
+// 2026/11/06 update_component を追加 (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Entity.h"
@@ -104,6 +105,55 @@ namespace dxforge::game_entity
 		{
 			free_ids.push_back(id);
 		}
+	}
+
+	bool update_component(entity_id id, entity_info info, component_type::type type)
+	{
+		assert(is_alive(id) && type != component_type::transform);
+		if (type == component_type::transform) return false;
+		const entity owner{ id };
+		const id::id_type index{ id::index(id) };
+
+		if (type == component_type::script)
+		{
+			if (scripts[index].is_valid())
+			{
+				script::remove(scripts[index]);
+				scripts[index] = {};
+			}
+
+			if (info.script && info.script->script_creator)
+			{
+				const script::component new_script{ script::create(*info.script, owner) };
+				assert(new_script.is_valid());
+				if (new_script.is_valid())
+				{
+					scripts[index] = new_script;
+					return true;
+				}
+			}
+		}
+		else if (type == component_type::geometry)
+		{
+			if (geometries[index].is_valid())
+			{
+				geometry::remove(geometries[index]);
+				geometries[index] = {};
+			}
+
+			if (info.geometry)
+			{
+				const geometry::component new_geometry{ geometry::create(*info.geometry, owner) };
+				assert(new_geometry.is_valid());
+				if (new_geometry.is_valid())
+				{
+					geometries[index] = new_geometry;
+					return true;
+				}
+			}
+		}
+
+		return false;
 	}
 
 	bool is_alive(entity_id id)

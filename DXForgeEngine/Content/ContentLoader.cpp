@@ -11,6 +11,7 @@
 // 2026/10/27 読み込むパスを指定できるようにし、失敗の理由を返すようにした (#11)
 // 2026/10/27 エラーメッセージに入れるスクリプト名の、表示できないASCII以外のバイトを\xNNにした(不正なUTF-8が--jsonに入っていたため) (#11)
 // 2026/10/27 ファイルの存在の確認自体に失敗したときは、file_not_foundではなくread_failedにして理由を返すようにした (#11)
+// 2026/11/06 コンポーネントの種類を Entity.h の component_type にし、read_geometry を追加 (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "ContentLoader.h"
@@ -29,15 +30,6 @@ namespace dxforge::content
 {
 	namespace
 	{
-		// コンポーネントの種類
-		enum conponent_type
-		{
-			transform,
-			script,
-
-			count
-		};
-
 		utl::vector < game_entity::entity > entities;	// エンティティのリスト
 		transform::init_info transform_info{};			// Transformの初期化情報
 		script::init_info script_info{};				// Scriptの初期化情報
@@ -168,14 +160,24 @@ namespace dxforge::content
 			return load_game_result::ok;
 		}
 
+		/// @brief Geometryを読み込む
+		/// @details game.bin にジオメトリの形式はまだない(エディタも書かない)ので、未知のコンポーネントとして失敗にする
+		/// @return 読み込みの結果
+		load_game_result read_geometry(blob_reader&, game_entity::entity_info&)
+		{
+			last_error = "geometry components are not supported in game.bin";
+			return load_game_result::unknown_component;
+		}
+
 		// 関数ポインタの型
 		using component_reader = load_game_result(*)(blob_reader&, game_entity::entity_info&);
 		component_reader component_readers[]
 		{
 			read_transform,
-			read_script
+			read_script,
+			read_geometry,
 		};
-		static_assert(_countof(component_readers) == conponent_type::count);	// コンポーネントの種類数と関数ポインタの数が一致していることを確認
+		static_assert(_countof(component_readers) == component_type::count);	// コンポーネントの種類数と関数ポインタの数が一致していることを確認
 
 		/// @brief ファイルを読み込む
 		/// @param path ファイルのパス
@@ -227,19 +229,19 @@ namespace dxforge::content
 			// コンポーネントを読み込む
 			for (u32 component_index{ 0 }; component_index < num_components; ++component_index)
 			{
-				u32 component_type{ 0 };	// コンポーネントの種類
-				if (!at.read_u32(component_type))
+				u32 type{ 0 };	// コンポーネントの種類
+				if (!at.read_u32(type))
 				{
 					last_error = "unexpected end of file in component type";
 					return load_game_result::invalid_format;
 				}
 				// コンポーネントの種類が範囲外ならエラー
-				if (component_type >= conponent_type::count)
+				if (type >= component_type::count)
 				{
-					last_error = "unknown component type " + std::to_string(component_type);
+					last_error = "unknown component type " + std::to_string(type);
 					return load_game_result::unknown_component;
 				}
-				const load_game_result result{ component_readers[component_type](at, info) };	// コンポーネントの読み込み
+				const load_game_result result{ component_readers[type](at, info) };	// コンポーネントの読み込み
 				if (result != load_game_result::ok) return result;
 			}
 

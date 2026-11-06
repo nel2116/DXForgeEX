@@ -11,11 +11,15 @@
 // 2026/11/02 エディタからエンジンを初期化・終了する InitializeEngine / ShutdownEngine を追加(Primal Day 078, #31)
 // 2026/11/02 CompileShader のインクルードのフォルダの扱いをコメントに追加(#150)
 // 2026/11/02 使っている D3D12 のランタイムをエディタに返す GetGraphicsRuntimeDescription を追加(#155)
+// 2026/11/06 ビューポートのカメラとライト、サーフェスの作成、SetGeometryIds、RenderFrame を追加 (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Common.h"
 #include "CommonHeaders.h"
 #include "Components/Script.h"
+#include "Components/Entity.h"
+#include "Components/Geometry.h"
+#include "Components/Transform.h"
 #include "Graphics/Renderer.h"
 #include "Platform/PlatformType.h"
 #include "Platform/Platform.h"
@@ -42,9 +46,143 @@ namespace
 	_get_script_creater get_script_creator{ nullptr };
 	using _get_script_names = LPSAFEARRAY(*)(void);
 	_get_script_names get_script_names{ nullptr };
-	utl::vector<graphics::render_surface> surfaces;
+
+	// エディタのビューポート。カメラと、描くジオメトリを持つ
+	struct viewport_surface : public graphics::render_surface
+	{
+		graphics::camera camera{};
+		utl::vector<id::id_type> geometry_ids{};
+	};
+
+	utl::vector<viewport_surface> surfaces;
+	utl::vector<u8> frame_info_buffer;
 	std::wstring graphics_runtime_description{};	// GetGraphicsRuntimeDescription が返す文字列の実体
+
+	void calculate_thresholds(const id::id_type* const geometry_ids, game_entity::entity_id* const entity_ids,
+		f32* const thresholds, u32 count, const graphics::camera& view_camera)
+	{
+		geometry::get_entity_ids(geometry_ids, entity_ids, count);
+		const game_entity::entity camera{ game_entity::entity_id{ view_camera.entity_id() } };
+
+		using namespace DirectX;
+		math::v3 pos{ camera.position() };
+		const XMVECTOR camera_pos{ XMLoadFloat3(&pos) };
+
+		for (u32 i{ 0 }; i < count; ++i)
+		{
+			assert(id::is_valid(entity_ids[i]));
+			pos = game_entity::entity{ entity_ids[i] }.position();
+			const XMVECTOR entity_pos{ XMLoadFloat3(&pos) };
+			const XMVECTOR distance{ XMVector3LengthEst(camera_pos - entity_pos) };
+			XMStoreFloat(&thresholds[i], distance);
+		}
+	}
+
+	// TEMPORARY: エディタにカメラとライトができるまでの仮のもの(Primal Day 082) ///////////////
+
+	graphics::light lights[4]{};
+
+	math::v3 rgb_to_color(u8 r, u8 g, u8 b) { return { r / 255.f, g / 255.f, b / 255.f }; }
+
+	// NOTE: Primal の script_name と geometry_info の引数は省いた。Primal Day 082〜084 でも常に nullptr を渡すだけで使わない
+	game_entity::entity create_one_game_entity(math::v3 position, math::v3 rotation)
+	{
+		constexpr math::v3 scale{ 1.f, 1.f, 1.f };
+		transform::init_info transform_info{};
+		const DirectX::XMVECTOR quat{ DirectX::XMQuaternionRotationRollPitchYawFromVector(DirectX::XMLoadFloat3(&rotation)) };
+		math::v4a rot_quat{};
+		DirectX::XMStoreFloat4A(&rot_quat, quat);
+		memcpy(&transform_info.rotation[0], &rot_quat.x, sizeof(transform_info.rotation));
+		memcpy(&transform_info.position[0], &position.x, sizeof(transform_info.position));
+		memcpy(&transform_info.scale[0], &scale.x, sizeof(transform_info.scale));
+
+		game_entity::entity_info entity_info{};
+		entity_info.transform = &transform_info;
+		const game_entity::entity ntt{ game_entity::create(entity_info) };
+		assert(ntt.is_valid());
+		return ntt;
+	}
+
+	graphics::camera create_camera()
+	{
+		const game_entity::entity ntt{ create_one_game_entity({ 0.f, 1.f, 10.f }, { 0.f, -math::pi, 0.f }) };
+		return graphics::create_camera(graphics::perspective_camera_init_info{ ntt.get_id() });
+	}
+
+	void remove_camera(graphics::camera& camera)
+	{
+		const game_entity::entity_id id{ camera.entity_id() };
+		graphics::remove_camera(camera.get_id());
+		camera = {};
+		game_entity::remove(id);
+	}
+
+	void create_lights()
+	{
+		graphics::create_light_set(0);
+
+		graphics::light_init_info info{};
+		info.entity_id = create_one_game_entity({}, { 0.23f, 5.28f, 0.f }).get_id();
+		info.type = graphics::light::directional;
+		info.light_set_key = 0;
+		info.intensity = 0.5f;
+		info.color = rgb_to_color(174, 174, 174);
+		lights[0] = graphics::create_light(info);
+
+		info.entity_id = create_one_game_entity({}, { 0.23f, 5.28f - math::pi, 0.f }).get_id();
+		info.intensity = 1.f;
+		lights[1] = graphics::create_light(info);
+
+		info.intensity = 0.5f;
+
+		info.entity_id = create_one_game_entity({}, { math::pi * 0.5f, 0.f, 0.f }).get_id();
+		info.color = rgb_to_color(17, 27, 48);
+		lights[2] = graphics::create_light(info);
+
+		info.entity_id = create_one_game_entity({}, { -math::pi * 0.5f, 0.f, 0.f }).get_id();
+		info.color = rgb_to_color(63, 47, 30);
+		lights[3] = graphics::create_light(info);
+	}
+
+	void remove_lights()
+	{
+		for (graphics::light& light : lights)
+		{
+			if (!light.is_valid()) continue;
+			const game_entity::entity_id id{ light.entity_id() };
+			graphics::remove_light(light.get_id(), light.light_set_key());
+			light = {};
+			game_entity::remove(id);
+		}
+
+		graphics::remove_light_set(0);
+	}
+
+	// TEMPORARY ここまで ///////////////////////////////////////////////////////////////////////
+
+	// ビューポートのサーフェスとカメラを作る。ライトは最初のビューポートで作る(Primal Day 083 の条件の修正を先に入れた)
+	// NOTE: エンジンの初期化に失敗したあと(DXGI のファクトリがない)と、大きさが 0 のときは作らない。大きさが 0 のときは次の Resize で作る。
+	void create_viewport_graphics(viewport_surface& surface)
+	{
+		const u32 width{ surface.window.width() };
+		const u32 height{ surface.window.height() };
+		if (!editor::is_engine_initialized() || !width || !height) return;
+
+		if (!lights[0].is_valid()) create_lights();
+		surface.surface = graphics::create_surface(surface.window);
+		surface.camera = create_camera();
+		surface.camera.aspect_ratio((f32)width / height);
+	}
+
+	void remove_viewport_graphics(viewport_surface& surface)
+	{
+		if (surface.camera.is_valid()) remove_camera(surface.camera);
+		if (surface.surface.is_valid()) graphics::remove_surface(surface.surface.get_id());
+		surface.surface = {};
+	}
 } // 匿名名前空間
+
+extern std::mutex mutex;	// EntityAPI.cpp
 
 // エンジンのシェーダーをコンパイルし、グラフィックスを初期化する(Primal Day 078)。返す値は editor::engine_init_error。
 // engine_path: エンジン(リポジトリ)のルートのフォルダ(UTF-16)。シェーダーのソースはその DXForgeEngine\Graphics\Direct3D12\Shaders から
@@ -64,8 +202,17 @@ EDITOR_INTERFACE u32 InitializeEngine(const wchar_t* engine_path)
 }
 
 // InitializeEngine で初期化したグラフィックスを終了する。初期化していないとき、2回目は何もしない。
+// NOTE: エディタは、ウィンドウを閉じるときに ShutdownEngine を呼び、そのあとで HwndHost が RemoveRenderSurface を呼ぶ。
+//       終了した D3D12 を触らないよう、ビューポートのサーフェスとカメラはここで片付ける(ウィンドウは RemoveRenderSurface で消す)。
 EDITOR_INTERFACE void ShutdownEngine()
 {
+	std::lock_guard lock{ mutex };
+	for (viewport_surface& surface : surfaces)
+	{
+		remove_viewport_graphics(surface);
+	}
+	// TEMPORARY
+	if (lights[0].is_valid()) remove_lights();
 	editor::shutdown_engine();
 }
 
@@ -131,30 +278,54 @@ EDITOR_INTERFACE LPSAFEARRAY GetScriptNames()
 
 EDITOR_INTERFACE u32 CreateRenderSurface(HWND host, s32 width, s32 height)
 {
+	std::lock_guard lock{ mutex };
 	assert(host);
 	platform::window_init_info info{ nullptr,host,nullptr,0,0,(u32)width,(u32)height };
-	graphics::render_surface surface{ platform::create_window(&info),{} };
+	viewport_surface surface{};
+	surface.window = platform::create_window(&info);
 	assert(surface.window.is_valid());
+	// NOTE: create_window() は 0 を既定の大きさとして扱うので、大きさが 0 かどうかは引数で見る(次の Resize で作る)
+	if (width > 0 && height > 0) create_viewport_graphics(surface);
 	surfaces.emplace_back(surface);
 	return (u32)surfaces.size() - 1;
 }
 
 EDITOR_INTERFACE void RemoveRenderSurface(u32 id)
 {
+	std::lock_guard lock{ mutex };
 	assert(id < surfaces.size());
-	platform::remove_window(surfaces[id].window.get_id());
+	viewport_surface& surface{ surfaces[id] };
+	remove_viewport_graphics(surface);
+	if (surface.window.is_valid()) platform::remove_window(surface.window.get_id());
+	surface.window = {};
+	surface.geometry_ids.clear();
 }
 
 EDITOR_INTERFACE intptr_t GetWindowHandle(u32 id)
 {
+	std::lock_guard lock{ mutex };
 	assert(id < surfaces.size());
 	return reinterpret_cast<intptr_t>(surfaces[id].window.handle());
 }
 
 EDITOR_INTERFACE void ResizeRenderSurface(u32 id)
 {
-	assert(id < surfaces.size());
-	surfaces[id].window.resize(0, 0);
+	std::lock_guard lock{ mutex };
+	// NOTE: エディタのリサイズのタイマーは、サーフェスを消したあとにも動くことがある
+	if (id >= surfaces.size() || !surfaces[id].window.is_valid()) return;
+	viewport_surface& surface{ surfaces[id] };
+	surface.window.resize(0, 0);
+	const u32 width{ surface.window.width() };
+	const u32 height{ surface.window.height() };
+	if (!width || !height) return;	// 大きさが 0 の間はそのままにして、次の Resize で合わせる
+
+	if (!surface.surface.is_valid())
+	{
+		create_viewport_graphics(surface);
+		return;
+	}
+	surface.surface.resize(width, height);
+	surface.camera.aspect_ratio((f32)width / height);
 }
 
 // エディタのアセットの PackForEngine() のデータから、エンジンのリソースを作る(Primal Day 077)。
@@ -314,4 +485,64 @@ EDITOR_INTERFACE u32 CompileShader(shader_data* data)
 	data->hash_size = byte_code_size ? (u32)hash_size : 0;
 
 	return byte_code_size ? TRUE : FALSE;
+}
+
+// ビューポートに描くジオメトリ(Geometry コンポーネントの ID)を設定する
+EDITOR_INTERFACE void SetGeometryIds(u32 surface_id, id::id_type* geometry_ids, u32 count)
+{
+	std::lock_guard lock{ mutex };
+	assert(surface_id < surfaces.size());
+
+	viewport_surface& surface{ surfaces[surface_id] };
+	surface.geometry_ids.resize(count);
+
+	if (count)
+	{
+		memcpy(surface.geometry_ids.data(), geometry_ids, count * sizeof(id::id_type));
+	}
+}
+
+// ビューポートを 1 フレーム描く。camera_id が無効ならビューポートのカメラを使う
+// NOTE: サーフェスがないとき(エンジンの初期化の失敗、大きさが 0)と、ライトカリングのタイルより小さいときは何もしない
+//       (delight::cull_lights() の assert)。
+EDITOR_INTERFACE void RenderFrame(u32 surface_id, id::id_type camera_id, u64 light_set)
+{
+	std::lock_guard lock{ mutex };
+	assert(surface_id < surfaces.size());
+
+	const viewport_surface& surface{ surfaces[surface_id] };
+	if (!surface.surface.is_valid() ||
+		surface.surface.width() < graphics::min_offscreen_surface_size || surface.surface.height() < graphics::min_offscreen_surface_size) return;
+
+	// TEMPORARY
+	light_set = 0;
+
+	const u32 count{ (u32)surface.geometry_ids.size() };
+	const u64 item_id_buffer_size{ sizeof(id::id_type) * count };
+	const u64 threshold_buffer_size{ sizeof(f32) * count };
+	const u64 entity_id_buffer_size{ sizeof(game_entity::entity_id) * count };
+
+	frame_info_buffer.resize(item_id_buffer_size + threshold_buffer_size + entity_id_buffer_size);
+
+	id::id_type* const item_ids{ (id::id_type*)frame_info_buffer.data() };
+	f32* const thresholds{ (f32*)(frame_info_buffer.data() + item_id_buffer_size) };
+	game_entity::entity_id* const entity_ids{ (game_entity::entity_id*)(frame_info_buffer.data() + item_id_buffer_size + threshold_buffer_size) };
+
+	// NOTE: LOD の距離は、描画に使うカメラから測る(Primal は常にビューポートのカメラから測る)
+	const graphics::camera view_camera{ !id::is_valid(camera_id) ? surface.camera : graphics::camera{ graphics::camera_id{ camera_id } } };
+
+	if (count)
+	{
+		geometry::get_render_item_ids(surface.geometry_ids.data(), item_ids, count);
+		calculate_thresholds(surface.geometry_ids.data(), entity_ids, thresholds, count, view_camera);
+	}
+
+	graphics::frame_info info{};
+	info.render_item_ids = item_ids;
+	info.render_item_count = count;
+	info.thresholds = thresholds;
+	info.camera_id = view_camera.get_id();
+	info.light_set_key = light_set;
+
+	surface.surface.render(info);
 }

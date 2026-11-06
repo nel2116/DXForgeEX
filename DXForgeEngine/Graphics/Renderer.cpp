@@ -13,6 +13,7 @@
 // 2026/10/18 カメラの上方向のsetterを削除 (#62)
 // 2026/10/29 画面外のサーフェス、読み戻し、初期化情報の転送を追加 (#127)
 // 2026/11/02 D3D12 のランタイム(Agility SDK か OS か)の情報を追加 (#155)
+// 2026/11/06 set_option, get_option を追加 (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Renderer.h"
@@ -64,6 +65,16 @@ namespace dxforge::graphics
 	void shutdown()
 	{
 		if (gfx.platform != (graphics_platform)-1) gfx.shutdown();
+	}
+
+	void set_option(renderer_option::option option, const void* const parameter, u32 parameter_size)
+	{
+		gfx.set_option(option, parameter, parameter_size);
+	}
+
+	void get_option(renderer_option::option option, void* const parameter, u32 parameter_size)
+	{
+		gfx.get_option(option, parameter, parameter_size);
 	}
 
 	u32 flush_debug_messages()

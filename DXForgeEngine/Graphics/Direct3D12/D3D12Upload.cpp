@@ -6,6 +6,7 @@
 // アップロードヒープのサブモジュール
 // 更新履歴
 // 2025/01/12 新規作成
+// 2026/11/06 フェンスの待ちをイベントなしにした (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Upload.h"
@@ -40,17 +41,16 @@ namespace dxforge::graphics::d3d12::upload
 		ID3D12CommandQueue* upload_cmd_queue{ nullptr };		// コマンドキュー
 		ID3D12Fence1* upload_fence{ nullptr };					// フェンス
 		u64 upload_fence_value{ 0 };							// フェンス値
-		HANDLE fence_event{};									// フェンスイベント
 		std::mutex frame_mutex{};								// ミューテックス
 		std::mutex queue_mutex{};								// ミューテックス
 
 		void upload_frame::wait_and_reset()
 		{
-			assert(upload_fence && fence_event);
+			assert(upload_fence);
 			if (upload_fence->GetCompletedValue() < fence_value)
 			{
-				DXCall(upload_fence->SetEventOnCompletion(fence_value, fence_event));
-				WaitForSingleObject(fence_event, INFINITE);
+				// NOTE: イベントに nullptr を渡すと、完了するまでこの呼び出しの中で待つ
+				DXCall(upload_fence->SetEventOnCompletion(fence_value, nullptr));
 			}
 
 			core::release(upload_buffer);
@@ -188,10 +188,6 @@ namespace dxforge::graphics::d3d12::upload
 		if (FAILED(hr)) return init_failed();
 		NAME_D3D12_OBJECT(upload_fence, L"Upload Fence");
 
-		fence_event = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
-		assert(fence_event);
-		if (!fence_event) return init_failed();
-
 		return true;
 	}
 
@@ -200,12 +196,6 @@ namespace dxforge::graphics::d3d12::upload
 		for (u32 i{ 0 }; i < upload_frame_count; ++i)
 		{
 			upload_frames[i].release();
-		}
-
-		if (fence_event)
-		{
-			CloseHandle(fence_event);
-			fence_event = nullptr;
 		}
 
 		core::release(upload_cmd_queue);

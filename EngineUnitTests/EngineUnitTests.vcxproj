@@ -96,6 +96,9 @@
     <ClCompile Include="..\DXForgeEngineDLL\EngineInit.cpp" />
     <ClCompile Include="Tests_EngineInit.cpp" />
     <ClCompile Include="Tests_D3D12Runtime.cpp" />
+    <ClCompile Include="..\DXForgeEngineDLL\EngineAPI.cpp" />
+    <ClCompile Include="..\DXForgeEngineDLL\EntityAPI.cpp" />
+    <ClCompile Include="Tests_EditorAPI.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MicroTest.h" />

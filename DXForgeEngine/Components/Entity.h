@@ -6,6 +6,7 @@
 // 	エンティティを定義したファイル
 // 更新履歴
 // 2024/08/12 新規作成
+// 2026/11/06 component_type と update_component を追加 (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -13,6 +14,19 @@
 
 namespace dxforge
 {
+	// コンポーネントの種類。game.bin とエディタの API で使う値
+	struct component_type
+	{
+		enum type : u32
+		{
+			transform,
+			script,
+			geometry,
+
+			count
+		};
+	};
+
 	// INIT_INFO マクロを定義：指定された component の名前空間に init_info 構造体を定義する
 #define INIT_INFO(component) namespace component { struct init_info; }
 
@@ -38,6 +52,10 @@ namespace dxforge
 
 		// ゲームエンティティを削除する関数
 		void remove(entity_id id);
+
+		// エンティティの Script か Geometry を作り直す(Transform は変えられない)。info にそのコンポーネントがなければ削除だけを行う。
+		// 新しいコンポーネントを作れたら true を返す
+		bool update_component(entity_id id, entity_info info, component_type::type type);
 
 		// 指定したエンティティが有効かどうかを確認する関数
 		bool is_alive(entity_id id);
