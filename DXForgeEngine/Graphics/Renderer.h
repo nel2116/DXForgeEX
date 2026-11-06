@@ -16,6 +16,7 @@
 // 2026/10/29 画面外のサーフェスの最小の大きさを追加 (#128 のレビュー)
 // 2026/10/30 material_surface から ambient_occlusion を削除(エディタのマテリアルと合わせる。Primal Day 077, #30)
 // 2026/11/02 D3D12 のランタイム(Agility SDK か OS か)の情報を追加 (#155)
+// 2026/11/06 レンダラーの設定(renderer_option, set_option, get_option)を追加 (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -26,6 +27,19 @@
 
 namespace dxforge::graphics
 {
+	// レンダラーの設定の種類
+	struct renderer_option
+	{
+		enum option : u64
+		{
+			vsync,			// bool
+			raytracing,		// bool
+			msaa,			// u32(1, 2, 4, 8)
+
+			count
+		};
+	};
+
 	struct frame_info
 	{
 		id::id_type* render_item_ids{ nullptr };
@@ -302,6 +316,11 @@ namespace dxforge::graphics
 
 	bool initialize(graphics_platform platform, const graphics_init_info& info = {});
 	void shutdown();
+
+	/// @brief レンダラーの設定を変える(graphics::initialize()のあとで呼ぶ)
+	void set_option(renderer_option::option option, const void* const parameter, u32 parameter_size);
+	/// @brief レンダラーの設定を取得する(graphics::initialize()のあとで呼ぶ)
+	void get_option(renderer_option::option option, void* const parameter, u32 parameter_size);
 
 	/// @brief 無人実行のとき、溜まったデバッグレイヤーのメッセージ(WARNING以上)を標準エラーに出して消す
 	/// @return ERROR・CORRUPTIONのメッセージの数(Debugビルドでない、またはデバッグレイヤーがなければ0)

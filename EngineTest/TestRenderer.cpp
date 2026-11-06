@@ -9,6 +9,7 @@
 // 2025/01/13 テストのためのワーカースレッドを追加
 // 2026/10/19 環境光(IBL)のライトのため、ライトセットを先に作って後で消すよう順番を変更し、Iキーで環境光を切り替える (Primal Day 075)
 // 2026/10/27 ShaderCompilation を DXForgeEngineDLL へ移動したため、インクルードのパスを変更 (Primal Day 076)
+// 2026/11/06 スペースキーで VSync を切り替える (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Platform/PlatformType.h"
@@ -146,6 +147,13 @@ LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 		else if (wparam == 'I')
 		{
 			toggle_ibl();
+		}
+		else if (wparam == VK_SPACE)
+		{
+			bool vsync{ false };
+			graphics::get_option(graphics::renderer_option::vsync, &vsync, sizeof(bool));
+			vsync = !vsync;
+			graphics::set_option(graphics::renderer_option::vsync, &vsync, sizeof(bool));
 		}
 		else if (wparam == VK_F11)
 		{

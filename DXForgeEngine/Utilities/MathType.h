@@ -7,6 +7,7 @@
 // 更新履歴
 // 2024/11/11 新規作成
 // 2026/10/18 inv_pi, inv_two_piの追加
+// 2026/11/06 to_rad, to_deg の追加 (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -21,6 +22,8 @@ namespace dxforge::math
 	constexpr f32 two_pi{ 2.f * pi };
 	constexpr f32 inv_two_pi{ 1.f / two_pi };
 	constexpr f32 epsilon{ 1e-5f };
+	constexpr f32 to_rad{ pi * (1.f / 180.f) };
+	constexpr f32 to_deg{ inv_pi * 180.f };
 
 #if defined(_WIN64)
 	using v2 = DirectX::XMFLOAT2;

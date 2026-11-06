@@ -6,6 +6,7 @@
 // Direct3D12のリソース管理
 // 更新履歴
 // 2024/12/30 新規作成
+// 2026/11/06 遅延解放のフラグを、インデックスを積んだフレームに設定する (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Resource.h"
@@ -137,7 +138,7 @@ namespace dxforge::graphics::d3d12
 
 		const u32 frame_idx{ core::current_frame_index() };
 		_deferred_free_indices[frame_idx].push_back(index);
-		core::set_deferred_releases_flag();
+		core::set_deferred_releases_flag(frame_idx);
 		handle = {};
 	}
 

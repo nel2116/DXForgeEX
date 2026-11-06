@@ -16,6 +16,7 @@
 // 2026/11/02 D3D12 Agility SDK のランタイム(D3D12Runtime)からデバイスを作るようにした (#155、Primal Day 079)
 // 2026/11/03 最大の機能レベルを、使えれば ID3D12Device16::CheckFeatureSupport1 で調べるようにした(デバッグレイヤーの WARNING #989 対応、#159)
 // 2026/11/03 無人実行では、一時的なデバイスのデバッグレイヤーのメッセージと最大の機能レベルも標準エラーに出すようにした (#159)
+// 2026/11/06 遅延解放の待ち、フェンスの待ち方、VSync とレンダラーの設定、DeltaTime、深度のバリアの順序を修正 (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Core.h"
@@ -98,11 +99,6 @@ namespace dxforge::graphics::d3d12::core
 				if (FAILED(hr)) goto _error;
 				NAME_D3D12_OBJECT(_fence, L"D3D12 Fence");
 
-				// フェンスイベントを作成
-				_fence_event = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
-				assert(_fence_event);
-				if (!_fence_event) goto _error;
-
 				// 成功した場合はここで終了
 				return;
 
@@ -122,7 +118,7 @@ namespace dxforge::graphics::d3d12::core
 				//  ====== フレームの開始処理 ======
 				command_frame& frame{ _cmd_frames[_frame_index] };
 				// GPUがまだコマンドリストを実行中の場合は、フレームのコマンドアロケータをリセットする前に待機する
-				frame.wait(_fence_event, _fence);
+				frame.wait(_fence);
 				// コマンドアロケータをリセット
 				DXCall(frame.cmd_allocator->Reset());
 				// コマンドリストをリセット
@@ -161,7 +157,7 @@ namespace dxforge::graphics::d3d12::core
 				if (!_fence) return;
 				for (u32 i{ 0 }; i < frame_buffer_count; ++i)
 				{
-					_cmd_frames[i].wait(_fence_event, _fence);
+					_cmd_frames[i].wait(_fence);
 				}
 				_frame_index = 0;
 			}
@@ -172,9 +168,6 @@ namespace dxforge::graphics::d3d12::core
 				flush();
 				core::release(_fence);		// フェンスの解放
 				_fence_value = 0;			// フェンスの値をリセット
-
-				CloseHandle(_fence_event);	// フェンスイベントの解放
-				_fence_event = nullptr;
 
 				core::release(_cmd_queue);	// コマンドキューの解放
 				core::release(_cmd_list);	// コマンドリストの解放
@@ -203,18 +196,16 @@ namespace dxforge::graphics::d3d12::core
 				ID3D12CommandAllocator* cmd_allocator{ nullptr };						// コマンドアロケータ
 				u64 fence_value{ 0 };													// フェンスの値
 
-				void wait(HANDLE fence_event, ID3D12Fence1* fence)
+				void wait(ID3D12Fence1* fence) const
 				{
-					assert(fence && fence_event);
+					assert(fence);
 					// 現在のフェンス値がまだ "fence_value "より小さい場合
 					// GPUは"_cmd_queue->Signal() "コマンドに到達していないため
 					// コマンドリストの実行が終了していないことがわかる
 					if (fence->GetCompletedValue() < fence_value)
 					{
-						// フェンスの現在値が "fence_value "と等しくなった時点で、フェンスがイベントを発生させる
-						DXCall(fence->SetEventOnCompletion(fence_value, fence_event));
-						// フェンスの現在値がコマンドキューの実行終了を示す「fence_value」に達したというイベントがトリガーされるまで待つ
-						WaitForSingleObject(fence_event, INFINITE);
+						// NOTE: イベントに nullptr を渡すと、フェンスの現在値が「fence_value」に達するまで、この呼び出しの中で待つ
+						DXCall(fence->SetEventOnCompletion(fence_value, nullptr));
 					}
 				}
 
@@ -229,7 +220,6 @@ namespace dxforge::graphics::d3d12::core
 			id3d12_graphics_command_list* _cmd_list{ nullptr };							// コマンドリスト
 			ID3D12Fence1* _fence{ nullptr };											// フェンス
 			u64 _fence_value{ 0 };														// フェンスの値
-			HANDLE _fence_event{ nullptr };												// フェンスイベント
 			command_frame _cmd_frames[frame_buffer_count];								// フレームバッファ
 			u32 _frame_index{ 0 };														// フレームインデックス
 
@@ -256,6 +246,16 @@ namespace dxforge::graphics::d3d12::core
 		std::mutex deferred_release_mutex{};											// 遅延解放ミューテックス
 
 		constexpr D3D_FEATURE_LEVEL minimum_feature_level{ D3D_FEATURE_LEVEL_11_0 };	// 最低限必要な機能レベル
+
+		// VSyncを無効にできるのは、DXGIがティアリングに対応しているときだけ
+		b32 tearing_is_supported{ 0 };
+
+		struct renderer_options
+		{
+			bool enable_vsync{ true };	// VSyncの有効・無効
+			bool enable_dxr{ false };	// DXR(レイトレーシング)の有効・無効
+			u32 msaa_samples{ 1 };		// MSAAのサンプル数(1, 2, 4, 8)
+		} options;
 
 		bool unattended_mode{ false };													// 無人実行(デバッグレイヤーでブレークしない)
 
@@ -415,20 +415,26 @@ namespace dxforge::graphics::d3d12::core
 			return feature_level_info.MaxSupportedFeatureLevel;
 		}
 
-		void __declspec(noinline) process_deferred_releases(u32 frame_idx)
+		void __declspec(noinline) process_deferred_releases(u32 frame_idx, bool force_release = false)
 		{
-			std::lock_guard lock{ deferred_release_mutex };
+			{
+				std::lock_guard lock{ deferred_release_mutex };
 
-			// NOTE: このフラグは最初にクリアする。
-			// もし最後にこのフラグをクリアしたら、このフラグを設定しようとしていた他のスレッドを上書きしてしまうかもしれない。
-			// 上書きはアイテムを処理する前に起こるので問題ない。
-			deferred_releases_flag[frame_idx] = 0;
+				// NOTE: リソースは、前のフレームでまだ使われているかもしれないので、もう1周待ってから解放する(Primal Day 082)。
+				//		 force_release は終了のときに使う。そのときは待たなくてよい。
+				if (!force_release && ++deferred_releases_flag[frame_idx] < frame_buffer_count) return;
 
+				deferred_releases_flag[frame_idx] = 0;
+			}
+
+			// NOTE: descriptor_heap::free() は、ヒープのミューテックスを持ったまま set_deferred_releases_flag() で
+			//		 deferred_release_mutex を取る。逆の順で取るとデッドロックするので、ここでは持たずに呼ぶ(Primal はこの順のまま)。
 			rtv_desc_heap.process_deferred_free(frame_idx);
 			dsv_desc_heap.process_deferred_free(frame_idx);
 			srv_desc_heap.process_deferred_free(frame_idx);
 			uav_desc_heap.process_deferred_free(frame_idx);
 
+			std::lock_guard lock{ deferred_release_mutex };
 			utl::vector<IUnknown*>& resources{ deferred_releases[frame_idx] };
 			if (!resources.empty())
 			{
@@ -438,7 +444,7 @@ namespace dxforge::graphics::d3d12::core
 
 		}
 
-		d3d12_frame_info get_d3d12_frame_info(const frame_info& info, constant_buffer& cbuffer, const d3d12_surface& surface, u32 frame_idx, f32 delta_time)
+		d3d12_frame_info get_d3d12_frame_info(const frame_info& info, constant_buffer& cbuffer, const d3d12_surface& surface, u32 frame_idx)
 		{
 			camera::d3d12_camera& camera{ camera::get(info.camera_id) };
 			camera.update();
@@ -454,7 +460,7 @@ namespace dxforge::graphics::d3d12::core
 			data.ViewWidth = surface.viewport().Width;
 			data.ViewHeight = surface.viewport().Height;
 			data.NumDirectionalLights = light::non_cullable_light_count(info.light_set_key);
-			data.DeltaTime = delta_time;
+			data.DeltaTime = info.average_frame_time;
 			data.AmbientLight = light::ambient_light(info.light_set_key);
 			// NOTE: このバッファから読み込まないように注意すること。 読み込みは本当に遅い。
 			hlsl::GlobalShaderData* const shader_data{ cbuffer.allocate<hlsl::GlobalShaderData>() };
@@ -469,7 +475,6 @@ namespace dxforge::graphics::d3d12::core
 				(u32)surface.height(),
 				surface.light_culling_id(),
 				frame_idx,
-				delta_time
 			};
 			return d3d12_info;
 		}
@@ -480,10 +485,10 @@ namespace dxforge::graphics::d3d12::core
 	{
 		void deferred_release(IUnknown* ptr)
 		{
-			const u32 frame_idx{ current_frame_index() };
 			std::lock_guard lock{ deferred_release_mutex };
+			const u32 frame_idx{ current_frame_index() };
 			deferred_releases[frame_idx].push_back(ptr);
-			set_deferred_releases_flag();
+			deferred_releases_flag[frame_idx] = 1;
 		}
 	}	// namespace detail
 
@@ -536,6 +541,13 @@ namespace dxforge::graphics::d3d12::core
 		// DXGIファクトリを作成
 		DXCall(hr = CreateDXGIFactory2(dxgi_factory_flag, IID_PPV_ARGS(&dxgi_factory)));
 		if (FAILED(hr)) return failed_init();
+
+		// NOTE: Primal は DXCall で確かめる。無人実行でブレークしないよう、失敗したときはティアリングなしとして続ける
+		tearing_is_supported = 0;
+		if (FAILED(dxgi_factory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearing_is_supported, sizeof(tearing_is_supported))))
+		{
+			tearing_is_supported = 0;
+		}
 
 		// 使用するアダプター（グラフィックカード）を決定する。
 		ComPtr<IDXGIAdapter4> main_adapter;
@@ -615,7 +627,7 @@ namespace dxforge::graphics::d3d12::core
 		// 依存するリソースが解放される前に解放することができないからである。
 		for (u32 i{ 0 }; i < frame_buffer_count; ++i)
 		{
-			process_deferred_releases(i);
+			process_deferred_releases(i, true);
 		}
 
 		// モジュールのシャットダウン(初期化と逆順に、初期化できたものだけ)
@@ -646,7 +658,7 @@ namespace dxforge::graphics::d3d12::core
 
 		// NOTE: いくつかのタイプは、シャットダウン/リセット/クリア時にのみ、リソースのディファード・リリースを使用する。
 		// これらのリソースを最終的に解放するために、process_deferred_releasesをもう一度呼び出す。
-		process_deferred_releases(0);
+		process_deferred_releases(0, true);
 
 		// デバッグモードでは、リークされたオブジェクトを報告する
 #ifdef _DEBUG
@@ -684,6 +696,66 @@ namespace dxforge::graphics::d3d12::core
 		runtime::shutdown();
 	}
 
+	void set_option(renderer_option::option option, const void* const parameter, [[maybe_unused]] u32 parameter_size)
+	{
+		assert(option < renderer_option::count);
+		assert(parameter && parameter_size);
+
+		switch (option)
+		{
+		case renderer_option::vsync:
+		{
+			assert(parameter_size == sizeof(bool));
+			const bool enable{ *(const bool*)parameter };
+			options.enable_vsync = enable || !tearing_is_supported;
+		}
+		break;
+		case renderer_option::raytracing:
+		{
+			assert(parameter_size == sizeof(bool));
+			const bool enable{ *(const bool*)parameter };
+			options.enable_dxr = enable;
+		}
+		break;
+		case renderer_option::msaa:
+		{
+			assert(parameter_size == sizeof(u32));
+			const u32 msaa_samples{ *(const u32*)parameter };
+			if (msaa_samples == 1 || msaa_samples == 2 || msaa_samples == 4 || msaa_samples == 8)
+			{
+				options.msaa_samples = msaa_samples;
+			}
+		}
+		break;
+		default:
+			break;
+		}
+	}
+
+	void get_option(renderer_option::option option, void* const parameter, [[maybe_unused]] u32 parameter_size)
+	{
+		assert(option < renderer_option::count);
+		assert(parameter && parameter_size);
+
+		switch (option)
+		{
+		case renderer_option::vsync:
+			assert(parameter_size == sizeof(bool));
+			*(bool*)parameter = options.enable_vsync;
+			break;
+		case renderer_option::raytracing:
+			assert(parameter_size == sizeof(bool));
+			*(bool*)parameter = options.enable_dxr;
+			break;
+		case renderer_option::msaa:
+			assert(parameter_size == sizeof(u32));
+			*(u32*)parameter = options.msaa_samples;
+			break;
+		default:
+			break;
+		}
+	}
+
 	u32 flush_debug_messages(void)
 	{
 		u32 error_count{ 0 };
@@ -702,7 +774,7 @@ namespace dxforge::graphics::d3d12::core
 		return main_adapter_name;
 	}
 
-	id3d12_device* const device()
+	id3d12_device* device()
 	{
 		return main_device;
 	}
@@ -737,9 +809,20 @@ namespace dxforge::graphics::d3d12::core
 		return gfx_command.frame_index();
 	}
 
-	void set_deferred_releases_flag()
+	void set_deferred_releases_flag(u32 frame_idx)
 	{
-		deferred_releases_flag[current_frame_index()] = 1;
+		std::lock_guard lock{ deferred_release_mutex };
+		deferred_releases_flag[frame_idx] = 1;
+	}
+
+	bool allow_tearing()
+	{
+		return tearing_is_supported;
+	}
+
+	bool vsync_enabled()
+	{
+		return options.enable_vsync;
 	}
 
 	surface create_surface(platform::window window)
@@ -887,7 +970,7 @@ namespace dxforge::graphics::d3d12::core
 		const d3d12_surface& surface{ surfaces[id] };
 		ID3D12Resource* const current_back_buffer{ surface.back_buffer() };
 
-		const d3d12_frame_info d3d12_info{ get_d3d12_frame_info(info, cbuffer, surface, frame_idx, 16.7f) };
+		const d3d12_frame_info d3d12_info{ get_d3d12_frame_info(info, cbuffer, surface, frame_idx) };
 
 		gpass::set_size({ d3d12_info.surface_width, d3d12_info.surface_height });
 		d3dx::d3d12_resource_barrier& barriers{ resource_barriers };
@@ -907,9 +990,10 @@ namespace dxforge::graphics::d3d12::core
 		gpass::depth_prepass(cmd_list, d3d12_info);
 
 		// Geometry and lighting pass
+		// NOTE: ライトカリングは深度を読むので、先に深度バッファを読める状態にする
+		gpass::add_transitions_for_gpass(barriers);
 		light::update_light_buffers(d3d12_info);
 		delight::cull_lights(cmd_list, d3d12_info, barriers);
-		gpass::add_transitions_for_gpass(barriers);
 		barriers.apply(cmd_list);
 		gpass::set_render_targets_for_gpass(cmd_list);
 		gpass::render(cmd_list, d3d12_info);

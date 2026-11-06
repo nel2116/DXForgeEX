@@ -8,6 +8,7 @@
 // 2024/12/30 新規作成
 // 2026/10/29 画面外のサーフェス(スワップチェインなしの描画先)を追加 (#127)
 // 2026/10/29 画面外のサーフェスの作成の失敗を返すようにした (#128 のレビュー)
+// 2026/11/06 ティアリングの判定を core に移した (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -41,8 +42,7 @@ namespace dxforge::graphics::d3d12
 
 		constexpr d3d12_surface(d3d12_surface&& o)
 			: _swap_chain{ o._swap_chain }, _window{ o._window }, _current_bb_index{ o._current_bb_index }
-			, _viewport{ o._viewport }, _scissor_rect{ o._scissor_rect }, _allow_tearing{ o._allow_tearing }
-			, _present_flags{ o._present_flags }, _light_culling_id{ o._light_culling_id }
+			, _viewport{ o._viewport }, _scissor_rect{ o._scissor_rect }, _light_culling_id{ o._light_culling_id }
 		{
 			for (u32 i{ 0 }; i < buffer_count; ++i)
 			{
@@ -109,8 +109,6 @@ namespace dxforge::graphics::d3d12
 			}
 			_window = o._window;
 			_current_bb_index = o._current_bb_index;
-			_allow_tearing = o._allow_tearing;
-			_present_flags = o._present_flags;
 			_viewport = o._viewport;
 			_scissor_rect = o._scissor_rect;
 			_light_culling_id = o._light_culling_id;
@@ -125,8 +123,6 @@ namespace dxforge::graphics::d3d12
 			}
 			_window = {};
 			_current_bb_index = 0;
-			_allow_tearing = 0;
-			_present_flags = 0;
 			_viewport = {};
 			_scissor_rect = {};
 			_light_culling_id = id::invalid_id;
@@ -147,8 +143,6 @@ namespace dxforge::graphics::d3d12
 		render_target_data _render_target_data[buffer_count]{};			// レンダーターゲットデータ
 		platform::window _window{};										// ウィンドウ
 		mutable u32 _current_bb_index{ 0 };								// 現在のバックバッファインデックス
-		u32 _allow_tearing{ 0 };										// ティアリングを許可するかどうか
-		u32 _present_flags{ 0 };										// プレゼントフラグ
 		D3D12_VIEWPORT _viewport{};										// ビューポート
 		D3D12_RECT _scissor_rect{};										// シザー矩形
 		id::id_type _light_culling_id{ id::invalid_id };				// ライトカリングID

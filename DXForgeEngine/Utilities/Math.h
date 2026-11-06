@@ -9,6 +9,7 @@
 // 2025/01/12 align_size_up()とalign_size_down()の追加
 // 2025/01/19 is_equal()の追加
 // 2025/04/15 コメントの追加
+// 2026/11/06 to_radians, to_degrees の追加 (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -172,6 +173,18 @@ namespace dxforge::math
 		}
 
 		return crc;
+	}
+
+	/// @brief 度数法のベクトルを弧度法にする
+	constexpr math::v3 to_radians(math::v3 degrees)
+	{
+		return { degrees.x * to_rad, degrees.y * to_rad, degrees.z * to_rad };
+	}
+
+	/// @brief 弧度法のベクトルを度数法にする
+	constexpr math::v3 to_degrees(math::v3 radians)
+	{
+		return { radians.x * to_deg, radians.y * to_deg, radians.z * to_deg };
 	}
 }	// namespace dxforge::math
 

@@ -7,6 +7,7 @@
 // 更新履歴
 // 2024/12/27 新規作成
 // 2026/10/29 画面外のサーフェスと読み戻し、WARPの選択、無人実行のデバッグレイヤーの扱いを追加 (#127)
+// 2026/11/06 レンダラーの設定、ティアリングとVSyncの取得を追加し、delta_time を削除 (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -25,7 +26,6 @@ namespace dxforge::graphics::d3d12
 		u32 surface_height{ 0 };							///< サーフェスの高さ
 		id::id_type light_culling_id{ id::invalid_id };		///< ライトカリングID
 		u32 frame_index{ 0 };								///< フレームインデックス
-		f32 delta_time{ 16.7f };							///< デルタタイム
 	};
 }	// namespace dxforge::graphics::d3d12
 
@@ -67,16 +67,21 @@ namespace dxforge::graphics::d3d12::core
 		}
 	}
 
+	void set_option(renderer_option::option option, const void* const parameter, u32 parameter_size);	// レンダラーの設定を変える
+	void get_option(renderer_option::option option, void* const parameter, u32 parameter_size);			// レンダラーの設定を取得する
+
 	// ------ アクセサ ------
-	[[nodiscard]] id3d12_device* const device();					// デバイス
+	[[nodiscard]] id3d12_device* device();					// デバイス
 	[[nodiscard]] descriptor_heap& rtv_heap();						// RTVヒープ
 	[[nodiscard]] descriptor_heap& dsv_heap();						// DSVヒープ
 	[[nodiscard]] descriptor_heap& srv_heap();						// SRVヒープ
 	[[nodiscard]] descriptor_heap& uav_heap();						// UAVヒープ
 	[[nodiscard]] constant_buffer& cbuffer();						// 定数バッファ
 	[[nodiscard]] u32 current_frame_index();						// 現在のフレームインデックス
-	void set_deferred_releases_flag();								// 遅延リリースフラグを設定
+	void set_deferred_releases_flag(u32 frame_idx);					// 遅延リリースフラグを設定
 
+	[[nodiscard]] bool allow_tearing();								// ティアリングが使えるか
+	[[nodiscard]] bool vsync_enabled();								// VSyncが有効か
 	[[nodiscard]] surface create_surface(platform::window window);	// サーフェスを作成
 	[[nodiscard]] surface create_offscreen_surface(u32 width, u32 height);	// 画面外のサーフェスを作成
 	bool read_back_surface(surface_id id, utl::vector<math::v4>& linear_rgba);	// 画面外のサーフェスの読み戻し

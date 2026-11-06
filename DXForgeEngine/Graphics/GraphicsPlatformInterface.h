@@ -12,6 +12,7 @@
 // 2025/01/18 light構造体を追加
 // 2026/10/29 画面外のサーフェスと読み戻し、初期化情報を追加 (#127)
 // 2026/11/02 D3D12 のランタイム(Agility SDK か OS か)の情報を追加 (#155)
+// 2026/11/06 set_option, get_option を追加 (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -24,6 +25,8 @@ namespace dxforge::graphics
 	{
 		bool(*initialize)(const graphics_init_info&);
 		void(*shutdown)(void);
+		void(*set_option)(renderer_option::option, const void* const, u32);
+		void(*get_option)(renderer_option::option, void* const, u32);
 		u32(*flush_debug_messages)(void);
 		const char* (*adapter_name)(void);
 		runtime_info(*runtime)(void);
