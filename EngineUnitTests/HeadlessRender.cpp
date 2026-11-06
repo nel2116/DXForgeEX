@@ -18,12 +18,14 @@
 // 2026/11/02 TestShader.hlsl のパスを ANSI に変換せずに渡すようにした (#31 の Codex の指摘)
 // 2026/11/02 エンジンのシェーダーのフォルダを extra_args の -I ではなく compile_shader() の引数で渡すようにした (#150)
 // 2026/11/02 使ったD3D12のランタイム(Agility SDK か OS か、バージョン)を --json と結果に出すようにした (#155)
+// 2026/11/06 遅延解放、レンダラーの設定、ジオメトリの取得と作り直し、エディタのビューポートの経路の確認を追加 (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
 #include "CommonHeaders.h"
 #include "Core/Headless.h"
 #include "Graphics/Renderer.h"
+#include "Graphics/Direct3D12/D3D12Core.h"
 #include "Content/ContentToEngine.h"
 #include "Components/Entity.h"
 #include "Components/Transform.h"
@@ -51,6 +53,15 @@
 #pragma comment(lib, "windowscodecs.lib")
 
 using namespace Microsoft::WRL;
+
+// DXForgeEngineDLL/EngineAPI.cpp。エディタと同じ関数をビューポートの確認で呼ぶ
+extern "C" void ShutdownEngine();
+extern "C" u32 CreateRenderSurface(HWND host, s32 width, s32 height);
+extern "C" void RemoveRenderSurface(u32 id);
+extern "C" intptr_t GetWindowHandle(u32 id);
+extern "C" void ResizeRenderSurface(u32 id);
+extern "C" void SetGeometryIds(u32 surface_id, dxforge::id::id_type* geometry_ids, u32 count);
+extern "C" void RenderFrame(u32 surface_id, dxforge::id::id_type camera_id, u64 light_set);
 
 namespace dxforge::headless::render
 {
@@ -108,6 +119,8 @@ namespace dxforge::headless::render
 		{
 			run_stage	stage{ run_stage::shaders };
 			bool		graphics_initialized{ false };	// graphics::shutdown()を呼ぶ必要があるか(1回だけ呼ぶため)
+			HWND		viewport_host{ nullptr };		// ビューポートの確認で作った親ウィンドウ
+			u32			live_viewport{ u32_invalid_id };	// ShutdownEngine のあとで消すビューポート
 		};
 
 		/// @brief UTF-16の文字列をUTF-8に変換する
@@ -461,6 +474,44 @@ namespace dxforge::headless::render
 				return info;
 			}
 
+			/// @brief Geometryコンポーネントのあるエンティティから、IDを指定した取得と作り直しを確かめ、描画する(Primal Day 082)
+			/// @return 失敗したときはその説明(成功なら空)
+			std::string check_geometry_updates(const graphics::surface& surface)
+			{
+				const id::id_type geometry_ids[2]{ _sphere_entity.geometry().get_id(), _floor_entity.geometry().get_id() };
+				id::id_type item_ids[2]{};
+				geometry::get_render_item_ids(geometry_ids, item_ids, 2);
+				if (item_ids[0] != _render_item_ids[0] || item_ids[1] != _render_item_ids[1]) return "get_render_item_ids(geometry_ids) returned other items";
+				game_entity::entity_id entity_ids[2]{};
+				geometry::get_entity_ids(geometry_ids, entity_ids, 2);
+				if (entity_ids[0] != _sphere_entity.get_id() || entity_ids[1] != _floor_entity.get_id()) return "get_entity_ids() returned other entities";
+
+				// 床のジオメトリを作り直す
+				id::id_type material_ids[]{ _floor_mtl_id };
+				geometry::init_info geometry_info{};
+				geometry_info.geometry_content_id = _floor_model_id;
+				geometry_info.material_count = 1;
+				geometry_info.material_ids = &material_ids[0];
+				game_entity::entity_info info{};
+				info.geometry = &geometry_info;
+				if (!game_entity::update_component(_floor_entity.get_id(), info, component_type::geometry)) return "update_component(geometry) failed";
+				const id::id_type floor_geometry_id{ _floor_entity.geometry().get_id() };
+				if (!id::is_valid(floor_geometry_id)) return "update_component(geometry) left no component";
+				geometry::get_render_item_ids(&floor_geometry_id, &_render_item_ids[1], 1);
+				surface.render(frame_info());
+
+				// 床のジオメトリを削除し、描画アイテムを減らして描く
+				info.geometry = nullptr;
+				if (game_entity::update_component(_floor_entity.get_id(), info, component_type::geometry)) return "update_component(geometry) created a component without init_info";
+				if (id::is_valid(_floor_entity.geometry().get_id())) return "update_component(geometry) did not remove the component";
+				_render_item_ids.resize(1);
+				_thresholds.resize(1);
+				surface.render(frame_info());
+				return {};
+			}
+
+			[[nodiscard]] id::id_type sphere_geometry_id() const { return _sphere_entity.geometry().get_id(); }
+
 			void destroy()
 			{
 				for (game_entity::entity* entity : { &_sphere_entity, &_floor_entity, &_camera_entity })
@@ -500,7 +551,8 @@ namespace dxforge::headless::render
 			}
 
 		private:
-			constexpr static u64 light_set_key{ 0 };
+			// NOTE: 0 はエディタのビューポートの仮のライト(EngineAPI.cpp)が使うので、ビューポートの確認と重ならない値にする
+			constexpr static u64 light_set_key{ 1 };
 
 			/// @brief エディタの AppliedMaterial.PackForEngine() の形のデータから、DLLと同じ経路でマテリアルを作る
 			id::id_type create_material(math::v4 base_color, f32 metallic, f32 roughness, const id::id_type* texture_ids = nullptr, u32 texture_count = 0)
@@ -705,6 +757,119 @@ namespace dxforge::headless::render
 			graphics::surface _surface{};
 		};
 
+		/// @brief Release を数えるだけの COM オブジェクト(遅延解放の確認用)
+		class counting_unknown : public IUnknown
+		{
+		public:
+			HRESULT STDMETHODCALLTYPE QueryInterface(REFIID, void** object) override { *object = nullptr; return E_NOINTERFACE; }
+			ULONG STDMETHODCALLTYPE AddRef() override { return 1; }
+			ULONG STDMETHODCALLTYPE Release() override { ++release_count; return 0; }
+			u32 release_count{ 0 };
+		};
+
+		/// @brief 遅延解放が、前のフレームが終わるまで待つことを確かめる(Primal Day 082 の修正)
+		/// @details 修正前は、積んだ次のフレームの開始で解放していた(GPU が前のフレームでまだ使っているかもしれない)
+		/// @return 失敗したときはその説明(成功なら空)
+		std::string check_deferred_release(const graphics::surface& surface, test_scene& scene)
+		{
+			static counting_unknown resource{};	// NOTE: 確認に失敗してもリストに残るので、shutdown() まで生かす
+			resource.release_count = 0;
+			IUnknown* ptr{ &resource };
+			graphics::d3d12::core::deferred_release(ptr);
+			surface.render(scene.frame_info());
+			if (resource.release_count != 0) return "a deferred release ran on the next frame while earlier frames may still use the resource";
+			for (u32 i{ 0 }; i < graphics::d3d12::frame_buffer_count; ++i) surface.render(scene.frame_info());
+			if (resource.release_count != 1) return "a deferred release did not run after waiting for the frame buffers (" + std::to_string(resource.release_count) + " releases)";
+			return {};
+		}
+
+		/// @brief レンダラーの設定(renderer_option)を確かめる
+		/// @return 失敗したときはその説明(成功なら空)
+		std::string check_renderer_options()
+		{
+			using graphics::renderer_option;
+			bool vsync{ false };
+			graphics::get_option(renderer_option::vsync, &vsync, sizeof(bool));
+			if (!vsync) return "vsync should be enabled by default";
+			vsync = false;
+			graphics::set_option(renderer_option::vsync, &vsync, sizeof(bool));
+			graphics::get_option(renderer_option::vsync, &vsync, sizeof(bool));
+			if (vsync == graphics::d3d12::core::allow_tearing()) return "vsync can be disabled only when tearing is supported";
+			vsync = true;
+			graphics::set_option(renderer_option::vsync, &vsync, sizeof(bool));
+
+			u32 samples{ 3 };
+			graphics::set_option(renderer_option::msaa, &samples, sizeof(u32));
+			graphics::get_option(renderer_option::msaa, &samples, sizeof(u32));
+			if (samples != 1) return "msaa should ignore an unsupported sample count";
+			samples = 4;
+			graphics::set_option(renderer_option::msaa, &samples, sizeof(u32));
+			graphics::get_option(renderer_option::msaa, &samples, sizeof(u32));
+			if (samples != 4) return "msaa should accept 4 samples";
+			samples = 1;
+			graphics::set_option(renderer_option::msaa, &samples, sizeof(u32));
+
+			bool raytracing{ true };
+			graphics::set_option(renderer_option::raytracing, &raytracing, sizeof(bool));
+			raytracing = false;
+			graphics::get_option(renderer_option::raytracing, &raytracing, sizeof(bool));
+			if (!raytracing) return "raytracing option was not stored";
+			raytracing = false;
+			graphics::set_option(renderer_option::raytracing, &raytracing, sizeof(bool));
+			return {};
+		}
+
+		/// @brief エディタのビューポートの経路(DLL の関数)を、隠しウィンドウと WARP で確かめる(Primal Day 082)
+		/// @details 描画結果は読み戻せない(スワップチェイン)ので、異常終了しないことと、デバッグレイヤーのエラーがないことを見る。
+		///			 最後のビューポートは残し、ShutdownEngine のあとで RemoveRenderSurface を呼ぶ(エディタを閉じるときの順序)。
+		/// @return 失敗したときはその説明(成功なら空)
+		std::string check_editor_viewports(test_scene& scene, run_state& state)
+		{
+			state.viewport_host = CreateWindowExW(0, L"STATIC", L"", WS_POPUP, 0, 0, 64, 64, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
+			if (!state.viewport_host) return "failed to create the hidden host window";
+
+			const auto resize = [](u32 id, int width, int height)
+			{
+				SetWindowPos((HWND)GetWindowHandle(id), nullptr, 0, 0, width, height, SWP_NOZORDER | SWP_NOMOVE | SWP_NOACTIVATE);
+				ResizeRenderSurface(id);
+			};
+
+			const u32 viewport{ CreateRenderSurface(state.viewport_host, 64, 64) };
+			if (!GetWindowHandle(viewport)) return "CreateRenderSurface() made no window";
+			RenderFrame(viewport, id::invalid_id, 0);	// 描くものがないフレーム
+			id::id_type geometry_ids[]{ scene.sphere_geometry_id() };
+			SetGeometryIds(viewport, geometry_ids, 1);
+			RenderFrame(viewport, id::invalid_id, 0);
+			resize(viewport, 128, 96);
+			RenderFrame(viewport, id::invalid_id, 0);
+			resize(viewport, 8, 8);	// ライトカリングのタイルより小さい: 描かない
+			RenderFrame(viewport, id::invalid_id, 0);
+			resize(viewport, 0, 0);	// 大きさが 0: サーフェスはそのまま
+			RenderFrame(viewport, id::invalid_id, 0);
+			resize(viewport, 64, 64);
+			RenderFrame(viewport, id::invalid_id, 0);
+
+			// 大きさ 0 で作ったビューポートは、Resize でサーフェスができる
+			const u32 second{ CreateRenderSurface(state.viewport_host, 0, 0) };
+			state.live_viewport = second;
+			RenderFrame(second, id::invalid_id, 0);
+			resize(second, 96, 64);
+			SetGeometryIds(second, geometry_ids, 1);
+			// 大きさの違う2つのビューポートを交互に描く(GPass のバッファが作り直される)
+			for (u32 i{ 0 }; i < 4; ++i)
+			{
+				RenderFrame(viewport, id::invalid_id, 0);
+				RenderFrame(second, id::invalid_id, 0);
+			}
+
+			RemoveRenderSurface(viewport);
+			RenderFrame(second, id::invalid_id, 0);
+			// NOTE: このあとシーンを消すので、残すビューポートにはジオメトリを持たせない
+			SetGeometryIds(second, nullptr, 0);
+			RenderFrame(second, id::invalid_id, 0);
+			return {};
+		}
+
 		/// @brief 描画して読み戻し、PNGに書き出す(graphics::initialize()のあと)
 		void render_and_capture(const options& opt, const std::filesystem::path& engine_root, run_result& result, run_state& state)
 		{
@@ -741,6 +906,16 @@ namespace dxforge::headless::render
 
 			utl::vector<math::v4> pixels{};
 			const bool read{ surface.get().read_back(pixels) };
+			// NOTE: 読み戻したあとで、基準画像に影響しない確認をする(Primal Day 082)
+			std::string check_error{ check_deferred_release(surface.get(), scene) };
+			if (check_error.empty()) check_error = check_renderer_options();
+			if (check_error.empty()) check_error = scene.check_geometry_updates(surface.get());
+			if (check_error.empty()) check_error = check_editor_viewports(scene, state);
+			if (!check_error.empty())
+			{
+				fail(result, exit_code::render_failed, "render_failed", check_error);
+				return;
+			}
 			surface.remove();
 			if (!check_debug_messages(result, "while rendering")) return;
 			if (!read || pixels.size() != (size_t)opt.width * opt.height)
@@ -777,6 +952,21 @@ namespace dxforge::headless::render
 				return;
 			}
 			std::fprintf(stderr, "[render] wrote %s\n", to_utf8(opt.screenshot).c_str());
+		}
+
+		/// @brief ShutdownEngine のあとで、残したビューポートのウィンドウを消す(エディタの HwndHost の順序)
+		void finish_viewports(run_state& state)
+		{
+			if (state.live_viewport != u32_invalid_id)
+			{
+				ResizeRenderSurface(state.live_viewport);	// サーフェスがなければ何もしない
+				RenderFrame(state.live_viewport, id::invalid_id, 0);
+				RemoveRenderSurface(state.live_viewport);
+				ResizeRenderSurface(state.live_viewport);	// エディタのタイマーは消したあとにも動くことがある
+				state.live_viewport = u32_invalid_id;
+			}
+			if (state.viewport_host) DestroyWindow(state.viewport_host);
+			state.viewport_host = nullptr;
 		}
 
 		void run_render(options& opt, run_result& result, run_state& state)
@@ -880,9 +1070,11 @@ namespace dxforge::headless::render
 			if (result.exit_code == exit_code::success) check_debug_messages(result, "while cleaning up");
 			else graphics::flush_debug_messages();
 			state.graphics_initialized = false;
-			editor::shutdown_engine();
+			// NOTE: 残したビューポートのサーフェスは ShutdownEngine が片付ける(エディタの DLL と同じ関数)
+			ShutdownEngine();
+			finish_viewports(state);
 			// 2回目の ShutdownEngine は何もしない(エディタはウィンドウを閉じるときとキャンセルのときに呼ぶ)
-			editor::shutdown_engine();
+			ShutdownEngine();
 			if (editor::is_engine_initialized() && result.exit_code == exit_code::success)
 			{
 				fail(result, exit_code::render_failed, "render_failed", "the engine is still initialized after shutdown_engine()");
@@ -932,7 +1124,8 @@ namespace dxforge::headless::render
 				try
 				{
 					graphics::flush_debug_messages();
-					editor::shutdown_engine();
+					ShutdownEngine();
+					finish_viewports(state);
 				}
 				catch (...)
 				{

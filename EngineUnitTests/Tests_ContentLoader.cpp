@@ -6,6 +6,7 @@
 // Content/ContentLoader.cppのgame.binの読み込み(load_game/unload_game)のテスト
 // 更新履歴
 // 2026/10/27 新規作成 (#107, #112, #11)
+// 2026/11/06 Geometryコンポーネントが読めないことのテストを追加 (Primal Day 082, #201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
@@ -266,6 +267,12 @@ DXFORGE_TEST_CASE(content_loader_rejects_broken_files)
 		game_bin_builder bin{};
 		bin.u32_value(1);
 		bin.entity(2).transform(0.f, 0.f, 0.f).u32_value(7);
+		CHECK(load(bin) == content::load_game_result::unknown_component);
+	}
+	{	// Geometryコンポーネント(game.bin にはまだ形式がない)
+		game_bin_builder bin{};
+		bin.u32_value(1);
+		bin.entity(2).transform(0.f, 0.f, 0.f).u32_value(component_type::geometry);
 		CHECK(load(bin) == content::load_game_result::unknown_component);
 	}
 	{	// スクリプト名の長さが0
