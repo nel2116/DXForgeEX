@@ -19,6 +19,7 @@
 // 2026/11/02 エンジンのシェーダーのフォルダを extra_args の -I ではなく compile_shader() の引数で渡すようにした (#150)
 // 2026/11/02 使ったD3D12のランタイム(Agility SDK か OS か、バージョン)を --json と結果に出すようにした (#155)
 // 2026/11/06 遅延解放、レンダラーの設定、ジオメトリの取得と作り直し、エディタのビューポートの経路の確認を追加 (Primal Day 082, #201)
+// 2026/11/06 大きさ 0 で作ったビューポートが Resize まで描画しないことの確認と、GPass のコメントの訂正 (#201)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -852,10 +853,17 @@ namespace dxforge::headless::render
 			// 大きさ 0 で作ったビューポートは、Resize でサーフェスができる
 			const u32 second{ CreateRenderSurface(state.viewport_host, 0, 0) };
 			state.live_viewport = second;
+			// NOTE: 描画が走るとフレーム番号が進む。サーフェスがなければ RenderFrame は何もしないので進まない
+			//       (create_window() は 0 を既定の大きさにするので、作成時の判定が壊れると大きなサーフェスができて描画が走る)
+			const u32 frame_before_size0{ graphics::d3d12::core::current_frame_index() };
 			RenderFrame(second, id::invalid_id, 0);
+			if (graphics::d3d12::core::current_frame_index() != frame_before_size0) return "a viewport created with size 0 should not render before Resize";
 			resize(second, 96, 64);
+			const u32 frame_before_resized{ graphics::d3d12::core::current_frame_index() };
+			RenderFrame(second, id::invalid_id, 0);
+			if (graphics::d3d12::core::current_frame_index() == frame_before_resized) return "a viewport created with size 0 should render after Resize";
 			SetGeometryIds(second, geometry_ids, 1);
-			// 大きさの違う2つのビューポートを交互に描く(GPass のバッファが作り直される)
+			// 大きさの違う2つのビューポートを交互に描く(GPass のバッファは、大きくなるときだけ作り直される。最大に達したあとは作り直さない)
 			for (u32 i{ 0 }; i < 4; ++i)
 			{
 				RenderFrame(viewport, id::invalid_id, 0);
