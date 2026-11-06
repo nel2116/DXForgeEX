@@ -31,7 +31,9 @@ namespace DXForgeEditor.Utilities
 
             try
             {
-                using var fs = new FileStream(path, FileMode.Open);
+                // 読むだけなので FileAccess.Read で開く。既定(ReadWrite)だと読み込み同士や読み取り専用ファイルで失敗する(#193)
+                // FileShare.Read のままなので、保存の File.Move の置き換えとは従来どおり重なると失敗する(終了コード 43)
+                using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
                 var serializer = new DataContractSerializer(typeof(T));
                 // ルート要素がnilの場合は従来どおりnullを返す(呼び出し元はnullを失敗として扱う)
                 T instance = (T)serializer.ReadObject(fs)!;
