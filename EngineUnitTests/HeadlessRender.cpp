@@ -21,6 +21,7 @@
 // 2026/11/06 遅延解放、レンダラーの設定、ジオメトリの取得と作り直し、エディタのビューポートの経路の確認を追加 (Primal Day 082, #201)
 // 2026/11/06 大きさ 0 で作ったビューポートが Resize まで描画しないことの確認と、GPass のコメントの訂正 (#201)
 // 2026/11/07 別のスレッドがビューポートを描く間にビューポートを操作する確認を追加 (Primal Day 083, #209)
+// 2026/11/07 別のスレッドが描いている間に ShutdownEngine を呼ぶ確認を追加 (#209)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -37,6 +38,7 @@
 #include "../DXForgeEngineDLL/EngineInit.h"
 #include "EditorAssetPacking.h"
 
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <cwchar>
@@ -1104,7 +1106,25 @@ namespace dxforge::headless::render
 			else graphics::flush_debug_messages();
 			state.graphics_initialized = false;
 			// NOTE: 残したビューポートのサーフェスは ShutdownEngine が片付ける(エディタの DLL と同じ関数)
+			// NOTE: エディタの render thread が残ったまま ShutdownEngine に入っても、終わったあとの RenderFrame は何もしない
+			std::atomic_bool render_started{ false };
+			std::atomic_bool stop_rendering{ false };
+			std::thread render_thread{};
+			if (state.live_viewport != u32_invalid_id)
+			{
+				render_thread = std::thread{ [&render_started, &stop_rendering, viewport = state.live_viewport]()
+					{
+						while (!stop_rendering)
+						{
+							RenderFrame(viewport, id::invalid_id, 0);
+							render_started = true;
+						}
+					} };
+				while (!render_started) std::this_thread::yield();
+			}
 			ShutdownEngine();
+			stop_rendering = true;
+			if (render_thread.joinable()) render_thread.join();
 			finish_viewports(state);
 			// 2回目の ShutdownEngine は何もしない(エディタはウィンドウを閉じるときとキャンセルのときに呼ぶ)
 			ShutdownEngine();

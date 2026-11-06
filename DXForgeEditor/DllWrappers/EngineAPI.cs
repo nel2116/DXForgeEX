@@ -91,11 +91,22 @@ namespace DXForgeEditor.EngineAPIStructs
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    class GameEntityDescriptor
+    class GameEntityDescriptor : IDisposable
     {
         public TransformComponent Transform = new();
         public ScriptComponent Script = new();
         public GeometryComponent Geometry = new();
+
+        public void Dispose()
+        {
+            Geometry.Dispose();
+            GC.SuppressFinalize(this);
+        }
+
+        ~GameEntityDescriptor()
+        {
+            Dispose();
+        }
     }
 
     // DXForgeEngineDLL の shader_data(EngineAPI.cpp)と同じ並び
@@ -464,6 +475,17 @@ namespace DXForgeEditor.DllWrappers
             return succeeded;
         }
 
+        // ビューポートに描くジオメトリのコンポーネントの ID を設定する(Primal Day 083)
+        [DllImport(_engineDll)]
+        public static extern void SetGeometryIds(int surfaceId, [In] int[] geometryComponentIds, int count);
+
+        // NOTE: render thread(RenderSurfaceHost)から呼ぶ。DLL の関数は同じミューテックス(ticket_mutex)を取る。
+        [DllImport(_engineDll)]
+        public static extern void RenderFrame(int surfaceId, int cameraId, ulong lightSet);
+
+        [DllImport(_engineDll)]
+        public static extern int GetComponentId(int entityId, ComponentType type);
+
         internal static class EntityAPI
         {
             [DllImport(_engineDll)]
@@ -471,7 +493,7 @@ namespace DXForgeEditor.DllWrappers
 
             public static int CreateGameEntity(GameEntity entity)
             {
-                GameEntityDescriptor desc = new();
+                using GameEntityDescriptor desc = new();
 
                 // transform component
                 {
@@ -509,14 +531,7 @@ namespace DXForgeEditor.DllWrappers
                     }
                 }
 
-                try
-                {
-                    return CreateGameEntity(desc);
-                }
-                finally
-                {
-                    desc.Geometry.Dispose();
-                }
+                return CreateGameEntity(desc);
             }
 
             [DllImport(_engineDll)]
@@ -524,6 +539,55 @@ namespace DXForgeEditor.DllWrappers
             public static void RemoveGameEntity(GameEntity entity)
             {
                 RemoveGameEntity(entity.EntityId);
+            }
+
+            [DllImport(_engineDll)]
+            private static extern int UpdateComponent(int entityId, GameEntityDescriptor desc, ComponentType type);
+
+            /// <summary>
+            /// エンティティの Script か Geometry を更新する(Primal Day 083)。Transform は更新できない。
+            /// </summary>
+            public static bool UpdateComponent(GameEntity entity, ComponentType type)
+            {
+                Debug.Assert(ID.IsValid(entity.EntityId));
+                Debug.Assert(type != ComponentType.Transform);
+
+                using GameEntityDescriptor desc = new();
+
+                switch (type)
+                {
+                    case ComponentType.Transform: return false;
+                    case ComponentType.Script:
+                        {
+                            var c = entity.GetComponent<Script>();
+                            if (c != null)
+                            {
+                                if (Project.Current?.AvailableScripts?.Contains(c.Name) == true)
+                                {
+                                    desc.Script.ScriptCreater = GetScriptCreater(c.Name);
+                                }
+                                else
+                                {
+                                    Logger.Log(MessageType.Error, $"{c.Name}という名前のスクリプトが見つかりません！");
+                                }
+                            }
+                        }
+                        break;
+                    case ComponentType.Geometry:
+                        {
+                            // NOTE: CreateGameEntity と同じく、アップロードできなかったときは Geometry なしで渡す
+                            var c = entity.GetComponent<Components.Geometry>();
+                            if (c != null && ID.IsValid(c.ContentId) && c.MaterialsList.Count > 0)
+                            {
+                                desc.Geometry = new(c);
+                            }
+                        }
+                        break;
+                    default:
+                        break;
+                }
+
+                return UpdateComponent(entity.EntityId, desc, type) != 0;
             }
         }
     }

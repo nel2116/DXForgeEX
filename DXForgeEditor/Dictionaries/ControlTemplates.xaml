@@ -4,7 +4,8 @@
                     xmlns:opt="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
                     xmlns:local="clr-namespace:DXForgeEditor.Dictionaries"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib"
-                    xmlns:utl="clr-namespace:DXForgeEditor.Utilities.Controls">
+                    xmlns:utl="clr-namespace:DXForgeEditor.Utilities.Controls"
+                    xmlns:rs="clr-namespace:DXForgeEditor.Utilities">
 
     <sys:Double x:Key="AssetIconWidth">90</sys:Double>
 
@@ -929,6 +930,18 @@
                             <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible" />
                         </Trigger>
                     </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="{x:Type rs:RenderSurfaceControl}" x:Key="{x:Type rs:RenderSurfaceControl}">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="UseLayoutRounding" Value="True"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type rs:RenderSurfaceControl}">
+                    <ContentPresenter/>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

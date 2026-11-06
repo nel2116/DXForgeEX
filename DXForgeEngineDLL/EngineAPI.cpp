@@ -13,6 +13,7 @@
 // 2026/11/02 使っている D3D12 のランタイムをエディタに返す GetGraphicsRuntimeDescription を追加(#155)
 // 2026/11/06 ビューポートのカメラとライト、サーフェスの作成、SetGeometryIds、RenderFrame を追加 (Primal Day 082, #201)
 // 2026/11/07 ミューテックスを ticket_mutex にし、エンティティ ID の取得を RenderFrame に移した (Primal Day 083, #209)
+// 2026/11/07 ShutdownEngine のコメントをエディタの閉じる順序に合わせた (#209)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Common.h"
@@ -203,8 +204,9 @@ EDITOR_INTERFACE u32 InitializeEngine(const wchar_t* engine_path)
 }
 
 // InitializeEngine で初期化したグラフィックスを終了する。初期化していないとき、2回目は何もしない。
-// NOTE: エディタは、ウィンドウを閉じるときに ShutdownEngine を呼び、そのあとで HwndHost が RemoveRenderSurface を呼ぶ。
-//       終了した D3D12 を触らないよう、ビューポートのサーフェスとカメラはここで片付ける(ウィンドウは RemoveRenderSurface で消す)。
+// NOTE: エディタは、ふつうは RemoveRenderSurface のあとで ShutdownEngine を呼ぶ(Primal Day 083 の RenderSurfaceControl、#209)。
+//       host が消されないまま終わると、ShutdownEngine のあとで HwndHost が RemoveRenderSurface を呼ぶ。
+//       終了した D3D12 を触らないよう、残っているサーフェスとカメラはここで片付ける(ウィンドウは RemoveRenderSurface で消す)。
 EDITOR_INTERFACE void ShutdownEngine()
 {
 	std::lock_guard lock{ mutex };
