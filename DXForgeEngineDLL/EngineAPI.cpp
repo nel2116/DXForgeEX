@@ -12,6 +12,7 @@
 // 2026/11/02 CompileShader のインクルードのフォルダの扱いをコメントに追加(#150)
 // 2026/11/02 使っている D3D12 のランタイムをエディタに返す GetGraphicsRuntimeDescription を追加(#155)
 // 2026/11/06 ビューポートのカメラとライト、サーフェスの作成、SetGeometryIds、RenderFrame を追加 (Primal Day 082, #201)
+// 2026/11/07 ミューテックスを ticket_mutex にし、エンティティ ID の取得を RenderFrame に移した (Primal Day 083, #209)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Common.h"
@@ -25,6 +26,7 @@
 #include "Platform/Platform.h"
 #include "Content/ContentToEngine.h"
 #include "Utilities/IOStream.h"
+#include "Utilities/Threading.h"
 #include "ShaderCompilation.h"
 #include "ResourceUpload.h"
 #include "EngineInit.h"
@@ -58,10 +60,9 @@ namespace
 	utl::vector<u8> frame_info_buffer;
 	std::wstring graphics_runtime_description{};	// GetGraphicsRuntimeDescription が返す文字列の実体
 
-	void calculate_thresholds(const id::id_type* const geometry_ids, game_entity::entity_id* const entity_ids,
+	void calculate_thresholds(const game_entity::entity_id* const entity_ids,
 		f32* const thresholds, u32 count, const graphics::camera& view_camera)
 	{
-		geometry::get_entity_ids(geometry_ids, entity_ids, count);
 		const game_entity::entity camera{ game_entity::entity_id{ view_camera.entity_id() } };
 
 		using namespace DirectX;
@@ -182,7 +183,7 @@ namespace
 	}
 } // 匿名名前空間
 
-extern std::mutex mutex;	// EntityAPI.cpp
+extern utl::ticket_mutex mutex;	// EntityAPI.cpp
 
 // エンジンのシェーダーをコンパイルし、グラフィックスを初期化する(Primal Day 078)。返す値は editor::engine_init_error。
 // engine_path: エンジン(リポジトリ)のルートのフォルダ(UTF-16)。シェーダーのソースはその DXForgeEngine\Graphics\Direct3D12\Shaders から
@@ -533,8 +534,10 @@ EDITOR_INTERFACE void RenderFrame(u32 surface_id, id::id_type camera_id, u64 lig
 
 	if (count)
 	{
-		geometry::get_render_item_ids(surface.geometry_ids.data(), item_ids, count);
-		calculate_thresholds(surface.geometry_ids.data(), entity_ids, thresholds, count, view_camera);
+		const id::id_type* const geometry_ids{ surface.geometry_ids.data() };
+		geometry::get_entity_ids(geometry_ids, entity_ids, count);
+		geometry::get_render_item_ids(geometry_ids, item_ids, count);
+		calculate_thresholds(entity_ids, thresholds, count, view_camera);
 	}
 
 	graphics::frame_info info{};

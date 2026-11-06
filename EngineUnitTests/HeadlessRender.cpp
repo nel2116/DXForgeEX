@@ -20,6 +20,7 @@
 // 2026/11/02 使ったD3D12のランタイム(Agility SDK か OS か、バージョン)を --json と結果に出すようにした (#155)
 // 2026/11/06 遅延解放、レンダラーの設定、ジオメトリの取得と作り直し、エディタのビューポートの経路の確認を追加 (Primal Day 082, #201)
 // 2026/11/06 大きさ 0 で作ったビューポートが Resize まで描画しないことの確認と、GPass のコメントの訂正 (#201)
+// 2026/11/07 別のスレッドがビューポートを描く間にビューポートを操作する確認を追加 (Primal Day 083, #209)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -42,6 +43,7 @@
 #include <exception>
 #include <filesystem>
 #include <string>
+#include <thread>
 #include <vector>
 
 #ifndef WIN32_LEAN_AND_MEAN
@@ -869,6 +871,29 @@ namespace dxforge::headless::render
 				RenderFrame(viewport, id::invalid_id, 0);
 				RenderFrame(second, id::invalid_id, 0);
 			}
+
+			// エディタの描画のスレッド(Primal Day 083)と同じ使い方。別のスレッドが描く間に、このスレッドがビューポートを操作する
+			// NOTE: どちらのスレッドも回数を決めてあるので必ず終わる。重なり方によらず、異常終了しなければよい
+			const u32 removed_while_rendering{ CreateRenderSurface(state.viewport_host, 32, 32) };
+			std::thread render_thread{ [=]()
+			{
+				for (u32 i{ 0 }; i < 16; ++i)
+				{
+					RenderFrame(viewport, id::invalid_id, 0);
+					RenderFrame(second, id::invalid_id, 0);
+					RenderFrame(removed_while_rendering, id::invalid_id, 0);
+				}
+			} };
+			for (u32 i{ 0 }; i < 8; ++i)
+			{
+				resize(viewport, 64 + 8 * i, 64);
+				SetGeometryIds(second, geometry_ids, i % 2);
+				// surfaces の再確保も起こす
+				RemoveRenderSurface(CreateRenderSurface(state.viewport_host, 32, 32));
+				if (i == 4) RemoveRenderSurface(removed_while_rendering);
+			}
+			render_thread.join();
+			SetGeometryIds(second, geometry_ids, 1);
 
 			RemoveRenderSurface(viewport);
 			RenderFrame(second, id::invalid_id, 0);

@@ -8,6 +8,7 @@
 // 2024/12/10 新規作成
 // 2026/11/03 Geometryコンポーネントの受け渡しを追加 (Primal Day 079, #32)
 // 2026/11/06 回転を度数法で受け取り、ミューテックス、UpdateComponent、GetComponentId を追加 (Primal Day 082, #201)
+// 2026/11/07 ミューテックスを ticket_mutex にし、UpdateComponent の戻り値を b32 にした (Primal Day 083, #209)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Common.h"
@@ -17,6 +18,7 @@
 #include "Components/Transform.h"
 #include "Components/Script.h"
 #include "Components/Geometry.h"
+#include "Utilities/Threading.h"
 
 using namespace dxforge;
 
@@ -102,7 +104,7 @@ namespace
 }	// 匿名名前空間
 
 // エンティティとビューポートの操作を守るミューテックス(EngineAPI.cpp と共有する)
-std::mutex mutex{};
+utl::ticket_mutex mutex{};
 
 // ゲームエンティティを生成する
 EDITOR_INTERFACE id::id_type CreateGameEntity(game_entity_descriptor* e)
@@ -130,7 +132,7 @@ EDITOR_INTERFACE void RemoveGameEntity(id::id_type id)
 }
 
 // エンティティの Script か Geometry を作り直す。type は component_type::type。新しいコンポーネントを作れたら 1 を返す
-EDITOR_INTERFACE u32 UpdateComponent(id::id_type entity_id, game_entity_descriptor* e, component_type::type type)
+EDITOR_INTERFACE b32 UpdateComponent(id::id_type entity_id, game_entity_descriptor* e, component_type::type type)
 {
 	std::lock_guard lock{ mutex };
 	assert(id::is_valid(entity_id) && e && type != component_type::transform);
