@@ -961,6 +961,18 @@ try
 	Check (Bytes-Equal (Read-Bytes $project) $before) "--dry-run: the .dxproj is unchanged"
 	Expect-NothingImported "--dry-run" $project
 
+	# Content にあるアセットと同じ表記が、まだ Content にないアセットにも通る
+	foreach ($spelling in @("./model.asset", ".//model.asset", "MODEL.asset")) {
+		$r = Invoke-Ops $project @((Import-Json $okSpec), '{"op":"create-entity","name":"E","as":"e"}', ('{"op":"add-component","target":"$e","type":"geometry","asset":"path:' + $spelling + '"}')) -DryRun -Importer $FakeImporter
+		Check ($r.Code -eq 0 -and $r.Json.changed -eq $true) "the imported asset is found by path:$spelling in the same ops" "$($r.Stdout) $($r.Stderr)"
+	}
+	# Content にあるアセットで見つからない表記は、まだ Content にないアセットでも見つからない(NUL で落ちない)
+	foreach ($spelling in @("model.ASSET", "model.asset.", 'model\u0000.asset')) {
+		$r = Invoke-Ops $project @((Import-Json $okSpec), '{"op":"create-entity","name":"E","as":"e"}', ('{"op":"add-component","target":"$e","type":"geometry","asset":"path:' + $spelling + '"}')) -DryRun -Importer $FakeImporter
+		Check ($r.Code -eq 41 -and $r.Json.error.code -eq "asset_not_found") "path:$spelling is not found in the same ops, as in Content" "$($r.Code) $($r.Stdout) $($r.Stderr)"
+	}
+	Expect-NothingImported "--dry-run with other spellings of the path" $project
+
 	# 後の操作の失敗
 	$r = Expect-Unchanged "a failure after import-asset" $project $before 41 "target_not_found" { Invoke-Ops $project @((Import-Json $okSpec), '{"op":"get-entity","target":"name:Nope"}') -Importer $FakeImporter }
 	Expect-NothingImported "a failure after import-asset" $project

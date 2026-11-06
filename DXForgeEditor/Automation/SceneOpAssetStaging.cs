@@ -102,8 +102,16 @@ namespace DXForgeEditor.Automation
         }
 
         /// <summary>まだ Content にない、この ops で取り込んだアセットを探す。</summary>
-        public AssetInfo? FindStaged(string relativePath) =>
-            _stagedByRelativePath.TryGetValue(relativePath, out var staged) && IsAsset(staged) ? Asset.TryGetAssetInfo(staged) : null;
+        /// <remarks>
+        /// Content にあるアセットと同じ表記だけを通す。./ や大文字と小文字の違いはファイルシステムが解決するので、ここでは正規化して探す。
+        /// 拡張子は Asset.TryGetAssetInfo と同じく、書かれた表記のまま比べる。NUL を含むパスは File.Exists と同じくないものとする(GetFullPath は例外を投げる)。
+        /// </remarks>
+        public AssetInfo? FindStaged(string relativePath)
+        {
+            if (relativePath.Contains('\0') || Path.GetExtension(relativePath) != Asset.AssetFileExtension) return null;
+            var normalized = Path.GetRelativePath(_contentFolder, Path.GetFullPath(Path.Combine(_contentFolder, relativePath)));
+            return _stagedByRelativePath.TryGetValue(normalized, out var staged) ? Asset.TryGetAssetInfo(staged) : null;
+        }
 
         public AssetInfo? FindStaged(Guid guid) => _stagedAssets.FirstOrDefault(x => x.Guid == guid);
 
