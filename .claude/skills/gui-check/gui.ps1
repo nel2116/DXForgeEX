@@ -430,6 +430,12 @@ function Close-Editor([int]$Id) {
 	throw "終了しません: PID $Id。今あるウィンドウ: $(Get-WindowSummary $Id)(assert のダイアログなら内容を報告してください)"
 }
 
+# この呼び出しで起動したエディタを、失敗のあとに閉じる。閉じられなくても元のエラーを隠さない(PID を出す)
+function Stop-StartedEditor([int]$Id) {
+	try { Close-Editor $Id | Out-Null }
+	catch { Write-Host "起動したエディタを閉じられませんでした。手で閉じてください: PID $Id($($_.Exception.Message))" }
+}
+
 function Save-Shot([System.Drawing.Rectangle]$Area, [string]$Path) {
 	$Path = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
 	New-Item -ItemType Directory -Force (Split-Path -Parent $Path) | Out-Null
@@ -555,15 +561,23 @@ try {
 	switch ($Action) {
 		"open" {
 			$id = Start-Editor
-			Wait-Browser $id
-			Open-InBrowser $id $Project
+			try {
+				Wait-Browser $id
+				Open-InBrowser $id $Project
+			}
+			catch { Stop-StartedEditor $id; throw }
 			Write-Output "PID $id"
 		}
 		"create" {
+			# ProcId があるときのエディタは呼び出した側のもの。閉じない
+			$started = -not $ProcId
 			if ($ProcId) { $id = $ProcId; Invoke-FileMenu $id "New Project" }
 			else { $id = Start-Editor }
-			Wait-Browser $id
-			$file = Create-InBrowser $id $Project
+			try {
+				Wait-Browser $id
+				$file = Create-InBrowser $id $Project
+			}
+			catch { if ($started) { Stop-StartedEditor $id }; throw }
 			Write-Output "Project $file"
 			Write-Output "PID $id"
 		}

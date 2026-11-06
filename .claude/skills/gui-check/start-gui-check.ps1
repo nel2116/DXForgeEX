@@ -99,7 +99,18 @@ function Invoke-Cleanup {
 	if (-not (Get-Command orca -ErrorAction SilentlyContinue)) { Write-Host "orca が見つかりません。"; exit 1 }
 	# 未コミットの変更があれば Orca が断る(ワーカーはコミットしない)。--force は付けない
 	& orca worktree rm --worktree "path:$path" --delete-branch
-	exit $LASTEXITCODE
+	if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+	# worker は detach して作業するので、--delete-branch が効かずブランチが残る(#199)。接頭辞は設定で変わるので固定にしない。
+	# コミットを失わないよう -D ではなく -d で消す
+	$number = ($WorktreeName -replace '^gui-check-pr-', '')
+	$names = @(git -C $RepoRoot for-each-ref --format='%(refname:short)' refs/heads)
+	if ($LASTEXITCODE -ne 0) { Write-Host "git for-each-ref に失敗しました。ブランチが残っていないか確かめてください。"; exit 1 }
+	$failed = $false
+	foreach ($branch in @($names | Where-Object { $_ -match "^([^/]+/)?gui-check-pr-$number$" })) {
+		git -C $RepoRoot branch -d $branch
+		if ($LASTEXITCODE -ne 0) { Write-Host "ブランチ $branch を消せませんでした(未マージのコミットがあるか、ルートのチェックアウトが古い)。確かめて手で消してください。"; $failed = $true }
+	}
+	exit $(if ($failed) { 1 } else { 0 })
 }
 
 if ($Cleanup) { Invoke-Cleanup }
