@@ -37,7 +37,11 @@
         { "$ref": "#/$defs/set-transform" },
         { "$ref": "#/$defs/add-component" },
         { "$ref": "#/$defs/remove-component" },
-        { "$ref": "#/$defs/set-geometry" }
+        { "$ref": "#/$defs/set-geometry" },
+        { "$ref": "#/$defs/create-scene" },
+        { "$ref": "#/$defs/remove-scene" },
+        { "$ref": "#/$defs/set-active-scene" },
+        { "$ref": "#/$defs/import-asset" }
       ]
     },
     "list-scenes": {
@@ -148,6 +152,44 @@
       "type": "object",
       "properties": { "op": { "const": "set-geometry" }, "target": { "$ref": "#/$defs/selector" }, "asset": { "$ref": "#/$defs/asset" } },
       "required": ["asset", "op", "target"],
+      "additionalProperties": false
+    },
+    "create-scene": {
+      "description": "アクティブではないシーンを足す。同じ名前のシーンがあれば終了コード 42(scene_exists)。",
+      "type": "object",
+      "properties": { "op": { "const": "create-scene" }, "name": { "$ref": "#/$defs/name" } },
+      "required": ["name", "op"],
+      "additionalProperties": false
+    },
+    "remove-scene": {
+      "description": "シーンをエンティティごと消す。最後のシーン(last_scene)とアクティブなシーン(scene_active)は消せない(終了コード 42)。",
+      "type": "object",
+      "properties": { "op": { "const": "remove-scene" }, "scene": { "$ref": "#/$defs/scene" } },
+      "required": ["op", "scene"],
+      "additionalProperties": false
+    },
+    "set-active-scene": {
+      "description": "アクティブなシーンを切り替える。",
+      "type": "object",
+      "properties": { "op": { "const": "set-active-scene" }, "scene": { "$ref": "#/$defs/scene" } },
+      "required": ["op", "scene"],
+      "additionalProperties": false
+    },
+    "import-asset": {
+      "description": "DXForgeImport で取り込み、すべての操作が成功したら Content に置く。結果の assets の path と guid は、同じ ops のあとの操作でも使える。既存のファイルは上書きしない(終了コード 42、asset_exists)。",
+      "type": "object",
+      "properties": {
+        "op": { "const": "import-asset" },
+        "source": { "description": "取り込むファイルの絶対パス(FBX か画像。種類は拡張子で決まる)。", "type": "string", "pattern": "^([A-Za-z]:[\\\\/]|\\\\\\\\)" },
+        "folder": { "description": "Content からの相対フォルダ(.. や絶対パスは使えない)。", "type": "string", "pattern": "\\S" },
+        "settings": {
+          "description": "インポート設定(DXForgeImport の --set と同じ項目名)。項目名の誤りは実行のときに終了コード 42(import_invalid_settings)。",
+          "type": "object",
+          "propertyNames": { "pattern": "^[A-Za-z0-9_]+$" },
+          "additionalProperties": { "type": ["string", "number", "boolean"] }
+        }
+      },
+      "required": ["op", "source"],
       "additionalProperties": false
     }
   }
