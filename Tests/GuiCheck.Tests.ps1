@@ -41,6 +41,9 @@ if ($args[1] -eq "worker-start") {
 	Copy-Item -LiteralPath $spec -Destination (Join-Path $env:DXFORGE_TEST_STATE "spec.md")
 }
 if ($env:DXFORGE_TEST_ORCA_FAIL) { exit 1 }
+if ($args[0] -eq "worktree" -and $args[1] -eq "rm" -and -not $env:DXFORGE_TEST_ORCA_SLOW) {
+	Set-Content -LiteralPath (Join-Path $env:DXFORGE_TEST_STATE "worktrees.txt") -Value "worktree C:/repo`nHEAD 0" -Encoding utf8
+}
 exit 0
 '@
 
@@ -49,6 +52,7 @@ $fakeGit = @'
 $line = "$args"
 Add-Content -LiteralPath (Join-Path $env:DXFORGE_TEST_STATE "git.log") -Value $line -Encoding utf8
 if ($line -match "for-each-ref") { Get-Content -Encoding utf8 (Join-Path $env:DXFORGE_TEST_STATE "branches.txt"); exit 0 }
+if ($line -match "rev-parse") { if ($env:DXFORGE_TEST_BRANCH_GONE) { exit 1 }; exit 0 }
 if ($line -match " branch -d (.+)$") { if ($env:DXFORGE_TEST_BRANCH_FAIL) { exit 1 }; exit 0 }
 if ($line -notmatch "worktree list --porcelain") { exit 1 }
 Get-Content -Encoding utf8 (Join-Path $env:DXFORGE_TEST_STATE "worktrees.txt")
@@ -307,15 +311,31 @@ Closes #7
 	$gitLog = Join-Path $state "git.log"
 	Set-Content -LiteralPath (Join-Path $state "branches.txt") -Value "develop`nnel2116/gui-check-pr-999998`ngui-check-pr-999998`nnel2116/gui-check-pr-9999981`ngui-check-pr-99999" -Encoding utf8
 	Remove-Item -LiteralPath $gitLog -ErrorAction SilentlyContinue
+	Set-Content -LiteralPath (Join-Path $state "worktrees.txt") -Value "worktree C:/repo`nHEAD 0`n`nworktree C:/w/gui-check-pr-999998`nHEAD 1" -Encoding utf8
 	$r = Invoke-Script $Start @("-Pr", "999998", "-Cleanup")
 	$g = Get-Content -Raw -Encoding utf8 $gitLog
 	Check ($r.Exit -eq 0 -and $g -match "branch -d nel2116/gui-check-pr-999998" -and $g -match "branch -d gui-check-pr-999998" -and $g -notmatch "9999981" -and $g -notmatch "(?m)gui-check-pr-99999\s*$" -and $g -cnotmatch "branch -D") "-Cleanup deletes the leftover branches with -d only (実際: $($r.Exit))"
 	$env:DXFORGE_TEST_BRANCH_FAIL = "1"
+	Set-Content -LiteralPath (Join-Path $state "worktrees.txt") -Value "worktree C:/repo`nHEAD 0`n`nworktree C:/w/gui-check-pr-999998`nHEAD 1" -Encoding utf8
 	$r = Invoke-Script $Start @("-Pr", "999998", "-Cleanup")
 	Check ($r.Exit -ne 0 -and $r.Output -match "消せませんでした") "-Cleanup exits non-zero when a branch cannot be deleted"
+	# 列挙のあとに Orca が先に消したブランチは成功とみなす
+	$env:DXFORGE_TEST_BRANCH_GONE = "1"
+	Set-Content -LiteralPath (Join-Path $state "worktrees.txt") -Value "worktree C:/repo`nHEAD 0`n`nworktree C:/w/gui-check-pr-999998`nHEAD 1" -Encoding utf8
+	$r = Invoke-Script $Start @("-Pr", "999998", "-Cleanup")
+	Check ($r.Exit -eq 0) "-Cleanup treats a branch that vanished meanwhile as deleted (実際: $($r.Exit))"
+	$env:DXFORGE_TEST_BRANCH_GONE = $null
 	$env:DXFORGE_TEST_BRANCH_FAIL = $null
+	# 登録が消えないときはブランチに触らない
+	$env:DXFORGE_TEST_ORCA_SLOW = "1"
+	Set-Content -LiteralPath (Join-Path $state "worktrees.txt") -Value "worktree C:/repo`nHEAD 0`n`nworktree C:/w/gui-check-pr-999998`nHEAD 1" -Encoding utf8
+	Remove-Item -LiteralPath $gitLog -ErrorAction SilentlyContinue
+	$r = Invoke-Script $Start @("-Pr", "999998", "-Cleanup")
+	Check ($r.Exit -ne 0 -and $r.Output -match "登録が残っています" -and ((Get-Content -Raw $gitLog) -notmatch "for-each-ref|branch -d")) "-Cleanup leaves branches alone while the worktree is still registered (実際: $($r.Exit))"
+	$env:DXFORGE_TEST_ORCA_SLOW = $null
 	# orca が失敗したときはブランチに触らない
 	$env:DXFORGE_TEST_ORCA_FAIL = "1"
+	Set-Content -LiteralPath (Join-Path $state "worktrees.txt") -Value "worktree C:/repo`nHEAD 0`n`nworktree C:/w/gui-check-pr-999998`nHEAD 1" -Encoding utf8
 	Remove-Item -LiteralPath $gitLog -ErrorAction SilentlyContinue
 	$r = Invoke-Script $Start @("-Pr", "999998", "-Cleanup")
 	Check ($r.Exit -ne 0 -and -not (Test-Path $gitLog -PathType Leaf -ErrorAction SilentlyContinue | Where-Object { $_ } | ForEach-Object { (Get-Content -Raw $gitLog) -match "for-each-ref|branch -d" })) "-Cleanup does not touch branches when orca worktree rm fails (実際: $($r.Exit))"
