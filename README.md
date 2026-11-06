@@ -125,6 +125,7 @@ Create ProjectのPath欄の既定値は、次の順に決まります(#141)。Pa
 | `-t`, `--type` | `auto`(既定。拡張子から決める)、`geometry`、`texture`。拡張子と合わなければ終了コード4 |
 | `-s`, `--settings` | インポート設定のJSONファイル(下記) |
 | `--set Name=Value` | インポート設定の1項目。入力の種類の設定に、設定ファイルの後で適用する。繰り返し指定できる |
+| `--sources-output <フォルダ>` | `--output`を一時的な置き場にして、あとでこのフォルダへ移すときに指定する。テクスチャの`.asset`のソース画像のパス(`Sources`)を、`--output`の下ではなくこのフォルダの下で書く |
 | `--json` | 結果をJSONで標準出力に出す。ログは常に標準エラー |
 
 インポート設定の項目は、エディタのインポート設定(`GeometryImportSettings`/`TextureImportSettings`)のプロパティ名そのままです(大文字・小文字は区別しません)。指定しなかった項目はエディタの既定値になります。知らない項目や型の合わない値は終了コード5になります。
@@ -286,6 +287,8 @@ pwsh -STA -NoProfile -File DXForgeCli/Tests/load_project_cli_test.ps1 -Configura
 ./x64/DebugEditor/dxforge.exe --load-project path/to/MyGame.dxproj --op '{"op":"list-entities"}' --json   # 1つだけ
 ./x64/DebugEditor/dxforge.exe --load-project path/to/MyGame.dxproj --ops ops.json --dry-run --json        # 検証だけで保存しない
 ```
+
+シーンは`create-scene`、`remove-scene`(最後のシーンとアクティブなシーンは消せない)、`set-active-scene`で変えます。`import-asset`は`DXForgeImport.exe`(`dxforge.exe`と同じフォルダ、`--importer`で変更可)でFBXや画像を取り込み、同じ`ops`の後続の`set-geometry`で使えます。取り込みは一時フォルダ(`.dxforge-import-*`)に書き、すべての操作が成功したときだけ`Content`へ移してから`.dxproj`を保存します。失敗すると`Content`と`.dxproj`は変わりません。既存のファイルは上書きしません。
 
 ```json
 {"ops":[

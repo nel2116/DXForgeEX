@@ -15,6 +15,11 @@
       6. エディタが開いている(44): エディタと同じ ProjectEditorLock をテストのプロセスで持つ。読むだけなら通り、離す・切り替えると通る。2 つのエディタが持つなら、両方が離すまで断る。
       7. 空のプロジェクトに作って保存し、エディタのコード(Project.Load)で読むと同じ内容で、--frames で実行できる。
       8. GUID のない .dxproj。保存し直しても game.bin が変わらない。日本語の名前。
+      9. シーンの追加・削除・切り替え(最後のシーン、アクティブなシーン、消したシーンの別名、新しいアクティブのシーンの game.bin)。
+     10. 偽の importer(fake_importer.cmd)で import-asset: 成功、folder、--dry-run、失敗で Content と .dxproj が変わらないこと、終了コードの対応、衝突、44。
+     11. コミットの失敗: Content への移動の途中の失敗、保存の失敗、戻す処理の失敗(LeftoverPaths)、タイムアウト。
+     12. 実物の DXForgeImport(--importer なし): box.fbx と埋め込みテクスチャの FBX を取り込み → set-geometry → --export-game-bin。
+         .asset の生のバイトに一時フォルダのパスが残らないこと。ContentTools.dll(FBX SDK)がなければ SKIP。
 
 .PARAMETER Configuration
     DebugEditor(既定)か ReleaseEditor。
@@ -25,15 +30,30 @@
 .PARAMETER RequireRunner
     ランナーがないときに、実行のケースを SKIP にせず失敗にする(CI はこれを付ける)。
 
+.PARAMETER RequireRealImporter
+    実物の importer(ContentTools.dll と FbxFile)がないときに、節 12 を SKIP にせず失敗にする。CI には FBX SDK がないので付けない。
+
+.PARAMETER FbxFile
+    節 12 で取り込む ASCII の FBX。既定は FBX SDK のサンプルの box.fbx。
+
+.PARAMETER LodFbxFile
+    節 12 で取り込む、LOD のある FBX。指定しなければ、この確認は行わない。
+
 .EXAMPLE
     pwsh -STA -NoProfile -File DXForgeCli/Tests/ops_cli_test.ps1 -RequireRunner
+
+.EXAMPLE
+    pwsh -STA -NoProfile -File DXForgeCli/Tests/ops_cli_test.ps1 -RequireRunner -RequireRealImporter -LodFbxFile F:\DXForgeTestAssets\LODTest.fbx
 #>
 [CmdletBinding()]
 param(
 	[ValidateSet("DebugEditor", "ReleaseEditor")]
 	[string]$Configuration = "DebugEditor",
 	[string]$Runner,
-	[switch]$RequireRunner
+	[switch]$RequireRunner,
+	[switch]$RequireRealImporter,
+	[string]$FbxFile = "C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\samples\ConvertScene\box.fbx",
+	[string]$LodFbxFile
 )
 
 $ErrorActionPreference = "Stop"
@@ -137,10 +157,11 @@ function Write-OpsFile([string[]]$ops)
 }
 
 # ops を --ops で実行する
-function Invoke-Ops([string]$project, [string[]]$ops, [switch]$DryRun)
+function Invoke-Ops([string]$project, [string[]]$ops, [switch]$DryRun, [string]$Importer)
 {
 	$arguments = @("--load-project", $project, "--ops", (Write-OpsFile $ops))
 	if ($DryRun) { $arguments += "--dry-run" }
+	if ($Importer) { $arguments += @("--importer", $Importer) }
 	return Invoke-Cli $arguments -Json
 }
 
@@ -779,6 +800,491 @@ try
 	Check ($r.Code -eq 0 -and $r.Stdout -match "dxforge: OK, 1 ops, changed: False, saved: False" -and $r.Stdout -match "Moved") "human-readable output" $r.Stdout
 	$r = Invoke-Cli @("--load-project", $TransformOnly, "--op", '{"op":"nope"}')
 	Check ($r.Code -eq 40 -and $r.Stdout -match "FAILED \(exit code 40\) ops_invalid") "human-readable error" $r.Stdout
+
+	Write-Host "9. create-scene, remove-scene, set-active-scene"
+	$project = New-EmptyProject "Scenes"
+	$before = Read-Bytes $project
+	$r = Invoke-Ops $project @('{"op":"create-scene","name":"Level2"}', '{"op":"create-entity","scene":"Level2","name":"InLevel2","as":"e"}', '{"op":"list-scenes"}') -DryRun
+	Check ($r.Code -eq 0 -and $r.Json.changed -eq $true -and $r.Json.saved -eq $false -and (Bytes-Equal (Read-Bytes $project) $before)) "create-scene --dry-run -> changed, not saved, the .dxproj is unchanged" $r.Stdout
+	$r = Invoke-Ops $project @('{"op":"create-scene","name":"Level2"}', '{"op":"create-entity","scene":"Level2","name":"InLevel2","as":"e"}', '{"op":"list-scenes"}')
+	Expect-Saved "create-scene and create-entity in the same ops" $r
+	$scenes = @(@($r.Json.results)[2].scenes)
+	Check (@($r.Json.results)[0].scene.name -eq "Level2" -and @($r.Json.results)[0].scene.active -eq $false -and $scenes.Count -eq 2 -and $scenes[0].active -eq $true -and $scenes[1].entity_count -eq 1) "create-scene adds an inactive scene" $r.Stdout
+	$loaded = (Load-Project $project).PSObject.BaseObject
+	Check (@($loaded.Scenes).Count -eq 2 -and @($loaded.Scenes)[1].Name -eq "Level2" -and @(@($loaded.Scenes)[1].GameEntities).Count -eq 1 -and $loaded.ActiveScene.Name -eq "Sample Scene") "Project.Load reads the new scene and its entity"
+
+	$before = Read-Bytes $project
+	$null = Expect-Unchanged "create-scene with a used name" $project $before 42 "scene_exists" { Invoke-Op $project '{"op":"create-scene","name":"Level2"}' }
+	$null = Expect-Unchanged "remove-scene of the active scene" $project $before 42 "scene_active" { Invoke-Op $project '{"op":"remove-scene","scene":"Sample Scene"}' }
+	$null = Expect-Unchanged "remove-scene: not found" $project $before 41 "scene_not_found" { Invoke-Op $project '{"op":"remove-scene","scene":"Nope"}' }
+	$null = Expect-Unchanged "set-active-scene: not found" $project $before 41 "scene_not_found" { Invoke-Op $project '{"op":"set-active-scene","scene":"Nope"}' }
+	$null = Expect-Unchanged "a failure after create-scene saves nothing" $project $before 41 "scene_not_found" { Invoke-Ops $project @('{"op":"create-scene","name":"Level3"}', '{"op":"remove-scene","scene":"Nope"}') }
+	$r = Invoke-Op $project '{"op":"set-active-scene","scene":"Sample Scene"}'
+	Check ($r.Code -eq 0 -and $r.Json.changed -eq $false -and $r.Json.saved -eq $false -and (Bytes-Equal (Read-Bytes $project) $before)) "set-active-scene to the active scene -> changed false, saved false" $r.Stdout
+	$r = Invoke-Ops $project @('{"op":"set-active-scene","scene":"Level2"}', '{"op":"remove-scene","scene":"Sample Scene"}') -DryRun
+	Check ($r.Code -eq 0 -and $r.Json.changed -eq $true -and $r.Json.saved -eq $false -and (Bytes-Equal (Read-Bytes $project) $before)) "set-active-scene and remove-scene --dry-run -> not saved" $r.Stdout
+	foreach ($case in @(
+			@{ Name = "create-scene without name"; Op = '{"op":"create-scene"}'; Key = "name" },
+			@{ Name = "create-scene with an empty name"; Op = '{"op":"create-scene","name":""}'; Key = "name" },
+			@{ Name = "remove-scene without scene"; Op = '{"op":"remove-scene"}'; Key = "scene" },
+			@{ Name = "set-active-scene without scene"; Op = '{"op":"set-active-scene"}'; Key = "scene" },
+			@{ Name = "set-active-scene with an unknown key"; Op = '{"op":"set-active-scene","scene":"Level2","name":"x"}'; Key = "name" }))
+	{
+		$r = Expect-Unchanged $case.Name $project $before 40 "ops_invalid" { Invoke-Op $project $case.Op }
+		Check ($r.Json.error.key -eq $case.Key) "$($case.Name) -> error.key $($case.Key)" $r.Stdout
+	}
+
+	# 新しくアクティブにしたシーンが game.bin になる(Sample Scene に 2 つ、Level2 に 1 つ)
+	$r = Invoke-Ops $project @('{"op":"create-entity","name":"S1"}', '{"op":"create-entity","name":"S2"}')
+	Expect-Saved "entities in the active scene" $r
+	$binFile = Join-Path $work "scene_active.bin"
+	$r = Invoke-Cli @("--load-project", $project, "--export-game-bin", $binFile) -Json
+	Check ($r.Code -eq 0 -and $r.Json.entity_count -eq 2) "--export-game-bin uses the active scene before the change" $r.Stdout
+	$r = Invoke-Ops $project @('{"op":"set-active-scene","scene":"Level2"}', '{"op":"remove-scene","scene":"Sample Scene"}')
+	Expect-Saved "set-active-scene, then remove-scene" $r
+	$loaded = (Load-Project $project).PSObject.BaseObject
+	Check (@($loaded.Scenes).Count -eq 1 -and $loaded.ActiveScene.Name -eq "Level2") "Project.Load: the old scene is gone, Level2 is active" $loaded.ActiveScene.Name
+	$r = Invoke-Cli @("--load-project", $project, "--export-game-bin", $binFile) -Json
+	Check ($r.Code -eq 0 -and $r.Json.entity_count -eq 1) "--export-game-bin uses the new active scene" $r.Stdout
+	$before = Read-Bytes $project
+	$null = Expect-Unchanged "remove-scene of the last scene" $project $before 42 "last_scene" { Invoke-Op $project '{"op":"remove-scene","scene":"Level2"}' }
+
+	# 消したシーンのエンティティを指す別名
+	$project = New-EmptyProject "RemovedAlias"
+	$before = Read-Bytes $project
+	$r = Expect-Unchanged "an alias in a removed scene" $project $before 41 "target_not_found" { Invoke-Ops $project @('{"op":"create-scene","name":"Gone"}', '{"op":"create-entity","scene":"Gone","name":"E","as":"e"}', '{"op":"remove-scene","scene":"Gone"}', '{"op":"get-entity","target":"$e"}') }
+	Check ($r.Json.error.op_index -eq 3) "an alias in a removed scene -> op_index 3" $r.Stdout
+
+	# 同じ名前のシーンが 2 つ(エディタでは作れるので、.dxproj を直接書く)
+	$project = New-EmptyProject "DuplicateScenes"
+	$xml = [System.IO.File]::ReadAllText($project)
+	$sceneBlock = [regex]::Match($xml, '(?s)<Scene z:Id="i2">.*?</Scene>').Value
+	$xml = $xml.Replace($sceneBlock, $sceneBlock + $sceneBlock.Replace('z:Id="i2"', 'z:Id="i99"').Replace('<IsActive>true</IsActive>', '<IsActive>false</IsActive>'))
+	[System.IO.File]::WriteAllText($project, $xml)
+	$before = Read-Bytes $project
+	$null = Expect-Unchanged "remove-scene with a duplicate name" $project $before 41 "ambiguous_target" { Invoke-Op $project '{"op":"remove-scene","scene":"Sample Scene"}' }
+
+	Write-Host "10. import-asset with the fake importer"
+	$FakeImporter = Join-Path $PSScriptRoot "fake_importer.cmd"
+	$templates = Join-Path $work "templates"
+
+	function New-Template([int]$type, [Guid]$guid)
+	{
+		$file = Join-Path $templates ("t" + (++$script:projectCounter) + ".asset")
+		New-Asset $file $type $guid
+		return $file
+	}
+
+	# 偽の importer への指示のファイル(import-asset の source)
+	function New-Spec([hashtable]$spec)
+	{
+		$file = Join-Path $work ("spec" + (++$script:projectCounter) + ".json")
+		[System.IO.File]::WriteAllText($file, ($spec | ConvertTo-Json -Depth 6))
+		return $file
+	}
+
+	function Import-Json([string]$source, [string]$folder, $settings)
+	{
+		$op = @{ op = "import-asset"; source = $source }
+		if ($folder) { $op.folder = $folder }
+		if ($null -ne $settings) { $op.settings = $settings }
+		return ($op | ConvertTo-Json -Depth 4 -Compress)
+	}
+
+	function Test-StagingLeft([string]$project) { return @(Get-ChildItem -Force -LiteralPath (Split-Path $project) -Filter ".dxforge-import-*").Count -gt 0 }
+
+	function Get-ContentOf([string]$project) { return Join-Path (Split-Path $project) "Content" }
+
+	# Content に何も増えず、一時フォルダが残らないことも確かめる
+	function Expect-NothingImported([string]$name, [string]$project)
+	{
+		$content = Get-ContentOf $project
+		Check (-not (Test-Path -LiteralPath $content)) "$name -> no Content folder" $content
+		Check (-not (Test-StagingLeft $project)) "$name -> no staging folder"
+	}
+
+	function Read-Latin1([string]$file) { return [System.Text.Encoding]::Latin1.GetString([System.IO.File]::ReadAllBytes($file)) }
+
+	$meshGuid = [Guid]::NewGuid()
+	$mesh = New-Template 4 $meshGuid
+	$okSpec = New-Spec @{ assets = @{ "model.asset" = $mesh }; warnings = @("from the importer") }
+
+	# 成功: 同じ ops の後続が path: でも guid: でも指せて、保存され、game.bin にできる
+	$project = New-EmptyProject "ImportOk"
+	$content = Get-ContentOf $project
+	$r = Invoke-Ops $project @(
+		(Import-Json $okSpec),
+		'{"op":"create-entity","name":"ByPath","as":"p"}',
+		'{"op":"add-component","target":"$p","type":"geometry","asset":"default:cube"}',
+		'{"op":"set-geometry","target":"$p","asset":"path:model.asset"}',
+		'{"op":"create-entity","name":"ByGuid","as":"g"}',
+		'{"op":"add-component","target":"$g","type":"geometry","asset":"default:cube"}',
+		"{`"op`":`"set-geometry`",`"target`":`"`$g`",`"asset`":`"guid:$meshGuid`"}") -Importer $FakeImporter
+	Expect-Saved "import-asset, then set-geometry by path: and guid:" $r
+	$imported = @($r.Json.results)[0]
+	Check (@($imported.assets).Count -eq 1 -and @($imported.assets)[0].path -eq "path:model.asset" -and @($imported.assets)[0].guid -eq "$meshGuid" -and @($imported.assets)[0].type -eq "mesh") "the result has the imported asset" $r.Stdout
+	Check (@($imported.warnings) -contains "from the importer") "the result has the importer's warnings" $r.Stdout
+	Check (@($r.Json.leftover_paths).Count -eq 0 -and $null -ne $r.Json.PSObject.Properties["leftover_paths"]) "success -> leftover_paths is an empty array" $r.Stdout
+	Check ((Test-Path -LiteralPath (Join-Path $content "model.asset")) -and -not (Test-StagingLeft $project)) "the asset is in Content, no staging folder is left"
+	Check ((Read-Latin1 (Join-Path $content "model.asset")).EndsWith($content)) "--sources-output is the final folder under Content, not the staging folder"
+	$r = Invoke-Op $project '{"op":"get-entity","target":"name:ByPath"}'
+	Check ((Get-Component $r.Json.results[0].entity "geometry").geometry -eq "$meshGuid") "set-geometry by path: is saved" $r.Stdout
+	$r = Invoke-Op $project '{"op":"get-entity","target":"name:ByGuid"}'
+	Check ((Get-Component $r.Json.results[0].entity "geometry").geometry -eq "$meshGuid") "set-geometry by guid: is saved" $r.Stdout
+	$r = Invoke-Op $project "{`"op`":`"set-geometry`",`"target`":`"name:ByPath`",`"asset`":`"path:model.asset`"}"
+	Check ($r.Code -eq 0 -and $r.Json.changed -eq $false) "the moved asset is found by path: in a later run" $r.Stdout
+	$binFile = Join-Path $work "import_ok.bin"
+	$r = Invoke-Cli @("--load-project", $project, "--export-game-bin", $binFile) -Json
+	Check ($r.Code -eq 0 -and $r.Json.entity_count -eq 2) "--export-game-bin after importing" "$($r.Stdout) $($r.Stderr)"
+
+	# 取り込みだけの ops も保存する。フォルダ(空白を含む)と複数のファイル
+	$project = New-EmptyProject "ImportFolder"
+	$content = Get-ContentOf $project
+	$guidA = [Guid]::NewGuid()
+	$guidB = [Guid]::NewGuid()
+	$image = Join-Path $work "image.png"
+	[System.IO.File]::WriteAllText($image, "not really an image")
+	$spec = New-Spec @{ assets = @{ "a.asset" = (New-Template 4 $guidA); "b.asset" = (New-Template 6 $guidB); "a.fbm\t.png" = $image } }
+	$r = Invoke-Ops $project @((Import-Json $spec "Models/New Sub")) -Importer $FakeImporter
+	Expect-Saved "import-asset alone" $r
+	$assets = @(@($r.Json.results)[0].assets)
+	Check ($assets.Count -eq 2 -and $assets[0].path -eq "path:Models/New Sub/a.asset" -and $assets[1].guid -eq "$guidB" -and $assets[1].type -eq "texture") "several assets under folder" $r.Stdout
+	$final = Join-Path $content "Models\New Sub"
+	Check ((Test-Path -LiteralPath (Join-Path $final "a.asset")) -and (Test-Path -LiteralPath (Join-Path $final "b.asset")) -and (Test-Path -LiteralPath (Join-Path $final "a.fbm\t.png"))) "the files keep their places under folder, also the ones that are not assets"
+	Check ((Read-Latin1 (Join-Path $final "a.asset")).EndsWith($final)) "--sources-output includes folder"
+
+	# --dry-run
+	$project = New-EmptyProject "ImportDry"
+	$before = Read-Bytes $project
+	$r = Invoke-Ops $project @((Import-Json $okSpec), '{"op":"create-entity","name":"E","as":"e"}', '{"op":"add-component","target":"$e","type":"geometry","asset":"path:model.asset"}') -DryRun -Importer $FakeImporter
+	Check ($r.Code -eq 0 -and $r.Json.changed -eq $true -and $r.Json.saved -eq $false -and @(@($r.Json.results)[0].assets).Count -eq 1) "--dry-run reports the assets, changed, not saved" $r.Stdout
+	Check (Bytes-Equal (Read-Bytes $project) $before) "--dry-run: the .dxproj is unchanged"
+	Expect-NothingImported "--dry-run" $project
+
+	# 後の操作の失敗
+	$r = Expect-Unchanged "a failure after import-asset" $project $before 41 "target_not_found" { Invoke-Ops $project @((Import-Json $okSpec), '{"op":"get-entity","target":"name:Nope"}') -Importer $FakeImporter }
+	Expect-NothingImported "a failure after import-asset" $project
+	# 別の種類の失敗(42)でも同じ
+	$r = Expect-Unchanged "a failed op (42) after import-asset" $project $before 42 "last_scene" { Invoke-Ops $project @((Import-Json $okSpec), '{"op":"remove-scene","scene":"Sample Scene"}') -Importer $FakeImporter }
+	Expect-NothingImported "a failed op (42) after import-asset" $project
+
+	# 途中までファイルを書いて失敗する
+	$spec = New-Spec @{ assets = @{ "partial.asset" = $mesh }; errors = @("broken on purpose"); exit = 1 }
+	$r = Expect-Unchanged "the importer writes a file, then exits 1" $project $before 42 "import_failed" { Invoke-Ops $project @((Import-Json $spec)) -Importer $FakeImporter }
+	Check ($r.Json.error.message -match "broken on purpose" -and $r.Json.error.op_index -eq 0) "the importer's errors are in the message" $r.Stdout
+	Expect-NothingImported "the importer writes a file, then exits 1" $project
+
+	# 終了コードの対応(DXForgeImport の ExitCode)
+	foreach ($case in @(
+			@{ Exit = 3; Code = 41; Error = "source_not_found"; Key = "source" },
+			@{ Exit = 4; Code = 42; Error = "import_unsupported_format"; Key = "source" },
+			@{ Exit = 5; Code = 42; Error = "import_invalid_settings"; Key = "settings" },
+			@{ Exit = 7; Code = 42; Error = "importer_unavailable"; Key = "source" },
+			@{ Exit = 1; Code = 42; Error = "import_failed"; Key = "source" },
+			@{ Exit = 10; Code = 42; Error = "import_failed"; Key = "source" },
+			@{ Exit = 99; Code = 42; Error = "import_failed"; Key = "source"; NoJson = $true }))
+	{
+		$spec = New-Spec @{ exit = $case.Exit; no_json = [bool]$case.NoJson }
+		$r = Expect-Unchanged "importer exit $($case.Exit)" $project $before $case.Code $case.Error { Invoke-Ops $project @((Import-Json $spec)) -Importer $FakeImporter }
+		Check ($r.Json.error.key -eq $case.Key) "importer exit $($case.Exit) -> error.key $($case.Key)" $r.Stdout
+		Expect-NothingImported "importer exit $($case.Exit)" $project
+	}
+
+	# source と importer
+	$null = Expect-Unchanged "source does not exist" $project $before 41 "source_not_found" { Invoke-Ops $project @((Import-Json (Join-Path $work "missing.fbx"))) -Importer $FakeImporter }
+	$null = Expect-Unchanged "the importer does not exist" $project $before 42 "importer_unavailable" { Invoke-Ops $project @((Import-Json $okSpec)) -Importer (Join-Path $work "missing.exe") }
+	Expect-NothingImported "the importer does not exist" $project
+	foreach ($case in @(
+			@{ Name = "relative source"; Op = '{"op":"import-asset","source":"model.fbx"}'; Key = "source" },
+			@{ Name = "no source"; Op = '{"op":"import-asset"}'; Key = "source" },
+			@{ Name = "folder with .."; Op = (Import-Json $okSpec "a/../../b"); Key = "folder" },
+			@{ Name = "absolute folder"; Op = (Import-Json $okSpec "C:\x"); Key = "folder" },
+			@{ Name = "rooted folder"; Op = (Import-Json $okSpec "/x"); Key = "folder" },
+			@{ Name = "settings is an array"; Op = (Import-Json $okSpec $null @(1)); Key = "settings" },
+			@{ Name = "a setting is an object"; Op = (Import-Json $okSpec $null @{ A = @{ B = 1 } }); Key = "settings.A" }))
+	{
+		$r = Expect-Unchanged $case.Name $project $before 40 "ops_invalid" { Invoke-Ops $project @($case.Op) -Importer $FakeImporter }
+		Check ($r.Json.error.key -eq $case.Key) "$($case.Name) -> error.key $($case.Key)" $r.Stdout
+	}
+	$r = Invoke-Cli @("--load-project", $project, "--frames", "1", "--importer", $FakeImporter) -Json
+	Check ($r.Code -eq 2 -and $r.Json.error.code -eq "invalid_arguments") "--importer without ops -> exit 2" $r.Stdout
+
+	# settings は --set で渡す
+	$argsLog = Join-Path $work "args.log"
+	$spec = New-Spec @{ assets = @{ "set.asset" = $mesh }; args_log = $argsLog }
+	$r = Invoke-Ops $project @((Import-Json $spec $null ([ordered]@{ MipLevels = 3; Compress = $false; Name = "a b" }))) -DryRun -Importer $FakeImporter
+	$logged = @(Get-Content -LiteralPath $argsLog)
+	$sets = @(for ($i = 0; $i -lt $logged.Count; ++$i) { if ($logged[$i] -eq "--set") { $logged[$i + 1] } })
+	Check ($r.Code -eq 0 -and ($sets -join "|") -eq "MipLevels=3|Compress=false|Name=a b") "settings -> --set Name=Value" ($logged -join " ")
+	Check (-not (($logged -join "`n") -match "--sources-output\n[^\n]*\.dxforge-import-") -and $logged -contains "--json" -and (($logged -join "`n") -match "--output\n[^\n]*\.dxforge-import-")) "--output is the staging folder, --sources-output is not" ($logged -join " ")
+
+	# 出力がない
+	$spec = New-Spec @{ }
+	$r = Expect-Unchanged "the importer exits 0 without an asset" $project $before 42 "import_failed" { Invoke-Ops $project @((Import-Json $spec)) -Importer $FakeImporter }
+	Expect-NothingImported "the importer exits 0 without an asset" $project
+
+	# 衝突
+	$project = New-EmptyProject "ImportCollision"
+	$content = Get-ContentOf $project
+	$existing = Join-Path $content "model.asset"
+	New-Asset $existing 4 ([Guid]::NewGuid())
+	$before = Read-Bytes $project
+	$existingBytes = Read-Bytes $existing
+	$r = Expect-Unchanged "a file that already exists" $project $before 42 "asset_exists" { Invoke-Ops $project @((Import-Json $okSpec)) -Importer $FakeImporter }
+	Check ((Bytes-Equal (Read-Bytes $existing) $existingBytes) -and -not (Test-StagingLeft $project)) "a file that already exists -> its bytes stay, no staging folder"
+	$project = New-EmptyProject "ImportTwice"
+	$before = Read-Bytes $project
+	$r = Expect-Unchanged "the same file twice in the ops" $project $before 42 "asset_exists" { Invoke-Ops $project @((Import-Json $okSpec), (Import-Json $okSpec)) -Importer $FakeImporter }
+	Check ($r.Json.error.op_index -eq 1) "the same file twice -> op_index 1" $r.Stdout
+	Expect-NothingImported "the same file twice in the ops" $project
+
+	# エディタが開いている(取り込みも断る。インポーターは起動しない)
+	$project = New-EmptyProject "ImportLocked"
+	$before = Read-Bytes $project
+	$lockLog = Join-Path $work "lock_args.log"
+	$spec = New-Spec @{ assets = @{ "locked.asset" = $mesh }; args_log = $lockLog }
+	Set-EditorProject (Load-Project $project)
+	try
+	{
+		$null = Expect-Unchanged "import-asset while the editor is open" $project $before 44 "editor_open" { Invoke-Ops $project @((Import-Json $spec)) -Importer $FakeImporter }
+		$null = Expect-Unchanged "import-asset --dry-run while the editor is open" $project $before 44 "editor_open" { Invoke-Ops $project @((Import-Json $spec)) -DryRun -Importer $FakeImporter }
+	}
+	finally
+	{
+		Set-EditorProject $null
+	}
+	Check (-not (Test-Path -LiteralPath $lockLog)) "the importer did not run while the editor was open"
+	Expect-NothingImported "import-asset while the editor is open" $project
+
+	Write-Host "11. import-asset: failures while committing"
+	# Content への移動の途中で失敗する: 後の取り込みの指示で、前の取り込みの移動先をフォルダとして塞ぐ
+	$project = New-EmptyProject "CommitFailure"
+	$content = Get-ContentOf $project
+	$before = Read-Bytes $project
+	$blocked = Join-Path $content "z.asset"
+	$specA = New-Spec @{ assets = @{ "a.asset" = $mesh; "z.asset" = (New-Template 4 ([Guid]::NewGuid())) } }
+	$specB = New-Spec @{ assets = @{ "b.asset" = (New-Template 4 ([Guid]::NewGuid())) }; mkdir = @($blocked) }
+	$r = Expect-Unchanged "a move into Content fails part way" $project $before 43 "asset_commit_failed" { Invoke-Ops $project @((Import-Json $specA), (Import-Json $specB)) -Importer $FakeImporter }
+	Check (-not (Test-Path -LiteralPath (Join-Path $content "a.asset")) -and -not (Test-Path -LiteralPath (Join-Path $content "b.asset"))) "a move fails part way -> the moved file is removed" (Get-ChildItem -Recurse -Force $content | Out-String)
+	Check ((Test-Path -LiteralPath $blocked -PathType Container) -and @(Get-ChildItem -Force -LiteralPath $content).Count -eq 1) "a move fails part way -> only the folder that was already there stays"
+	Check (@($r.Json.leftover_paths).Count -eq 0 -and -not (Test-StagingLeft $project)) "a move fails part way -> no leftovers, no staging folder" $r.Stdout
+
+	# 保存の失敗: 移したファイルと、そのために作ったフォルダ(Content を含む)を消す
+	$project = New-EmptyProject "SaveFailure"
+	$before = Read-Bytes $project
+	Set-ItemProperty -LiteralPath $project -Name IsReadOnly -Value $true
+	try
+	{
+		$r = Expect-Unchanged "saving fails after the move" $project $before 43 "save_failed" { Invoke-Ops $project @((Import-Json $okSpec "new/sub")) -Importer $FakeImporter }
+	}
+	finally
+	{
+		Set-ItemProperty -LiteralPath $project -Name IsReadOnly -Value $false
+	}
+	Expect-NothingImported "saving fails after the move" $project
+	Check (@($r.Json.leftover_paths).Count -eq 0) "saving fails -> no leftovers" $r.Stdout
+
+	# 保存の失敗でも、もとからあった Content のファイルには触らない
+	$project = New-EmptyProject "SaveFailureKeeps"
+	$content = Get-ContentOf $project
+	$kept = Join-Path $content "kept.asset"
+	New-Asset $kept 4 ([Guid]::NewGuid())
+	$keptBytes = Read-Bytes $kept
+	Set-ItemProperty -LiteralPath $project -Name IsReadOnly -Value $true
+	try
+	{
+		$r = Invoke-Ops $project @((Import-Json $okSpec)) -Importer $FakeImporter
+	}
+	finally
+	{
+		Set-ItemProperty -LiteralPath $project -Name IsReadOnly -Value $false
+	}
+	Check ($r.Code -eq 43 -and (Bytes-Equal (Read-Bytes $kept) $keptBytes) -and @(Get-ChildItem -Force -LiteralPath $content).Count -eq 1) "saving fails -> the files that were in Content stay" $r.Stdout
+
+	# ここからはプロセスの外から起こせないので、SceneOpAssetStaging を直接呼ぶ
+	$stagingType = $editor.GetType("DXForgeEditor.Automation.SceneOpAssetStaging", $true)
+	$documentType = $editor.GetType("DXForgeEditor.Automation.SceneOpDocument", $true)
+	function New-Staging([string]$project, [string]$importer) { return $stagingType.GetConstructors($flags)[0].Invoke([object[]]@($project, $importer)) }
+	function Invoke-StagingImport($staging, [string]$opJson)
+	{
+		$op = @($documentType.GetMethod("ParseSingle", $flags).Invoke($null, [object[]]@($opJson)))[0]
+		$null = $stagingType.GetMethod("Import", $flags).Invoke($staging, [object[]]@($op, [System.Text.Json.Nodes.JsonObject]::new(), [System.Text.Json.Nodes.JsonArray]::new()))
+	}
+
+	# 戻す処理そのものの失敗: 消せないものは LeftoverPaths に入る
+	$project = New-EmptyProject "RollbackFailure"
+	$content = Get-ContentOf $project
+	$staging = New-Staging $project $FakeImporter
+	$spec = New-Spec @{ assets = @{ "held.asset" = $mesh; "free.asset" = (New-Template 4 ([Guid]::NewGuid())) } }
+	Invoke-StagingImport $staging (Import-Json $spec "deep/er")
+	$null = $stagingType.GetMethod("MoveToContent", $flags).Invoke($staging, @())
+	$held = Join-Path $content "deep\er\held.asset"
+	$free = Join-Path $content "deep\er\free.asset"
+	$holder = [System.IO.FileStream]::new($held, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+	try
+	{
+		$null = $stagingType.GetMethod("RollbackMoved", $flags).Invoke($staging, @())
+		$staging.Dispose()
+		$left = @($stagingType.GetProperty("LeftoverPaths", $flags).GetValue($staging))
+		Check ($left -contains $held) "rollback cannot delete a file -> LeftoverPaths has it" ($left -join "; ")
+		Check ($left -contains (Join-Path $content "deep\er")) "rollback cannot delete a folder that still has a file -> LeftoverPaths has it" ($left -join "; ")
+		Check (-not (Test-Path -LiteralPath $free) -and (Test-Path -LiteralPath $held)) "rollback removes what it can"
+		Check (-not (Test-StagingLeft $project)) "rollback failure -> the staging folder is removed"
+	}
+	finally
+	{
+		$holder.Dispose()
+	}
+
+	# タイムアウト
+	$project = New-EmptyProject "Timeout"
+	$staging = New-Staging $project $FakeImporter
+	$stagingType.GetProperty("ImporterTimeout", $flags).SetValue($staging, [TimeSpan]::FromSeconds(1))
+	$spec = New-Spec @{ sleep = 60; assets = @{ "late.asset" = $mesh } }
+	$elapsed = [System.Diagnostics.Stopwatch]::StartNew()
+	$errorCode = $null
+	try { Invoke-StagingImport $staging (Import-Json $spec) }
+	catch
+	{
+		$inner = $_.Exception
+		while ($inner.InnerException) { $inner = $inner.InnerException }
+		if ($inner.GetType().Name -eq "SceneOpException") { $errorCode = $inner.GetType().GetProperty("Code", $flags).GetValue($inner) } else { $errorCode = "$inner" }
+	}
+	$elapsed.Stop()
+	Check ($errorCode -eq "import_failed") "the importer does not finish in time -> import_failed" $errorCode
+	Check ($elapsed.Elapsed.TotalSeconds -lt 30) "the importer does not finish in time -> it is killed (not waited for)" $elapsed.Elapsed
+	$staging.Dispose()
+	Check (-not (Test-StagingLeft $project) -and -not (Test-Path -LiteralPath (Get-ContentOf $project))) "the importer does not finish in time -> nothing is left"
+
+	Write-Host "12. import-asset with the real DXForgeImport"
+	$checker = Join-Path $RepoRoot "DXForgeEditor\Resources\TextureEditor\Checker64.png"
+	# --importer なしの既定の場所(CI でも ContentTools.dll の前に断るケース)
+	$project = New-EmptyProject "RealDefault"
+	$before = Read-Bytes $project
+	$unsupported = Join-Path $work "unsupported.txt"
+	[System.IO.File]::WriteAllText($unsupported, "x")
+	$null = Expect-Unchanged "default importer: unsupported format" $project $before 42 "import_unsupported_format" { Invoke-Ops $project @((Import-Json $unsupported)) }
+	$null = Expect-Unchanged "default importer: unknown setting" $project $before 42 "import_invalid_settings" { Invoke-Ops $project @((Import-Json $checker $null @{ NoSuchSetting = 1 })) }
+	Expect-NothingImported "default importer: failures" $project
+
+	$realReady = (Test-Path (Join-Path $OutDir "DXForgeImport.exe")) -and (Test-Path (Join-Path $OutDir "ContentTools.dll")) -and (Test-Path -LiteralPath $FbxFile)
+	if (-not $realReady)
+	{
+		if ($RequireRealImporter) { Check $false "the real importer is available (DXForgeImport.exe, ContentTools.dll, $FbxFile)" }
+		else
+		{
+			Write-Host "  SKIP real importer (no ContentTools.dll in $OutDir or no $FbxFile; -RequireRealImporter makes this a failure)"
+			$skips.Add("real importer")
+		}
+	}
+	else
+	{
+		# .asset の生のバイトに、一時フォルダのパスが UTF-8 でも UTF-16 でも残っていない(すべてのファイル)
+		function Test-NoStagingPath([string]$name, [string]$folder)
+		{
+			$utf8Marker = ".dxforge-import-"
+			$utf16Marker = [System.Text.Encoding]::Latin1.GetString([System.Text.Encoding]::Unicode.GetBytes($utf8Marker))
+			$files = @(Get-ChildItem -LiteralPath $folder -Recurse -File -Filter "*.asset")
+			Check ($files.Count -gt 0) "$name -> there are .asset files to check"
+			foreach ($file in $files)
+			{
+				$raw = Read-Latin1 $file.FullName
+				Check (-not $raw.Contains($utf8Marker) -and -not $raw.Contains($utf16Marker)) "$name -> no staging path in the bytes of $($file.Name)"
+			}
+		}
+
+		$project = New-EmptyProject "RealBox"
+		$content = Get-ContentOf $project
+		$r = Invoke-Ops $project @(
+			(Import-Json $FbxFile "Models"),
+			'{"op":"create-entity","name":"Box","as":"b"}',
+			'{"op":"add-component","target":"$b","type":"geometry","asset":"default:cube"}',
+			'{"op":"set-geometry","target":"$b","asset":"path:Models/box.asset"}')
+		Expect-Saved "real importer: box.fbx without --importer, then set-geometry" $r
+		Write-Host "       assets: $(@(@($r.Json.results)[0].assets) | ConvertTo-Json -Compress)"
+		$boxGuid = @(@(@($r.Json.results)[0].assets) | Where-Object { $_.path -eq "path:Models/box.asset" })[0].guid
+		Check ($null -ne $boxGuid -and (Get-Component @($r.Json.results)[3].entity "geometry").geometry -eq $boxGuid -and -not (Test-StagingLeft $project)) "real importer: box.fbx -> the entity has the imported GUID, no staging folder" $r.Stdout
+		Test-NoStagingPath "real importer: box.fbx" $content
+		$binFile = Join-Path $work "real_box.bin"
+		$r = Invoke-Cli @("--load-project", $project, "--export-game-bin", $binFile) -Json
+		Write-Host "       --export-game-bin: exit $($r.Code), entity_count $($r.Json.entity_count), $((Get-Item -LiteralPath $binFile).Length) bytes"
+		Check ($r.Code -eq 0 -and $r.Json.entity_count -eq 1) "real importer: box.fbx -> --export-game-bin" "$($r.Stdout) $($r.Stderr)"
+		$loaded = (Load-Project $project).PSObject.BaseObject
+		$loadedGeometry = @(@($loaded.ActiveScene.GameEntities)[0].Components | Where-Object { $_.GetType().Name -eq "Geometry" })[0]
+		Check ("$($loadedGeometry.GeometryGuid)" -eq $boxGuid) "real importer: Project.Load sees the imported GUID"
+
+		# 埋め込みテクスチャ(作り方は import_cli_test.ps1 と同じ)
+		$lines = [System.Collections.Generic.List[string]]([System.IO.File]::ReadAllLines($FbxFile))
+		if ($lines[0] -notmatch '^; FBX 7') { Check $false "$FbxFile is an ASCII FBX 7 file" }
+		else
+		{
+			$base64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($checker))
+			$objectsEnd = $lines.IndexOf("Connections:  {") - 1
+			while ($lines[$objectsEnd] -ne "}") { --$objectsEnd }
+			$lines.InsertRange($objectsEnd, [string[]]@(
+				'    Video: 900000001, "Video::embedded_checker", "Clip" {',
+				'        Type: "Clip"',
+				'        Properties70:  {',
+				'            P: "Path", "KString", "XRefUrl", "", "embedded_checker.png"',
+				'        }',
+				'        Filename: "embedded_checker.png"',
+				'        RelativeFilename: "embedded_checker.png"',
+				('        Content: , "' + $base64 + '"'),
+				'    }'))
+			$count = $lines.IndexOf("Definitions:  {") + 1
+			while ($lines[$count] -notmatch '^\s+Count: (\d+)$') { ++$count }
+			$lines[$count] = "    Count: $([int]$Matches[1] + 1)"
+			$lines.InsertRange($count + 1, [string[]]@('    ObjectType: "Video" {', '        Count: 1', '    }'))
+			$embeddedFbx = Join-Path $work "embedded_box.fbx"
+			[System.IO.File]::WriteAllLines($embeddedFbx, $lines)
+
+			$project = New-EmptyProject "RealEmbedded"
+			$content = Get-ContentOf $project
+			$r = Invoke-Ops $project @(
+				(Import-Json $embeddedFbx "Models"),
+				'{"op":"create-entity","name":"Box","as":"b"}',
+				'{"op":"add-component","target":"$b","type":"geometry","asset":"path:Models/embedded_box.asset"}')
+			Expect-Saved "real importer: FBX with an embedded texture" $r
+			Write-Host "       assets: $(@(@($r.Json.results)[0].assets) | ConvertTo-Json -Compress)"
+			$textureAsset = Join-Path $content "Models\embedded_checker.asset"
+			$finalImage = Join-Path $content "Models\embedded_box.fbm\embedded_checker.png"
+			Check ((Test-Path -LiteralPath $textureAsset) -and (Test-Path -LiteralPath $finalImage)) "real importer: the embedded texture and its image are in Content"
+			Check (@(@(@($r.Json.results)[0].assets) | Where-Object { $_.type -eq "texture" }).Count -eq 1) "real importer: the result lists the embedded texture" $r.Stdout
+			Check ((Read-Latin1 $textureAsset).Contains($finalImage)) "real importer: the texture's Sources point at the image under Content" $finalImage
+			Test-NoStagingPath "real importer: embedded texture" $content
+			Check (-not (Test-StagingLeft $project)) "real importer: embedded texture -> no staging folder"
+			$binFile = Join-Path $work "real_embedded.bin"
+			$r = Invoke-Cli @("--load-project", $project, "--export-game-bin", $binFile) -Json
+			Write-Host "       --export-game-bin: exit $($r.Code), entity_count $($r.Json.entity_count), $((Get-Item -LiteralPath $binFile).Length) bytes"
+			Check ($r.Code -eq 0 -and $r.Json.entity_count -eq 1) "real importer: embedded texture -> --export-game-bin" "$($r.Stdout) $($r.Stderr)"
+		}
+
+		# 画像を直接取り込み、settings を実物に渡す
+		$project = New-EmptyProject "RealTexture"
+		$content = Get-ContentOf $project
+		$r = Invoke-Ops $project @((Import-Json $checker "Textures" @{ Compress = $false; MipLevels = 1 }))
+		Expect-Saved "real importer: an image with settings" $r
+		Check ((Read-Latin1 (Join-Path $content "Textures\checker64.asset")).Contains($checker)) "real importer: an image outside the output keeps its own path in Sources"
+		Test-NoStagingPath "real importer: an image" $content
+		$before = Read-Bytes $project
+		$existingBytes = Read-Bytes (Join-Path $content "Textures\checker64.asset")
+		$null = Expect-Unchanged "real importer: importing the same image again" $project $before 42 "asset_exists" { Invoke-Ops $project @((Import-Json $checker "Textures")) }
+		Check ((Bytes-Equal (Read-Bytes (Join-Path $content "Textures\checker64.asset")) $existingBytes)) "real importer: the existing asset keeps its bytes"
+
+		# LOD のある FBX
+		if ($LodFbxFile -and (Test-Path -LiteralPath $LodFbxFile))
+		{
+			$project = New-EmptyProject "RealLod"
+			$content = Get-ContentOf $project
+			$r = Invoke-Ops $project @((Import-Json $LodFbxFile))
+			Expect-Saved "real importer: an FBX with LODs" $r
+			$assets = @(@($r.Json.results)[0].assets)
+			Write-Host "       assets: $($assets | ConvertTo-Json -Compress)"
+			Check ($assets.Count -ge 1 -and @($assets | Where-Object { $_.type -ne "mesh" }).Count -eq 0) "real importer: an FBX with LODs -> mesh assets" $r.Stdout
+			Test-NoStagingPath "real importer: an FBX with LODs" $content
+		}
+		else { Write-Host "  (-LodFbxFile is not given: an FBX with LODs is not checked)" }
+	}
 
 	Check ($assertRecorder.Failures.Count -eq 0) "no Debug.Assert fired in the editor code" ($assertRecorder.Failures -join "; ")
 }
