@@ -22,6 +22,7 @@
 // 2026/11/06 大きさ 0 で作ったビューポートが Resize まで描画しないことの確認と、GPass のコメントの訂正 (#201)
 // 2026/11/07 別のスレッドがビューポートを描く間にビューポートを操作する確認を追加 (Primal Day 083, #209)
 // 2026/11/07 別のスレッドが描いている間に ShutdownEngine を呼ぶ確認を追加 (#209)
+// 2026/11/07 GetDrawnFrameCount が描いたときだけ増えることの確認を追加 (#209)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -67,6 +68,7 @@ extern "C" intptr_t GetWindowHandle(u32 id);
 extern "C" void ResizeRenderSurface(u32 id);
 extern "C" void SetGeometryIds(u32 surface_id, dxforge::id::id_type* geometry_ids, u32 count);
 extern "C" void RenderFrame(u32 surface_id, dxforge::id::id_type camera_id, u64 light_set);
+extern "C" u64 GetDrawnFrameCount(u32 surface_id);
 
 namespace dxforge::headless::render
 {
@@ -839,20 +841,30 @@ namespace dxforge::headless::render
 				ResizeRenderSurface(id);
 			};
 
+			// 1 回の RenderFrame で、描いた回数の累計がいくつ増えるか
+			const auto drawn_by_render = [](u32 id)
+			{
+				const u64 before{ GetDrawnFrameCount(id) };
+				RenderFrame(id, id::invalid_id, 0);
+				return GetDrawnFrameCount(id) - before;
+			};
+
 			const u32 viewport{ CreateRenderSurface(state.viewport_host, 64, 64) };
 			if (!GetWindowHandle(viewport)) return "CreateRenderSurface() made no window";
-			RenderFrame(viewport, id::invalid_id, 0);	// 描くものがないフレーム
+			if (GetDrawnFrameCount(viewport) != 0) return "a new viewport should have drawn no frames";
+			if (GetDrawnFrameCount(viewport + 1000) != 0) return "GetDrawnFrameCount() should return 0 for an unknown surface";
+			if (drawn_by_render(viewport) != 1) return "an empty frame of a viewport should count as drawn";	// 描くものがないフレーム
 			id::id_type geometry_ids[]{ scene.sphere_geometry_id() };
 			SetGeometryIds(viewport, geometry_ids, 1);
 			RenderFrame(viewport, id::invalid_id, 0);
 			resize(viewport, 128, 96);
 			RenderFrame(viewport, id::invalid_id, 0);
 			resize(viewport, 8, 8);	// ライトカリングのタイルより小さい: 描かない
-			RenderFrame(viewport, id::invalid_id, 0);
+			if (drawn_by_render(viewport) != 0) return "a viewport smaller than a light culling tile should not count as drawn";
 			resize(viewport, 0, 0);	// 大きさが 0: サーフェスはそのまま
-			RenderFrame(viewport, id::invalid_id, 0);
+			if (drawn_by_render(viewport) != 0) return "a viewport resized to 0 from a small size should not count as drawn";
 			resize(viewport, 64, 64);
-			RenderFrame(viewport, id::invalid_id, 0);
+			if (drawn_by_render(viewport) != 1) return "a viewport should count as drawn again after it grows back";
 
 			// 大きさ 0 で作ったビューポートは、Resize でサーフェスができる
 			const u32 second{ CreateRenderSurface(state.viewport_host, 0, 0) };
@@ -860,7 +872,7 @@ namespace dxforge::headless::render
 			// NOTE: 描画が走るとフレーム番号が進む。サーフェスがなければ RenderFrame は何もしないので進まない
 			//       (create_window() は 0 を既定の大きさにするので、作成時の判定が壊れると大きなサーフェスができて描画が走る)
 			const u32 frame_before_size0{ graphics::d3d12::core::current_frame_index() };
-			RenderFrame(second, id::invalid_id, 0);
+			if (drawn_by_render(second) != 0) return "a viewport created with size 0 should not count as drawn";
 			if (graphics::d3d12::core::current_frame_index() != frame_before_size0) return "a viewport created with size 0 should not render before Resize";
 			resize(second, 96, 64);
 			const u32 frame_before_resized{ graphics::d3d12::core::current_frame_index() };
@@ -898,6 +910,7 @@ namespace dxforge::headless::render
 			SetGeometryIds(second, geometry_ids, 1);
 
 			RemoveRenderSurface(viewport);
+			if (drawn_by_render(viewport) != 0) return "a removed viewport should not count as drawn";
 			RenderFrame(second, id::invalid_id, 0);
 			// NOTE: このあとシーンを消すので、残すビューポートにはジオメトリを持たせない
 			SetGeometryIds(second, nullptr, 0);

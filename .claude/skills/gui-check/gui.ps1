@@ -22,6 +22,7 @@
 	  create          Empty Project から -Project(GuiCheck で始まる名前)を作る。-ProcId を渡すと File > New Project から
 	  switch          開いているエディタ(-ProcId)で File > Open Project から -Project に切り替える
 	  close           WM_CLOSE で閉じる。Project Browser が残ったら続けて閉じ、終了を確かめる。ゲームや VS の PID も渡せる
+	  end-session     OS のセッション終了(ログオフ)を -ProcId のトップレベルウィンドウにだけ模擬し、終了と終了コードを確かめる。実際のログオフはしない
 	  click           -Target を押す([-Clicks n])
 	  drag            -Target から -To へドラッグする
 	  keys            -Keys を SendKeys で送る(-ProcId を渡すと先に前面に出す)
@@ -45,7 +46,7 @@
 [CmdletBinding()]
 param(
 	[Parameter(Mandatory)]
-	[ValidateSet("names", "open", "create", "switch", "close", "click", "drag", "keys", "shot", "tree", "wait", "move", "prepare", "remove-project", "diff")]
+	[ValidateSet("names", "open", "create", "switch", "close", "end-session", "click", "drag", "keys", "shot", "tree", "wait", "move", "prepare", "remove-project", "diff")]
 	[string]$Action,
 
 	[int]$ProcId,
@@ -167,6 +168,7 @@ public static class DXForgeGui {
 	[DllImport("user32.dll")] public static extern void mouse_event(uint f, uint x, uint y, uint d, UIntPtr e);
 	[DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr h, int x, int y, int w, int t, bool r);
 	[DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
+	[DllImport("user32.dll")] public static extern IntPtr SendMessageTimeout(IntPtr h, uint msg, IntPtr w, IntPtr l, uint flags, uint timeout, out IntPtr result);
 	[DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr c);
 	[DllImport("user32.dll")] public static extern IntPtr SetThreadDpiAwarenessContext(IntPtr c);
 	[DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
@@ -175,6 +177,11 @@ public static class DXForgeGui {
 	public static List<IntPtr> Find(uint target) {
 		var list = new List<IntPtr>();
 		EnumWindows((h, l) => { uint p; GetWindowThreadProcessId(h, out p); if (p == target && IsWindowVisible(h)) list.Add(h); return true; }, IntPtr.Zero);
+		return list;
+	}
+	public static List<IntPtr> FindAll(uint target) {
+		var list = new List<IntPtr>();
+		EnumWindows((h, l) => { uint p; GetWindowThreadProcessId(h, out p); if (p == target) list.Add(h); return true; }, IntPtr.Zero);
 		return list;
 	}
 	public static string Text(IntPtr h) { var s = new StringBuilder(512); GetWindowText(h, s, 512); return s.ToString(); }
@@ -430,6 +437,28 @@ function Close-Editor([int]$Id) {
 	throw "終了しません: PID $Id。今あるウィンドウ: $(Get-WindowSummary $Id)(assert のダイアログなら内容を報告してください)"
 }
 
+# OS が送る順(WM_QUERYENDSESSION のあと WM_ENDSESSION)を、対象のプロセスのトップレベルウィンドウにだけ送る。
+# WPF の Application が受けるウィンドウは隠れているので、見えていないものにも送る
+function Send-EndSession([int]$Id) {
+	$process = Get-Process -Id $Id -ErrorAction SilentlyContinue
+	if (-not $process) { throw "プロセスがありません: PID $Id" }
+	$null = $process.Handle	# 終了したあとに ExitCode を読むため、先に開く
+	$logoff = [IntPtr]::new([long]2147483648)	# ENDSESSION_LOGOFF
+	$abortIfHung = [uint32]2
+	$handles = @([DXForgeGui]::FindAll([uint32]$Id))
+	$result = [IntPtr]::Zero
+	foreach ($handle in $handles) { [void][DXForgeGui]::SendMessageTimeout($handle, 0x0011, [IntPtr]::Zero, $logoff, $abortIfHung, 5000, [ref]$result) }
+	foreach ($handle in $handles) { [void][DXForgeGui]::SendMessageTimeout($handle, 0x0016, [IntPtr]::new(1), $logoff, $abortIfHung, 5000, [ref]$result) }
+	if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+		# NOTE: 終了の途中で assert のダイアログが出ると、Get-Process では見つからなくなるので、ウィンドウを直接読む
+		$names = @([DXForgeGui]::Find([uint32]$Id) | ForEach-Object { "'" + [DXForgeGui]::Text($_) + "'" })
+		throw "終了しません: PID $Id。今あるウィンドウ: $($names -join ', ')(assert のダイアログなら内容を報告してください)"
+	}
+	$code = "0x{0:X8}" -f $process.ExitCode
+	if ($process.ExitCode -ne 0) { throw "異常終了しました: PID $Id、終了コード $code" }
+	Write-Output "終了しました: PID $Id、終了コード $code"
+}
+
 # この呼び出しで起動したエディタを、失敗のあとに閉じる。閉じられなくても元のエラーを隠さない(PID を出す)
 function Stop-StartedEditor([int]$Id) {
 	try { Close-Editor $Id | Out-Null }
@@ -553,7 +582,7 @@ switch ($Action) {
 	"shot" { if (-not $ProcId -or -not $OutFile) { Stop-Usage "shot には -ProcId と -OutFile が要ります。" } }
 	"wait" { if (-not $ProcId -or (-not $Target -and -not $Title)) { Stop-Usage "wait には -ProcId と、-Target か -Title が要ります。" } }
 	"move" { if (-not $ProcId -or $X -lt 0 -or $Y -lt 0 -or $W -le 0 -or $H -le 0) { Stop-Usage "move には -ProcId、-X、-Y、-W、-H が要ります。" } }
-	{ $_ -in "close", "tree" } { if (-not $ProcId) { Stop-Usage "$Action には -ProcId が要ります。" } }
+	{ $_ -in "close", "end-session", "tree" } { if (-not $ProcId) { Stop-Usage "$Action には -ProcId が要ります。" } }
 }
 
 try {
@@ -588,6 +617,7 @@ try {
 			Write-Output "PID $ProcId"
 		}
 		"close" { Close-Editor $ProcId }
+		"end-session" { Send-EndSession $ProcId }
 		"click" {
 			$point = Resolve-Target $ProcId $Target
 			Invoke-MouseClick $point $Clicks

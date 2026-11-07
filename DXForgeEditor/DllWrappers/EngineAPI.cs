@@ -483,6 +483,11 @@ namespace DXForgeEditor.DllWrappers
         [DllImport(_engineDll)]
         public static extern void RenderFrame(int surfaceId, int cameraId, ulong lightSet);
 
+        // RenderFrame が実際に描いた回数の累計(#209)。何もしなかったフレームは数えない。
+        // NOTE: render thread から呼ぶ。UI スレッドから呼ぶと、描画の間ミューテックスを待つ(#213)。
+        [DllImport(_engineDll)]
+        public static extern ulong GetDrawnFrameCount(int surfaceId);
+
         [DllImport(_engineDll)]
         public static extern int GetComponentId(int entityId, ComponentType type);
 

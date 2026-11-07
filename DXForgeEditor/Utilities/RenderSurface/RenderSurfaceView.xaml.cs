@@ -27,6 +27,7 @@ namespace DXForgeEditor.Utilities
                 {
                     frameTime.Text = $"DT: {stats.AverageFrameTime * 1000f:F1} ms";
                     frameRate.Text = $"FPS: {stats.FPS} Hz";
+                    drawnFrames.Text = $"Frames: {stats.DrawnFrameCount}";
                 });
             };
         }
