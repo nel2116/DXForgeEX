@@ -488,6 +488,26 @@ namespace DXForgeEditor.DllWrappers
         [DllImport(_engineDll)]
         public static extern ulong GetDrawnFrameCount(int surfaceId);
 
+        // エディタのカメラ(EditorCamera)の値をビューポートのカメラに設定する(Primal Day 085, #225)。
+        // NOTE: UI スレッドと render thread の両方から呼ばれる。DLL の関数は同じミューテックス(ticket_mutex)を取るので、
+        //       UI スレッドからは、描画中の RenderFrame 1 回の分だけ待つことがある(#213)。
+        //       カメラがまだない(大きさが 0)ときは、DLL が値を覚えておき、カメラを作ったときに反映する。
+        [DllImport(_engineDll, EntryPoint = "UpdateEditorCamera")]
+        private static extern void UpdateEditorCamera(int surfaceId, float posX, float posY, float posZ, float rotX, float rotY, float rotZ);
+
+        // rotation はラジアン(EditorCamera の内部の値)。エンティティの Transform の回転の単位とは別。
+        public static void UpdateEditorCamera(int surfaceId, Vector3 position, Vector3 rotation)
+        {
+            UpdateEditorCamera(surfaceId, position.X, position.Y, position.Z, rotation.X, rotation.Y, rotation.Z);
+        }
+
+        [DllImport(_engineDll)]
+        public static extern void SetCameraRange(int surfaceId, float nearZ, float farZ);
+
+        // fov は度数
+        [DllImport(_engineDll)]
+        public static extern void SetCameraFoV(int surfaceId, float fov);
+
         internal static class EntityAPI
         {
             // エンティティのコンポーネントの ID(Primal Day 084 で EntityAPI の中に移った)。なければ ID.INVALID_ID

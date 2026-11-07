@@ -16,6 +16,7 @@
 // 2026/11/07 ShutdownEngine のコメントをエディタの閉じる順序に合わせた (#209)
 // 2026/11/07 実際に描いた回数を返す GetDrawnFrameCount を追加 (#209)
 // 2026/11/08 消すジオメトリの ID をビューポートから取り除く remove_geometry_from_viewports を追加 (#214)
+// 2026/11/08 エディタのカメラの UpdateEditorCamera / SetCameraRange / SetCameraFoV とマウスの追跡を追加 (Primal Day 085, #225)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Common.h"
@@ -52,10 +53,26 @@ namespace
 	using _get_script_names = LPSAFEARRAY(*)(void);
 	_get_script_names get_script_names{ nullptr };
 
+	// エディタが最後に設定したビューポートのカメラの値(Primal Day 085, #225)
+	// NOTE: Primal にはない。DXForgeEX はカメラを大きさが 0 でないときだけ作る(create_viewport_graphics)ので、
+	//       エディタが値を設定したときにカメラがまだないことがある。値を覚えておき、カメラを作ったときに反映する。
+	struct editor_camera_settings
+	{
+		math::v3 position{};
+		math::v4 rotation{};	// クォータニオン
+		f32 near_z{ 0.f };
+		f32 far_z{ 0.f };
+		f32 field_of_view{ 0.f };	// エンジンの単位(度数 / 180)
+		bool has_transform{ false };
+		bool has_range{ false };
+		bool has_field_of_view{ false };
+	};
+
 	// エディタのビューポート。カメラと、描くジオメトリを持つ
 	struct viewport_surface : public graphics::render_surface
 	{
 		graphics::camera camera{};
+		editor_camera_settings camera_settings{};
 		utl::vector<id::id_type> geometry_ids{};
 		u64 drawn_frame_count{ 0 };	// RenderFrame が実際に描いた回数(GetDrawnFrameCount)
 	};
@@ -112,6 +129,68 @@ namespace
 	{
 		const game_entity::entity ntt{ create_one_game_entity({ 0.f, 1.f, 10.f }, { 0.f, -math::pi, 0.f }) };
 		return graphics::create_camera(graphics::perspective_camera_init_info{ ntt.get_id() });
+	}
+
+	// エディタが設定したカメラの値のうち、設定したものをカメラに反映する。カメラがなければ何もしない(#225)
+	void apply_camera_settings(const viewport_surface& surface)
+	{
+		const graphics::camera& camera{ surface.camera };
+		if (!camera.is_valid()) return;
+		const editor_camera_settings& settings{ surface.camera_settings };
+
+		if (settings.has_transform)
+		{
+			const id::id_type entity_id{ camera.entity_id() };
+			assert(id::is_valid(entity_id));
+			transform::component_cache cache{};
+			cache.position = settings.position;
+			cache.rotation = settings.rotation;
+			cache.flags = transform::component_flags::position | transform::component_flags::rotation;
+			cache.id = transform::transform_id{ entity_id };
+			transform::update(&cache, 1);
+		}
+		if (settings.has_range) camera.range(settings.near_z, settings.far_z);
+		if (settings.has_field_of_view) camera.field_of_view(settings.field_of_view);
+	}
+
+	// エディタのカメラの API が値を設定してよいビューポートか(#225)
+	// NOTE: Primal は surface_id を assert で確かめるだけ。DXForgeEX では、render thread の EditorCamera.ChangePosition / Seek が
+	//       RemoveRenderSurface と前後しうるので、範囲外と、消したあと(ウィンドウがない)のビューポートでは何もしない。
+	bool is_editor_camera_target(u32 surface_id)
+	{
+		return surface_id < surfaces.size() && surfaces[surface_id].window.is_valid();
+	}
+
+	// マウスがウィンドウの外に出たことを知らせてもらう(Primal Day 085)。エディタの RenderSurfaceControl が
+	// WM_MOUSEHOVER / WM_MOUSELEAVE で、マウスがビューポートの上にあるかを判断する。
+	bool tracking{ false };
+	void track_mouse(HWND hwnd)
+	{
+		TRACKMOUSEEVENT tme{};
+		tme.cbSize = sizeof(TRACKMOUSEEVENT);
+		tme.dwFlags = TME_HOVER | TME_LEAVE;
+		tme.dwHoverTime = 10;
+		tme.hwndTrack = hwnd;
+
+		TrackMouseEvent(&tme);
+	}
+
+	LRESULT win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+	{
+		switch (msg)
+		{
+		case WM_MOUSEMOVE:
+			if (!tracking)
+			{
+				track_mouse(hwnd);
+				tracking = true;
+			}
+			break;
+		case WM_MOUSELEAVE:
+			tracking = false;
+			break;
+		}
+		return DefWindowProc(hwnd, msg, wparam, lparam);
 	}
 
 	void remove_camera(graphics::camera& camera)
@@ -177,6 +256,7 @@ namespace
 		surface.surface = graphics::create_surface(surface.window);
 		surface.camera = create_camera();
 		surface.camera.aspect_ratio((f32)width / height);
+		apply_camera_settings(surface);	// カメラを作る前にエディタが設定した値(#225)
 	}
 
 	void remove_viewport_graphics(viewport_surface& surface)
@@ -188,6 +268,14 @@ namespace
 } // 匿名名前空間
 
 extern utl::ticket_mutex mutex;	// EntityAPI.cpp
+math::v4 to_quat(math::v3 angles, bool is_degrees);	// EntityAPI.cpp
+
+// ビューポートのカメラ(テスト専用。EngineUnitTests が extern で宣言する。DLL からはエクスポートしない、#225)
+// 範囲外の surface_id やカメラがないときは無効なカメラを返す。mutex を持たないので、描画と同時には呼ばない。
+graphics::camera get_viewport_camera(u32 surface_id)
+{
+	return surface_id < surfaces.size() ? surfaces[surface_id].camera : graphics::camera{};
+}
 
 // 消す前のジオメトリのコンポーネントの ID を、全ビューポートの描くジオメトリから取り除く(#214)。
 // EntityAPI.cpp の RemoveGameEntity と UpdateComponent が、mutex を持ったまま、エンジンから消す前に呼ぶ。
@@ -317,7 +405,7 @@ EDITOR_INTERFACE u32 CreateRenderSurface(HWND host, s32 width, s32 height)
 {
 	std::lock_guard lock{ mutex };
 	assert(host);
-	platform::window_init_info info{ nullptr,host,nullptr,0,0,(u32)width,(u32)height };
+	platform::window_init_info info{ &win_proc,host,nullptr,0,0,(u32)width,(u32)height };
 	viewport_surface surface{};
 	surface.window = platform::create_window(&info);
 	assert(surface.window.is_valid());
@@ -593,4 +681,45 @@ EDITOR_INTERFACE u64 GetDrawnFrameCount(u32 surface_id)
 {
 	std::lock_guard lock{ mutex };
 	return surface_id < surfaces.size() ? surfaces[surface_id].drawn_frame_count : 0;
+}
+
+// エディタのカメラ(EditorCamera)の位置と回転を、ビューポートのカメラに設定する(Primal Day 085)
+// rot はラジアンのピッチ、ヨー、ロール(エディタのカメラの内部の値。エンティティの Transform の回転の単位とは別)。
+// NOTE: Primal はカメラがあることを assert で確かめる。DXForgeEX は大きさが 0 の間カメラを作らないので、値を覚えておき、
+//       カメラを作ったときに反映する(apply_camera_settings)。範囲外と消したあとのビューポートでは何もしない。
+EDITOR_INTERFACE void UpdateEditorCamera(u32 surface_id, f32 pos_x, f32 pos_y, f32 pos_z, f32 rot_x, f32 rot_y, f32 rot_z)
+{
+	std::lock_guard lock{ mutex };
+	if (!is_editor_camera_target(surface_id)) return;
+	viewport_surface& surface{ surfaces[surface_id] };
+	surface.camera_settings.position = { pos_x, pos_y, pos_z };
+	surface.camera_settings.rotation = to_quat({ rot_x, rot_y, rot_z }, false);
+	surface.camera_settings.has_transform = true;
+	apply_camera_settings(surface);
+}
+
+// ビューポートのカメラの近クリップ面と遠クリップ面を設定する(Primal Day 085)。カメラがなければ、作ったときに反映する。
+EDITOR_INTERFACE void SetCameraRange(u32 surface_id, f32 near_z, f32 far_z)
+{
+	std::lock_guard lock{ mutex };
+	assert(near_z > 0 && far_z >= near_z);
+	if (!is_editor_camera_target(surface_id)) return;
+	viewport_surface& surface{ surfaces[surface_id] };
+	surface.camera_settings.near_z = near_z;
+	surface.camera_settings.far_z = far_z;
+	surface.camera_settings.has_range = true;
+	apply_camera_settings(surface);
+}
+
+// ビューポートのカメラの視野角(度数)を設定する(Primal Day 085)。カメラがなければ、作ったときに反映する。
+// NOTE: エンジンのカメラは field_of_view * pi を視野角にするので、180 で割る。
+EDITOR_INTERFACE void SetCameraFoV(u32 surface_id, f32 fov)
+{
+	std::lock_guard lock{ mutex };
+	assert(fov > 0);
+	if (!is_editor_camera_target(surface_id)) return;
+	viewport_surface& surface{ surfaces[surface_id] };
+	surface.camera_settings.field_of_view = fov * (1.f / 180.f);
+	surface.camera_settings.has_field_of_view = true;
+	apply_camera_settings(surface);
 }

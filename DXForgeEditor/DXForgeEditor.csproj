@@ -26,6 +26,7 @@
 
 	<ItemGroup>
 		<Resource Include="Resources\ContentBrowser\OpenImportCfg.png" />
+		<Resource Include="Resources\RenderSurface\CameraSettings.png" />
 	</ItemGroup>
 
 	<ItemGroup>

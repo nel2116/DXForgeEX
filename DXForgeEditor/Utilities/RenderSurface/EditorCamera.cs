@@ -1,17 +1,21 @@
-﻿using System;
+﻿using DXForgeEditor.DllWrappers;
+using System;
 using System.Numerics;
-using System.Windows.Input;
 
 namespace DXForgeEditor.Utilities
 {
-    // NOTE: Day 083 ではエンジンにつながっていない(Primal の "TODO: call engineAPI")。入力で値が変わるだけで、画面は変わらない。
+    // NOTE: Primal Day 085 から、値が変わるとエンジンのビューポートのカメラに設定する(EngineAPI.UpdateEditorCamera など)。
     //       角度はこのクラスの中でだけラジアンを使い、エンジンの回転の単位(#208)とは関係しない。
+    //       ChangePosition と Update は render thread から、そのほかは UI スレッドから呼ばれる。Primal と同じくロックはない。
+    //       競合すると 1 フレームだけ新旧の混ざった値を使ったり、片方の変更が上書きされたりするが、値はどれも有限で、次の Seek で収束する。
+    //       SetSurfaceId の前(_surfaceId が無効)はエンジンを呼ばない(Primal は無効な ID で呼んで DLL の assert に当たる)。
     class EditorCamera
     {
         private static readonly float _minNearZ = 0.001f; // 1 mm
         private static readonly float _minDiffNearZFarZ = 0.001f;
         private static readonly float _minFov = 0.01f;
-        private static readonly float _maxFov = 180f;
+        // NOTE: Primal は 180 度まで許すが、180 度ではエンジンの射影(XMMatrixPerspectiveFovRH に pi)の縦横の倍率がほぼ 0 になり、描画が潰れる
+        private static readonly float _maxFov = 179f;
 
         private int _surfaceId = ID.INVALID_ID;
         private bool _updatePosition;
@@ -50,7 +54,7 @@ namespace DXForgeEditor.Utilities
                 if (!_fov.IsTheSameAs(value))
                 {
                     _fov = value;
-                    // TODO: call engineAPI
+                    if (ID.IsValid(_surfaceId)) EngineAPI.SetCameraFoV(_surfaceId, _fov);
                 }
             }
         }
@@ -65,7 +69,7 @@ namespace DXForgeEditor.Utilities
                 if (!_nearZ.IsTheSameAs(value))
                 {
                     _nearZ = value;
-                    // TODO: call engineAPI
+                    if (ID.IsValid(_surfaceId)) EngineAPI.SetCameraRange(_surfaceId, _nearZ, FarZ);
                 }
             }
         }
@@ -80,7 +84,7 @@ namespace DXForgeEditor.Utilities
                 if (!_farZ.IsTheSameAs(value))
                 {
                     _farZ = value;
-                    // TODO: call engineAPI
+                    if (ID.IsValid(_surfaceId)) EngineAPI.SetCameraRange(_surfaceId, NearZ, _farZ);
                 }
             }
         }
@@ -114,7 +118,7 @@ namespace DXForgeEditor.Utilities
                 _position = _desiredPosition;
                 _rotation = _desiredRotation;
 
-                // TODO: call engineAPI
+                if (ID.IsValid(_surfaceId)) EngineAPI.UpdateEditorCamera(_surfaceId, _position, _rotation);
             }
             else
             {
@@ -140,7 +144,8 @@ namespace DXForgeEditor.Utilities
             {
                 _acceleration += 0.02f * dtScale;
             }
-            var step = Speed * dtScale * (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? 0.1f : 0.01f);
+            // NOTE: render thread から呼ばれる。Keyboard.Modifiers は UI スレッドでしか使えないので、キーの状態を直接読む(Primal Day 085)
+            var step = Speed * dtScale * (KeyboardHelper.GetAsyncKeyState(KeyboardHelper.VKey.Shift) < 0 ? 0.1f : 0.01f);
             var v = Vector3.Transform(direction * step, rotationMatrix) * _acceleration;
 
             _desiredPosition += v;
@@ -193,13 +198,20 @@ namespace DXForgeEditor.Utilities
                 _rotation = _updateRotation ? _rotation + o * dtScale : _desiredRotation;
             }
 
-            // TODO: call EngineAPI
+            EngineAPI.UpdateEditorCamera(_surfaceId, _position, _rotation);
         }
 
         public void SetSurfaceId(int surfaceId)
         {
             _surfaceId = surfaceId;
-            // TODO: call EngineAPI
+            if (ID.IsValid(_surfaceId))
+            {
+                EngineAPI.UpdateEditorCamera(_surfaceId, _position, _rotation);
+                // NOTE: Primal は位置と回転だけを送る。プロジェクトを開き直すと同じ EditorCamera が新しいビューポートにつながるので、
+                //       画面に出している FoV と範囲もここで送り、エンジンのカメラ(既定は 45 度、0.01〜1000)と合わせる。
+                EngineAPI.SetCameraFoV(_surfaceId, _fov);
+                EngineAPI.SetCameraRange(_surfaceId, _nearZ, _farZ);
+            }
         }
 
         public void Update(float dt)
