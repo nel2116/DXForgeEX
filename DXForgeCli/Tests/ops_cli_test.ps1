@@ -19,6 +19,7 @@
      10. 偽の importer(fake_importer.cmd)で import-asset: 成功、folder、--dry-run、失敗で Content と .dxproj が変わらないこと、終了コードの対応、衝突、44。
      11. コミットの失敗: Content への移動の途中の失敗、保存の失敗、戻す処理の失敗(LeftoverPaths)、タイムアウト。
      12. 実物の DXForgeImport(--importer なし): box.fbx と埋め込みテクスチャの FBX を取り込み → set-geometry → --export-game-bin。
+         LOD グループが 2 つの FBX で、複数の .asset が全部 assets に出て Content に移ること。
          .asset の生のバイトに一時フォルダのパスが残らないこと。ContentTools.dll(FBX SDK)がなければ SKIP。
 
 .PARAMETER Configuration
@@ -39,6 +40,10 @@
 .PARAMETER LodFbxFile
     節 12 で取り込む、LOD のある FBX。指定しなければ、この確認は行わない。
 
+.PARAMETER MultiLodFbxFile
+    節 12 で取り込む、LOD グループが 2 つ以上ある FBX。assets に全部が出て、Content に移ることを確かめる。
+    指定しなければ FbxFile から DXForgeImport\Tests\make_multilod_fbx.py で作る。
+
 .EXAMPLE
     pwsh -STA -NoProfile -File DXForgeCli/Tests/ops_cli_test.ps1 -RequireRunner
 
@@ -53,7 +58,8 @@ param(
 	[switch]$RequireRunner,
 	[switch]$RequireRealImporter,
 	[string]$FbxFile = "C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\samples\ConvertScene\box.fbx",
-	[string]$LodFbxFile
+	[string]$LodFbxFile,
+	[string]$MultiLodFbxFile
 )
 
 $ErrorActionPreference = "Stop"
@@ -1296,6 +1302,28 @@ try
 			Test-NoStagingPath "real importer: an FBX with LODs" $content
 		}
 		else { Write-Host "  (-LodFbxFile is not given: an FBX with LODs is not checked)" }
+
+		# LOD グループが 2 つ以上ある FBX: .asset が複数でき、全部が assets に出て Content に移る
+		if (-not $MultiLodFbxFile)
+		{
+			$MultiLodFbxFile = Join-Path $work "multilod.fbx"
+			python (Join-Path $RepoRoot "DXForgeImport\Tests\make_multilod_fbx.py") $FbxFile $MultiLodFbxFile
+			Check ($LASTEXITCODE -eq 0) "real importer: make_multilod_fbx.py makes an FBX from $FbxFile"
+		}
+		$project = New-EmptyProject "RealMultiLod"
+		$content = Get-ContentOf $project
+		$r = Invoke-Ops $project @((Import-Json $MultiLodFbxFile "Models"))
+		Expect-Saved "real importer: an FBX with several LOD groups" $r
+		$assets = @(@($r.Json.results)[0].assets)
+		Write-Host "       assets: $($assets | ConvertTo-Json -Compress)"
+		$files = @(Get-ChildItem -LiteralPath (Join-Path $content "Models") -Filter "*.asset" -File -ErrorAction SilentlyContinue)
+		Check ($assets.Count -ge 2 -and $files.Count -eq $assets.Count) "real importer: several LOD groups -> several assets, as many files in Content" $r.Stdout
+		foreach ($asset in $assets)
+		{
+			Check (Test-Path -LiteralPath (Join-Path $content ($asset.path -replace '^path:', ''))) "real importer: several LOD groups -> $($asset.path) is in Content"
+		}
+		Check (-not (Test-StagingLeft $project)) "real importer: several LOD groups -> no staging folder"
+		Test-NoStagingPath "real importer: several LOD groups" $content
 	}
 
 	Check ($assertRecorder.Failures.Count -eq 0) "no Debug.Assert fired in the editor code" ($assertRecorder.Failures -join "; ")

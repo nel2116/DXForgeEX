@@ -328,7 +328,13 @@ namespace DXForgeImportTest
 		Check (@($r.Json.files).Count -eq 0 -and (Get-Content $readOnlyAsset) -eq "read only") "保存の失敗: files は空で、既存のファイルはそのまま"
 		(Get-Item $readOnlyAsset).IsReadOnly = $false
 
-		# 一部だけ保存できた場合(LODグループが2つ以上あるFBXが必要)
+		# 一部だけ保存できた場合(LODグループが2つ以上あるFBXが必要)。指定がなければ box.fbx から作る
+		if (-not $MultiLodFbxFile -and (Test-Path -LiteralPath $FbxFile))
+		{
+			$MultiLodFbxFile = Join-Path $WorkDir "multilod.fbx"
+			python (Join-Path $PSScriptRoot "make_multilod_fbx.py") $FbxFile $MultiLodFbxFile
+			Check ($LASTEXITCODE -eq 0) "一部の保存: 準備として、$FbxFile から LOD グループが2つのFBXを作れる"
+		}
 		if ($MultiLodFbxFile)
 		{
 			$partialDir = Join-Path $WorkDir "partial"
@@ -346,7 +352,7 @@ namespace DXForgeImportTest
 		}
 		else
 		{
-			Write-Host "  (-MultiLodFbxFile を指定していないので、一部だけ保存できた場合のテストは行いません)"
+			Write-Host "  SKIP -MultiLodFbxFile の指定も $FbxFile もないので、一部だけ保存できた場合のテストは行いません"
 		}
 
 		# FBXの埋め込みテクスチャ: ASCII の box.fbx に Checker64.png を Video オブジェクトとして埋め込んだFBXを作る
