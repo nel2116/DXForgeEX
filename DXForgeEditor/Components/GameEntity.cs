@@ -115,11 +115,20 @@ namespace DXForgeEditor.Components
             Debug.Assert(component != null);
             if (!Components.Any(x => x.GetType() == component.GetType()))
             {
-                // 非アクティブなエンティティにコンポーネントを足しても、アクティブにしない(Primal Day 079)
-                var wasActive = IsActive;
-                IsActive = false;
+                // NOTE: Primal Day 084 は常にエンジンのコンポーネントを更新する。エンジンにないエンティティ(非アクティブ、
+                //       ヘッドレスの dxforge の操作)では足すだけにする(アクティブにするときに IsActive が読み込む)
+                if (!IsActive)
+                {
+                    _components.Add(component);
+                    return true;
+                }
+
+                // エンティティを作り直さず、エンジンのコンポーネントだけを更新する(Primal Day 084)
+                component.Load();
                 _components.Add(component);
-                IsActive = wasActive;
+                EngineAPI.EntityAPI.UpdateComponent(this, component.ToEnumType());
+                // NOTE: Primal はここで UpdateScene を呼ばないので、次に呼ばれるまで足したジオメトリが描かれない
+                if (component is Geometry) ParentScene.Project.UpdateScene();
                 return true;
             }
             Logger.Log(MessageType.Warning, $"Entity {Name} はすでに {component.GetType().Name} Componentを持っています。");
@@ -129,19 +138,27 @@ namespace DXForgeEditor.Components
         public void RemoveComponent(Component component)
         {
             Debug.Assert(component != null);
-            if (component is Transform) return; // TransformComponentは削除できない
+            if (component is Transform || !_components.Contains(component)) return; // TransformComponentは削除できない
 
-            if (_components.Contains(component))
+            // NOTE: エンジンにないエンティティ(非アクティブ)では外すだけにする(Primal Day 084 は常にエンジンを更新する)
+            if (!IsActive)
             {
-                IsActive = false;
                 _components.Remove(component);
-                IsActive = true;
+                return;
             }
+
+            // エンティティを作り直さず、エンジンのコンポーネントだけを更新する(Primal Day 084)
+            // NOTE: ジオメトリは、エンジンから消す前にビューポートから外す(#214。Primal はしないので、消した ID が描かれる)
+            var enableList = component is Geometry ? ParentScene.DisableAndUpdate([this]) : null;
+            _components.Remove(component);
+            EngineAPI.EntityAPI.UpdateComponent(this, component.ToEnumType());
+            component.Unload();
+            if (enableList != null) ParentScene.EnableAndUpdate(enableList);
         }
 
         /// <summary>
-        /// エンジンに触らずにコンポーネントを外す(dxforge の操作, #183)。RemoveComponent は外したあとで IsActive = true にするので、
-        /// エンジンのないヘッドレスでは使えない。
+        /// エンジンに触らずにコンポーネントを外す(dxforge の操作, #183)。非アクティブなエンティティでは RemoveComponent と同じだが、
+        /// エンジンに触らないことを呼び出し側で明示するために残す。
         /// </summary>
         internal void RemoveComponentWithoutEngine(Component component)
         {

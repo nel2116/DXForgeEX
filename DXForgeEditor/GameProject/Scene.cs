@@ -57,35 +57,124 @@ namespace DXForgeEditor.GameProject
 
         // The commands are initialized synchronously by OnDeserialized.
         public ICommand RenameCommand { get; private set; } = null!;
-        public ICommand AddGameEntityCommand { get; private set; } = null!;
-        public ICommand RemoveGameEntityCommand { get; private set; } = null!;
 
-        private void AddGameEntity(GameEntity entity, int index = -1)
+        private void AddGameEntities_Internal(List<(GameEntity Entity, bool IsEnabled, int Index)> entities)
         {
-            Debug.Assert(!_gameEntities.Contains(entity));
-            entity.IsActive = IsActive;
-            if (index == -1)
+            if (entities.Count == 0) return;
+
+            // NOTE: Primal Day 084 は渡した順に入れる。複数を消したあとの undo では、消す前の位置の昇順に入れないと位置がずれる
+            //       (足すときの位置は -1 なので順番は変わらない)
+            foreach (var (entity, isEnabled, index) in entities.OrderBy(x => x.Index))
             {
-                _gameEntities.Add(entity);
+                Debug.Assert(!_gameEntities.Contains(entity));
+
+                entity.IsEnabled = isEnabled;
+                entity.IsActive = IsActive;
+
+                if (index == -1 || index >= _gameEntities.Count)
+                {
+                    _gameEntities.Add(entity);
+                }
+                else
+                {
+                    _gameEntities.Insert(index, entity);
+                }
             }
-            else
-            {
-                _gameEntities.Insert(index, entity);
-            }
+
+            Project.UpdateScene();
         }
 
-        private void RemoveGameEntity(GameEntity entity)
+        /// <summary>エンティティを足す(Primal Day 084)。undo の履歴は 1 件。</summary>
+        public void AddGameEntities(List<GameEntity> entities, int index = -1)
         {
-            Debug.Assert(_gameEntities.Contains(entity));
-            entity.IsActive = false;
-            _gameEntities.Remove(entity);
+            if (entities.Count == 0) return;
+
+            var enableList = entities.Select(entity => (entity, entity.IsEnabled, index)).ToList();
+            AddGameEntities_Internal(enableList);
+
+            Project.UndoRedo.Add(new UndoRedoAction(
+                () => RemoveGameEntities_Internal(entities),
+                () => AddGameEntities_Internal(enableList),
+                entities.Count == 1 ?
+                    $"Add {entities[0].Name} to {Name}" :
+                    $"Add multiple entities to {Name}"));
+        }
+
+        private List<(GameEntity Entity, bool IsEnabled, int Index)> RemoveGameEntities_Internal(List<GameEntity> entities)
+        {
+            if (entities.Count == 0) return [];
+
+            // 描いているジオメトリを先にビューポートから外してから、エンジンから消す(#214)
+            var enableList = DisableAndUpdate(entities);
+            var indices = enableList.Select(x => (x.Entity, x.IsEnabled, _gameEntities.IndexOf(x.Entity))).ToList();
+
+            foreach (var entity in entities)
+            {
+                Debug.Assert(_gameEntities.Contains(entity));
+                entity.IsActive = false;
+                _gameEntities.Remove(entity);
+            }
+
+            return indices;
+        }
+
+        /// <summary>エンティティを消す(Primal Day 084)。undo の履歴は 1 件。</summary>
+        public void RemoveGameEntities(List<GameEntity> entities)
+        {
+            if (entities.Count == 0) return;
+
+            var enableList = RemoveGameEntities_Internal(entities);
+
+            Project.UndoRedo.Add(new UndoRedoAction(
+                () => AddGameEntities_Internal(enableList),
+                () => RemoveGameEntities_Internal(entities),
+                entities.Count == 1 ?
+                    $"Remove {entities[0].Name} from {Name}" :
+                    $"Remove multiple entities from {Name}"));
+        }
+
+        /// <summary>
+        /// ビューポートに描く、有効でエンジンにあるエンティティのジオメトリのコンポーネントの ID(Primal Day 084)。
+        /// NOTE: Primal はすべて有効な ID だと assert する。DXForgeEX はジオメトリを読み込めなかったエンティティ(アセットがないなど)を
+        ///       Geometry なしでエンジンに作る(EngineAPI.EntityAPI.CreateGameEntity)ので、その ID は飛ばす
+        /// </summary>
+        public List<int> GetGeometryComponentIds()
+        {
+            return GameEntities
+                .Where(entity => entity.IsEnabled && entity.IsActive)
+                .Select(entity => entity.GetComponent<Components.Geometry>())
+                .Where(c => c != null)
+                .Select(c => c!.GetComponentId())
+                .Where(ID.IsValid)
+                .ToList();
+        }
+
+        /// <summary>
+        /// エンティティを無効にして、ビューポートから外す(Primal Day 084)。エンジンから消すか作り直す前に呼ぶ(#214)。
+        /// 元の IsEnabled を返す(EnableAndUpdate で戻す)。
+        /// </summary>
+        public List<(GameEntity Entity, bool IsEnabled)> DisableAndUpdate(List<GameEntity> entities, bool update = true)
+        {
+            var enableList = entities.Select(x => (x, x.IsEnabled)).ToList();
+            entities.ForEach(x => x.IsEnabled = false);
+
+            if (update) Project.UpdateScene();
+
+            return enableList;
+        }
+
+        /// <summary>DisableAndUpdate で無効にしたエンティティの IsEnabled を戻して、ビューポートに描く(Primal Day 084)。</summary>
+        public void EnableAndUpdate(List<(GameEntity Entity, bool IsEnabled)> enableList, bool update = true)
+        {
+            enableList.ForEach(x => x.Entity.IsEnabled = x.IsEnabled);
+            if (update) Project.UpdateScene();
         }
 
         /// <summary>
         /// ドロップしたファイルのうち、このプロジェクトのジオメトリのアセットごとに、その名前のエンティティを Geometry 付きで作る
-        /// (Primal Day 081)。エンティティごとに undo の履歴が 1 件増える。作ったエンティティを返す。
+        /// (Primal Day 081)。undo の履歴は 1 件(Primal Day 084)。作ったエンティティを返す。
         /// NOTE: Primal は Task.Run で IsActive = true と AddComponent をするが、DXForgeEX はアセットとエンジンの呼び出しに
-        ///       ロックがない(#171)ので、UI スレッドで作る。エンジンに作るのは AddGameEntity の IsActive = IsActive に任せる。
+        ///       ロックがない(#171)ので、UI スレッドで作る。エンジンに作るのは AddGameEntities の IsActive = IsActive に任せる。
         /// </summary>
         internal List<GameEntity> AddGeometryEntities(IEnumerable<string> files)
         {
@@ -111,9 +200,9 @@ namespace DXForgeEditor.GameProject
 
                 var entity = new GameEntity(this) { Name = assetInfo.FullName.Trim() };
                 entity.AddComponent(new Components.Geometry(entity, assetInfo));
-                AddGameEntityCommand.Execute(entity);
                 entities.Add(entity);
             }
+            AddGameEntities(entities);
             return entities;
         }
 
@@ -137,27 +226,6 @@ namespace DXForgeEditor.GameProject
                 Project.UndoRedo.Add(new UndoRedoAction(nameof(Name), this,
                     oldName, x, $"Rename scene '{oldName}' to '{x}'"));
             }, x => x != _name);
-
-            AddGameEntityCommand = new RelayCommand<GameEntity>(x =>
-            {
-                AddGameEntity(x);
-                var entityIndex = _gameEntities.Count - 1;
-                Project.UndoRedo.Add(new UndoRedoAction(
-                    () => RemoveGameEntity(x),
-                    () => AddGameEntity(x, entityIndex),
-                    $"Add {x.Name} to {Name}"));
-            });
-
-            RemoveGameEntityCommand = new RelayCommand<GameEntity>(x =>
-            {
-                var entityIndex = _gameEntities.IndexOf(x);
-                RemoveGameEntity(x);
-                Project.UndoRedo.Add(new UndoRedoAction(
-                    () => AddGameEntity(x, entityIndex),
-                    () => RemoveGameEntity(x),
-                    $"Remove {x.Name}"));
-            });
-
         }
 
 

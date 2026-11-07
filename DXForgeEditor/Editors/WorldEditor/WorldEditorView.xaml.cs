@@ -6,6 +6,7 @@ using DXForgeEditor.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -30,13 +31,28 @@ namespace DXForgeEditor.Editors
         public WorldEditorView()
         {
             InitializeComponent();
-            Loaded += OnWorldEditorViewLoaded;
+            Project.SceneUpdated += OnSceneUpdated;
+            DataContextChanged += OnWorldEditorDataContextChanged;
         }
 
-        private void OnWorldEditorViewLoaded(object sender, RoutedEventArgs e)
+        private void OnWorldEditorDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
-            Loaded -= OnWorldEditorViewLoaded;
             Focus();
+        }
+
+        /// <summary>
+        /// アクティブなシーンのジオメトリを、ビューポートに描かせる(Primal Day 084)。
+        /// NOTE: Primal は 4 つのビューポート(sv1〜sv4)に渡す。DXForgeEX はビューポートが 1 つ(PR #212)
+        /// </summary>
+        private void OnSceneUpdated(object? sender, EventArgs e)
+        {
+            Debug.Assert((sender as Scene)?.Project == Project.Current);
+
+            if (sender is Scene scene)
+            {
+                var ids = scene.IsActive ? scene.GetGeometryComponentIds() : [];
+                sv1.RenderSurfaceControl.SetComponentIds(ids);
+            }
         }
 
         private void OnNewScript_Button_Click(object sender, RoutedEventArgs e)
@@ -46,8 +62,7 @@ namespace DXForgeEditor.Editors
 
         private void OnCreatePrimitiveMesh_Button_Click(object sender, RoutedEventArgs e)
         {
-            var dlg = new PrimitiveMeshDialog();
-            dlg.ShowDialog();
+            new PrimitiveMeshDialog().ShowDialog();
         }
 
         /// <summary>
@@ -67,20 +82,20 @@ namespace DXForgeEditor.Editors
 
         private void UnloadAndCloseAllWindows()
         {
-            Project.Current?.Unload();
-
             var mainWindow = Application.Current.MainWindow;
 
             foreach (Window win in Application.Current.Windows)
             {
                 if (win != mainWindow)
                 {
-                    win.DataContext = null;
                     win.Close();
                 }
             }
 
+            // NOTE: 順番が大事(Primal Day 084)。DataContext を外してビューポートの host を Dispose し(render thread が止まる)、
+            //       そのあとでプロジェクトを閉じて、エンジンからエンティティとリソースを消す(#214)
             mainWindow.DataContext = null;
+            Project.Current?.Unload();
             mainWindow.Close();
         }
 

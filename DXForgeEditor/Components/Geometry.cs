@@ -1,4 +1,5 @@
 ﻿using DXForgeEditor.Content;
+using DXForgeEditor.DllWrappers;
 using DXForgeEditor.Utilities;
 using System;
 using System.Collections.Generic;
@@ -176,6 +177,8 @@ namespace DXForgeEditor.Components
     class Geometry : Component
     {
         private UploadedAsset? _geometry;
+        // エンジンのジオメトリのコンポーネントの ID(GetComponentId がエンジンに聞いて覚える。Primal Day 084)
+        private int _componentId = ID.INVALID_ID;
 
         [DataMember(Name = "Geometry")]
         public Guid GeometryGuid { get; private set; }
@@ -321,6 +324,7 @@ namespace DXForgeEditor.Components
 
         public override void Unload()
         {
+            _componentId = ID.INVALID_ID;
             if (_geometry == null) return;
 
             var materials = MaterialsList;
@@ -345,16 +349,78 @@ namespace DXForgeEditor.Components
         /// </summary>
         public void SetGeometry(Guid guid, List<AppliedMaterialData>? materials = null)
         {
-            if (GeometryGuid != guid)
+            if (GeometryGuid == guid) return;
+
+            if (Owner.IsActive)
             {
-                // エンティティを消して(ジオメトリをエンジンから外して)から、新しいジオメトリで作り直す
-                var wasActive = Owner.IsActive;
-                Owner.IsActive = false;
+                // エンティティを作り直さず、エンジンのジオメトリのコンポーネントだけを更新する(Primal Day 084)
+                // NOTE: 呼び出し側が先に Scene.DisableAndUpdate でビューポートから外す(#214)
+                UpdateComponent(materials, guid);
+            }
+            else
+            {
+                // エンジンにないエンティティ(非アクティブ、ヘッドレスの dxforge の操作)は、GUID とマテリアルだけを変える
                 GeometryGuid = guid;
                 _materials = materials != null ? [.. materials] : [];
-                Owner.IsActive = wasActive;
-                OnPropertyChanged(nameof(GeometryGuid));
             }
+            OnPropertyChanged(nameof(GeometryGuid));
+        }
+
+        /// <summary>
+        /// 新しいジオメトリとマテリアルを読み込んで、エンジンのジオメトリのコンポーネントを更新する(Primal Day 084)。
+        /// 読み込めたら古いものを外して true。読み込めなければ古いものに戻して false(Load がログを出す)。
+        /// NOTE: Primal は読み込めないとき GeometryGuid を古いアセットの GUID に戻す。DXForgeEX は読み込めていない
+        ///       (アセットがない)ジオメトリもあるので、古い GeometryGuid に戻す
+        /// </summary>
+        private bool UpdateComponent(List<AppliedMaterialData>? materials, Guid guid)
+        {
+            Debug.Assert(Owner.IsActive);
+            var oldGeometryWithMaterials = GeometryWithMaterials;
+            var oldMaterials = MaterialsList;
+            var oldMaterialsData = _materials;
+            var oldGeometry = _geometry;
+            var oldGeometryGuid = GeometryGuid;
+            var oldComponentId = _componentId;
+
+            GeometryWithMaterials = null;
+            GeometryGuid = guid;
+            _materials = materials != null ? [.. materials] : [];
+            _geometry = null;
+            _componentId = ID.INVALID_ID;
+            Load();
+
+            if (ID.IsValid(_geometry?.ContentId ?? ID.INVALID_ID))
+            {
+                EngineAPI.EntityAPI.UpdateComponent(Owner, ComponentType.Geometry);
+
+                oldMaterials.ForEach(x => x.UnloadFromEngine());
+                if (oldGeometry != null) UploadedAsset.RemoveFromScene(oldGeometry);
+                return true;
+            }
+
+            GeometryWithMaterials = oldGeometryWithMaterials;
+            GeometryGuid = oldGeometryGuid;
+            _geometry = oldGeometry;
+            _materials = oldMaterialsData;
+            _componentId = oldComponentId;
+
+            return false;
+        }
+
+        /// <summary>
+        /// エンジンのジオメトリのコンポーネントの ID(Primal Day 084)。最初に呼んだときにエンジンに聞いて覚える。
+        /// エンジンにないとき(非アクティブ、ジオメトリを読み込めなかった)は ID.INVALID_ID。
+        /// NOTE: エンジンに聞くと ticket_mutex を待つ(最長で描画 1 フレーム)ので、エンティティを作るか変えたあとの 1 回だけにする
+        /// </summary>
+        public int GetComponentId()
+        {
+            if (!ID.IsValid(_componentId) && ID.IsValid(Owner.EntityId) && IsLoaded)
+            {
+                _componentId = EngineAPI.EntityAPI.GetComponentId(Owner.EntityId, ComponentType.Geometry);
+                Debug.Assert(ID.IsValid(_componentId));
+            }
+
+            return _componentId;
         }
 
         public override IMSComponent GetMultiselectionComponent(MSEntity msEntity) => new MSGeometry(msEntity);
@@ -377,6 +443,7 @@ namespace DXForgeEditor.Components
         {
             // DataContractSerializer はフィールドの初期化子を実行しないので、要素がないときは空にする
             _materials ??= [];
+            _componentId = ID.INVALID_ID;
         }
 
         public Geometry(GameEntity owner, AssetInfo geometry) : base(owner)
@@ -421,7 +488,13 @@ namespace DXForgeEditor.Components
 
         public void SetGeometry(Guid guid)
         {
+            // ビューポートから外してからジオメトリを変え、描き直す(Primal Day 084, #214)
+            // NOTE: Primal は MSEntity.CurrentSelection の SelectedEntities を使う。DXForgeEX は選んだコンポーネントの Owner を使う
+            var entities = SelectedComponents.Select(x => x.Owner).ToList();
+            var scene = entities[0].ParentScene;
+            var enableList = scene.DisableAndUpdate(entities);
             SelectedComponents.ForEach(x => x.SetGeometry(guid));
+            scene.EnableAndUpdate(enableList);
             Refresh();
         }
 

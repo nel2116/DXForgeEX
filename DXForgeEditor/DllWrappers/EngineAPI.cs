@@ -488,11 +488,12 @@ namespace DXForgeEditor.DllWrappers
         [DllImport(_engineDll)]
         public static extern ulong GetDrawnFrameCount(int surfaceId);
 
-        [DllImport(_engineDll)]
-        public static extern int GetComponentId(int entityId, ComponentType type);
-
         internal static class EntityAPI
         {
+            // エンティティのコンポーネントの ID(Primal Day 084 で EntityAPI の中に移った)。なければ ID.INVALID_ID
+            [DllImport(_engineDll)]
+            public static extern int GetComponentId(int entityId, ComponentType type);
+
             [DllImport(_engineDll)]
             private static extern int CreateGameEntity(GameEntityDescriptor desc);
 

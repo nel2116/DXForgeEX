@@ -1,4 +1,5 @@
 ﻿using DXForgeEditor.DllWrappers;
+using DXForgeEditor.GameProject;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -184,8 +185,9 @@ namespace DXForgeEditor.Utilities
                 // NOTE: 待っている間にプロジェクトを閉じると host は消えている。async void なので例外を投げない。
                 if (_host == host && host.HostReady)
                 {
-                    // NOTE: Primal はここで Project.Current.UpdateScene() を呼ぶが、Day 083 では中身が空なので Day 084 で足す。
                     _camera.SetSurfaceId(host.SurfaceId);
+                    // 準備ができる前には渡せなかった、描くジオメトリの ID を渡す(Primal Day 084)
+                    Project.Current?.UpdateScene();
                 }
             }
             else if (e.NewValue == null && _host != null)

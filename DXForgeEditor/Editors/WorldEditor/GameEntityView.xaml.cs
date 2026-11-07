@@ -66,6 +66,7 @@ namespace DXForgeEditor.Editors
             {
                 selection.ForEach(item => item.entity.IsEnabled = item.IsEnabled);
                 ((MSEntity)DataContext).Refresh();
+                Project.Current?.UpdateScene();
             });
         }
 
@@ -91,6 +92,8 @@ namespace DXForgeEditor.Editors
             var undoAction = GetIsEnabledAction();
             var vm = (MSEntity)DataContext;
             vm.IsEnabled = ((CheckBox)sender).IsChecked == true;
+            // NOTE: Primal Day 084 は IsEnabled を変えても UpdateScene を呼ばないので、ビューポートに反映されない
+            Project.Current?.UpdateScene();
             var redoAction = GetIsEnabledAction();
             Project.UndoRedo.Add(new UndoRedoAction(undoAction, redoAction,
                 vm.IsEnabled == true ? "ゲーム・エンティティを有効にする" : "ゲーム・エンティティを無効にする"));
