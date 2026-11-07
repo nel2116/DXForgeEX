@@ -26,6 +26,7 @@
 // 2026/11/08 描画中にエディタがエンティティを作って消す確認を追加 (Primal Day 084, #214)
 // 2026/11/08 描いたあとでメッシュをアップロードする確認を追加 (#224)
 // 2026/11/08 エディタのカメラの API(UpdateEditorCamera / SetCameraRange / SetCameraFoV)の確認を追加 (Primal Day 085, #225)
+// 2026/11/08 エディタのエンティティの記述子の回転をクォータニオンにした (#205)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -87,7 +88,7 @@ extern "C" dxforge::id::id_type GetComponentId(dxforge::id::id_type entity_id, d
 struct editor_entity_descriptor
 {
 	f32 position[3]{};
-	f32 rotation[3]{};
+	f32 rotation[4]{ 0.f, 0.f, 0.f, 1.f };	// クォータニオン(#205)
 	f32 scale[3]{ 1.f, 1.f, 1.f };
 	dxforge::script::detail::script_creator script_creator{ nullptr };
 	dxforge::id::id_type geometry_content_id{ dxforge::id::invalid_id };

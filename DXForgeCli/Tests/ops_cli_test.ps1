@@ -848,6 +848,17 @@ try
 	$transform = @(@($loaded.ActiveScene.GameEntities)[1].Components)[0]
 	Check ($null -ne $loaded -and $transform.RotationQuaternion.IsIdentity -and $assertRecorder.Failures.Count -eq $assertsBefore) "old Rotation member: Project.Load (the editor's path) does not throw or assert" "$($transform.RotationQuaternion)"
 
+	# 不正なクォータニオン(0、正規化すると溢れる大きさ)は、警告を出して回転なしにする
+	foreach ($bad in @(@{ Name = "zero"; Xml = "<b:W>0</b:W><b:X>0</b:X><b:Y>0</b:Y><b:Z>0</b:Z>" }, @{ Name = "overflow"; Xml = "<b:W>0</b:W><b:X>1E+20</b:X><b:Y>0</b:Y><b:Z>0</b:Z>" }))
+	{
+		$invalid = New-FixtureCopy
+		$xml = [regex]::Replace([System.IO.File]::ReadAllText($invalid), "(<a:RotationQuaternion [^>]*>).*?(</a:RotationQuaternion>)", "`${1}$($bad.Xml)`${2}")
+		[System.IO.File]::WriteAllText($invalid, $xml)
+		$r = Invoke-Op $invalid '{"op":"get-entity","target":"name:Moved"}'
+		$transform = Get-Component $r.Json.results[0].entity "transform"
+		Check ($r.Code -eq 0 -and (Near $transform.rotation_deg @(0, 0, 0)) -and (Near $transform.rotation_quat @(0, 0, 0, 1)) -and $r.Stderr -match "Moved.*クォータニオン") "invalid quaternion ($($bad.Name)): loads, warns, identity rotation" "$($r.Stdout) $($r.Stderr)"
+	}
+
 	# 手がかり(度数)がクォータニオンと違う回転なら、クォータニオンから作り直す。同じ回転なら入力どおりに残す
 	$hints = New-FixtureCopy
 	$xml = [System.IO.File]::ReadAllText($hints)

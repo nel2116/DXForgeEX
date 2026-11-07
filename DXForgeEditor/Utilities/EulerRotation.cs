@@ -48,10 +48,13 @@ namespace DXForgeEditor.Utilities
             return Math.Abs(Quaternion.Dot(Quaternion.Normalize(a), Quaternion.Normalize(b))) >= SameRotationDot;
         }
 
-        /// <summary>回転として使えるか(有限で、長さが 0 でない)。</summary>
+        /// <summary>回転として使えるか(有限で、長さが 0 でなく、正規化しても 0 や NaN にならない)。</summary>
         public static bool IsValid(Quaternion q)
         {
-            return float.IsFinite(q.X) && float.IsFinite(q.Y) && float.IsFinite(q.Z) && float.IsFinite(q.W) && q.LengthSquared() > 1e-12f;
+            // NOTE: 成分が有限でも、1e20 などでは LengthSquared() が無限大になり、正規化すると 0 になる
+            var lengthSquared = q.LengthSquared();
+            return float.IsFinite(q.X) && float.IsFinite(q.Y) && float.IsFinite(q.Z) && float.IsFinite(q.W)
+                && float.IsFinite(lengthSquared) && lengthSquared > 1e-12f;
         }
 
         public static float ToRadians(float degrees) => (float)(degrees * Math.PI / 180.0);
