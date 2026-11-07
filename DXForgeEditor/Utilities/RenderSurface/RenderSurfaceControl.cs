@@ -16,11 +16,13 @@ namespace DXForgeEditor.Utilities
     {
         public float AverageFrameTime { get; }
         public int FPS { get; }
+        public ulong DrawnFrameCount { get; }
 
-        public RenderSurfaceFrameStatsArgs(float averageFrameTime, int fps)
+        public RenderSurfaceFrameStatsArgs(float averageFrameTime, int fps, ulong drawnFrameCount)
         {
             AverageFrameTime = averageFrameTime;
             FPS = fps;
+            DrawnFrameCount = drawnFrameCount;
         }
     }
 
@@ -207,7 +209,10 @@ namespace DXForgeEditor.Utilities
 
             if (_frameTimer.MeasureFrameTime())
             {
-                FrameStatsUpdated?.Invoke(this, new RenderSurfaceFrameStatsArgs(_frameTimer.AverageFrameTime, _frameTimer.FPS));
+                // NOTE: FPS は RenderFrame の呼び出しを数えるので、描いていないときも増える。描いた回数は DLL に聞く(#209)。
+                //       UI スレッドがミューテックスを待たないよう(#213)、ここ(render thread)で読んで渡す。
+                var drawnFrames = EngineAPI.GetDrawnFrameCount(_host.SurfaceId);
+                FrameStatsUpdated?.Invoke(this, new RenderSurfaceFrameStatsArgs(_frameTimer.AverageFrameTime, _frameTimer.FPS, drawnFrames));
             }
 
             if (_capturedLeft && !_isXZLocked && GetAsyncKeyState(VKey.Alt) == 0)

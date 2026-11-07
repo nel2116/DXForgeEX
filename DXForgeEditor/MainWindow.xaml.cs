@@ -24,9 +24,12 @@ namespace DXForgeEditor
         public static string DXForgePath { get; private set; } = string.Empty;
         internal static EnginePathSource EnginePathSource { get; private set; } = EnginePathSource.None;
 
+        private bool _sessionEnding;
+
         public MainWindow()
         {
             InitializeComponent();
+            Application.Current.SessionEnding += (_, _) => _sessionEnding = true;
             Loaded += OnMainWindowLoaded;
             Closing += OnMainWindowClosing;
             DataContextChanged += (_, e) => Automation.ProjectEditorLock.OnProjectChanged(e.NewValue as Project); // dxforge に開いていることを知らせる(#183)
@@ -39,7 +42,7 @@ namespace DXForgeEditor
             {
                 // エンジンのパスのダイアログをキャンセルした
                 Shutdown();
-                Application.Current.Shutdown();
+                Application.Current?.Shutdown();
                 return;
             }
             // エディタの既定アセット(BRDF LUTなど)がなければ作る(Primal Day 075)。
@@ -53,7 +56,7 @@ namespace DXForgeEditor
             else
             {
                 Shutdown();
-                Application.Current.Shutdown();
+                Application.Current?.Shutdown();
             }
         }
 
@@ -153,7 +156,9 @@ namespace DXForgeEditor
 
         private void OnMainWindowClosing(object? sender, CancelEventArgs e)
         {
-            if (DataContext == null)
+            // NOTE: OS のセッション終了(ログオフ、シャットダウン)では、WPF が SessionEnding のあとにウィンドウを閉じ、dispatcher を止める。
+            //       ここで Project Browser を開いてはいけない。Primal にはない分岐(#209)。
+            if (DataContext == null && !_sessionEnding)
             {
                 e.Cancel = true;
                 Application.Current.MainWindow.Hide();
@@ -190,6 +195,7 @@ namespace DXForgeEditor
             EngineAPI.ShutdownEngine();
         }
 
+        // NOTE: セッション終了で ShowDialog が戻ったときは、Application.Current はすでに null(#209)
         private void OpenProjectBrowserDialog()
         {
             // NOTE: 新しいプロジェクトは Project.Load が Project.Current にするので、ダイアログの前に閉じる(Primal Day 081)
@@ -198,7 +204,7 @@ namespace DXForgeEditor
             if (projectBrowser.ShowDialog() == false || projectBrowser.DataContext == null)
             {
                 Shutdown();
-                Application.Current.Shutdown();
+                Application.Current?.Shutdown();
             }
             else
             {

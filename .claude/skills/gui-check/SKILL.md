@@ -40,6 +40,7 @@ $p = [int](($out | Select-Object -Last 1) -replace 'PID ', '')
 & $gui -Action shot -ProcId $p -Region Hierarchy -OutFile $env:TEMP\gui-check-pr-200\pr-hierarchy.png
 & $gui -Action switch -ProcId $p -Project GuiCheck200b           # File > Open Project。作るなら -Action create -ProcId $p
 & $gui -Action close -ProcId $p                                  # Project Browser が残っても閉じ、終了を確かめる
+& $gui -Action end-session -ProcId $p                            # ログオフを対象のプロセスにだけ模擬し、終了コードを確かめる(実際にはログオフしない)
 & $gui -Action remove-project -Project GuiCheck200               # GuiCheck で始まる名前だけ
 & $gui -Action diff -Dir $env:TEMP\gui-check-pr-200              # base-*.png と pr-*.png の画素の差
 ```

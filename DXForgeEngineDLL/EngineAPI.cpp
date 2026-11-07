@@ -14,6 +14,7 @@
 // 2026/11/06 ビューポートのカメラとライト、サーフェスの作成、SetGeometryIds、RenderFrame を追加 (Primal Day 082, #201)
 // 2026/11/07 ミューテックスを ticket_mutex にし、エンティティ ID の取得を RenderFrame に移した (Primal Day 083, #209)
 // 2026/11/07 ShutdownEngine のコメントをエディタの閉じる順序に合わせた (#209)
+// 2026/11/07 実際に描いた回数を返す GetDrawnFrameCount を追加 (#209)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Common.h"
@@ -55,6 +56,7 @@ namespace
 	{
 		graphics::camera camera{};
 		utl::vector<id::id_type> geometry_ids{};
+		u64 drawn_frame_count{ 0 };	// RenderFrame が実際に描いた回数(GetDrawnFrameCount)
 	};
 
 	utl::vector<viewport_surface> surfaces;
@@ -513,7 +515,7 @@ EDITOR_INTERFACE void RenderFrame(u32 surface_id, id::id_type camera_id, u64 lig
 	std::lock_guard lock{ mutex };
 	assert(surface_id < surfaces.size());
 
-	const viewport_surface& surface{ surfaces[surface_id] };
+	viewport_surface& surface{ surfaces[surface_id] };
 	if (!surface.surface.is_valid() ||
 		surface.surface.width() < graphics::min_offscreen_surface_size || surface.surface.height() < graphics::min_offscreen_surface_size) return;
 
@@ -550,4 +552,13 @@ EDITOR_INTERFACE void RenderFrame(u32 surface_id, id::id_type camera_id, u64 lig
 	info.light_set_key = light_set;
 
 	surface.surface.render(info);
+	++surface.drawn_frame_count;
+}
+
+// RenderFrame がこのビューポートを実際に描いた回数の累計(#209)。何もしなかったフレーム(サーフェスがない、小さい)は数えない。
+// NOTE: エディタは render thread のコールバックから呼ぶ。UI スレッドから呼ぶと、描画の間ミューテックスを待つ(#213)。
+EDITOR_INTERFACE u64 GetDrawnFrameCount(u32 surface_id)
+{
+	std::lock_guard lock{ mutex };
+	return surface_id < surfaces.size() ? surfaces[surface_id].drawn_frame_count : 0;
 }
