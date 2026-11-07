@@ -29,6 +29,7 @@
 
 	CodexReview.ps1 が強制終了で残したもの(一時worktree、refs/codex-review/*、ログ、ロック)は、実行ごとに
 	ロックを開いて調べる。開けたら誰も使っていないので消す。共有違反なら実行中なので触らない。
+	worktreeもrefもないロックは、ロックに書かれたリポジトリがこのリポジトリのときだけ消す(%TEMP% は共有のため)。
 	ロックがないか確かめられないときは、消さずに警告して手のコマンドを出す。
 
 	最後に、ルートのチェックアウトが develop で、追跡しているファイルに変更がなければ
@@ -274,6 +275,14 @@ try {
 		}
 	}
 
+	# ロックに書かれた、レビューを実行したリポジトリ(git の共通フォルダ)を返す
+	function Read-ReviewLockOwner([IO.FileStream]$lock) {
+		# 最後の引数でロックを閉じないようにする
+		$reader = [IO.StreamReader]::new($lock, [Text.Encoding]::UTF8, $true, 1024, $true)
+		try { return $reader.ReadToEnd().Trim() }
+		finally { $reader.Dispose() }
+	}
+
 	Write-Output "== worktree"
 	$removedBranches = @()
 	foreach ($wt in $worktrees | Select-Object -Skip 1) {
@@ -330,6 +339,7 @@ try {
 	# CodexReview.ps1 の実行ごとに、登録されたworktree、ref、%TEMP% のロックを集める。
 	# ロックだけのものは、refを作る前に止まったときと、子プロセスが残ってロックを消せなかったときに残る
 	$reviewTemp = [IO.Path]::GetTempPath()
+	$repoCommonDir = git rev-parse --path-format=absolute --git-common-dir
 	$reviewRuns = [ordered]@{}
 	function Get-ReviewRun([string]$key) {
 		if (-not $reviewRuns.Contains($key)) { $reviewRuns[$key] = [pscustomobject]@{ Key = $key; Worktree = $null; Refs = @() } }
@@ -360,6 +370,16 @@ try {
 			if ($run.Worktree) { Write-Warning "  git worktree remove --force `"$($run.Worktree)`"" }
 			foreach ($name in $run.Refs) { Write-Warning "  git update-ref -d $name" }
 			continue
+		}
+		# worktreeもrefもこのリポジトリになければ、別のクローンのレビューかもしれない。
+		# 消すと、持ち主のクローンでそのworktreeとrefを片付けられなくなる
+		if (-not $run.Worktree -and -not $run.Refs) {
+			$owner = Read-ReviewLockOwner $lock
+			if ($owner -ne $repoCommonDir) {
+				$lock.Dispose()
+				Write-Output "残す: $folder(このリポジトリのレビューではない: $owner)"
+				continue
+			}
 		}
 		Write-Output "削除: $folder(レビューは終わっている)"
 		$done = $true

@@ -234,9 +234,14 @@ $head = $info.headRefOid
 $runId = [guid]::NewGuid().ToString('N').Substring(0, 8)
 $ref = "refs/codex-review/$Pr-$runId"
 $work = Join-Path ([System.IO.Path]::GetTempPath()) "DXForgeCodexReview-$Pr-$runId"
-# refとworktreeを作る前に開く。強制終了で finally が走らなくても、ロックが開けるようになることで終わったと分かる
+# refとworktreeを作る前に開く。強制終了で finally が走らなくても、ロックが開けるようになることで終わったと分かる。
+# %TEMP% はクローンの間で共有されるので、どのリポジトリのレビューかを書いておく
+$repoCommonDir = git -C $RepoRoot rev-parse --path-format=absolute --git-common-dir
 $reviewLock = [System.IO.FileStream]::new("$work.lock", [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::ReadWrite,
 	[System.IO.FileShare]::None -bor [System.IO.FileShare]::Inheritable)
+$ownerBytes = [System.Text.UTF8Encoding]::new($false).GetBytes("$repoCommonDir")
+$reviewLock.Write($ownerBytes, 0, $ownerBytes.Length)
+$reviewLock.Flush()
 # FETCH_HEADは共有されるため、並行して実行したときに書き込みが競合しないよう書き出さない
 git -C $RepoRoot fetch --quiet --no-tags --no-write-fetch-head $repoUrl "+refs/heads/${base}:$ref/base" "+refs/pull/$Pr/head:$ref/head"
 if ($LASTEXITCODE -ne 0) {

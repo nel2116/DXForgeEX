@@ -29,6 +29,7 @@
 	  worker-unknown        run-list か worker-list が失敗したときは、残す
 	  review-free   ロックを開けるレビューの残り(worktree、ref、ログ、ロック、登録のないフォルダ)は消える
 	  review-busy   ロックを別のプロセスが持っているレビューには触らない
+	  review-other-repo     別のクローンのレビューのロックと、持ち主が書かれていないロックには触らない
 	  review-no-lock        ロックがないか確かめられないレビューの残りは、消さずに警告する
 	  review-dry-run        -DryRun ではレビューの残りを消さない
 
@@ -215,14 +216,15 @@ function New-Branch($sb, [string]$branch, [switch]$Worktree, [switch]$Merge) {
 }
 
 # CodexReview.ps1 の実行が残すものを作る。戻り値の Path は一時worktreeのパス(ログとロックはその隣)
-function New-ReviewRun($sb, [string]$key, [switch]$Worktree, [switch]$Refs, [switch]$Log, [switch]$Lock) {
+# -Owner を省くと、ロックの持ち主はこのリポジトリになる
+function New-ReviewRun($sb, [string]$key, [switch]$Worktree, [switch]$Refs, [switch]$Log, [switch]$Lock, [string]$Owner = (git -C $sb.Root rev-parse --path-format=absolute --git-common-dir)) {
 	$path = Join-Path $sb.Temp "DXForgeCodexReview-$key"
 	if ($Worktree) { Invoke-Git -C $sb.Root worktree add --quiet --detach $path develop | Out-Null }
 	if ($Refs) {
 		foreach ($side in "base", "head") { Invoke-Git -C $sb.Root update-ref "refs/codex-review/$key/$side" develop | Out-Null }
 	}
 	if ($Log) { Set-Content -LiteralPath "$path.log" -Value "log" }
-	if ($Lock) { Set-Content -LiteralPath "$path.lock" -Value "" }
+	if ($Lock) { Set-Content -LiteralPath "$path.lock" -Value $Owner }
 	return [ordered]@{ Key = $key; Path = $path; Registered = ($path -replace '\\', '/') }
 }
 
@@ -593,6 +595,23 @@ $cases["review-busy"] = {
 		if ($held) { $held.Dispose() }
 		Remove-Sandbox $sb
 	}
+}
+
+$cases["review-other-repo"] = {
+	$sb = New-Sandbox
+	try {
+		# 別のクローンで止まったレビュー。%TEMP% は共有なので、フォルダとロックが見える
+		$other = New-ReviewRun $sb "7-eeeeeee1" -Lock -Log -Owner "C:/somewhere/else/.git"
+		New-Item -ItemType Directory -Force $other.Path | Out-Null
+		$blank = New-ReviewRun $sb "7-eeeeeee2" -Lock -Owner ""
+		$r = Invoke-Cleanup $sb
+		Check ($r.ExitCode -eq 0) "終了コードが0"
+		Check ($r.Text -match "残す: .*DXForgeCodexReview-7-eeeeeee1\(このリポジトリのレビューではない: C:/somewhere/else/\.git\)") "別のリポジトリのレビューなので残すと表示する"
+		Check ($r.Text -notmatch 'WARNING|警告') "警告は出ない"
+		Check ((Test-Path -LiteralPath $other.Path) -and (Test-Path -LiteralPath "$($other.Path).lock") -and (Test-Path -LiteralPath "$($other.Path).log")) "フォルダ、ロック、ログは残っている"
+		Check (Test-Path -LiteralPath "$($blank.Path).lock") "持ち主が書かれていないロックも残っている"
+	}
+	finally { Remove-Sandbox $sb }
 }
 
 $cases["review-no-lock"] = {
