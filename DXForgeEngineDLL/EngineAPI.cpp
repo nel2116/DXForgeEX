@@ -15,6 +15,7 @@
 // 2026/11/07 ミューテックスを ticket_mutex にし、エンティティ ID の取得を RenderFrame に移した (Primal Day 083, #209)
 // 2026/11/07 ShutdownEngine のコメントをエディタの閉じる順序に合わせた (#209)
 // 2026/11/07 実際に描いた回数を返す GetDrawnFrameCount を追加 (#209)
+// 2026/11/08 消すジオメトリの ID をビューポートから取り除く remove_geometry_from_viewports を追加 (#214)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Common.h"
@@ -187,6 +188,37 @@ namespace
 } // 匿名名前空間
 
 extern utl::ticket_mutex mutex;	// EntityAPI.cpp
+
+// 消す前のジオメトリのコンポーネントの ID を、全ビューポートの描くジオメトリから取り除く(#214)。
+// EntityAPI.cpp の RemoveGameEntity と UpdateComponent が、mutex を持ったまま、エンジンから消す前に呼ぶ。
+// NOTE: Primal にはない DXForgeEX の安全策。エディタは消す前に SetGeometryIds で外す(Primal Day 084 の順序)ので、
+//       ふつうは何もしない。順序を誤ると、消した ID が残り、次の RenderFrame の geometry::get_entity_ids が assert に当たる。
+//       順序の誤りが隠れないよう、取り除いたときは Debug でデバッグ出力に 1 行出す(assert にはしない)。
+void remove_geometry_from_viewports(id::id_type geometry_id)
+{
+	if (!id::is_valid(geometry_id)) return;
+
+	for (u32 surface_id{ 0 }; surface_id < surfaces.size(); ++surface_id)
+	{
+		utl::vector<id::id_type>& ids{ surfaces[surface_id].geometry_ids };
+		for (u64 i{ 0 }; i < ids.size();)
+		{
+			if (ids[i] == geometry_id)
+			{
+				ids.erase(i);
+#ifdef _DEBUG
+				wchar_t message[160];
+				swprintf_s(message, L"[DXForgeEngineDLL] removed geometry %u from viewport %u: the editor removed it before SetGeometryIds (#214)\n", geometry_id, surface_id);
+				OutputDebugStringW(message);
+#endif
+			}
+			else
+			{
+				++i;
+			}
+		}
+	}
+}
 
 // エンジンのシェーダーをコンパイルし、グラフィックスを初期化する(Primal Day 078)。返す値は editor::engine_init_error。
 // engine_path: エンジン(リポジトリ)のルートのフォルダ(UTF-16)。シェーダーのソースはその DXForgeEngine\Graphics\Direct3D12\Shaders から
