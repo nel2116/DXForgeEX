@@ -9,7 +9,7 @@ using DXForgeEditor.Utilities;
 namespace DXForgeImport
 {
     /// <summary>
-    /// 終了コード。--help と README.md にも同じ一覧を書く。
+    /// 終了コード。--help と docs/dev/DXForgeImport.md にも同じ一覧を書く。
     /// </summary>
     enum ExitCode
     {

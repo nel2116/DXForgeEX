@@ -15,13 +15,13 @@ Primal decides *what* comes next, not *how* the code looks: where Primal's desig
 | When you touch... | Read |
 |---|---|
 | engine/editor structure, renderer status, which project does what | `docs/dev/Architecture.md` |
-| build scripts, DXC, FBX SDK, warnings, encodings, tests, CI | `docs/dev/BuildAndTest.md` |
+| build scripts and `build.ps1` parameters, DXC, FBX SDK, warnings, encodings, tests, CI | `docs/dev/BuildAndTest.md` |
 | `DXForgeImport/` | `docs/dev/DXForgeImport.md` |
 | PR review, merging, `CodexReview.ps1`, `PrePr.ps1`, `CleanupMerged.ps1` | `docs/dev/ReviewAndMerge.md` |
 | orchestrated workers, `StartWorker.ps1`, `WorkerStatus.ps1` | `docs/dev/WorkerRules.md`, `docs/dev/ReviewAndMerge.md` |
 | editor behavior that needs a manual GUI check | `docs/ManualVerification.md` |
 | operating the editor for a GUI check, `start-gui-check.ps1` | `.claude/skills/gui-check/SKILL.md` |
-| `build.ps1` parameters, human-facing overview | `README.md` |
+| human-facing overview (Japanese; details are in `docs/dev/`) | `README.md` |
 | any Markdown doc: language, where a fact lives, last-reviewed date | `.claude/skills/writing-docs/SKILL.md` |
 | units, file formats, other recorded design decisions | `docs/design/` (e.g. `rotation-units.md` for all angles) |
 

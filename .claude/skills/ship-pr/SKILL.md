@@ -1,88 +1,88 @@
 ---
 name: ship-pr
-description: DXForgeEX の PR を、CI の確認 → Codex レビュー → 指摘への対応 → 再レビュー → -SetStatus による自動マージ → 後片付け、までやり切る。ユーザーに「マージして」「マージまで進めて」「PR を仕上げて」と言われたとき、自分で作った PR の完了条件がそろったとき、コーディネーターとして worker の PR を受け取ったときに使う。
+description: Take a DXForgeEX PR all the way through CI check -> Codex review -> handling findings -> re-review -> auto-merge via -SetStatus -> cleanup. Use when the user says 「マージして」「マージまで進めて」「PR を仕上げて」, when a PR you created meets its completion conditions, or when receiving a worker's PR as coordinator.
 ---
 
-# PR をマージまで進める
+# Taking a PR to the merge
 
 <!-- last-reviewed: 2026-11-05 -->
 
-`CodexReview.ps1` と `CleanupMerged.ps1` は個々の手順を自動化しているが、それをどの順で、いつ、どこまで回すかはここに書く。仕組みの詳細と検証済みの落とし穴は `docs/dev/ReviewAndMerge.md`。
+`CodexReview.ps1` and `CleanupMerged.ps1` automate the individual steps; this file says in what order, when and how far to run them. Mechanism details and verified pitfalls are in `docs/dev/ReviewAndMerge.md`.
 
-自動マージの予約までと後片付けは、ユーザーに毎回頼まれなくても行う(ユーザーの方針)。今の develop は人の承認(`merge-ok`、#160)を必須にしていないので、CI と `codex-review` がそろえばそのままマージされる(個人開発で速度を優先するユーザーの方針、2026/11/03)。承認を必須に戻したときも、エージェントは `merge-ok` を付けない(`gh` で付けるコマンドは PreToolUse フック `Tests/guard_merge_approval.py` が止める)。ゲートは決して迂回しない。admin でのマージ、保護のないブランチでの `gh pr merge --auto`、`hold` ラベルの除去、`merge-ok` の付与はしない。
+Scheduling the auto-merge and the cleanup are done without the user asking each time (user policy). develop currently does not require human approval (`merge-ok`, #160), so it merges as soon as CI and `codex-review` pass (solo development, speed first; user policy 2026/11/03). Even if approval becomes required again, agents never add `merge-ok` (the PreToolUse hook `Tests/guard_merge_approval.py` blocks `gh` commands that add it). Never bypass the gates: no admin merges, no `gh pr merge --auto` on an unprotected branch, no removing the `hold` label, no adding `merge-ok`.
 
-`.ps1` は PowerShell ツールで実行する。Bash ツールで実行すると、BOM の行で構文エラーになる。
+Run `.ps1` files with the PowerShell tool. Through the Bash tool they fail with a syntax error on the BOM line.
 
-## 1. 完了条件を確かめる
+## 1. Check the completion conditions
 
-次の条件がそろうまで、`-SetStatus` を付けない(付けると、指摘がなければその場で自動マージが予約され、CI がそろった時点でマージされる)。
+Don't use `-SetStatus` until all of these hold (with no findings it schedules the auto-merge on the spot, and the PR merges once CI passes):
 
-- CI がすべて成功している: `gh pr checks <N>`。実行中なら `gh pr checks <N> --watch --interval 20` で待つ。承認を必須にしているとき(変数 `REQUIRE_MERGE_APPROVAL` が `true`)は、`Merge approved` は承認(`merge-ok`)までは失敗するのが正常なので、それ以外がすべて成功していればよい(`--watch` は、この失敗のため終了コード 1 で終わる)。
-- PR の完了条件(Issue と PR 本文に書かれたもの)を満たし、根拠(コマンドと出力)が PR に書かれている。
-- **GUI 確認が要る変更**(エディタの画面、ゲームの実行、描画)は、確認が済んでいる。済んでいなければマージせずに止め、`./.claude/skills/gui-check/start-gui-check.ps1 -Pr <N>` で別のワーカーに任せる。コーディネーターは自分で操作せず、画像も読まない(フックが止める)。`worker_done` の `head:` が今の PR の head と同じことを確かめる。違えば(確認のあとに push された)確認をやり直す。
-- GUI で確かめた PR は、本文の `<!-- gui-check:start -->` の節に、結果とスクリーンショットが載っている。ユーザーが自分で確かめた場合も、スクリーンショットをもらえたら同じ節に載せる(`gui-check` スキルの `push-pr-assets.ps1`)。載っていなければ、マージの前に載せる。
-- 前回までの Codex の指摘に、すべて対応している。ワーカーが直さなかった指摘は、コーディネーターが理由を確かめている。
+- All CI succeeded: `gh pr checks <N>`. If running, wait with `gh pr checks <N> --watch --interval 20`. When approval is required (variable `REQUIRE_MERGE_APPROVAL` is `true`), `Merge approved` correctly fails until `merge-ok` is added, so everything else passing is enough (`--watch` then exits with 1 because of it).
+- The PR's completion conditions (in the issue and PR body) are met, with evidence (commands and output) in the PR.
+- **Changes that need a GUI check** (editor screen, running the game, rendering) have been checked. If not, stop before merging and hand the check to another worker with `./.claude/skills/gui-check/start-gui-check.ps1 -Pr <N>`. The coordinator does not operate the GUI or read the images (a hook blocks it). Confirm the `head:` in `worker_done` equals the current PR head; if not (pushed after the check), check again.
+- A PR checked in the GUI has the results and screenshots in the `<!-- gui-check:start -->` section of its body. If the user checked it themselves and provided screenshots, put them in the same section (`push-pr-assets.ps1` of the `gui-check` skill). If missing, add them before merging.
+- Every earlier Codex finding is handled. For findings a worker did not fix, the coordinator has verified the reasons.
 
-## 2. レビューを回す
+## 2. Run the review
 
 ```powershell
-./CodexReview.ps1 -Pr <N> -Post     # 1〜数分。結果を PR にコメントする
+./CodexReview.ps1 -Pr <N> -Post     # 1 to a few minutes; comments the result on the PR
 ```
 
-オーケストレーションでは、これは worker が自分の worktree で実行する(#195)。コーディネーターは「PR 準備完了」の報告と PR のコメントを確かめ、もう一度レビューしない。worker がいない PR をコーディネーターが扱うときは、ルートのチェックアウトを切り替えず、origin/develop から作った detached worktree で実行し、終わったら消す。CI の待ちとレビューは独立しているので、並行して実行してよい。
+In orchestration the worker runs this in its own worktree (#195). The coordinator checks the 「PR 準備完了」 report and the PR comment and does not review again. When the coordinator handles a PR without a worker, it runs it in a detached worktree created from origin/develop without switching the root checkout, and deletes the worktree afterwards. Waiting for CI and the review are independent and may run in parallel.
 
-指摘(`- [P0〜P3] ...` の行)があれば、重大度を問わず、1 件ずつ次のどちらかで対応する。
+Handle each finding (lines `- [P0-P3] ...`), whatever its severity, in one of two ways:
 
-- **直す**: まず指摘の入力で失敗するテストを足し、修正前のコードで失敗すること、修正後に通ることを確かめる(`git stash push -- <直したファイル>` でテストだけを修正前のコードに当てられる)。直したら、どの指摘をどう直したか、テストで何を確かめたかを PR にコメントする。
-- **直さない**: 誤りや範囲外の指摘なら、理由を PR に返信する。返信するだけではゲートは通らないので、次回のレビューで同じ指摘が出るなら、その点をユーザーに相談する。
+- **Fix it**: first add a test that fails on the finding's input, confirm it fails before the fix and passes after (`git stash push -- <fixed files>` applies just the test to the old code). Then comment on the PR which finding was fixed how and what the test verifies.
+- **Don't fix it**: if the finding is wrong or out of scope, reply on the PR with the reason. A reply alone does not pass the gate; if the same finding comes back in the next review, consult the user.
 
-worker は自分で指摘を確かめて対応し、直さなかった指摘は理由と一緒に `ask` で伝える。コーディネーターはその理由を確かめ、正しくなければ直すように返す(`send --to dispatch:<id>`)。
+Workers verify and handle findings themselves and send unfixed ones with reasons via `ask`. The coordinator checks the reasons and, if they don't hold, sends them back (`send --to dispatch:<id>`).
 
-修正を push すると、`codex-review` のステータスはコミットから外れる。CI が通るのを待って、もう一度レビューする。
+Pushing a fix detaches the `codex-review` status from the commit. Wait for CI and review again.
 
-## 3. 指摘が収束しないとき
+## 3. When findings don't converge
 
-`-Post` は、その PR の FINDINGS の回数を出し、3 回を超えると「コーディネーターに `ask` で相談する」と出す。直すたびに別の穴が見つかるときは、ループを止める。たとえば、#124 の `python3` を止めるフックでは、正規表現でシェルの構文を追う方式に対して、6 回続けて別の指摘が出た。
+`-Post` prints the PR's FINDINGS count and, past 3, says to consult the coordinator with `ask`. When every fix reveals another hole, stop the loop. Example: the #124 hook that blocks `python3` tracked shell syntax with regexes and got a different finding six times in a row.
 
-- 2〜3 回続けて**同じ部分**に新しい種類の指摘が出たら、個々の修正ではなく方式の問題を疑う。
-- 方式を変えるか、その部分を PR から外すかを、選択肢とおすすめを添えてユーザーに相談する。自分の判断で指摘を無視したり、ゲートを迂回したりしない。
-- 外した部分の代わりの対策(例: Windows の設定で原因を取り除く)があれば、それも示す。
+- If 2-3 reviews in a row find a new kind of problem in **the same part**, suspect the approach rather than the individual fixes.
+- Consult the user on changing the approach or removing that part from the PR, with options and a recommendation. Don't ignore findings or bypass the gate on your own judgment.
+- If there is an alternative to the removed part (e.g. removing the cause through a Windows setting), present it too.
 
-## 4. 自動マージを予約し、承認を待つ
+## 4. Schedule the auto-merge
 
-完了条件がそろい、直前のレビューで指摘がなければ、コーディネーターが次を実行する(worker の会話ではフックが止める。#195)。
+When the conditions hold and the last review had no findings, the coordinator runs (a hook blocks it in worker conversations, #195):
 
 ```powershell
 ./CodexReview.ps1 -Pr <N> -Post -SetStatus
 ```
 
-今の head の PASS が PR にあれば、Codex を実行せずに `codex-review` を success にし、自動マージを予約する。なければレビューし、指摘がなければ同じように進み、指摘が出たら 2 に戻る。やり直すときは `-ForceReview` を足す。
+If the PR has a PASS for the current head, it skips Codex, sets `codex-review` to success and schedules the auto-merge. Otherwise it reviews; with no findings it proceeds the same way, with findings go back to 2. Add `-ForceReview` to redo the review.
 
-予約したら、マージされるまで待つ。ブランチ保護が `Merge approved` も必須にしているとき(承認を必須に戻したとき)だけは、ユーザーに「承認待ち」と報告し、`merge-ok` を付けてもらう。報告には、PR の番号と、CI・Codex・GUI 確認の結果を書く。
+Then wait for the merge. Only when branch protection also requires `Merge approved` (approval required again), report 「承認待ち」 to the user with the PR number and the CI/Codex/GUI results, and have them add `merge-ok`.
 
 ```bash
-gh pr view <N> --json state --jq .state     # MERGED になるまで、gh pr checks <N> --watch で待つ
+gh pr view <N> --json state --jq .state     # until MERGED; wait with gh pr checks <N> --watch
 ```
 
-承認を必須にしているときは、承認のあとに push すると `merge-ok` が外れる(`.github/workflows/pr-automation.yml`)。直したときは、レビューをやり直してから、もう一度承認を頼む。
+When approval is required, pushing after approval removes `merge-ok` (`.github/workflows/pr-automation.yml`). After a fix, review again and then ask for approval again.
 
-## 5. 後片付けと確認
+## 5. Cleanup and checks
 
 ```powershell
-git switch develop      # 自分がその PR のブランチにいるとき
+git switch develop      # if you are on the PR's branch
 ./CleanupMerged.ps1
 ```
 
-- 警告(`Orcaの削除が終わりませんでした`、`worktreeのフォルダが残っています`、`ブランチを削除できませんでした`)が出たら、実際の問題としてユーザーに報告する。
-- develop の CI が成功したことを確かめる: `gh run list --branch develop --workflow ci.yml --limit 1`
-- PR 本文の「マージ後に確かめる項目」があれば、それを実行する。
-- `Closes #NN` の Issue は、`close-issues` ジョブが閉じる。閉じていなければ手で閉じる。
+- Report warnings (`Orcaの削除が終わりませんでした`, `worktreeのフォルダが残っています`, `ブランチを削除できませんでした`) to the user as real problems.
+- Confirm develop's CI succeeded: `gh run list --branch develop --workflow ci.yml --limit 1`.
+- Run the PR body's 「マージ後に確かめる項目」 if any.
+- The `close-issues` job closes the `Closes #NN` issues; close them by hand if it didn't.
 
-## 6. 報告する
+## 6. Report
 
-日本語で短く報告する。
+Briefly, in Japanese:
 
-- PR の番号と、マージしたかどうか
-- Codex の指摘の件数と対応(直したもの、直さなかったものと理由)
-- 後片付けの結果
-- 残った課題
+- The PR number and whether it merged
+- Number of Codex findings and how they were handled (fixed; not fixed, with reasons)
+- The cleanup result
+- Remaining issues

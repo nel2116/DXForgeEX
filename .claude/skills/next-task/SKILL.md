@@ -1,15 +1,15 @@
 ---
 name: next-task
-description: DXForgeEX で次に取り組むべき作業を、リポジトリの状態(develop の CI、開いている PR と Issue、Primal の進み具合、確認待ちの項目)から調べて提案する。ユーザーに「次に行うべきタスクは?」「他にやるべきことは?」「次は何をする?」と聞かれたときに使う。提案するだけで、作業には着手しない。
+description: Propose what to work on next in DXForgeEX from the repository's state (develop CI, open PRs and issues, Primal progress, pending checks). Use when the user asks 「次に行うべきタスクは?」「他にやるべきことは?」「次は何をする?」. It only proposes; it does not start the work.
 ---
 
-# 次の作業を提案する
+# Proposing the next task
 
 <!-- last-reviewed: 2026-10-29 -->
 
-ユーザーはこの質問のあと、たいてい「そのためのプロンプトを提示して」と続ける。だから、**提案だけをして作業は始めない**。選ばれた作業の指示文は `orchestration-prompt` スキルで作る。
+After this question the user usually follows with 「そのためのプロンプトを提示して」, so **only propose; do not start the work**. The instructions for the chosen task are written with the `orchestration-prompt` skill.
 
-## 1. 状態を集める
+## 1. Gather the state
 
 ```bash
 git fetch -q origin
@@ -17,35 +17,35 @@ gh run list --branch develop --workflow ci.yml --limit 1 --json conclusion,headS
 gh pr list --state open --json number,title,labels,headRefName
 gh issue list --state open --limit 50 --json number,title,labels
 git worktree list
-python Tests/check_conventions.py | grep '^warning:'   # 最後に見直してから 90 日を過ぎた文書
+python Tests/check_conventions.py | grep '^warning:'   # docs not reviewed for over 90 days
 ```
 
-- 開いている PR は、なぜ開いたままかを本文とコメントから確かめる(GUI 確認待ち、`hold` ラベル、Codex の指摘待ちなど)。
-- 確認待ちの項目は、メモリと、PR 本文の「マージ後に確かめる項目」「GUI の確認手順」から拾う。
-- Primal の進み具合は、Issue のタイトルの `Primal Day NNN` と、`docs/dev/Architecture.md` の「Renderer status」から判断する。次の Day が Issue になっていなければ、それも候補にする(Primal: https://github.com/TheGameEngineers/Primal のコミット履歴の順)。
+- For each open PR, find out from its body and comments why it is still open (waiting for a GUI check, `hold` label, pending Codex findings, ...).
+- Collect pending checks from memory and from PR bodies' 「マージ後に確かめる項目」 and 「GUI の確認手順」.
+- Judge Primal progress from `Primal Day NNN` in issue titles and the "Renderer status" in `docs/dev/Architecture.md`. If the next Day has no issue yet, that is a candidate too (order of Primal's commit history: https://github.com/TheGameEngineers/Primal).
 
-## 2. 優先順位を付ける
+## 2. Prioritize
 
-上から順に優先する。
+Higher items first:
 
-1. **develop の CI が失敗している** → 何よりも先に直す。
-2. **終わりかけの作業**: GUI 確認だけが残った PR、Codex の指摘への対応が残った PR。新しい作業より先に閉じる。
-3. **開発の流れを止めている不具合**: ビルド、テスト、レビュー、マージ、後片付けが失敗するもの。今後のすべての作業に効く。
-4. **Primal の次の Day**(機能の前進)。
-5. **AI/CLI で扱いやすいエンジンにする作業**(#11 の続きなど、無人で確かめられる範囲を広げるもの)。
-6. そのほかの改善。古くなった文書の見直し(上の `warning:`)もここに入れる。1 件 1 つの小さな PR で、手順は `writing-docs` スキル。
+1. **develop's CI is failing** -> fix before anything else.
+2. **Nearly finished work**: PRs with only a GUI check left, or Codex findings left to handle. Close these before starting new work.
+3. **Bugs that stall development**: build, test, review, merge or cleanup failures. They affect all future work.
+4. **The next Primal Day** (feature progress).
+5. **Making the engine easier to drive from AI/CLI** (continuing #11, widening what can be verified unattended).
+6. Other improvements. Reviewing stale docs (the `warning:` lines above) also goes here: one small PR per doc, procedure in the `writing-docs` skill.
 
-さらに、次の観点も添える。
+Also note for each:
 
-- **GUI 確認の要否**: ユーザーが不在なら、ヘッドレスで完了まで確かめられるものを優先する。
-- **並行できるか**: 編集するファイルが重ならない作業どうしなら、worker を分けて並行にできる。
-- **大きさ**: 1 つの PR に収まるか。収まらないなら分け方も示す。
+- **GUI check needed?** If the user is away, prefer work that can be verified headless to completion.
+- **Parallelizable?** Work that edits disjoint files can go to separate workers in parallel.
+- **Size**: does it fit one PR? If not, show how to split it.
 
-## 3. 提示する
+## 3. Present
 
-日本語で、次の形で短く示す。
+Briefly, in Japanese:
 
-- 状態の要約(2〜3 行): develop の CI、開いている PR、確認待ちの項目。
-- 候補の表(3〜5 件): 作業(Issue 番号)、理由、大きさ、GUI 確認の要否、並行できる相手。
-- **おすすめ**: 1 つ(並行なら組み合わせ)と、その理由。
-- 最後に「この作業のプロンプトを作りますか?」と聞いて止まる。
+- State summary (2-3 lines): develop CI, open PRs, pending checks.
+- Candidate table (3-5 rows): task (issue number), reason, size, GUI check needed, parallel partner.
+- **Recommendation**: one (or a parallel combination) and why.
+- End by asking 「この作業のプロンプトを作りますか?」 and stop.

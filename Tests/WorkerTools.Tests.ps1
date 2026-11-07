@@ -110,12 +110,12 @@ try {
 	Write-Host "== StartWorker.ps1 =="
 	$specFile = Join-Path $state "input.md"
 	Set-Content -LiteralPath $specFile -Value "## タスク: テストの仕様" -Encoding utf8
-	$rulesFirstLine = (Get-Content -LiteralPath (Join-Path $RepoRoot "docs/dev/WorkerRules.md") -Encoding utf8 -TotalCount 1)
+	$rulesFirstLine = "## Rules for every worker"
 
 	$r = Invoke-Tool "StartWorker.ps1" @("-SpecFile", $specFile, "-Name", "issue-1-x")
 	$sent = Get-Content -Raw -Encoding utf8 (Join-Path $state "spec.md")
 	Check ($r.Exit -eq 0 -and $r.Output -match "started") "starts the worker"
-	Check ($sent.StartsWith($rulesFirstLine) -and $sent -match "タスク: テストの仕様") "the spec is the common rules followed by the task"
+	Check ($sent.StartsWith($rulesFirstLine) -and $sent -match "タスク: テストの仕様") "the spec is the common rules (without the last-reviewed line) followed by the task"
 	Check ($sent.IndexOf("PrePr.ps1") -ge 0 -and $sent.IndexOf("CodexReview.ps1 -Pr <N> -Post") -ge 0) "the rules contain the new review flow"
 	Check ($r.Log -match "--agent claude --worktree new-top-level --name issue-1-x --base-branch origin/develop --setup run" -and $r.Log -notmatch "--model") "normal: a new worktree from origin/develop, no model override"
 	Check (-not (Test-Path -LiteralPath (Get-Content -Encoding utf8 (Join-Path $state "spec-path.txt")))) "the temporary spec is deleted"

@@ -228,15 +228,15 @@ Closes #7
 '@
 	Set-Pr $body
 	$r = Invoke-Script $Start @("-Pr", "7", "-DryRun")
-	$steps = $r.Output.Substring($r.Output.IndexOf("### 手順"))
+	$steps = $r.Output.Substring($r.Output.IndexOf("### Steps"))
 	Check ($r.Exit -eq 0 -and -not $r.Log) "-DryRun does not call orca"
 	Check ($r.Output -match "--worktree new-top-level --name gui-check-pr-7 --base-branch origin/develop --setup run --model claude-sonnet-5-5") "a new worktree from origin/develop, on the small model"
 	Check ($r.Output -match "git fetch origin refs/pull/7/head" -and $r.Output -match ("git checkout --detach " + ("a" * 40))) "the worker fetches the PR ref and checks out the head"
 	Check ($steps -match "1\. エディタを開く" -and $steps -match "コードの中の見出しは節を閉じない" -and $steps -match "子の見出しは節に含む") "takes the section with code and sub-headings"
 	Check ($steps -notmatch "これは手順ではない|これも手順ではない|Closes|Generated") "does not take other sections"
 	Check ($steps -match "2\. \{\{HEAD\}\} はそのまま残す") "placeholders in the steps stay as written"
-	Check ($r.Output -match ("確かめる head: ``" + ("a" * 40)) -and $r.Output -match "ブランチ ``fix/issue-7-x``" -and $r.Output -match "Title \{\{HEAD\}\}") "the spec carries the head and keeps the title as written"
-	Check ($r.Output -match "worker 共通のルール" -and $r.Output -match "共通のルールとの違い") "the spec is the common rules, then the fixed rules"
+	Check ($r.Output -match ("Head to check: ``" + ("a" * 40)) -and $r.Output -match "branch ``fix/issue-7-x``" -and $r.Output -match "Title \{\{HEAD\}\}") "the spec carries the head and keeps the title as written"
+	Check ($r.Output -match "Rules for every worker" -and $r.Output -match "Differences from the common rules") "the spec is the common rules, then the fixed rules"
 	Check ($r.Output -notmatch "\{\{(PR|URL|TITLE|HEAD_REF|BASE_REF|STEPS)\}\}") "no placeholder is left"
 
 	Set-Pr "## GUI の確認手順`n`n1. 手順`n`n<!-- gui-check:start -->`n2. 結果の節の中`n<!-- gui-check:end -->"
@@ -270,7 +270,7 @@ Closes #7
 	$env:TMP = $savedTmp
 	$sent = Get-Content -Raw -Encoding utf8 (Join-Path $state "spec.md")
 	Check ($r.Exit -eq 0 -and $r.Log -match "--run run_x" -and $r.Log -notmatch "--model") "normal size and the Run are passed"
-	Check ($sent -match "1\. 起動の確認" -and $sent -match "worker 共通のルール") "the spec reaches the worker"
+	Check ($sent -match "1\. 起動の確認" -and $sent -match "Rules for every worker") "the spec reaches the worker"
 	Check ($r.Output -match "-Pr 7 -Cleanup") "tells how to clean up"
 	$leftovers = @(Get-ChildItem $specTemp -Filter "dxforge_gui_check_spec_*")
 	Check ($leftovers.Count -eq 0) "no temporary spec is left"

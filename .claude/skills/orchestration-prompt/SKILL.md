@@ -1,27 +1,27 @@
 ---
 name: orchestration-prompt
-description: DXForgeEX の Issue を Orca のコーディネーター(/orchestration)に進めさせるための指示文を作って提示する。ユーザーに「プロンプトを提示して」「〜のためのプロンプトを」「指示文を作って」と言われたとき、next-task で選んだ作業を任せる準備をするときに使う。指示文を作るだけで、worker の起動や実装はしない。
+description: Write and present the instruction text that has an Orca coordinator (/orchestration) carry out DXForgeEX issues. Use when the user says 「プロンプトを提示して」「〜のためのプロンプトを」「指示文を作って」, or when preparing to hand off work chosen with next-task. It only writes the text; it does not start workers or implement anything.
 ---
 
-# コーディネーター向けの指示文を作る
+# Writing instructions for a coordinator
 
 <!-- last-reviewed: 2026-11-05 -->
 
-ユーザーは、ここで作った指示文を新しい Claude セッション(Orca のコーディネーター)に貼り付けて使う。**作って提示するだけで、自分では実行しない。** 「勝手に進めないでプロンプトだけ提示して」と言われたことがある。worker を起動したり、実装を始めたりしない。
+The user pastes the text written here into a new Claude session (the Orca coordinator). **Write and present it; never run it yourself.** The user once said 「勝手に進めないでプロンプトだけ提示して」. Do not start workers or begin implementing.
 
-雛形は同じフォルダの `template.md`。これまでの指示文(#10、#11/#107、#104、#116/#117)から共通部分を抜き出したもの。
+The template is `template.md` in this folder, distilled from earlier instructions (#10, #11/#107, #104, #116/#117).
 
-## 1. 決めることを確かめる
+## 1. Settle what must be decided
 
-ユーザーの依頼から読み取れないものだけを聞く(読み取れるものは聞かない)。
+Ask only about what cannot be read from the user's request.
 
-- **対象の Issue**: 1 つか複数か。複数なら、1 つの PR にまとめるか、worker を分けて並行にするか。並行にするのは、編集するファイルが重ならない場合だけにする。
-- **ユーザーの在不在**: 不在なら、GUI を使わずヘッドレスで確かめられる範囲に絞る。仕様を超える判断は「範囲を縮める方向でコーディネーターが決め、理由を報告する」にする。
-- **GUI 確認の要否**: エディタの画面、ゲームの実行結果、描画に関わる変更は GUI 確認が要る。その場合、コーディネーターは `-SetStatus` を実行せず、マージの前に止める。確認は、コーディネーターが `./.claude/skills/gui-check/start-gui-check.ps1 -Pr <N>` で起動する別のワーカーが行い、コーディネーターは結果の要約だけを読む(#195)。GUI 確認が済んだら(要らなければすぐに)、コーディネーターが `-SetStatus` でマージまで進める(人の承認 `merge-ok` は必須にしていない、#160)。`-Post` と指摘の修正は worker が行い、`-SetStatus` はコーディネーターだけが行う(#195)。
+- **Target issues**: one or several. If several, one PR or parallel workers. Parallelize only when the edited files do not overlap.
+- **Whether the user is present**: if absent, limit the work to what can be verified headless without the GUI. Decisions beyond the spec become "the coordinator decides in the direction of a smaller scope and reports why".
+- **Whether a GUI check is needed**: changes to the editor screen, game run results or rendering need one. Then the coordinator stops before merging instead of running `-SetStatus`. The check is done by a separate worker the coordinator starts with `./.claude/skills/gui-check/start-gui-check.ps1 -Pr <N>`; the coordinator reads only the summary (#195). After the GUI check (or right away if none is needed), the coordinator runs `-SetStatus` through to the merge (human approval `merge-ok` is not required, #160). The worker runs `-Post` and fixes findings; only the coordinator runs `-SetStatus` (#195).
 
-## 2. 調べて「前提」を埋める
+## 2. Research and fill in the premises
 
-指示文の価値の大半は「前提(コーディネーターが確かめたこと)」にある。worker が同じ調査をやり直さずに済むようにする。
+Most of the value is in the premises section (what the coordinator verified), so workers do not redo the research.
 
 ```bash
 gh issue view <N> --json title,body,comments
@@ -29,21 +29,21 @@ git fetch -q origin && git log --oneline -15 origin/develop
 gh pr list --state open --json number,title,headRefName
 ```
 
-- Issue の本文に書かれた原因の箇所を、実際にコードで確かめる(`ファイル:行` で書く)。Issue が書かれたあとに変わっていることがある。
-- Primal の機能を移植する作業なら、該当する Primal Day とその実装の場所を書く。
-- 確かめていないことには(推定)と付ける。
-- 開いている PR や残っている worktree と編集範囲が重ならないかを確かめ、重なるなら Ownership に書く。
+- Check the cause location written in the issue against the actual code (write it as `file:line`); it may have changed since the issue was written.
+- For porting a Primal feature, write the Primal Day and where its implementation is.
+- Mark anything unverified as (推定).
+- Check that the edit scope does not overlap open PRs or leftover worktrees; if it does, write it under Ownership.
 
-## 3. 雛形を埋める
+## 3. Fill in the template
 
-- `template.md` の `<...>` を埋め、当てはまらない行(GUI の有無で分かれる行など)と、先頭の見直した日の行は消す。
-- 完了条件と Observable acceptance は、**確かめられる形**で書く(どのコマンドで何が出るか、修正前に何が起きるか)。「動作すること」のような書き方はしない。
-- バグの修正なら、修正前に再現して失敗することを確かめる条件を入れる。
-- 方式に複数の選択肢がある難しい作業なら、実装の前に ask で方式を承認する手順と「方式の判断基準」を入れる。単純な作業なら入れない。
-- 範囲外のこと(今回はやらないこと)を明記する。worker が範囲を広げすぎるのを防ぐ。
+- Fill in the `<...>` of `template.md`, and delete lines that do not apply (e.g. the GUI/no-GUI alternatives) as well as the last-reviewed line at the top.
+- Write the completion conditions and Observable acceptance in a **verifiable form** (which command shows what, what happens before the fix). Never "it works".
+- For a bug fix, include a condition that reproduces the failure before the fix.
+- For hard work with several possible approaches, include a step where the approach is approved via ask before implementation, plus the "approach criteria". Leave them out for simple work.
+- State what is out of scope, so the worker does not widen it.
 
-## 4. 提示する
+## 4. Present it
 
-- 指示文全体を 1 つのコードブロック(` ```markdown `)で示し、そのままコピーできるようにする。
-- コードブロックの前に、2〜4 行で要点を書く: 何を何人で進めるか、GUI 確認の要否、自動マージを予約するか(マージの確定はユーザーの承認)、判断に迷った点。
-- 提示したあと、ユーザーの返事を待つ。
+- Show the whole text in one code block (` ```markdown `) so it can be copied as-is.
+- Before the block, 2-4 lines in Japanese with the key points: what is done by how many workers, whether a GUI check is needed, whether auto-merge is scheduled, and any points you were unsure about.
+- Then wait for the user's reply.
