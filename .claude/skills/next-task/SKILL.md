@@ -5,6 +5,8 @@ description: DXForgeEX で次に取り組むべき作業を、リポジトリの
 
 # 次の作業を提案する
 
+<!-- last-reviewed: 2026-10-29 -->
+
 ユーザーはこの質問のあと、たいてい「そのためのプロンプトを提示して」と続ける。だから、**提案だけをして作業は始めない**。選ばれた作業の指示文は `orchestration-prompt` スキルで作る。
 
 ## 1. 状態を集める
@@ -15,6 +17,7 @@ gh run list --branch develop --workflow ci.yml --limit 1 --json conclusion,headS
 gh pr list --state open --json number,title,labels,headRefName
 gh issue list --state open --limit 50 --json number,title,labels
 git worktree list
+python Tests/check_conventions.py | grep '^warning:'   # 最後に見直してから 90 日を過ぎた文書
 ```
 
 - 開いている PR は、なぜ開いたままかを本文とコメントから確かめる(GUI 確認待ち、`hold` ラベル、Codex の指摘待ちなど)。
@@ -30,7 +33,7 @@ git worktree list
 3. **開発の流れを止めている不具合**: ビルド、テスト、レビュー、マージ、後片付けが失敗するもの。今後のすべての作業に効く。
 4. **Primal の次の Day**(機能の前進)。
 5. **AI/CLI で扱いやすいエンジンにする作業**(#11 の続きなど、無人で確かめられる範囲を広げるもの)。
-6. そのほかの改善。
+6. そのほかの改善。古くなった文書の見直し(上の `warning:`)もここに入れる。1 件 1 つの小さな PR で、手順は `writing-docs` スキル。
 
 さらに、次の観点も添える。
 

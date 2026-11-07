@@ -1,5 +1,7 @@
 # Review, merge and cleanup
 
+<!-- last-reviewed: 2026-11-07 -->
+
 How a PR gets from "done" to merged into `develop`, and how local worktrees are cleaned up afterwards. The rules to follow are summarized in the root `AGENTS.md`; this file has the mechanics and the verified pitfalls.
 
 ## Cross-model review with Codex (`CodexReview.ps1`, issue #56)

@@ -1,4 +1,6 @@
-﻿## タスク: PR #{{PR}} の GUI 確認(#195)
+﻿<!-- last-reviewed: 2026-11-05 -->
+
+## タスク: PR #{{PR}} の GUI 確認(#195)
 
 PR: {{URL}}(「{{TITLE}}」)。確かめる head: `{{HEAD}}`(ブランチ `{{HEAD_REF}}`、向き先 `{{BASE_REF}}`)。
 

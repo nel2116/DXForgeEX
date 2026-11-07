@@ -1,10 +1,12 @@
 ﻿# CLAUDE.md
 
+<!-- last-reviewed: 2026-11-05 -->
+
 @AGENTS.md
 
 ## Claude Code specifics
 
-- A hook in `.claude/settings.json` checks every `Write`/`Edit` of a C/C++/C#/XAML/`.ps1`/HLSL file with `Tests/check_conventions.py --hook`. When a hook reports a violation, fix it (`--fix` handles BOMs) instead of working around it. If a rule keeps being missed, make the check stricter rather than adding emphasis here.
+- A hook in `.claude/settings.json` checks every `Write`/`Edit` of a C/C++/C#/XAML/`.ps1`/HLSL/Markdown file with `Tests/check_conventions.py --hook`. When a hook reports a violation, fix it (`--fix` handles BOMs) instead of working around it. If a rule keeps being missed, make the check stricter rather than adding emphasis here.
 - In orchestrated work the implementing worker runs `CodexReview.ps1 -Pr <N> -Post`, fixes the findings and reports after a PASS; only the **coordinator** runs `-SetStatus` (a hook blocks it in worker conversations) and verifies the findings a worker chose not to fix (`docs/dev/ReviewAndMerge.md`).
 - Run `./CleanupMerged.ps1` without being asked after merges.
 - **Write edit scripts to a file, don't inline them.** A quoted heredoc passed to `python -`/`pwsh -Command` loses backslashes on the way in: Windows paths break (`\v` in `\vswhere` becomes a vertical tab), `\n` becomes a real newline so patterns stop matching, and regex character classes like `[^"\\]` fail to compile. Write the script into the scratchpad directory and run it by path. The same applies to JSON with Windows paths piped through Git Bash `echo`.

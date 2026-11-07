@@ -1,5 +1,7 @@
 # DXForgeImport (headless asset importer, issue #10)
 
+<!-- last-reviewed: 2026-11-07 -->
+
 C#/.NET console app, built only in `DebugEditor`/`ReleaseEditor` (like the editor).
 
 ```

@@ -1,5 +1,7 @@
 # DXForgeEX
 
+<!-- last-reviewed: 2026-11-07 -->
+
 [Game Engine Series (TheGameEngineers / Arash Khatami)](https://www.youtube.com/playlist?list=PLU2nPsAdxKWQYxkmQ3TdbLsyc1l2j25XM) と、その実装である [Primal](https://github.com/TheGameEngineers/Primal) を参考に実装している、学習用の3Dゲームエンジン + WPFレベルエディタです。
 
 C++によるプラットフォーム非依存のエンジンコア、C ABIのDLL境界、その上で動くC#/WPFエディタ、オフラインのコンテンツ(FBX/テクスチャ)インポートパイプラインという構成を踏襲しています。現在の実装は、PBRの直接光(GGX/Smith/Schlickフレネル)まで到達しており、IBL(Image Based Lighting)は未実装です。
