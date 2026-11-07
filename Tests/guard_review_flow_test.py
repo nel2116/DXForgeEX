@@ -7,6 +7,7 @@
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -32,10 +33,24 @@ def user_message(content, **extra):
     return {"type": "user", "message": {"role": "user", "content": content}, **extra}
 
 
+def _remove_readonly(function, path, _error):
+    # git のオブジェクトは読み取り専用で、Windows の rmtree は消せない。属性を外してやり直す。
+    # やり直しも失敗したら、その例外をそのままテストの失敗にする(Issue #215)。
+    os.chmod(path, stat.S_IWRITE)
+    function(path)
+
+
+def remove_tree(path):
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=_remove_readonly)
+    else:
+        shutil.rmtree(path, onerror=_remove_readonly)
+
+
 class TempDir(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp(prefix="dxforge_guard_test_")
-        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.addCleanup(remove_tree, self.dir)
 
 
 class RunsSetStatus(unittest.TestCase):
