@@ -27,6 +27,10 @@
 	削除のあとにフォルダが残っていたら(ファイルがロックされているなど)、警告を出し、そのフォルダの下の
 	DLLやexeを読み込んでいるプロセスを候補として表示する。プロセスは終了させず、フォルダも消さない。
 
+	CodexReview.ps1 が強制終了で残したもの(一時worktree、refs/codex-review/*、ログ、ロック)は、実行ごとに
+	ロックを開いて調べる。開けたら誰も使っていないので消す。共有違反なら実行中なので触らない。
+	ロックがないか確かめられないときは、消さずに警告して手のコマンドを出す。
+
 	最後に、ルートのチェックアウトが develop で、追跡しているファイルに変更がなければ
 	git pull --ff-only する。
 
@@ -252,11 +256,31 @@ try {
 		Write-Warning "  プロセスを終了してから、フォルダを手で消してください。"
 	}
 
+	# CodexReview.ps1 の一時worktreeなら、実行ごとのID(<PR番号>-<ID>)を返す
+	function Get-ReviewRunKey($wt) {
+		if (-not $wt.Branch -and (Split-Path -Leaf $wt.Path) -match '^DXForgeCodexReview-(\d+-[0-9a-f]{8})$') { return $Matches[1] }
+		return $null
+	}
+
+	# 開いたロックか、開けない理由("busy"、"missing"、それ以外は説明)を返す
+	function Open-ReviewLock([string]$path) {
+		if (-not (Test-Path -LiteralPath $path)) { return "missing" }
+		try { return [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None) }
+		catch {
+			$failure = $_.Exception.GetBaseException()
+			# ERROR_SHARING_VIOLATION(32)、ERROR_LOCK_VIOLATION(33)
+			if (($failure.HResult -band 0xFFFF) -in 32, 33) { return "busy" }
+			return $failure.Message
+		}
+	}
+
 	Write-Output "== worktree"
 	$removedBranches = @()
 	foreach ($wt in $worktrees | Select-Object -Skip 1) {
 		if ($wt.Prunable) { continue }
 		if (-not $wt.Branch) {
+			# CodexReview.ps1 の一時worktreeは下の「== review worktree」で扱う
+			if (Get-ReviewRunKey $wt) { continue }
 			Write-Output "残す: $($wt.Path)(detached HEAD)"
 			continue
 		}
@@ -300,6 +324,76 @@ try {
 		}
 		Write-LeftoverFolder $wt.Path
 		$removedBranches += $wt.Branch
+	}
+
+	Write-Output "== review worktree"
+	# CodexReview.ps1 の実行ごとに、登録されたworktree、ref、%TEMP% のロックを集める。
+	# ロックだけのものは、refを作る前に止まったときと、子プロセスが残ってロックを消せなかったときに残る
+	$reviewTemp = [IO.Path]::GetTempPath()
+	$reviewRuns = [ordered]@{}
+	function Get-ReviewRun([string]$key) {
+		if (-not $reviewRuns.Contains($key)) { $reviewRuns[$key] = [pscustomobject]@{ Key = $key; Worktree = $null; Refs = @() } }
+		return $reviewRuns[$key]
+	}
+	foreach ($wt in Get-Worktrees) {
+		$key = Get-ReviewRunKey $wt
+		if ($key) { (Get-ReviewRun $key).Worktree = $wt.Path }
+	}
+	foreach ($name in git for-each-ref --format='%(refname)' refs/codex-review) {
+		$run = Get-ReviewRun (($name -replace '^refs/codex-review/', '') -replace '/[^/]+$', '')
+		$run.Refs += $name
+	}
+	foreach ($file in Get-ChildItem -LiteralPath $reviewTemp -Filter 'DXForgeCodexReview-*.lock' -File -ErrorAction SilentlyContinue) {
+		if ($file.BaseName -match '^DXForgeCodexReview-(\d+-[0-9a-f]{8})$') { Get-ReviewRun $Matches[1] | Out-Null }
+	}
+	foreach ($run in $reviewRuns.Values) {
+		$folder = if ($run.Worktree) { Get-NormalizedPath $run.Worktree } else { Join-Path $reviewTemp "DXForgeCodexReview-$($run.Key)" }
+		$lock = Open-ReviewLock "$folder.lock"
+		if ($lock -eq "busy") {
+			Write-Output "残す: $folder(レビューの実行中)"
+			continue
+		}
+		if ($lock -is [string]) {
+			$why = if ($lock -eq "missing") { "ロックがありません" } else { "ロックを確かめられません: $lock" }
+			Write-Warning "レビューの残りを消しません($why): $($run.Key)"
+			Write-Warning "  使われていないことを確かめてから、手で消してください:"
+			if ($run.Worktree) { Write-Warning "  git worktree remove --force `"$($run.Worktree)`"" }
+			foreach ($name in $run.Refs) { Write-Warning "  git update-ref -d $name" }
+			continue
+		}
+		Write-Output "削除: $folder(レビューは終わっている)"
+		$done = $true
+		try {
+			# ロックを開いたまま消す
+			if ($run.Worktree) {
+				$path = $run.Worktree
+				if (-not (Invoke-Step "git worktree remove --force $path" { git worktree remove --force $path })) {
+					Write-Warning "一時worktreeを削除できませんでした: $path"
+					$done = $false
+				}
+			}
+			# git worktree remove はフォルダを消せなくても登録を消すので、登録のないフォルダも残っていることがある
+			if (-not $DryRun -and (Test-Path -LiteralPath $folder)) {
+				Remove-Item -LiteralPath $folder -Recurse -Force -ErrorAction SilentlyContinue
+				if (Test-Path -LiteralPath $folder) {
+					Write-LeftoverFolder $folder
+					$done = $false
+				}
+			}
+			foreach ($name in $run.Refs) {
+				if (-not (Invoke-Step "git update-ref -d $name" { git update-ref -d $name })) {
+					Write-Warning "refを削除できませんでした: $name"
+					$done = $false
+				}
+			}
+		}
+		finally {
+			$lock.Dispose()
+		}
+		# 残りがあるときはロックも残し、次の実行でやり直す
+		if ($done -and -not $DryRun) {
+			Remove-Item -LiteralPath "$folder.log", "$folder.lock" -ErrorAction SilentlyContinue
+		}
 	}
 
 	Write-Output "== ローカルブランチ"

@@ -6,6 +6,9 @@
 	実装したエージェントとは別のモデルに差分を見せ、別の視点からの指摘を得るためのもの。
 	PRのhead(refs/pull/<番号>/head)を一時フォルダに使い捨てのworktreeとして展開し、その中で
 	codex review を実行する。終わったら(失敗しても)worktreeは削除する。作業中のworktreeには触らない。
+	プロセスが強制終了されると後始末が走らないので、実行中は %TEMP% の DXForgeCodexReview-<番号>-<ID>.lock を
+	排他で開いて持つ。子プロセス(codex)にも継承させるので、ロックを開けるなら誰も使っていない。
+	残ったものは CleanupMerged.ps1 が、ロックを開けたものだけ片付ける。
 
 	注意点:
 	- Windowsでは Codex のサンドボックスが無効("Windows sandbox selection: disabled")だと、読み取り専用の
@@ -193,6 +196,15 @@ function Set-ReviewStatus([string]$Verdict, [string]$Description, [string]$Targe
 	}
 }
 
+# このレビューのrefを消してロックを閉じる。-KeepLock ならロックのファイルは残す(CleanupMerged.ps1 が残りを片付ける目印)
+function Remove-ReviewRun([switch]$KeepLock) {
+	git -C $RepoRoot update-ref -d "$ref/base"
+	git -C $RepoRoot update-ref -d "$ref/head"
+	$reviewLock.Dispose()
+	# codex の子プロセスが残ってロックを継承していれば消せないので、次の CleanupMerged.ps1 に任せる
+	if (-not $KeepLock) { Remove-Item -LiteralPath "$work.lock" -ErrorAction SilentlyContinue }
+}
+
 foreach ($tool in "git", "gh", "codex") {
 	if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
 		throw "$tool が見つかりません。"
@@ -221,9 +233,16 @@ $head = $info.headRefOid
 # 同じPRを並行してレビューしても衝突しないよう、refとworktreeの名前には実行ごとのIDを含める
 $runId = [guid]::NewGuid().ToString('N').Substring(0, 8)
 $ref = "refs/codex-review/$Pr-$runId"
+$work = Join-Path ([System.IO.Path]::GetTempPath()) "DXForgeCodexReview-$Pr-$runId"
+# refとworktreeを作る前に開く。強制終了で finally が走らなくても、ロックが開けるようになることで終わったと分かる
+$reviewLock = [System.IO.FileStream]::new("$work.lock", [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::ReadWrite,
+	[System.IO.FileShare]::None -bor [System.IO.FileShare]::Inheritable)
 # FETCH_HEADは共有されるため、並行して実行したときに書き込みが競合しないよう書き出さない
 git -C $RepoRoot fetch --quiet --no-tags --no-write-fetch-head $repoUrl "+refs/heads/${base}:$ref/base" "+refs/pull/$Pr/head:$ref/head"
-if ($LASTEXITCODE -ne 0) { throw "git fetch に失敗しました。" }
+if ($LASTEXITCODE -ne 0) {
+	Remove-ReviewRun
+	throw "git fetch に失敗しました。"
+}
 $baseSha = git -C $RepoRoot rev-parse "$ref/base"
 # gh で情報を取得してから push されていても、実際に取得したheadをレビューする
 $head = git -C $RepoRoot rev-parse "$ref/head"
@@ -232,8 +251,7 @@ $head = git -C $RepoRoot rev-parse "$ref/head"
 # マージコミットの1番目の親(マージ直前のbase)と2番目の親(マージ時点のPRのhead)を比べる
 $merged = $info.state -eq "MERGED"
 if ($SetStatus -and $info.state -ne "OPEN") {
-	git -C $RepoRoot update-ref -d "$ref/base"
-	git -C $RepoRoot update-ref -d "$ref/head"
+	Remove-ReviewRun
 	throw "-SetStatus はオープンなPRにしか使えません(PR #$Pr は $($info.state))。"
 }
 if ($SetStatus) {
@@ -249,8 +267,7 @@ if ($SetStatus) {
 		Pop-Location
 	}
 	if ($LASTEXITCODE -ne 0 -or "codex-review" -notin $required -or "No hold label" -notin $required) {
-		git -C $RepoRoot update-ref -d "$ref/base"
-		git -C $RepoRoot update-ref -d "$ref/head"
+		Remove-ReviewRun
 		throw "向き先 $base のブランチ保護が codex-review と No hold label を必須にしていないため、-SetStatus(自動マージ)は使えません。"
 	}
 	$needsApproval = "Merge approved" -in $required
@@ -264,8 +281,7 @@ if ($SetStatus) {
 			$reusable = $null
 		}
 		if ($reusable) {
-			git -C $RepoRoot update-ref -d "$ref/base"
-			git -C $RepoRoot update-ref -d "$ref/head"
+			Remove-ReviewRun
 			Write-Output "$($head.Substring(0, 7)) のPASSがPRにあるので、レビューを省略します: $($reusable.Url)(やり直すときは -ForceReview)"
 			Write-Output "判定: PASS"
 			Set-ReviewStatus "PASS" "Codex review: no findings (PASS comment on this commit)" $reusable.Url
@@ -278,20 +294,17 @@ if ($merged) {
 	$mergeSha = $info.mergeCommit.oid
 	$parents = @(git -C $RepoRoot rev-list --parents -n 1 $mergeSha) -split " "
 	if ($parents.Count -ne 3) {
-		git -C $RepoRoot update-ref -d "$ref/base"
-		git -C $RepoRoot update-ref -d "$ref/head"
+		Remove-ReviewRun
 		throw "マージコミット $mergeSha の親が2つではありません(squashやrebaseでマージされたPRには未対応です)。"
 	}
 	$baseSha = $parents[1]
 	$head = $parents[2]
 }
 
-$work = Join-Path ([System.IO.Path]::GetTempPath()) "DXForgeCodexReview-$Pr-$runId"
 $log = "$work.log"
 git -C $RepoRoot worktree add --quiet --detach $work $head
 if ($LASTEXITCODE -ne 0) {
-	git -C $RepoRoot update-ref -d "$ref/base"
-	git -C $RepoRoot update-ref -d "$ref/head"
+	Remove-ReviewRun
 	throw "一時worktreeの作成に失敗しました。"
 }
 
@@ -344,9 +357,9 @@ try {
 }
 finally {
 	git -C $RepoRoot worktree remove --force $work 2>$null
-	if ($LASTEXITCODE -ne 0) { Write-Warning "一時worktreeを削除できませんでした: $work" }
-	git -C $RepoRoot update-ref -d "$ref/base"
-	git -C $RepoRoot update-ref -d "$ref/head"
+	$worktreeRemoved = $LASTEXITCODE -eq 0
+	if (-not $worktreeRemoved) { Write-Warning "一時worktreeを削除できませんでした: $work" }
+	Remove-ReviewRun -KeepLock:(-not $worktreeRemoved)
 }
 
 Remove-Item -ErrorAction SilentlyContinue $log
