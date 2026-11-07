@@ -24,6 +24,7 @@
 // 2026/11/07 別のスレッドが描いている間に ShutdownEngine を呼ぶ確認を追加 (#209)
 // 2026/11/07 GetDrawnFrameCount が描いたときだけ増えることの確認を追加 (#209)
 // 2026/11/08 描画中にエディタがエンティティを作って消す確認を追加 (Primal Day 084, #214)
+// 2026/11/08 エディタのカメラの API(UpdateEditorCamera / SetCameraRange / SetCameraFoV)の確認を追加 (Primal Day 085, #225)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -70,6 +71,11 @@ extern "C" void ResizeRenderSurface(u32 id);
 extern "C" void SetGeometryIds(u32 surface_id, dxforge::id::id_type* geometry_ids, u32 count);
 extern "C" void RenderFrame(u32 surface_id, dxforge::id::id_type camera_id, u64 light_set);
 extern "C" u64 GetDrawnFrameCount(u32 surface_id);
+extern "C" void UpdateEditorCamera(u32 surface_id, f32 pos_x, f32 pos_y, f32 pos_z, f32 rot_x, f32 rot_y, f32 rot_z);
+extern "C" void SetCameraRange(u32 surface_id, f32 near_z, f32 far_z);
+extern "C" void SetCameraFoV(u32 surface_id, f32 fov);
+// テスト専用(DLL からはエクスポートしない)。ビューポートのカメラ。なければ無効なカメラ
+dxforge::graphics::camera get_viewport_camera(u32 surface_id);
 // NOTE: 引数は DXForgeEngineDLL/EntityAPI.cpp の game_entity_descriptor と同じ並びの editor_entity_descriptor
 struct editor_entity_descriptor;
 extern "C" dxforge::id::id_type CreateGameEntity(editor_entity_descriptor* e);
@@ -998,6 +1004,100 @@ namespace dxforge::headless::render
 			return {};
 		}
 
+		/// @brief エディタのカメラの API(Primal Day 085)を、隠しウィンドウと WARP のビューポートで確かめる(#225)
+		/// @details スワップチェインは読み戻せないので、カメラの値(エンティティの位置と回転、視野角、範囲、ビュー射影行列)を読み戻す。
+		///			 大きさ 0 で作ったビューポート(カメラがない)で呼んでも assert に当たらず、Resize で作ったカメラに値が効くことも見る。
+		///			 check_editor_viewports のあと(state.viewport_host があるとき)に呼ぶ。作ったビューポートは消して戻る。
+		/// @return 失敗したときはその説明(成功なら空)
+		std::string check_editor_camera(run_state& state)
+		{
+			if (!state.viewport_host) return "check_editor_camera() needs the hidden host window";
+
+			const auto near_equal = [](f32 a, f32 b) { return std::fabs(a - b) <= 1e-5f; };
+			const auto position_is = [&](const graphics::camera& camera, math::v3 expected)
+			{
+				const math::v3 p{ game_entity::entity{ game_entity::entity_id{ camera.entity_id() } }.position() };
+				return near_equal(p.x, expected.x) && near_equal(p.y, expected.y) && near_equal(p.z, expected.z);
+			};
+			const auto rotation_is = [&](const graphics::camera& camera, math::v3 radians)
+			{
+				using namespace DirectX;
+				math::v4 expected{};
+				XMStoreFloat4(&expected, XMQuaternionRotationRollPitchYawFromVector(XMLoadFloat3(&radians)));
+				const math::v4 q{ game_entity::entity{ game_entity::entity_id{ camera.entity_id() } }.rotation() };
+				return near_equal(q.x, expected.x) && near_equal(q.y, expected.y) && near_equal(q.z, expected.z) && near_equal(q.w, expected.w);
+			};
+			const auto settings_are = [&](const graphics::camera& camera, math::v3 position, math::v3 rotation, f32 near_z, f32 far_z, f32 fov_degrees)
+			{
+				return position_is(camera, position) && rotation_is(camera, rotation) &&
+					near_equal(camera.near_z(), near_z) && near_equal(camera.far_z(), far_z) && near_equal(camera.field_of_view(), fov_degrees / 180.f);
+			};
+			const auto resize = [](u32 id, int width, int height)
+			{
+				SetWindowPos((HWND)GetWindowHandle(id), nullptr, 0, 0, width, height, SWP_NOZORDER | SWP_NOMOVE | SWP_NOACTIVATE);
+				ResizeRenderSurface(id);
+			};
+
+			// カメラがあるビューポート: 値がすぐにカメラに効き、ビュー射影行列(描画)が変わる
+			const u32 viewport{ CreateRenderSurface(state.viewport_host, 64, 64) };
+			const graphics::camera camera{ get_viewport_camera(viewport) };
+			if (!camera.is_valid()) return "a viewport created with a size should have a camera";
+			RenderFrame(viewport, id::invalid_id, 0);
+			const math::m4x4 before{ camera.view_projection() };
+
+			const math::v3 position{ 1.f, 2.f, 3.f };
+			const math::v3 rotation{ 0.1f, -2.f, 0.f };
+			UpdateEditorCamera(viewport, position.x, position.y, position.z, rotation.x, rotation.y, rotation.z);
+			if (!position_is(camera, position) || !rotation_is(camera, rotation)) return "UpdateEditorCamera() should move the viewport camera";
+			SetCameraRange(viewport, 0.5f, 50.f);
+			if (!near_equal(camera.near_z(), 0.5f) || !near_equal(camera.far_z(), 50.f)) return "SetCameraRange() should set the range of the viewport camera";
+			SetCameraFoV(viewport, 90.f);
+			if (!near_equal(camera.field_of_view(), 0.5f)) return "SetCameraFoV() should set the field of view in degrees / 180";
+
+			const u64 drawn{ GetDrawnFrameCount(viewport) };
+			RenderFrame(viewport, id::invalid_id, 0);
+			if (GetDrawnFrameCount(viewport) != drawn + 1) return "a viewport should draw after its camera settings change";
+			const math::m4x4 after{ camera.view_projection() };
+			if (memcmp(&before, &after, sizeof(math::m4x4)) == 0) return "the view projection of the viewport camera should change with the camera settings";
+
+			// 大きさ 0 で作ったビューポート(カメラがない): 呼んでも何もせず、Resize で作ったカメラに最後の値が効く
+			const u32 empty{ CreateRenderSurface(state.viewport_host, 0, 0) };
+			if (get_viewport_camera(empty).is_valid()) return "a viewport created with size 0 should have no camera";
+			UpdateEditorCamera(empty, 9.f, 9.f, 9.f, 0.f, 0.f, 0.f);
+			UpdateEditorCamera(empty, -1.f, 0.5f, 4.f, -0.3f, 1.f, 0.f);
+			SetCameraRange(empty, 0.25f, 200.f);
+			SetCameraFoV(empty, 60.f);
+			RenderFrame(empty, id::invalid_id, 0);
+			if (get_viewport_camera(empty).is_valid()) return "camera settings should not create a camera for a viewport of size 0";
+			resize(empty, 96, 64);
+			const graphics::camera created{ get_viewport_camera(empty) };
+			if (!created.is_valid()) return "a viewport created with size 0 should have a camera after Resize";
+			if (!settings_are(created, { -1.f, 0.5f, 4.f }, { -0.3f, 1.f, 0.f }, 0.25f, 200.f, 60.f))
+				return "the camera made by Resize should use the last camera settings";
+			RenderFrame(empty, id::invalid_id, 0);
+			// 幅を 0 にしてもカメラは作り直さないので、値はそのまま
+			resize(empty, 0, 64);
+			resize(empty, 96, 64);
+			if (get_viewport_camera(empty).get_id() != created.get_id() || !settings_are(created, { -1.f, 0.5f, 4.f }, { -0.3f, 1.f, 0.f }, 0.25f, 200.f, 60.f))
+				return "resizing a viewport to width 0 and back should keep its camera and settings";
+
+			// 範囲外のビューポートと、消したビューポートでは何もしない(render thread の呼び出しが RemoveRenderSurface と前後してもよい)
+			UpdateEditorCamera(empty + 1000, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f);
+			SetCameraRange(empty + 1000, 1.f, 2.f);
+			SetCameraFoV(empty + 1000, 30.f);
+			UpdateEditorCamera(u32_invalid_id, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f);
+			RemoveRenderSurface(viewport);
+			UpdateEditorCamera(viewport, 0.f, 0.f, 0.f, 0.f, 0.f, 0.f);
+			SetCameraRange(viewport, 1.f, 2.f);
+			SetCameraFoV(viewport, 30.f);
+			if (get_viewport_camera(viewport).is_valid()) return "a removed viewport should have no camera";
+			if (!settings_are(created, { -1.f, 0.5f, 4.f }, { -0.3f, 1.f, 0.f }, 0.25f, 200.f, 60.f))
+				return "camera settings for another viewport should not change this camera";
+
+			RemoveRenderSurface(empty);
+			return {};
+		}
+
 		/// @brief 描画して読み戻し、PNGに書き出す(graphics::initialize()のあと)
 		void render_and_capture(const options& opt, const std::filesystem::path& engine_root, run_result& result, run_state& state)
 		{
@@ -1039,6 +1139,7 @@ namespace dxforge::headless::render
 			if (check_error.empty()) check_error = check_renderer_options();
 			if (check_error.empty()) check_error = scene.check_geometry_updates(surface.get());
 			if (check_error.empty()) check_error = check_editor_viewports(scene, state);
+			if (check_error.empty()) check_error = check_editor_camera(state);
 			if (!check_error.empty())
 			{
 				fail(result, exit_code::render_failed, "render_failed", check_error);

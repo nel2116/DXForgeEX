@@ -31,5 +31,10 @@ namespace DXForgeEditor.Utilities
                 });
             };
         }
+
+        private void OnCameraSettings_Button_Click(object sender, RoutedEventArgs e)
+        {
+            cameraSettingsPopup.IsOpen = true;
+        }
     }
 }

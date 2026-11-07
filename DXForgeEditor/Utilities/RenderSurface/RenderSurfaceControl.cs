@@ -222,7 +222,8 @@ namespace DXForgeEditor.Utilities
                 var moveDir = GetMoveDirection();
                 if (moveDir.LengthSquared() > MathUtil.Epsilon)
                 {
-                    _ = Dispatcher.BeginInvoke(() => _camera.ChangePosition(moveDir, _frameTimer.AverageFrameTime));
+                    // NOTE: Primal Day 085 と同じく、render thread から直接呼ぶ(EditorCamera の NOTE を参照)
+                    _camera.ChangePosition(moveDir, _frameTimer.AverageFrameTime);
                 }
             }
 
