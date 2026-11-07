@@ -18,11 +18,14 @@ namespace DXForgeEditor.Automation
     /// NOTE: 別のプロセスにするのは、インポートのコード(DXForgeImport の ImportAndSave と HeadlessEnvironment)を二重にしないためと、
     ///       ContentTools のネイティブのクラッシュを操作の失敗にするため。
     /// NOTE: プロセスが強制終了されると一時フォルダ(.dxforge-import-*)は残るが、Content には何も残らない。
+    ///       残ったフォルダは、次の変更の操作のときに SweepAbandoned が片付ける。
     /// </summary>
     class SceneOpAssetStaging(string projectFile, string importerPath) : IDisposable
     {
         public const string ImporterFileName = "DXForgeImport.exe";
         public const string StagingFolderPrefix = ".dxforge-import-";
+        private const string StagingLockFileName = "staging.lock";
+        private const int ErrorSharingViolation = 32;
 
         // DXForgeImport の終了コード(DXForgeImport/Program.cs の ExitCode)
         private const int ImporterInputNotFound = 3;
@@ -41,6 +44,7 @@ namespace DXForgeEditor.Automation
         private readonly List<string> _createdFolders = [];
         private readonly List<string> _leftoverPaths = [];
         private string? _stagingFolder;
+        private FileStream? _stagingLock;
 
         public static string DefaultImporterPath => Path.Combine(AppContext.BaseDirectory, ImporterFileName);
 
@@ -49,14 +53,67 @@ namespace DXForgeEditor.Automation
         /// <summary>消せずに残ったファイルとフォルダ。失敗したときも成功したときも、結果に出す。</summary>
         public IReadOnlyList<string> LeftoverPaths => _leftoverPaths;
 
+        /// <summary>
+        /// 強制終了で残った一時フォルダを片付ける。例外は投げない。ロックを共有なしで開けたフォルダだけを消す(所有者も、その子の importer も、もういない)。
+        /// 共有違反は使用中なので触らない。ロックがない、または確かめられないフォルダは、使っていないと言えないので消さずに警告する。
+        /// </summary>
+        public static StagingSweepResult SweepAbandoned(string projectFile)
+        {
+            var result = new StagingSweepResult();
+            var projectFolder = Path.GetDirectoryName(Path.GetFullPath(projectFile)) ?? string.Empty;
+            List<string> folders;
+            try
+            {
+                folders = Directory.EnumerateDirectories(projectFolder, StagingFolderPrefix + "*").ToList();
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                result.Warnings.Add($"残った一時フォルダを確かめられません: {projectFolder}({ex.Message})");
+                return result;
+            }
+
+            foreach (var folder in folders)
+            {
+                // 自分の形の名前だけを見る
+                if (!Guid.TryParseExact(Path.GetFileName(folder)[StagingFolderPrefix.Length..], "N", out _)) continue;
+
+                FileStream? held = null;
+                try
+                {
+                    held = new FileStream(Path.Combine(folder, StagingLockFileName), FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                }
+                catch (Exception ex) when (ex is FileNotFoundException || ex is DirectoryNotFoundException)
+                {
+                    // 確かめる間に所有者が消したなら、何も残っていない
+                    if (Directory.Exists(folder)) result.Warnings.Add($"ロックのない一時フォルダは消しません。使っている dxforge がなければ、手で消してください: {folder}");
+                }
+                catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+                {
+                    if ((ex.HResult & 0xFFFF) != ErrorSharingViolation) result.Warnings.Add($"一時フォルダが使用中かを確かめられないので、消しません: {folder}({ex.Message})");
+                }
+                if (held == null) continue;
+
+                var error = DeleteStagingFolder(folder, held);
+                if (error == null)
+                {
+                    result.Removed.Add(folder);
+                }
+                else
+                {
+                    result.Leftovers.Add(folder);
+                    result.Warnings.Add($"残った一時フォルダを消せませんでした: {folder}({error})");
+                }
+            }
+            return result;
+        }
+
         /// <summary>取り込んで一時フォルダに書く。結果の assets と warnings を埋める。Content には触らない。</summary>
         public void Import(SceneOp op, JsonObject result, JsonArray warnings)
         {
             var source = op.Source!;
             if (!File.Exists(source)) throw new SceneOpException(SceneOpErrorKind.NotFound, "source_not_found", $"取り込むファイルがありません: {source}", key: "source");
 
-            _stagingFolder ??= Path.Combine(_projectFolder, StagingFolderPrefix + Guid.NewGuid().ToString("N"));
-            var opFolder = Path.Combine(_stagingFolder, op.Index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            var opFolder = Path.Combine(EnsureStagingFolder(), op.Index.ToString(System.Globalization.CultureInfo.InvariantCulture));
             var relativeFolder = op.Folder ?? string.Empty;
             var output = Path.GetFullPath(Path.Combine(opFolder, relativeFolder));
             var finalOutput = Path.GetFullPath(Path.Combine(_contentFolder, relativeFolder));
@@ -175,11 +232,72 @@ namespace DXForgeEditor.Automation
         /// <summary>一時フォルダを消す。成功したときも失敗したときも、最後に必ず呼ぶ。</summary>
         public void Dispose()
         {
-            if (_stagingFolder != null && Directory.Exists(_stagingFolder))
+            if (_stagingLock != null && _stagingFolder != null)
+            {
+                var error = DeleteStagingFolder(_stagingFolder, _stagingLock);
+                if (error != null)
+                {
+                    _leftoverPaths.Add(_stagingFolder);
+                    Logger.Log(MessageType.Warning, $"消せませんでした: {_stagingFolder}({error})");
+                }
+            }
+            else if (_stagingFolder != null && Directory.Exists(_stagingFolder))
             {
                 TryDelete(_stagingFolder, () => Directory.Delete(_stagingFolder, recursive: true));
             }
+            _stagingLock = null;
             _stagingFolder = null;
+        }
+
+        /// <summary>
+        /// 一時フォルダを作り、このプロセスが生きている間はロックを持つ。OS がハンドルを閉じるので、強制終了されてもロックは残らない。
+        /// NOTE: Inheritable にして importer にも継承させる。dxforge だけが殺されても、importer が書き終わるまでは使用中と判定するため。
+        /// </summary>
+        private string EnsureStagingFolder()
+        {
+            if (_stagingFolder != null) return _stagingFolder;
+            _stagingFolder = Path.Combine(_projectFolder, StagingFolderPrefix + Guid.NewGuid().ToString("N"));
+            try
+            {
+                Directory.CreateDirectory(_stagingFolder);
+                _stagingLock = new FileStream(Path.Combine(_stagingFolder, StagingLockFileName), FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None | FileShare.Inheritable);
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                throw new SceneOpException(SceneOpErrorKind.OperationFailed, "import_failed", $"一時フォルダを作れません: {_stagingFolder}({ex.Message})", key: "source");
+            }
+            return _stagingFolder;
+        }
+
+        /// <summary>
+        /// ロックを持ったまま中身を消し、最後にロックを閉じてフォルダごと消す。held は必ず閉じる。消せなければその理由を返し、ロックのファイルは残す(次の実行が片付ける)。
+        /// </summary>
+        private static string? DeleteStagingFolder(string folder, FileStream held)
+        {
+            try
+            {
+                foreach (var entry in Directory.EnumerateFileSystemEntries(folder).ToList())
+                {
+                    if (string.Equals(Path.GetFileName(entry), StagingLockFileName, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (Directory.Exists(entry)) Directory.Delete(entry, recursive: true);
+                    else File.Delete(entry);
+                }
+                held.Dispose();
+                Directory.Delete(folder, recursive: true);
+                return null;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return null; // ロックを閉じたあとに、別の実行の片付けが先に消した
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                return ex.Message;
+            }
+            finally
+            {
+                held.Dispose();
+            }
         }
 
         private void TryDelete(string path, Action delete)
@@ -300,5 +418,13 @@ namespace DXForgeEditor.Automation
                 }
             }
         }
+    }
+
+    /// <summary>SceneOpAssetStaging.SweepAbandoned の結果。</summary>
+    class StagingSweepResult
+    {
+        public List<string> Removed { get; } = [];
+        public List<string> Leftovers { get; } = [];
+        public List<string> Warnings { get; } = [];
     }
 }

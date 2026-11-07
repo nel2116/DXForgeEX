@@ -27,6 +27,11 @@
 	  terminal-unknown      terminal list が失敗したときと途中で切れたときは、残す
 	  live-worker   worker-list に解放されていないworkerがいるworktreeは残し、released だけのworktreeは消す(#166)
 	  worker-unknown        run-list か worker-list が失敗したときは、残す
+	  review-free   ロックを開けるレビューの残り(worktree、ref、ログ、ロック、登録のないフォルダ)は消える
+	  review-busy   ロックを別のプロセスが持っているレビューには触らない
+	  review-other-repo     別のクローンのレビューのロックと、持ち主が書かれていないロックには触らない
+	  review-no-lock        ロックがないか確かめられないレビューの残りは、消さずに警告する
+	  review-dry-run        -DryRun ではレビューの残りを消さない
 
 .PARAMETER ScriptPath
 	テストするスクリプト。既定はリポジトリの CleanupMerged.ps1。修正前のスクリプトで再現を確かめるときは、
@@ -178,8 +183,10 @@ function New-Sandbox {
 	Invoke-Git -C $root commit --quiet -m "init" | Out-Null
 	Invoke-Git -C $root remote add origin $origin | Out-Null
 	Invoke-Git -C $root push --quiet -u origin develop | Out-Null
+	$temp = Join-Path $dir "tmp"
+	New-Item -ItemType Directory -Force $temp | Out-Null
 	return [ordered]@{
-		Dir = $dir; Bin = $bin; Root = $root; Prs = @{}; Pids = (Join-Path $dir "pids.txt"); OrcaLog = (Join-Path $dir "orca.log")
+		Dir = $dir; Bin = $bin; Root = $root; Prs = @{}; Pids = (Join-Path $dir "pids.txt"); OrcaLog = (Join-Path $dir "orca.log"); Temp = $temp
 	}
 }
 
@@ -208,10 +215,31 @@ function New-Branch($sb, [string]$branch, [switch]$Worktree, [switch]$Merge) {
 	if ($path) { return ($path -replace '\\', '/') }
 }
 
+# CodexReview.ps1 の実行が残すものを作る。戻り値の Path は一時worktreeのパス(ログとロックはその隣)
+# -Owner を省くと、ロックの持ち主はこのリポジトリになる
+function New-ReviewRun($sb, [string]$key, [switch]$Worktree, [switch]$Refs, [switch]$Log, [switch]$Lock, [string]$Owner = (git -C $sb.Root rev-parse --path-format=absolute --git-common-dir)) {
+	$path = Join-Path $sb.Temp "DXForgeCodexReview-$key"
+	if ($Worktree) { Invoke-Git -C $sb.Root worktree add --quiet --detach $path develop | Out-Null }
+	if ($Refs) {
+		foreach ($side in "base", "head") { Invoke-Git -C $sb.Root update-ref "refs/codex-review/$key/$side" develop | Out-Null }
+	}
+	if ($Log) { Set-Content -LiteralPath "$path.log" -Value "log" }
+	if ($Lock) { Set-Content -LiteralPath "$path.lock" -Value $Owner }
+	return [ordered]@{ Key = $key; Path = $path; Registered = ($path -replace '\\', '/') }
+}
+
+function Get-ReviewRefs($sb, [string]$key) {
+	return @(git -C $sb.Root for-each-ref --format='%(refname)' "refs/codex-review/$key")
+}
+
 # テスト対象を実行する。-NoOrca なら本物も偽物もない PATH にする
 function Invoke-Cleanup($sb, [string[]]$arguments = @(), [switch]$NoOrca, [string]$OrcaMode = "async", [string]$Script, [switch]$InPlace, [string]$Terminals = "", [string]$Workers = "") {
 	$savedPath = $env:PATH
+	# スクリプトは %TEMP% のレビューのロックを読むので、本物の %TEMP% を見せない
+	$savedTemp = $env:TEMP, $env:TMP
 	try {
+		$env:TEMP = $sb.Temp
+		$env:TMP = $sb.Temp
 		$dirs = $env:PATH -split ';' | Where-Object { $_ }
 		if ($NoOrca) {
 			$orcaDirs = Get-Command orca -All -ErrorAction SilentlyContinue | ForEach-Object { Split-Path $_.Source }
@@ -256,6 +284,7 @@ function Invoke-Cleanup($sb, [string[]]$arguments = @(), [switch]$NoOrca, [strin
 	}
 	finally {
 		$env:PATH = $savedPath
+		$env:TEMP, $env:TMP = $savedTemp
 	}
 }
 
@@ -519,6 +548,110 @@ $cases["worker-unknown"] = {
 			Check ((Test-Registered $sb $wt) -and (Test-BranchExists $sb "fix/unknown")) "$mode : worktreeとブランチは残っている"
 		}
 		Check ((Get-OrcaCalls $sb).Count -eq 0) "orca worktree rm は呼ばれない"
+	}
+	finally { Remove-Sandbox $sb }
+}
+
+$cases["review-free"] = {
+	$sb = New-Sandbox
+	try {
+		$full = New-ReviewRun $sb "7-aaaaaaa1" -Worktree -Refs -Log -Lock
+		$lockOnly = New-ReviewRun $sb "7-aaaaaaa2" -Lock
+		# git worktree remove がフォルダを消せずに登録だけ消した状態
+		$folderOnly = New-ReviewRun $sb "7-aaaaaaa3" -Lock
+		New-Item -ItemType Directory -Force $folderOnly.Path | Out-Null
+		Set-Content -LiteralPath (Join-Path $folderOnly.Path "left.txt") -Value "left"
+		$r = Invoke-Cleanup $sb
+		Check ($r.ExitCode -eq 0) "終了コードが0"
+		Check ($r.Text -notmatch 'WARNING|警告') "警告が1つも出ない"
+		Check ($r.Text -notmatch 'detached HEAD') "detached HEAD として二重に表示しない"
+		Check (-not (Test-Registered $sb $full.Registered)) "worktreeの登録が消えた"
+		Check (-not (Test-Path -LiteralPath $full.Path)) "worktreeのフォルダが消えた"
+		Check ((Get-ReviewRefs $sb $full.Key).Count -eq 0) "refが消えた"
+		Check (-not (Test-Path -LiteralPath "$($full.Path).log")) "ログが消えた"
+		Check (-not (Test-Path -LiteralPath "$($full.Path).lock")) "ロックが消えた"
+		Check (-not (Test-Path -LiteralPath "$($lockOnly.Path).lock")) "ロックだけのものも消えた"
+		Check (-not (Test-Path -LiteralPath $folderOnly.Path)) "登録のないフォルダが消えた"
+		Check (-not (Test-Path -LiteralPath "$($folderOnly.Path).lock")) "登録のないフォルダのロックが消えた"
+	}
+	finally { Remove-Sandbox $sb }
+}
+
+$cases["review-busy"] = {
+	$sb = New-Sandbox
+	$held = $null
+	try {
+		$run = New-ReviewRun $sb "7-bbbbbbb1" -Worktree -Refs -Log -Lock
+		$held = [IO.File]::Open("$($run.Path).lock", [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+		$r = Invoke-Cleanup $sb
+		Check ($r.ExitCode -eq 0) "終了コードが0"
+		Check ($r.Text -match "残す: .*DXForgeCodexReview-7-bbbbbbb1\(レビューの実行中\)") "実行中なので残すと表示する"
+		Check ($r.Text -notmatch 'WARNING|警告') "警告は出ない"
+		Check ((Test-Registered $sb $run.Registered) -and (Test-Path -LiteralPath $run.Path)) "worktreeは残っている"
+		Check ((Get-ReviewRefs $sb $run.Key).Count -eq 2) "refは残っている"
+		Check ((Test-Path -LiteralPath "$($run.Path).log") -and (Test-Path -LiteralPath "$($run.Path).lock")) "ログとロックは残っている"
+	}
+	finally {
+		if ($held) { $held.Dispose() }
+		Remove-Sandbox $sb
+	}
+}
+
+$cases["review-other-repo"] = {
+	$sb = New-Sandbox
+	try {
+		# 別のクローンで止まったレビュー。%TEMP% は共有なので、フォルダとロックが見える
+		$other = New-ReviewRun $sb "7-eeeeeee1" -Lock -Log -Owner "C:/somewhere/else/.git"
+		New-Item -ItemType Directory -Force $other.Path | Out-Null
+		$blank = New-ReviewRun $sb "7-eeeeeee2" -Lock -Owner ""
+		$r = Invoke-Cleanup $sb
+		Check ($r.ExitCode -eq 0) "終了コードが0"
+		Check ($r.Text -match "残す: .*DXForgeCodexReview-7-eeeeeee1\(このリポジトリのレビューではない: C:/somewhere/else/\.git\)") "別のリポジトリのレビューなので残すと表示する"
+		Check ($r.Text -notmatch 'WARNING|警告') "警告は出ない"
+		Check ((Test-Path -LiteralPath $other.Path) -and (Test-Path -LiteralPath "$($other.Path).lock") -and (Test-Path -LiteralPath "$($other.Path).log")) "フォルダ、ロック、ログは残っている"
+		Check (Test-Path -LiteralPath "$($blank.Path).lock") "持ち主が書かれていないロックも残っている"
+	}
+	finally { Remove-Sandbox $sb }
+}
+
+$cases["review-no-lock"] = {
+	$sb = New-Sandbox
+	try {
+		$noLock = New-ReviewRun $sb "7-ccccccc1" -Worktree -Refs -Log
+		$refsOnly = New-ReviewRun $sb "7-ccccccc2" -Refs
+		# ロックの代わりにフォルダがあると開けない(確かめられない場合の再現)
+		$unknown = New-ReviewRun $sb "7-ccccccc3" -Worktree -Refs
+		New-Item -ItemType Directory -Force "$($unknown.Path).lock" | Out-Null
+		$r = Invoke-Cleanup $sb
+		Check ($r.ExitCode -eq 0) "終了コードが0"
+		Check ($r.Text -match "ロックがありません\): 7-ccccccc1") "ロックがないと警告する"
+		Check ($r.Text -match "ロックを確かめられません.*: 7-ccccccc3") "確かめられないと警告する"
+		Check ($r.Text.Contains("git worktree remove --force `"$($noLock.Registered)`"")) "worktreeを消す手のコマンドを出す"
+		Check ($r.Text.Contains("git update-ref -d refs/codex-review/7-ccccccc2/base")) "refを消す手のコマンドを出す"
+		foreach ($run in $noLock, $unknown) {
+			Check ((Test-Registered $sb $run.Registered) -and (Test-Path -LiteralPath $run.Path)) "$($run.Key): worktreeは残っている"
+		}
+		foreach ($run in $noLock, $refsOnly, $unknown) {
+			Check ((Get-ReviewRefs $sb $run.Key).Count -eq 2) "$($run.Key): refは残っている"
+		}
+		Check (Test-Path -LiteralPath "$($noLock.Path).log") "ログは残っている"
+	}
+	finally { Remove-Sandbox $sb }
+}
+
+$cases["review-dry-run"] = {
+	$sb = New-Sandbox
+	try {
+		$run = New-ReviewRun $sb "7-ddddddd1" -Worktree -Refs -Log -Lock
+		$lockOnly = New-ReviewRun $sb "7-ddddddd2" -Lock
+		$r = Invoke-Cleanup $sb @("-DryRun")
+		Check ($r.ExitCode -eq 0) "終了コードが0"
+		Check ($r.Text -match "削除: .*DXForgeCodexReview-7-ddddddd1") "消す対象を表示する"
+		Check ($r.Text -match "\(DryRun\) git worktree remove --force") "コマンドを実行せずに表示する"
+		Check ((Test-Registered $sb $run.Registered) -and (Test-Path -LiteralPath $run.Path)) "worktreeは残っている"
+		Check ((Get-ReviewRefs $sb $run.Key).Count -eq 2) "refは残っている"
+		Check ((Test-Path -LiteralPath "$($run.Path).log") -and (Test-Path -LiteralPath "$($run.Path).lock")) "ログとロックは残っている"
+		Check (Test-Path -LiteralPath "$($lockOnly.Path).lock") "ロックだけのものも残っている"
 	}
 	finally { Remove-Sandbox $sb }
 }

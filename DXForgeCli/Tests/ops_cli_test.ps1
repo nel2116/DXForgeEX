@@ -19,7 +19,9 @@
      10. 偽の importer(fake_importer.cmd)で import-asset: 成功、folder、--dry-run、失敗で Content と .dxproj が変わらないこと、終了コードの対応、衝突、44。
      11. コミットの失敗: Content への移動の途中の失敗、保存の失敗、戻す処理の失敗(LeftoverPaths)、タイムアウト。
      12. 実物の DXForgeImport(--importer なし): box.fbx と埋め込みテクスチャの FBX を取り込み → set-geometry → --export-game-bin。
+         LOD グループが 2 つの FBX で、複数の .asset が全部 assets に出て Content に移ること。
          .asset の生のバイトに一時フォルダのパスが残らないこと。ContentTools.dll(FBX SDK)がなければ SKIP。
+     13. 強制終了で残った一時フォルダの片付け: ロックが空いていれば消す、使用中とロックのないものは消さない。dxforge だけを kill しても importer が生きている間は消さない。
 
 .PARAMETER Configuration
     DebugEditor(既定)か ReleaseEditor。
@@ -39,6 +41,10 @@
 .PARAMETER LodFbxFile
     節 12 で取り込む、LOD のある FBX。指定しなければ、この確認は行わない。
 
+.PARAMETER MultiLodFbxFile
+    節 12 で取り込む、LOD グループが 2 つ以上ある FBX。assets に全部が出て、Content に移ることを確かめる。
+    指定しなければ FbxFile から DXForgeImport\Tests\make_multilod_fbx.py で作る。
+
 .EXAMPLE
     pwsh -STA -NoProfile -File DXForgeCli/Tests/ops_cli_test.ps1 -RequireRunner
 
@@ -53,7 +59,8 @@ param(
 	[switch]$RequireRunner,
 	[switch]$RequireRealImporter,
 	[string]$FbxFile = "C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\samples\ConvertScene\box.fbx",
-	[string]$LodFbxFile
+	[string]$LodFbxFile,
+	[string]$MultiLodFbxFile
 )
 
 $ErrorActionPreference = "Stop"
@@ -1296,7 +1303,136 @@ try
 			Test-NoStagingPath "real importer: an FBX with LODs" $content
 		}
 		else { Write-Host "  (-LodFbxFile is not given: an FBX with LODs is not checked)" }
+
+		# LOD グループが 2 つ以上ある FBX: .asset が複数でき、全部が assets に出て Content に移る
+		if (-not $MultiLodFbxFile)
+		{
+			$MultiLodFbxFile = Join-Path $work "multilod.fbx"
+			python (Join-Path $RepoRoot "DXForgeImport\Tests\make_multilod_fbx.py") $FbxFile $MultiLodFbxFile
+			Check ($LASTEXITCODE -eq 0) "real importer: make_multilod_fbx.py makes an FBX from $FbxFile"
+		}
+		$project = New-EmptyProject "RealMultiLod"
+		$content = Get-ContentOf $project
+		$r = Invoke-Ops $project @((Import-Json $MultiLodFbxFile "Models"))
+		Expect-Saved "real importer: an FBX with several LOD groups" $r
+		$assets = @(@($r.Json.results)[0].assets)
+		Write-Host "       assets: $($assets | ConvertTo-Json -Compress)"
+		$files = @(Get-ChildItem -LiteralPath (Join-Path $content "Models") -Filter "*.asset" -File -ErrorAction SilentlyContinue)
+		Check ($assets.Count -ge 2 -and $files.Count -eq $assets.Count) "real importer: several LOD groups -> several assets, as many files in Content" $r.Stdout
+		foreach ($asset in $assets)
+		{
+			Check (Test-Path -LiteralPath (Join-Path $content ($asset.path -replace '^path:', ''))) "real importer: several LOD groups -> $($asset.path) is in Content"
+		}
+		Check (-not (Test-StagingLeft $project)) "real importer: several LOD groups -> no staging folder"
+		Test-NoStagingPath "real importer: several LOD groups" $content
 	}
+
+	Write-Host "13. staging folders left by a killed process"
+	function New-LeftStaging([string]$project, [switch]$NoLock)
+	{
+		$folder = Join-Path (Split-Path $project) (".dxforge-import-" + [Guid]::NewGuid().ToString("N"))
+		$null = New-Item -ItemType Directory -Force (Join-Path $folder "0\Models")
+		[System.IO.File]::WriteAllText((Join-Path $folder "0\Models\left.asset"), "left")
+		if (-not $NoLock) { [System.IO.File]::WriteAllText((Join-Path $folder "staging.lock"), "") }
+		return $folder
+	}
+	$changeOp = '{"op":"create-entity","name":"AfterKill"}'
+
+	# 所有者がいない(ロックが空いている) -> 消す。1 回の実行で一度だけ。JSON はそのまま
+	$project = New-EmptyProject "SweepAbandoned"
+	$folder = New-LeftStaging $project
+	$second = New-LeftStaging $project
+	$r = Invoke-Ops $project @($changeOp)
+	Expect-Saved "abandoned staging folders" $r
+	Check (-not (Test-Path -LiteralPath $folder) -and -not (Test-Path -LiteralPath $second)) "abandoned staging folders -> removed" $r.Stderr
+	Check (@($r.Json.leftover_paths).Count -eq 0) "abandoned staging folders -> leftover_paths is empty" $r.Stdout
+	Check (([regex]::Matches($r.Stderr, [regex]::Escape($folder))).Count -eq 1) "abandoned staging folders -> swept once in a run" $r.Stderr
+
+	# --dry-run と読むだけの操作では消さない
+	$project = New-EmptyProject "SweepDryRun"
+	$folder = New-LeftStaging $project
+	$r = Invoke-Ops $project @($changeOp) -DryRun
+	Check ($r.Code -eq 0 -and (Test-Path -LiteralPath $folder)) "--dry-run -> a left staging folder stays" $r.Stdout
+	$r = Invoke-Ops $project @('{"op":"list-entities"}')
+	Check ($r.Code -eq 0 -and (Test-Path -LiteralPath $folder)) "read-only ops -> a left staging folder stays" $r.Stdout
+
+	# 操作が失敗しても片付けるが、.dxproj は変わらない
+	$before = Read-Bytes $project
+	$r = Expect-Unchanged "a failing op with a left staging folder" $project $before 41 "target_not_found" { Invoke-Ops $project @('{"op":"remove-entity","target":"guid:00000000-0000-4000-8000-00000000dead"}') }
+	Check (-not (Test-Path -LiteralPath $folder)) "a failing op -> the left staging folder is removed" $r.Stderr
+
+	# 使用中(別のプロセスがロックを持つ) -> 消さず、警告もしない
+	$project = New-EmptyProject "SweepInUse"
+	$folder = New-LeftStaging $project
+	$holder = [System.IO.FileStream]::new((Join-Path $folder "staging.lock"), [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+	try
+	{
+		$r = Invoke-Ops $project @($changeOp)
+		Expect-Saved "a staging folder in use" $r
+		Check ((Test-Path -LiteralPath (Join-Path $folder "0\Models\left.asset")) -and $r.Stderr -notmatch [regex]::Escape($folder)) "a staging folder in use -> not touched, no warning" $r.Stderr
+	}
+	finally { $holder.Dispose() }
+
+	# ロックのないフォルダ(この変更より前の残り、作成の瞬間) -> 消さずに stderr に警告。stdout の JSON は読める
+	$project = New-EmptyProject "SweepNoLock"
+	$folder = New-LeftStaging $project -NoLock
+	$r = Invoke-Ops $project @($changeOp)
+	Expect-Saved "a staging folder without a lock" $r
+	Check ((Test-Path -LiteralPath (Join-Path $folder "0\Models\left.asset")) -and $r.Stderr -match [regex]::Escape($folder)) "a staging folder without a lock -> kept, warned on stderr" $r.Stderr
+	Check (@($r.Json.leftover_paths).Count -eq 0) "a staging folder without a lock -> not in leftover_paths" $r.Stdout
+
+	# 名前が自分の形でないものには触らない
+	$project = New-EmptyProject "SweepOtherName"
+	$other = Join-Path (Split-Path $project) ".dxforge-import-keep"
+	$null = New-Item -ItemType Directory $other
+	[System.IO.File]::WriteAllText((Join-Path $other "staging.lock"), "")
+	$r = Invoke-Ops $project @($changeOp)
+	Check ($r.Code -eq 0 -and (Test-Path -LiteralPath $other) -and $r.Stderr -notmatch "keep") "a folder not named by dxforge -> not touched, no warning" $r.Stderr
+
+	# 中のファイルを消せない -> leftover_paths に出して、操作は成功。次の実行で消える
+	$project = New-EmptyProject "SweepUndeletable"
+	$folder = New-LeftStaging $project
+	$holder = [System.IO.FileStream]::new((Join-Path $folder "0\Models\left.asset"), [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+	try
+	{
+		$r = Invoke-Ops $project @($changeOp)
+		Expect-Saved "a left staging folder that cannot be deleted" $r
+		Check (@($r.Json.leftover_paths) -contains $folder) "a left staging folder that cannot be deleted -> leftover_paths has it" $r.Stdout
+	}
+	finally { $holder.Dispose() }
+	$r = Invoke-Ops $project @('{"op":"create-entity","name":"AfterRelease"}')
+	Check ($r.Code -eq 0 -and -not (Test-Path -LiteralPath $folder)) "the next run removes it" "$($r.Stdout) $($r.Stderr)"
+
+	# dxforge と実際に Process.Start された importer の組み合わせ: dxforge だけを kill しても、importer が生きている間はロックが続く
+	$project = New-EmptyProject "SweepKilled"
+	$argsLog = Join-Path $work "killed_args.txt"
+	$spec = New-Spec @{ args_log = $argsLog; sleep = 12; assets = @{ "killed.asset" = $mesh } }
+	$psi = [System.Diagnostics.ProcessStartInfo]::new($Cli)
+	$psi.UseShellExecute = $false
+	$psi.RedirectStandardOutput = $true
+	$psi.RedirectStandardError = $true
+	foreach ($a in @("--load-project", $project, "--op", (Import-Json $spec), "--importer", $FakeImporter, "--json")) { $psi.ArgumentList.Add($a) }
+	$killed = [System.Diagnostics.Process]::Start($psi)
+	$deadline = [DateTime]::UtcNow.AddSeconds(30)
+	while (-not (Test-Path -LiteralPath $argsLog) -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 100 }
+	Check (Test-Path -LiteralPath $argsLog) "killed dxforge: the importer started"
+	$killed.Kill() # 子のプロセスは残す
+	$killed.WaitForExit()
+	$left = @(Get-ChildItem -Force -LiteralPath (Split-Path $project) -Directory -Filter ".dxforge-import-*")
+	Check ($left.Count -eq 1 -and -not (Test-Path -LiteralPath (Get-ContentOf $project))) "killed dxforge: a staging folder is left, nothing in Content"
+	$r = Invoke-Ops $project @($changeOp)
+	Expect-Saved "killed dxforge, the importer still runs" $r
+	Check ($left.Count -eq 1 -and (Test-Path -LiteralPath $left[0].FullName) -and $r.Stderr -notmatch "\.dxforge-import-") "killed dxforge: the importer still holds the inherited lock -> the folder is not touched" $r.Stderr
+	$lockFree = $false
+	$deadline = [DateTime]::UtcNow.AddSeconds(60)
+	while (-not $lockFree -and [DateTime]::UtcNow -lt $deadline)
+	{
+		try { [System.IO.FileStream]::new((Join-Path $left[0].FullName "staging.lock"), [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None).Dispose(); $lockFree = $true }
+		catch { Start-Sleep -Milliseconds 200 }
+	}
+	Check $lockFree "killed dxforge: the lock is free once the importer ends"
+	$r = Invoke-Ops $project @('{"op":"create-entity","name":"AfterImporter"}')
+	Check ($r.Code -eq 0 -and -not (Test-StagingLeft $project)) "killed dxforge: the next run removes the folder after the importer ended" "$($r.Stdout) $($r.Stderr)"
 
 	Check ($assertRecorder.Failures.Count -eq 0) "no Debug.Assert fired in the editor code" ($assertRecorder.Failures -join "; ")
 }
