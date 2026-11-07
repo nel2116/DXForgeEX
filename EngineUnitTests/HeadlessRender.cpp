@@ -26,6 +26,7 @@
 // 2026/11/08 描画中にエディタがエンティティを作って消す確認を追加 (Primal Day 084, #214)
 // 2026/11/08 描いたあとでメッシュをアップロードする確認を追加 (#224)
 // 2026/11/08 エディタのカメラの API(UpdateEditorCamera / SetCameraRange / SetCameraFoV)の確認を追加 (Primal Day 085, #225)
+// 2026/11/08 ウィンドウを持つスレッドがミューテックスを待つ間に別のスレッドが Present する確認と --show-viewports を追加 (#213)
 // 2026/11/08 エディタのエンティティの記述子の回転をクォータニオンにした (#205)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
@@ -119,6 +120,7 @@ namespace dxforge::headless::render
 			bool			has_width{ false };
 			bool			has_height{ false };
 			bool			as_json{ false };
+			bool			show_viewports{ false };	// #213 の確認の親ウィンドウを画面に出す
 		};
 
 		// 実行結果
@@ -234,6 +236,10 @@ namespace dxforge::headless::render
 				else if (arg == L"--json")
 				{
 					opt.as_json = true;
+				}
+				else if (arg == L"--show-viewports")
+				{
+					opt.show_viewports = true;
 				}
 				else if (arg == L"--frames" || arg == L"--width" || arg == L"--height")
 				{
@@ -1119,6 +1125,113 @@ namespace dxforge::headless::render
 			return {};
 		}
 
+		/// @brief ウィンドウを持つスレッドがメッセージを処理せずにミューテックスを待つ間に、別のスレッドが Present する(#213)
+		/// @details エディタでは、UI スレッドがビューポートのウィンドウとスワップチェインを作り、render thread が RenderFrame の中で
+		///			 ミューテックスを持ったまま Present を呼ぶ。UI スレッドは UpdateEditorCamera や ResizeRenderSurface で同じミューテックスを
+		///			 スピンで待ち、その間メッセージを処理しない。Present がウィンドウのスレッドのメッセージ処理を待つなら、ここで止まる。
+		///			 このスレッド(ウィンドウを持つ)は、確認の間に一度もメッセージを処理しない。止まったときは、見張りのスレッドが
+		///			 時間切れでプロセスを終了コード 22 で終える(止まったスレッドは戻れないので、結果の JSON は出ない)。
+		///			 UpdateEditorCamera 1 回にかかった時間(ほぼミューテックスの待ち)も測り、標準エラーに出す。
+		/// @param show_window true なら親ウィンドウを画面に出す(--show-viewports。実機の GPU で DWM を通す確認用)
+		/// @return 失敗したときはその説明(成功なら空)
+		std::string check_present_while_window_thread_waits(test_scene& scene, bool show_window)
+		{
+			constexpr u32 iterations{ 300 };		// このスレッドが UpdateEditorCamera を呼ぶ回数
+			constexpr u32 resize_every{ 5 };		// この回数ごとにリサイズする
+			constexpr DWORD timeout_ms{ 60000 };	// これを超えたら止まったとみなす
+			constexpr int width{ 320 };
+			constexpr int height{ 180 };
+
+			const DWORD style{ WS_POPUP | (show_window ? (DWORD)WS_VISIBLE : 0u) };
+			const HWND host{ CreateWindowExW(0, L"STATIC", L"", style, 100, 100, width + 64, height + 64, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr) };
+			if (!host) return "failed to create the host window for the present check";
+
+			const HANDLE finished{ CreateEventW(nullptr, TRUE, FALSE, nullptr) };
+			if (!finished)
+			{
+				DestroyWindow(host);
+				return "failed to create the event for the present check";
+			}
+			std::thread watchdog{ [finished]()
+			{
+				if (WaitForSingleObject(finished, timeout_ms) == WAIT_TIMEOUT)
+				{
+					std::fprintf(stderr, "[render] present check: no progress for %lu ms; the window thread and Present are waiting on each other (#213)\n", timeout_ms);
+					std::fflush(stderr);
+					TerminateProcess(GetCurrentProcess(), exit_code::render_failed);
+				}
+			} };
+
+			const u32 viewport{ CreateRenderSurface(host, width, height) };
+			if (show_window) ShowWindow((HWND)GetWindowHandle(viewport), SW_SHOWNA);
+			id::id_type geometry_ids[]{ scene.sphere_geometry_id() };
+			SetGeometryIds(viewport, geometry_ids, 1);
+
+			std::atomic<bool> stop{ false };
+			u64 presented{ 0 };
+			double render_ms_total{ 0.0 };
+			const auto seconds_since = [](LARGE_INTEGER start)
+			{
+				LARGE_INTEGER now{}, frequency{};
+				QueryPerformanceCounter(&now);
+				QueryPerformanceFrequency(&frequency);
+				return (double)(now.QuadPart - start.QuadPart) / (double)frequency.QuadPart;
+			};
+			std::thread render_thread{ [&]()
+			{
+				while (!stop.load())
+				{
+					LARGE_INTEGER start{};
+					QueryPerformanceCounter(&start);
+					RenderFrame(viewport, id::invalid_id, 0);
+					render_ms_total += seconds_since(start) * 1000.0;
+					++presented;
+				}
+			} };
+
+			// このスレッドはメッセージを処理しない(GetMessage / PeekMessage を呼ばない)
+			double wait_ms_total{ 0.0 };
+			double wait_ms_max{ 0.0 };
+			u32 resizes{ 0 };
+			LARGE_INTEGER loop_start{};
+			QueryPerformanceCounter(&loop_start);
+			for (u32 i{ 0 }; i < iterations; ++i)
+			{
+				LARGE_INTEGER start{};
+				QueryPerformanceCounter(&start);
+				UpdateEditorCamera(viewport, 0.f, 0.f, 3.f + 0.001f * i, 0.f, 0.01f * i, 0.f);
+				const double wait_ms{ seconds_since(start) * 1000.0 };
+				wait_ms_total += wait_ms;
+				if (wait_ms > wait_ms_max) wait_ms_max = wait_ms;
+
+				if (i % resize_every == 0)
+				{
+					const int w{ width - 32 * (int)(resizes % 2) };
+					SetWindowPos((HWND)GetWindowHandle(viewport), nullptr, 0, 0, w, height, SWP_NOZORDER | SWP_NOMOVE | SWP_NOACTIVATE);
+					ResizeRenderSurface(viewport);
+					++resizes;
+				}
+			}
+			const double loop_s{ seconds_since(loop_start) };
+			stop.store(true);
+			render_thread.join();
+			SetEvent(finished);
+			watchdog.join();
+			CloseHandle(finished);
+
+			SetGeometryIds(viewport, nullptr, 0);
+			RemoveRenderSurface(viewport);
+			DestroyWindow(host);
+
+			std::fprintf(stderr,
+				"[render] present check (#213): %u UpdateEditorCamera calls and %u resizes on the window thread without pumping messages, "
+				"%llu frames presented in %.2f s; wait per call avg %.3f ms, max %.3f ms; RenderFrame avg %.3f ms\n",
+				iterations, resizes, (unsigned long long)presented, loop_s, wait_ms_total / iterations, wait_ms_max,
+				presented ? render_ms_total / (double)presented : 0.0);
+			if (presented == 0) return "the render thread presented no frames during the present check";
+			return {};
+		}
+
 		/// @brief 描画して読み戻し、PNGに書き出す(graphics::initialize()のあと)
 		void render_and_capture(const options& opt, const std::filesystem::path& engine_root, run_result& result, run_state& state)
 		{
@@ -1162,6 +1275,7 @@ namespace dxforge::headless::render
 			if (check_error.empty()) check_error = check_editor_viewports(scene, state);
 			if (check_error.empty()) check_error = check_upload_after_render(surface.get(), scene);
 			if (check_error.empty()) check_error = check_editor_camera(state);
+			if (check_error.empty()) check_error = check_present_while_window_thread_waits(scene, opt.show_viewports);
 			if (!check_error.empty())
 			{
 				fail(result, exit_code::render_failed, "render_failed", check_error);
@@ -1471,6 +1585,7 @@ namespace dxforge::headless::render
 			"  --adapter <a>        warp (default; software rasterizer, deterministic) or hardware (default GPU selection)\n"
 			"  --engine-path <dir>  root of the engine repository for the shader sources (default: ..\\..\\ of the exe folder)\n"
 			"  --json               print a machine-readable result to stdout (logs go to stderr)\n"
+			"  --show-viewports     show the window of the Present/window-thread check (#213) on screen (use with --adapter hardware)\n"
 			"  Needs dxcompiler.dll/dxil.dll next to the exe and the shader sources of the repository\n"
 			"  (EngineTest/TestShader.hlsl, DXForgeEngine/Graphics/Direct3D12/Shaders) at ..\\..\\ from the exe.\n"
 			"Exit codes:\n"
