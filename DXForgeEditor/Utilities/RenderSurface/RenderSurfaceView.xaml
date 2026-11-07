@@ -82,7 +82,8 @@
                         <DockPanel>
                             <TextBlock Text="Camera FoV" Width="90" Margin="0,5"/>
                             <TextBlock Text="{Binding CameraFov, StringFormat=F1}" Margin="0,5" Width="32"/>
-                            <Slider Minimum="0.01" Maximum="180" VerticalAlignment="Center"
+                            <!-- NOTE: Primal の上限は 180。180 度では射影が潰れるので、EditorCamera の上限と同じ 179 にした -->
+                            <Slider Minimum="0.01" Maximum="179" VerticalAlignment="Center"
                                     Value="{Binding CameraFov}"/>
                         </DockPanel>
                         <DockPanel>

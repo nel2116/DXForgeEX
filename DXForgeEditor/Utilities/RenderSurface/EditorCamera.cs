@@ -14,7 +14,8 @@ namespace DXForgeEditor.Utilities
         private static readonly float _minNearZ = 0.001f; // 1 mm
         private static readonly float _minDiffNearZFarZ = 0.001f;
         private static readonly float _minFov = 0.01f;
-        private static readonly float _maxFov = 180f;
+        // NOTE: Primal は 180 度まで許すが、180 度ではエンジンの射影(XMMatrixPerspectiveFovRH に pi)の縦横の倍率がほぼ 0 になり、描画が潰れる
+        private static readonly float _maxFov = 179f;
 
         private int _surfaceId = ID.INVALID_ID;
         private bool _updatePosition;
@@ -203,7 +204,14 @@ namespace DXForgeEditor.Utilities
         public void SetSurfaceId(int surfaceId)
         {
             _surfaceId = surfaceId;
-            if (ID.IsValid(_surfaceId)) EngineAPI.UpdateEditorCamera(_surfaceId, _position, _rotation);
+            if (ID.IsValid(_surfaceId))
+            {
+                EngineAPI.UpdateEditorCamera(_surfaceId, _position, _rotation);
+                // NOTE: Primal は位置と回転だけを送る。プロジェクトを開き直すと同じ EditorCamera が新しいビューポートにつながるので、
+                //       画面に出している FoV と範囲もここで送り、エンジンのカメラ(既定は 45 度、0.01〜1000)と合わせる。
+                EngineAPI.SetCameraFoV(_surfaceId, _fov);
+                EngineAPI.SetCameraRange(_surfaceId, _nearZ, _farZ);
+            }
         }
 
         public void Update(float dt)
