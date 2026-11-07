@@ -12,6 +12,9 @@
 #             (L"..." でも)書かない。文字列化の結果はナロー文字列なので、narrow と同じく C4566 になる(#149)。
 #             リテラルはマクロの外の定数に移す。
 #   header    C/C++ ファイルは日本語のヘッダーコメント(// _/_/_/...)で始める。外部コードと VS の生成物は除外。
+#   review    Markdown の文書は、最後に見直した日を <!-- last-reviewed: YYYY-MM-DD --> の 1 行で持つ(#237)。
+#             無い・書式が崩れている・2 つ以上ある・未来の日付は違反。REVIEW_STALE_DAYS を過ぎたものは
+#             警告だけ出す(終了コードは変えない)。手順は .claude/skills/writing-docs/SKILL.md。
 #
 # 使い方:
 #   python Tests/check_conventions.py                  git で管理しているファイルすべて(CI)
@@ -20,6 +23,7 @@
 #   python Tests/check_conventions.py --hook           Claude Code の PostToolUse フック。stdin の JSON から
 #                                                      編集されたファイルを読み、違反があれば stderr に出して終了コード2
 # 終了コード: 0 違反なし / 1 違反あり / 2 フックで違反あり(Claude Code はこれを Claude に返す)
+import datetime
 import json
 import os
 import re
@@ -32,6 +36,14 @@ BOM = b"\xef\xbb\xbf"
 CPP_EXTS = {"c", "cpp", "h", "hpp"}
 BOM_EXTS = CPP_EXTS | {"cs", "xaml", "ps1"}
 HLSL_EXTS = {"hlsl", "hlsli"}
+DOC_EXTS = {"md"}
+# 行全体がこの形のものだけを見直した日として扱う(文中に `...` で書いた例は数えない)
+REVIEW_RE = re.compile(r"^<!-- last-reviewed: (\d{4}-\d{2}-\d{2}) -->[ \t]*$", re.M)
+# 書式が崩れた見直した日(行頭の <!-- に last-reviewed を含むが REVIEW_RE に合わない)を見つける
+REVIEW_LOOSE_RE = re.compile(r"^[ \t]*<!--[^\n]*last-reviewed", re.M | re.I)
+REVIEW_STALE_DAYS = 90
+# CI(UTC)と手元(JST)で日付がずれても、今日書いた日付を未来扱いしない
+REVIEW_FUTURE_SLACK_DAYS = 1
 FXC_DIRS = ("ContentTools/", "DXForgeEditor/")
 # ヘッダーコメントの対象外: 外部コード(MikkTSpace)と、Visual Studio が生成したファイル
 HEADER_EXEMPT = {
@@ -72,7 +84,7 @@ def is_fxc(rel):
 
 
 def is_target(rel):
-    return not under(rel, SKIP_DIRS) and ext_of(rel) in (BOM_EXTS | HLSL_EXTS)
+    return not under(rel, SKIP_DIRS) and ext_of(rel) in (BOM_EXTS | HLSL_EXTS | DOC_EXTS)
 
 
 def wants_bom(rel, data):
@@ -191,9 +203,48 @@ def find_stringized_non_ascii(text, scanned=None):
             if has_non_ascii(body) and any(a <= start and end <= b for a, b in spans)]
 
 
-def check_file(rel, data):
+def review_date(text):
+    # 文書の見直した日を (date, 行番号, エラー) で返す。正しく 1 つあれば エラー は None
+    found = list(REVIEW_RE.finditer(text))
+    loose = [m for m in REVIEW_LOOSE_RE.finditer(text)
+             if not any(f.start() <= m.start() < f.end() for f in found)]
+    if loose:
+        ln = text.count("\n", 0, loose[0].start()) + 1
+        return None, ln, "見直した日の書式が崩れています。<!-- last-reviewed: YYYY-MM-DD --> の 1 行にしてください。"
+    if not found:
+        return None, 1, ("最後に見直した日がありません。<!-- last-reviewed: YYYY-MM-DD --> の行を足してください"
+                         "(新しい文書は今日の日付。手順は .claude/skills/writing-docs/SKILL.md)。")
+    if len(found) > 1:
+        ln = text.count("\n", 0, found[1].start()) + 1
+        return None, ln, "見直した日が 2 つ以上あります。1 つにしてください。"
+    m = found[0]
+    ln = text.count("\n", 0, m.start()) + 1
+    try:
+        return datetime.date.fromisoformat(m.group(1)), ln, None
+    except ValueError:
+        return None, ln, f"見直した日 {m.group(1)} は存在しない日付です。"
+
+
+def stale_days(data, today=None):
+    # 見直した日から REVIEW_STALE_DAYS を過ぎていれば経過日数を、そうでなければ None を返す
+    date, _, error = review_date(data.decode("utf-8-sig", errors="replace").replace("\r\n", "\n"))
+    if error:
+        return None
+    days = ((today or datetime.date.today()) - date).days
+    return days if days > REVIEW_STALE_DAYS else None
+
+
+def check_file(rel, data, today=None):
     # 1ファイルの違反を (規則, 行番号, メッセージ) のリストで返す
     ext = ext_of(rel)
+    if ext in DOC_EXTS:
+        date, ln, error = review_date(data.decode("utf-8-sig", errors="replace").replace("\r\n", "\n"))
+        if error:
+            return [("review", ln, error)]
+        limit = (today or datetime.date.today()) + datetime.timedelta(days=REVIEW_FUTURE_SLACK_DAYS)
+        if date > limit:
+            return [("review", ln, f"見直した日 {date} が未来の日付です。")]
+        return []
     has_bom = data.startswith(BOM)
     fix = f"直し方: python Tests/check_conventions.py --fix {rel}"
     violations = []
@@ -291,6 +342,7 @@ def main(argv):
     else:
         targets = [(rel, os.path.join(REPO_ROOT, rel)) for rel in git_files()]
     count = 0
+    stale = []
     for rel, full in targets:
         if rel is None or not is_target(rel) or not os.path.isfile(full):
             continue
@@ -298,9 +350,17 @@ def main(argv):
             done = fix_bom(rel, full)
             if done:
                 print(f"{rel}: {done}")
-        for rule, ln, msg in check_file(rel, read(full)):
+        data = read(full)
+        for rule, ln, msg in check_file(rel, data):
             print(f"{rel}:{ln}: [{rule}] {msg}")
             count += 1
+        if ext_of(rel) in DOC_EXTS:
+            days = stale_days(data)
+            if days is not None:
+                stale.append((rel, days))
+    # 古い文書は警告だけ(終了コードは変えない)。見直しの手順は .claude/skills/writing-docs/SKILL.md
+    for rel, days in stale:
+        print(f"warning: {rel}: 最後に見直してから {days} 日たっています(目安 {REVIEW_STALE_DAYS} 日)。")
     if count:
         print(f"{count} 件の規約違反があります。", file=sys.stderr)
         return 1

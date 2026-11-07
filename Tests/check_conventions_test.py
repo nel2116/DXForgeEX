@@ -4,6 +4,7 @@
 #
 # 規則ごとに「違反を見つけること」と「正しいものを違反にしないこと」の両方を確かめる。
 # フック(--hook)と --fix は、リポジトリの Tests/ の下に作る使い捨てのフォルダで、別プロセスとして確かめる。
+import datetime
 import json
 import os
 import shutil
@@ -126,13 +127,47 @@ class CheckFileTest(unittest.TestCase):
     def test_targets(self):
         self.assertTrue(cc.is_target("DXForgeEngine/A.cpp"))
         self.assertFalse(cc.is_target("packages/X/a.h"))
-        self.assertFalse(cc.is_target("README.md"))
+        self.assertTrue(cc.is_target("README.md"))
+        self.assertTrue(cc.is_target("docs/dev/A.md"))
+        self.assertFalse(cc.is_target("packages/X/README.md"))
 
     def test_paths_are_case_insensitive(self):
         # Windows では contenttools/... でも同じファイルを指すので、同じ規則を選ぶ
         self.assertEqual(rules("contenttools/A.hlsl", cc.BOM + b"x"), [("no-bom", 1)])
         self.assertEqual(rules("dxforgeenginedll/PCH.h", cc.BOM + b"#pragma once\n"), [])
         self.assertFalse(cc.is_target("Packages/X/a.h"))
+
+
+class ReviewDateTest(unittest.TestCase):
+    TODAY = datetime.date(2026, 11, 8)
+
+    def review(self, text):
+        return [(rule, ln) for rule, ln, _ in cc.check_file("docs/A.md", text.encode("utf-8"), self.TODAY)]
+
+    def test_valid_marker_anywhere(self):
+        self.assertEqual(self.review("# A\n<!-- last-reviewed: 2026-11-08 -->\n"), [])
+        self.assertEqual(self.review("---\nname: x\n---\n<!-- last-reviewed: 2026-01-01 -->\r\nbody\n"), [])
+        # CI(UTC)と手元(JST)のずれを許す
+        self.assertEqual(self.review("<!-- last-reviewed: 2026-11-09 -->\n"), [])
+
+    def test_missing_malformed_duplicate_future(self):
+        self.assertEqual(self.review("# A\n"), [("review", 1)])
+        self.assertEqual(self.review("# A\n<!-- last-reviewed: 2026/11/08 -->\n"), [("review", 2)])
+        self.assertEqual(self.review("<!-- last-reviewed: 2026-02-30 -->\n"), [("review", 1)])
+        self.assertEqual(self.review("<!-- last-reviewed: 2026-11-08 -->\n<!-- last-reviewed: 2026-11-01 -->\n"),
+                         [("review", 2)])
+        self.assertEqual(self.review("<!-- last-reviewed: 2026-11-20 -->\n"), [("review", 1)])
+
+    def test_inline_example_is_not_a_marker(self):
+        # 手順の説明に `...` で書いた例は、見直した日として数えない
+        self.assertEqual(self.review("Add `<!-- last-reviewed: YYYY-MM-DD -->` at the top.\n"), [("review", 1)])
+
+    def test_stale_is_warning_only(self):
+        old = b"<!-- last-reviewed: 2026-08-01 -->\n"
+        self.assertEqual(cc.check_file("docs/A.md", old, self.TODAY), [])
+        self.assertEqual(cc.stale_days(old, self.TODAY), 99)
+        self.assertIsNone(cc.stale_days(b"<!-- last-reviewed: 2026-08-10 -->\n", self.TODAY))
+        self.assertIsNone(cc.stale_days(b"# no marker\n", self.TODAY))
 
 
 class ProcessTest(unittest.TestCase):
@@ -166,7 +201,9 @@ class ProcessTest(unittest.TestCase):
 
     def test_hook_passes_clean_unrelated_and_outside_files(self):
         self.assertEqual(self.hook(self.write("A.cpp", cpp("int x;\n"))).returncode, 0)
-        self.assertEqual(self.hook(self.write("notes.md", b"x")).returncode, 0)
+        self.assertEqual(self.hook(self.write("notes.txt", b"x")).returncode, 0)
+        self.assertEqual(self.hook(self.write("notes.md", b"<!-- last-reviewed: 2026-11-08 -->\n")).returncode, 0)
+        self.assertEqual(self.hook(self.write("bad.md", b"x")).returncode, 2)
         outside = tempfile.mkdtemp()
         try:
             path = os.path.join(outside, "A.cpp")
