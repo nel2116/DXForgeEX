@@ -124,7 +124,8 @@ function New-GameBin([object[]]$entities)
 		$bw.Write([int]0)
 		$bw.Write([int]$(if ($e.Script) { 2 } else { 1 }))
 		$bw.Write([int]0) # Transform
-		foreach ($v in @($e.Position + $e.Rotation + $e.Scale)) { $bw.Write([single]$v) }
+		# 回転は、エディタの Transform の度数法の手がかりをラジアンにしたもの(#205。クォータニオンにするのは PR 2)
+		foreach ($v in @($e.Position + (Radians $e.Rotation) + $e.Scale)) { $bw.Write([single]$v) }
 		if ($e.Script)
 		{
 			$bytes = [System.Text.Encoding]::UTF8.GetBytes($e.Script)
@@ -149,17 +150,21 @@ function Near([double[]]$actual, [double[]]$expected, [double]$tolerance = 1e-5)
 	return $true
 }
 
-# エンジン(XMQuaternionRotationRollPitchYawFromVector(x=pitch, y=yaw, z=roll))と同じ回転のクォータニオン
-function Quaternion([double[]]$euler)
+# エディタの Transform.WriteToBinary と同じく、float の度数を double でラジアンにして float にする
+function Radians([double[]]$degrees) { return @($degrees | ForEach-Object { [single]([single]$_ * [Math]::PI / 180.0) }) }
+
+# エンジン(XMQuaternionRotationRollPitchYawFromVector(x=pitch, y=yaw, z=roll))と同じ回転のクォータニオン。引数は度数法
+function Quaternion([double[]]$degrees)
 {
+	$euler = Radians $degrees
 	$q = [System.Numerics.Quaternion]::CreateFromYawPitchRoll($euler[1], $euler[0], $euler[2])
 	return @($q.X, $q.Y, $q.Z, $q.W)
 }
 
 $ActiveSceneEntities = @(
 	@{ Name = "Origin"; Position = @(0, 0, 0); Rotation = @(0, 0, 0); Scale = @(1, 1, 1) },
-	@{ Name = "Moved"; Position = @(1.5, -2, 3.25); Rotation = @(0, 1.5707964, 0); Scale = @(1, 1, 1) },
-	@{ Name = "Scaled"; Position = @(-4, 0.5, 10); Rotation = @(0.5, 0, 0.25); Scale = @(2, 3, 0.5) }
+	@{ Name = "Moved"; Position = @(1.5, -2, 3.25); Rotation = @(0, 90, 0); Scale = @(1, 1, 1) },
+	@{ Name = "Scaled"; Position = @(-4, 0.5, 10); Rotation = @(30, 0, 15); Scale = @(2, 3, 0.5) }
 )
 $SecondSceneEntities = @(@{ Name = "OnlyInSecond"; Position = @(7, 8, 9); Rotation = @(0, 0, 0); Scale = @(1, 1, 1) })
 $WithScriptEntities = @(

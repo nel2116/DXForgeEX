@@ -14,7 +14,10 @@
       5. --dry-run と途中の失敗で .dxproj が 1 バイトも変わらない。保存の失敗(43)。一時ファイルが残らない。
       6. エディタが開いている(44): エディタと同じ ProjectEditorLock をテストのプロセスで持つ。読むだけなら通り、離す・切り替えると通る。2 つのエディタが持つなら、両方が離すまで断る。
       7. 空のプロジェクトに作って保存し、エディタのコード(Project.Load)で読むと同じ内容で、--frames で実行できる。
+         回転(#205): rotation_deg のエンティティを --export-game-bin とランナーで読むと、dxforge の rotation_quat(エディタが DLL に
+         渡すクォータニオン)と同じになる。いくつかの角度で、C# と C++(XMQuaternionRotationRollPitchYaw)のオイラー角の順序が一致する。
       8. GUID のない .dxproj。保存し直しても game.bin が変わらない。日本語の名前。
+         古い形式の回転(Rotation)は警告を出して回転なしにする。手がかりがクォータニオンと違う回転なら作り直す。
       9. シーンの追加・削除・切り替え(最後のシーン、アクティブなシーン、消したシーンの別名、新しいアクティブのシーンの game.bin)。
      10. 偽の importer(fake_importer.cmd)で import-asset: 成功、folder、--dry-run、失敗で Content と .dxproj が変わらないこと、終了コードの対応、衝突、44。
      11. コミットの失敗: Content への移動の途中の失敗、保存の失敗、戻す処理の失敗(LeftoverPaths)、タイムアウト。
@@ -125,6 +128,21 @@ function Near([double[]]$actual, [double[]]$expected, [double]$tolerance = 1e-4)
 	if ($actual.Count -ne $expected.Count) { return $false }
 	for ($i = 0; $i -lt $actual.Count; ++$i) { if ([Math]::Abs($actual[$i] - $expected[$i]) -gt $tolerance) { return $false } }
 	return $true
+}
+
+# エディタ(EulerRotation.FromDegrees)と同じ: x = ピッチ、y = ヨー、z = ロール(度数法)
+function Quaternion-Deg([double[]]$degrees)
+{
+	$r = @($degrees | ForEach-Object { [single]([single]$_ * [Math]::PI / 180.0) })
+	$q = [System.Numerics.Quaternion]::CreateFromYawPitchRoll($r[1], $r[0], $r[2])
+	return @($q.X, $q.Y, $q.Z, $q.W)
+}
+
+# 同じ回転のクォータニオンか(q と -q は同じ回転)
+function Same-Rotation([double[]]$a, [double[]]$b, [double]$tolerance = 1e-4)
+{
+	if ($a.Count -ne 4 -or $b.Count -ne 4) { return $false }
+	return (Near $a $b $tolerance) -or (Near $a @($b | ForEach-Object { -$_ }) $tolerance)
 }
 
 function Bytes-Equal([byte[]]$a, [byte[]]$b)
@@ -381,7 +399,7 @@ try
 		$entity = $results[$i].entity
 		$transform = Get-Component $entity "transform"
 		Check ($results[$i].ok -and $results[$i].changed -eq $false -and $entity.guid -eq $MovedGuid -and $entity.name -eq "Moved" -and $entity.enabled -eq $true -and $entity.scene -eq "Sample Scene" -and $entity.index -eq 1) "get-entity selector $i finds Moved" ($results[$i] | ConvertTo-Json -Depth 8 -Compress)
-		Check ((Near $transform.position @(1.5, -2, 3.25)) -and (Near $transform.rotation_rad @(0, 1.5707964, 0)) -and (Near $transform.rotation_deg @(0, 90, 0)) -and (Near $transform.scale @(1, 1, 1))) "get-entity returns the transform, rotation in both units" ($transform | ConvertTo-Json -Compress)
+		Check ((Near $transform.position @(1.5, -2, 3.25)) -and (Near $transform.rotation_deg @(0, 90, 0)) -and (Near $transform.rotation_quat @(0, 0.70710678, 0, 0.70710678)) -and $null -eq $transform.rotation_rad -and (Near $transform.scale @(1, 1, 1))) "get-entity returns the transform, rotation as degrees and a quaternion" ($transform | ConvertTo-Json -Compress)
 	}
 
 	# 変える: 1 つずつ --op で実行して、保存され、読み直しても残る
@@ -403,11 +421,11 @@ try
 	$r = Invoke-Op $project '{"op":"set-transform","target":"name:Renamed","position":[1,2,3],"rotation_deg":[0,90,45],"scale":[2,2,2]}'
 	Expect-Saved "set-transform (degrees)" $r
 	$transform = Get-Component $r.Json.results[0].entity "transform"
-	Check ((Near $transform.position @(1, 2, 3)) -and (Near $transform.rotation_deg @(0, 90, 45)) -and (Near $transform.rotation_rad @(0, ([Math]::PI / 2), ([Math]::PI / 4))) -and (Near $transform.scale @(2, 2, 2))) "rotation_deg is stored as radians, both are returned" ($transform | ConvertTo-Json -Compress)
+	Check ((Near $transform.position @(1, 2, 3)) -and (Near $transform.rotation_deg @(0, 90, 45)) -and (Near $transform.rotation_quat (Quaternion-Deg @(0, 90, 45))) -and (Near $transform.scale @(2, 2, 2))) "rotation_deg sets the degrees and the quaternion" ($transform | ConvertTo-Json -Compress)
 	$r = Invoke-Op $project '{"op":"set-transform","target":"name:Renamed","rotation_rad":[1,0,0]}'
 	Expect-Saved "set-transform (radians, only one value)" $r
 	$transform = Get-Component $r.Json.results[0].entity "transform"
-	Check ((Near $transform.rotation_rad @(1, 0, 0)) -and (Near $transform.rotation_deg @((180 / [Math]::PI), 0, 0)) -and (Near $transform.position @(1, 2, 3)) -and (Near $transform.scale @(2, 2, 2))) "rotation_rad keeps the other values" ($transform | ConvertTo-Json -Compress)
+	Check ((Near $transform.rotation_deg @((180 / [Math]::PI), 0, 0)) -and (Near $transform.rotation_quat (Quaternion-Deg @((180 / [Math]::PI), 0, 0))) -and (Near $transform.position @(1, 2, 3)) -and (Near $transform.scale @(2, 2, 2))) "rotation_rad keeps the other values" ($transform | ConvertTo-Json -Compress)
 
 	$r = Invoke-Op $project '{"op":"add-component","target":"name:Renamed","type":"script","name":"Mover"}'
 	Expect-Saved "add-component script" $r
@@ -743,7 +761,7 @@ try
 	$script = @($entity.Components | Where-Object { $_.GetType() -eq $scriptType })[0]
 	$geometry = @($entity.Components | Where-Object { $_.GetType() -eq $geometryType })[0]
 	Check ($entity.Name -eq "Box" -and "$($entity.EntityGuid)" -eq $created.guid -and $entity.IsEnabled -and $entity.EntityId -eq -1 -and [object]::ReferenceEquals($entity.ParentScene, $loaded.ActiveScene)) "Project.Load: name, GUID, enabled, scene" "$($entity.Name) $($entity.EntityGuid)"
-	Check ((Near @($transform.Position.X, $transform.Position.Y, $transform.Position.Z) @(1.5, -2, 3.25)) -and (Near @($transform.Rotation.X, $transform.Rotation.Y, $transform.Rotation.Z) @(0, ([Math]::PI / 2), 0)) -and (Near @($transform.Scale.X, $transform.Scale.Y, $transform.Scale.Z) @(2, 3, 0.5))) "Project.Load: Transform" "$($transform.Position) $($transform.Rotation) $($transform.Scale)"
+	Check ((Near @($transform.Position.X, $transform.Position.Y, $transform.Position.Z) @(1.5, -2, 3.25)) -and (Near @($transform.RotationEulerHint.X, $transform.RotationEulerHint.Y, $transform.RotationEulerHint.Z) @(0, 90, 0)) -and (Near @($transform.RotationQuaternion.X, $transform.RotationQuaternion.Y, $transform.RotationQuaternion.Z, $transform.RotationQuaternion.W) @(0, 0.70710678, 0, 0.70710678)) -and (Near @($transform.Scale.X, $transform.Scale.Y, $transform.Scale.Z) @(2, 3, 0.5))) "Project.Load: Transform (degrees and quaternion)" "$($transform.Position) $($transform.RotationEulerHint) $($transform.RotationQuaternion) $($transform.Scale)"
 	Check ($script.Name -eq "Mover" -and "$($geometry.GeometryGuid)" -eq $DefaultCubeGuid -and "$($editor.GetType('DXForgeEditor.Content.DefaultAssets', $true).GetField('DefaultGeometryGuid', $flags).GetValue($null))" -eq $DefaultCubeGuid) "Project.Load: Script and Geometry (DefaultGeometryGuid)" "$($script.Name) $($geometry.GeometryGuid)"
 	$r = Invoke-Op $project "{`"op`":`"get-entity`",`"target`":`"guid:$($created.guid)`"}"
 	Check ((($r.Json.results[0].entity | ConvertTo-Json -Depth 8 -Compress)) -eq ($created | ConvertTo-Json -Depth 8 -Compress)) "get-entity after saving == the result of the last op" $r.Stdout
@@ -765,6 +783,42 @@ try
 	{
 		$r = Invoke-Cli @("--load-project", $project, "--frames", "1", "--runner", $Runner) -Json
 		Check ($r.Code -eq 0 -and $r.Json.entity_count -eq 1 -and @($r.Json.entities)[0].name -eq "Box" -and (Near @($r.Json.entities)[0].position @(1.5, -2, 3.25)) -and (Near @($r.Json.entities)[0].scale @(2, 3, 0.5))) "--frames runs the created entity, --json shows it" "$($r.Stdout) $($r.Stderr)"
+		$createdQuat = (Get-Component $created "transform").rotation_quat
+		Check (Same-Rotation @($r.Json.entities)[0].rotation $createdQuat) "--frames: the engine's rotation == dxforge's rotation_quat (rotation_deg [0,90,0])" "$(@($r.Json.entities)[0].rotation -join ',') vs $($createdQuat -join ',')"
+
+		# オイラー角の順序(#205): dxforge(C# の EulerRotation)のクォータニオンと、game.bin を読んだエンジン(C++ の
+		# XMQuaternionRotationRollPitchYawFromVector)のクォータニオンが同じ回転になる。期待値のある 5 つは
+		# EngineUnitTests の euler_order_matches_the_editor と同じ表
+		$eulerCases = @(
+			@{ Deg = @(0, 90, 0); Quat = @(0, 0.70710678, 0, 0.70710678) },
+			@{ Deg = @(90, 0, 0); Quat = @(0.70710678, 0, 0, 0.70710678) },
+			@{ Deg = @(0, 0, 90); Quat = @(0, 0, 0.70710678, 0.70710678) },
+			@{ Deg = @(30, 45, 60); Quat = @(0.39190382, 0.20056215, 0.36042339, 0.82236314) },
+			@{ Deg = @(-120, 200, 15); Quat = @(0.21336880, 0.46856225, 0.83423936, -0.19740298) },
+			@{ Deg = @(90, 30, 40); Quat = $null },
+			@{ Deg = @(-45, -170, 135); Quat = $null })
+		$eulerProject = New-EmptyProject "EulerOrder"
+		$eulerOps = for ($i = 0; $i -lt $eulerCases.Count; ++$i)
+		{
+			"{`"op`":`"create-entity`",`"as`":`"e$i`",`"name`":`"E$i`"}"
+			"{`"op`":`"set-transform`",`"target`":`"`$e$i`",`"rotation_deg`":[$($eulerCases[$i].Deg -join ',')]}"
+		}
+		$r = Invoke-Ops $eulerProject @($eulerOps)
+		Expect-Saved "Euler order: create the entities" $r
+		$eulerBin = Join-Path $work "euler_order.bin"
+		$export = Invoke-Cli @("--load-project", $eulerProject, "--export-game-bin", $eulerBin) -Json
+		Check ($export.Code -eq 0) "Euler order: --export-game-bin" "$($export.Stdout) $($export.Stderr)"
+		$runOutput = & $Runner --game-bin $eulerBin --frames 1 --json 2>$null
+		$runCode = $LASTEXITCODE
+		$run = $runOutput | ConvertFrom-Json
+		Check ($runCode -eq 0 -and $run.entity_count -eq $eulerCases.Count) "Euler order: the runner loads the game.bin" "$runOutput"
+		for ($i = 0; $i -lt $eulerCases.Count; ++$i)
+		{
+			$fromCli = (Get-Component @($r.Json.results)[2 * $i + 1].entity "transform").rotation_quat
+			$fromEngine = @($run.entities)[$i].rotation
+			$expected = if ($eulerCases[$i].Quat) { $eulerCases[$i].Quat } else { $fromCli }
+			Check ((Same-Rotation $fromCli $expected) -and (Same-Rotation $fromEngine $fromCli)) "Euler order: rotation_deg [$($eulerCases[$i].Deg -join ',')] -> the same quaternion in C# and in the engine" "C# $($fromCli -join ',') engine $($fromEngine -join ',')"
+		}
 	}
 
 	Write-Host "8. .dxproj without GUIDs, game.bin, Japanese names"
@@ -780,6 +834,31 @@ try
 	$first = Invoke-Op $noGuid '{"op":"get-entity","target":"name:Moved"}'
 	$second = Invoke-Op $noGuid '{"op":"get-entity","target":"name:Moved"}'
 	Check ($first.Json.results[0].entity.guid -eq $second.Json.results[0].entity.guid) "no <Guid>: after saving, the GUIDs are fixed" $first.Stdout
+
+	# 古い形式の回転(Rotation、#205 より前)は移行しない。例外を投げず、警告を出して回転なしにする
+	$legacy = New-FixtureCopy
+	$numerics = 'xmlns:b="http://schemas.datacontract.org/2004/07/System.Numerics"'
+	$xml = [regex]::Replace([System.IO.File]::ReadAllText($legacy), "<a:RotationEulerHint .*?</a:RotationQuaternion>", "<a:Rotation $numerics><b:X>0</b:X><b:Y>1.5707964</b:Y><b:Z>0</b:Z></a:Rotation>")
+	[System.IO.File]::WriteAllText($legacy, $xml)
+	$r = Invoke-Op $legacy '{"op":"get-entity","target":"name:Moved"}'
+	$transform = Get-Component $r.Json.results[0].entity "transform"
+	Check ($r.Code -eq 0 -and (Near $transform.rotation_deg @(0, 0, 0)) -and (Near $transform.rotation_quat @(0, 0, 0, 1)) -and $r.Stderr -match "Moved.*Rotation" -and $r.Stderr -match "Origin.*Rotation") "old Rotation member: loads, warns per entity, identity rotation" "$($r.Stdout) $($r.Stderr)"
+	$assertsBefore = $assertRecorder.Failures.Count
+	$loaded = (Load-Project $legacy).PSObject.BaseObject
+	$transform = @(@($loaded.ActiveScene.GameEntities)[1].Components)[0]
+	Check ($null -ne $loaded -and $transform.RotationQuaternion.IsIdentity -and $assertRecorder.Failures.Count -eq $assertsBefore) "old Rotation member: Project.Load (the editor's path) does not throw or assert" "$($transform.RotationQuaternion)"
+
+	# 手がかり(度数)がクォータニオンと違う回転なら、クォータニオンから作り直す。同じ回転なら入力どおりに残す
+	$hints = New-FixtureCopy
+	$xml = [System.IO.File]::ReadAllText($hints)
+	$xml = $xml.Replace("<b:X>0</b:X><b:Y>90</b:Y><b:Z>0</b:Z></a:RotationEulerHint>", "<b:X>0</b:X><b:Y>45</b:Y><b:Z>0</b:Z></a:RotationEulerHint>")
+	$xml = $xml.Replace("<b:X>30</b:X><b:Y>0</b:Y><b:Z>15</b:Z></a:RotationEulerHint>", "<b:X>30</b:X><b:Y>360</b:Y><b:Z>15</b:Z></a:RotationEulerHint>")
+	[System.IO.File]::WriteAllText($hints, $xml)
+	$r = Invoke-Ops $hints @('{"op":"get-entity","target":"name:Moved"}', '{"op":"get-entity","target":"name:Scaled"}')
+	$moved = Get-Component $r.Json.results[0].entity "transform"
+	$scaled = Get-Component $r.Json.results[1].entity "transform"
+	Check ($r.Code -eq 0 -and (Near $moved.rotation_deg @(0, 90, 0)) -and (Near $moved.rotation_quat @(0, 0.70710678, 0, 0.70710678))) "a hint that disagrees with the quaternion is regenerated" ($moved | ConvertTo-Json -Compress)
+	Check ((Near $scaled.rotation_deg @(30, 360, 15)) -and (Same-Rotation $scaled.rotation_quat (Quaternion-Deg @(30, 0, 15)))) "a hint that gives the same rotation is kept as typed" ($scaled | ConvertTo-Json -Compress)
 
 	# 保存し直しても game.bin は同じ(GUID を書かない)。値を戻して保存したあとも
 	$project = New-FixtureCopy

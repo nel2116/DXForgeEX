@@ -2,7 +2,7 @@
 
 <!-- last-reviewed: 2026-11-08 -->
 
-- Status: Accepted (implementation pending: #205)
+- Status: Accepted. #205 PR 1 implements points 2, 3 and 5 (editor model, `.dxproj`, dxforge, DLL); points 4 and 6 (`game.bin` quaternion, `ContentLoader`, FoV) are pending in #205 PR 2
 - Decided: 2026/11/08, by the user
 - Issues: #208 (decision), #205 (bug and implementation), #183 (dxforge value conventions, partly superseded)
 
