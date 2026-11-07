@@ -68,6 +68,13 @@ function Find($root, [type]$type)
 
 $editor.GetType("DXForgeEditor.GameProject.ProjectLoadEnvironment", $true).GetProperty("Headless", $flags).SetValue($null, $true)
 $projectType = $editor.GetType("DXForgeEditor.GameProject.Project", $true)
+$entityType = $editor.GetType("DXForgeEditor.Components.GameEntity", $true)
+# Scene.AddGameEntities/RemoveGameEntities(Primal Day 084)に渡す List<GameEntity>
+function EntityList($items) {
+	$list = [Activator]::CreateInstance([System.Collections.Generic.List`1].MakeGenericType($entityType))
+	foreach ($item in $items) { [void]$list.Add($item) }
+	return ,$list
+}
 $load = $projectType.GetMethod("Load", $flags)
 $fixture = Join-Path $RepoRoot "DXForgeCli\Tests\Projects\TransformOnly\TransformOnly.dxproj"
 $undo = $projectType.GetProperty("UndoRedo", $flags).GetValue($null)
@@ -108,11 +115,11 @@ try
 	Pump
 	$list.SelectedIndex = 2; Pump
 	Check ($inspector.DataContext.Name -eq "Scaled") "select Scaled"
-	$scene.RemoveGameEntityCommand.Execute($scene.GameEntities[2]); Pump
+	$scene.RemoveGameEntities((EntityList @($scene.GameEntities[2]))); Pump
 	Check ($list.SelectedIndex -eq -1 -and $scene.GameEntities.Count -eq 2 -and $null -eq $inspector.DataContext) "removing the selected entity empties the selection and the inspector"
 	$list.SelectedIndex = 1; Pump
-	$added = [Activator]::CreateInstance($editor.GetType("DXForgeEditor.Components.GameEntity", $true), $flags, $null, [object[]]@($scene), $null)
-	$scene.AddGameEntityCommand.Execute($added); Pump
+	$added = [Activator]::CreateInstance($entityType, $flags, $null, [object[]]@($scene), $null)
+	$scene.AddGameEntities((EntityList @($added)), -1); Pump
 
 	# Undo の最初の 2 件は「エンティティの追加」(選択は Moved のまま)と「Moved の選択」
 	$undo.Undo(); Pump
@@ -131,7 +138,7 @@ try
 	# 選択したままその前のエンティティを消すと番号がずれる(SelectionChanged は来ない)。それでも同じエンティティに戻る(Codex の指摘)
 	$list.SelectedIndex = 2; Pump
 	$selected = $scene.GameEntities[2]
-	$scene.RemoveGameEntityCommand.Execute($scene.GameEntities[0]); Pump
+	$scene.RemoveGameEntities((EntityList @($scene.GameEntities[0]))); Pump
 	$list.SelectedIndex = 0; Pump
 	$undo.Undo(); Pump
 	Check ($list.SelectedItems.Count -eq 1 -and [object]::ReferenceEquals($list.SelectedItems[0], $selected.PSObject.BaseObject)) "undo selects the same entity after an earlier entity was removed"

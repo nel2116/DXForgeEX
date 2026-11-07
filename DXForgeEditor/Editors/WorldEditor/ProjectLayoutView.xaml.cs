@@ -45,7 +45,38 @@ namespace DXForgeEditor.Editors
         {
             var btn = (Button)sender;
             var vm = (Scene)btn.DataContext;
-            vm.AddGameEntityCommand.Execute(new GameEntity(vm) { Name = "Empty Entity" });
+            vm.AddGameEntities([new GameEntity(vm) { Name = "Empty Entity" }]);
+        }
+
+        /// <summary>Delete キーで、選んだエンティティを消す(Primal Day 084)。</summary>
+        private void OnGameEntities_ListBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Delete && sender is ListBox listBox)
+            {
+                var entities = listBox.SelectedItems.Cast<GameEntity>().ToList();
+                listBox.UnselectAll();
+
+                if (entities.Count > 0)
+                {
+                    RemoveGameEntities(entities);
+                }
+            }
+        }
+
+        private void RemoveGameEntities(List<GameEntity> entities)
+        {
+            if (DataContext is Project { ActiveScene: Scene scene })
+            {
+                scene.RemoveGameEntities(entities);
+            }
+        }
+
+        private void OnRemoveGameEntity_Button_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button { DataContext: GameEntity entity })
+            {
+                RemoveGameEntities([entity]);
+            }
         }
 
         private void OnGameEntities_ListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)

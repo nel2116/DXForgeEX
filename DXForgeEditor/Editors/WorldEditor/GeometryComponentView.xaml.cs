@@ -28,7 +28,14 @@ namespace DXForgeEditor.Editors
         /// </summary>
         private static void ResetGeometry(List<(Components.Geometry Geometry, Guid Guid, List<AppliedMaterialData>? Materials)> selection)
         {
+            if (selection.Count == 0) return;
+
+            // ビューポートから外してからジオメトリを変え、描き直す(MSGeometry.SetGeometry と同じ。#214)
+            var entities = selection.Select(x => x.Geometry.Owner).ToList();
+            var scene = entities[0].ParentScene;
+            var enableList = scene.DisableAndUpdate(entities);
             selection.ForEach(x => x.Geometry.SetGeometry(x.Guid, x.Materials));
+            scene.EnableAndUpdate(enableList);
 
             // NOTE: Primal は MSEntity.CurrentSelection を足して使う。ここでは今のインスペクターの選択を使う
             //       (選択が変わっていて Geometry を持たなければ、更新するものはない)

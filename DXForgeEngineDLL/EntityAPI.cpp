@@ -9,6 +9,7 @@
 // 2026/11/03 Geometryコンポーネントの受け渡しを追加 (Primal Day 079, #32)
 // 2026/11/06 回転を度数法で受け取り、ミューテックス、UpdateComponent、GetComponentId を追加 (Primal Day 082, #201)
 // 2026/11/07 ミューテックスを ticket_mutex にし、UpdateComponent の戻り値を b32 にした (Primal Day 083, #209)
+// 2026/11/08 消すジオメトリの ID をビューポートから取り除くようにした (#214)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Common.h"
@@ -106,6 +107,8 @@ namespace
 // エンティティとビューポートの操作を守るミューテックス(EngineAPI.cpp と共有する)
 utl::ticket_mutex mutex{};
 
+void remove_geometry_from_viewports(id::id_type geometry_id);	// EngineAPI.cpp(#214)
+
 // ゲームエンティティを生成する
 EDITOR_INTERFACE id::id_type CreateGameEntity(game_entity_descriptor* e)
 {
@@ -128,6 +131,7 @@ EDITOR_INTERFACE void RemoveGameEntity(id::id_type id)
 {
 	std::lock_guard lock{ mutex };
 	assert(id::is_valid(id));
+	remove_geometry_from_viewports(entity_from_id(id).geometry().get_id());
 	game_entity::remove(game_entity::entity_id{ id });
 }
 
@@ -145,6 +149,7 @@ EDITOR_INTERFACE b32 UpdateComponent(id::id_type entity_id, game_entity_descript
 		&script_info,
 		id::is_valid(desc.geometry.geometry_content_id) ? &geometry_info : nullptr,
 	};
+	if (type == component_type::geometry) remove_geometry_from_viewports(entity_from_id(entity_id).geometry().get_id());
 	return game_entity::update_component(game_entity::entity_id{ entity_id }, entity_info, type) ? 1 : 0;
 }
 

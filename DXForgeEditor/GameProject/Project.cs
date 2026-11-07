@@ -17,6 +17,12 @@ namespace DXForgeEditor.GameProject
     [DataContract(Name = "Game")]
     class Project : ViewModelBase
     {
+        /// <summary>
+        /// アクティブなシーンの描くもの(エンティティ、有効と無効、ジオメトリ)が変わった(Primal Day 084)。sender はシーン。
+        /// WorldEditorView がビューポートに描くジオメトリの ID を渡し直す。
+        /// </summary>
+        public static event EventHandler? SceneUpdated;
+
         public static string Extension => ".dxproj";
         [DataMember]
         public string Name { get; private set; } = "New Project";
@@ -98,6 +104,15 @@ namespace DXForgeEditor.GameProject
         public static Project? Current { get; private set; }
 
         public static UndoRedo UndoRedo { get; } = new UndoRedo();
+
+        /// <summary>
+        /// アクティブなシーンが変わったことを SceneUpdated で伝える(Primal Day 084)。エディタで開いていないとき
+        /// (ヘッドレスの読み込み、Current が null)は何もしない。
+        /// </summary>
+        public void UpdateScene()
+        {
+            if (Current != null) SceneUpdated?.Invoke(ActiveScene, EventArgs.Empty);
+        }
 
         public ICommand? UndoCommand { get; private set; }
 
@@ -208,6 +223,7 @@ namespace DXForgeEditor.GameProject
                 project.Path = path;
                 Current = project;
                 project.LoadEntitiesWithAssets();
+                project.UpdateScene();
                 return project;
             }
             catch (Exception ex)
@@ -224,6 +240,9 @@ namespace DXForgeEditor.GameProject
 
         public void Unload()
         {
+            // 描いているジオメトリを先にビューポートから外してから、エンジンから消す(Primal Day 084, #214)
+            // NOTE: Primal と同じく、エンティティの IsEnabled を false にしたままにする(このあとプロジェクトは保存しない)
+            ActiveScene.DisableAndUpdate(ActiveScene.GameEntities.ToList());
             UnloadGameCodeDLL();
             // スクリプトのないエンティティもエンジンから消し、コンポーネントがアップロードしたもの(Geometry のメッシュと
             // マテリアル)を外す(Codexの指摘, #32)。UnloadGameCodeDLL はゲームのコードの読み直しでも呼ぶので、そこでは消さない。
@@ -330,6 +349,7 @@ namespace DXForgeEditor.GameProject
             {
                 AvailableScripts = EngineAPI.GetScriptNames();
                 ActiveScene.GameEntities.Where(x => x.GetComponent<Script>() != null).ToList().ForEach(x => x.IsActive = true);
+                UpdateScene();
                 Logger.Log(MessageType.Info, "ゲームコードDLLは正常にロードされました。");
             }
             else
@@ -338,9 +358,18 @@ namespace DXForgeEditor.GameProject
             }
         }
 
+        /// <summary>
+        /// ゲームのコードの DLL を外す。スクリプトを持つエンティティはエンジンから消す(LoadGameCodeDLL で作り直す)。
+        /// NOTE: Primal Day 084 は RemoveScriptComponents でスクリプトだけを外すが、Dispatcher.BeginInvoke の中の戻り値を捨てて
+        ///       常に空の一覧を返すので、外したスクリプトを戻さない(保存するとスクリプトが消える)。DXForgeEX は今までどおり
+        ///       エンティティを作り直し、消す前にビューポートから外す(消したジオメトリの ID を描かない, #214)。
+        /// </summary>
         private void UnloadGameCodeDLL()
         {
-            ActiveScene.GameEntities.Where(x => x.GetComponent<Script>() != null).ToList().ForEach(x => x.IsActive = false);
+            var scriptEntities = ActiveScene.GameEntities.Where(x => x.GetComponent<Script>() != null).ToList();
+            var enableList = ActiveScene.DisableAndUpdate(scriptEntities);
+            scriptEntities.ForEach(x => x.IsActive = false);
+            ActiveScene.EnableAndUpdate(enableList);
             if (EngineAPI.UnloadGameCodeDll() != 0)
             {
                 Logger.Log(MessageType.Info, "ゲームコードDLLのアンロード");

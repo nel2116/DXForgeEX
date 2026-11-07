@@ -23,6 +23,7 @@
 // 2026/11/07 別のスレッドがビューポートを描く間にビューポートを操作する確認を追加 (Primal Day 083, #209)
 // 2026/11/07 別のスレッドが描いている間に ShutdownEngine を呼ぶ確認を追加 (#209)
 // 2026/11/07 GetDrawnFrameCount が描いたときだけ増えることの確認を追加 (#209)
+// 2026/11/08 描画中にエディタがエンティティを作って消す確認を追加 (Primal Day 084, #214)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -69,6 +70,23 @@ extern "C" void ResizeRenderSurface(u32 id);
 extern "C" void SetGeometryIds(u32 surface_id, dxforge::id::id_type* geometry_ids, u32 count);
 extern "C" void RenderFrame(u32 surface_id, dxforge::id::id_type camera_id, u64 light_set);
 extern "C" u64 GetDrawnFrameCount(u32 surface_id);
+// NOTE: 引数は DXForgeEngineDLL/EntityAPI.cpp の game_entity_descriptor と同じ並びの editor_entity_descriptor
+struct editor_entity_descriptor;
+extern "C" dxforge::id::id_type CreateGameEntity(editor_entity_descriptor* e);
+extern "C" void RemoveGameEntity(dxforge::id::id_type id);
+extern "C" dxforge::id::id_type GetComponentId(dxforge::id::id_type entity_id, dxforge::component_type::type type);
+
+// DXForgeEngineDLL/EntityAPI.cpp の game_entity_descriptor と同じ並び(Tests_EditorAPI.cpp の test_descriptor と同じ)
+struct editor_entity_descriptor
+{
+	f32 position[3]{};
+	f32 rotation[3]{};
+	f32 scale[3]{ 1.f, 1.f, 1.f };
+	dxforge::script::detail::script_creator script_creator{ nullptr };
+	dxforge::id::id_type geometry_content_id{ dxforge::id::invalid_id };
+	u32 material_count{ 0 };
+	dxforge::id::id_type* material_ids{ nullptr };
+};
 
 namespace dxforge::headless::render
 {
@@ -519,6 +537,10 @@ namespace dxforge::headless::render
 
 			[[nodiscard]] id::id_type sphere_geometry_id() const { return _sphere_entity.geometry().get_id(); }
 
+			/// @brief 球のメッシュとマテリアル(check_editor_viewports がエディタと同じ経路でエンティティを作るのに使う)
+			[[nodiscard]] id::id_type sphere_model_id() const { return _sphere_model_id; }
+			[[nodiscard]] id::id_type sphere_material_id() const { return _sphere_mtl_id; }
+
 			void destroy()
 			{
 				for (game_entity::entity* entity : { &_sphere_entity, &_floor_entity, &_camera_entity })
@@ -826,6 +848,62 @@ namespace dxforge::headless::render
 			return {};
 		}
 
+		/// @brief 描画中に、エディタと同じ経路でエンティティを作って消す(Primal Day 084, #214)
+		/// @details render thread が viewport を描き続ける間に、このスレッドがエディタの順序(CreateGameEntity → SetGeometryIds →
+		///			 SetGeometryIds で外す → RemoveGameEntity)を繰り返す。半分の回は外さずに消す(順序の誤り)。DLL の安全策
+		///			 (remove_geometry_from_viewports)がないと、次の RenderFrame が消したジオメトリを読んで assert に当たる。
+		///			 異常終了しないことと、デバッグレイヤーのエラーがないこと(呼び出し元の check_debug_messages)を見る。
+		/// NOTE: メッシュとマテリアルは、サーフェスを作る前に作ったシーンのものを使い回し、描画中には CreateResource を呼ばない。
+		///		  ビューポートのサーフェスを作って描いたあとでメッシュをアップロードすると、WARP でデバイスが消えることがある
+		///		  (DXGI_ERROR_DEVICE_REMOVED。並行の問題ではなく、同じスレッドで順に呼んでも起きる。#214 の PR に書いた別の不具合)。
+		/// @return 失敗したときはその説明(成功なら空)
+		std::string check_editor_entities_while_rendering(test_scene& scene, u32 viewport)
+		{
+			std::atomic<bool> done{ false };
+			std::thread render_thread{ [&]()
+			{
+				while (!done) RenderFrame(viewport, id::invalid_id, 0);
+			} };
+
+			std::string error{};
+			const id::id_type sphere_geometry_id{ scene.sphere_geometry_id() };
+			id::id_type material_id{ scene.sphere_material_id() };
+			for (u32 i{ 0 }; i < 16 && error.empty(); ++i)
+			{
+				editor_entity_descriptor desc{};
+				desc.position[0] = (f32)i * 0.1f;
+				desc.geometry_content_id = scene.sphere_model_id();
+				desc.material_count = 1;
+				desc.material_ids = &material_id;
+				const id::id_type entity_id{ CreateGameEntity(&desc) };
+				const id::id_type geometry_id{ id::is_valid(entity_id) ? GetComponentId(entity_id, component_type::geometry) : id::invalid_id };
+				if (!id::is_valid(geometry_id))
+				{
+					error = "failed to create an entity with a geometry from the editor's data";
+				}
+				else
+				{
+					id::id_type ids[2]{ sphere_geometry_id, geometry_id };
+					SetGeometryIds(viewport, ids, 2);
+					// 新しいエンティティを含むフレームを、少なくとも 1 回描かせる
+					const u64 drawn{ GetDrawnFrameCount(viewport) };
+					const u64 start{ GetTickCount64() };
+					while (GetDrawnFrameCount(viewport) == drawn && GetTickCount64() - start < 5000) std::this_thread::yield();
+					if (GetDrawnFrameCount(viewport) == drawn) error = "the render thread drew no frame with the new entity";
+					// 偶数の回はエディタの順序(先にビューポートから外す)。奇数の回は外さずに消す(DLL の安全策が取り除く)
+					if (i % 2 == 0) SetGeometryIds(viewport, ids, 1);
+				}
+				if (id::is_valid(entity_id)) RemoveGameEntity(entity_id);
+			}
+
+			done = true;
+			render_thread.join();
+			if (!error.empty()) return error;
+			// 消したジオメトリが残っていれば、ここで assert に当たる
+			RenderFrame(viewport, id::invalid_id, 0);
+			return {};
+		}
+
 		/// @brief エディタのビューポートの経路(DLL の関数)を、隠しウィンドウと WARP で確かめる(Primal Day 082)
 		/// @details 描画結果は読み戻せない(スワップチェイン)ので、異常終了しないことと、デバッグレイヤーのエラーがないことを見る。
 		///			 最後のビューポートは残し、ShutdownEngine のあとで RemoveRenderSurface を呼ぶ(エディタを閉じるときの順序)。
@@ -886,6 +964,8 @@ namespace dxforge::headless::render
 				RenderFrame(second, id::invalid_id, 0);
 			}
 
+			const std::string entity_error{ check_editor_entities_while_rendering(scene, second) };
+			if (!entity_error.empty()) return entity_error;
 			// エディタの描画のスレッド(Primal Day 083)と同じ使い方。別のスレッドが描く間に、このスレッドがビューポートを操作する
 			// NOTE: どちらのスレッドも回数を決めてあるので必ず終わる。重なり方によらず、異常終了しなければよい
 			const u32 removed_while_rendering{ CreateRenderSurface(state.viewport_host, 32, 32) };
