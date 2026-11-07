@@ -93,7 +93,9 @@ if (-not $isRetry) {
 			exit 2
 		}
 	}
-	$rules = [System.IO.File]::ReadAllText((Resolve-Path -LiteralPath $rulesPath).Path, [System.Text.Encoding]::UTF8).Trim()
+	$rules = [System.IO.File]::ReadAllText((Resolve-Path -LiteralPath $rulesPath).Path, [System.Text.Encoding]::UTF8)
+	# 文書の見直した日(#237)はワーカーへの仕様に要らないので除く
+	$rules = [regex]::Replace($rules, '(?m)^<!-- last-reviewed: [^\r\n]*\r?\n', '').Trim()
 	$spec = [System.IO.File]::ReadAllText((Resolve-Path -LiteralPath $SpecFile).Path, [System.Text.Encoding]::UTF8).Trim()
 	if (-not $rules -or -not $spec) {
 		Write-Host "共通のルールまたは仕様が空です。"

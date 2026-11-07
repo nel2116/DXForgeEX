@@ -1,21 +1,21 @@
 <!-- last-reviewed: 2026-11-05 -->
 
-## worker 共通のルール
+## Rules for every worker
 
-- リポジトリは DXForgeEX(GitHub の nel2116/DXForgeEX)。リポジトリ直下の `AGENTS.md`(Claude Code は `CLAUDE.md` 経由で読み込まれる)を最初に読み、それに従う。PR 本文と報告は日本語で書く。
-- 自分の worktree は origin/develop から作った新しいトップレベルの worktree。最初に `git fetch` し、`git merge-base --is-ancestor origin/develop HEAD` で確かめる(失敗したらコーディネーターに ask で報告する)。それ以外の場所(特にルートのチェックアウト F:\HAL\Self\DXForgeEX)は編集せず、ブランチも切り替えない。PR の向き先は develop。マージはしない。
-- ブランチ名は `<fix|feature>/issue-N-...`。`nel2116/` が付いていたら、最初に `git branch -m` で付け直す。
-- コミットメッセージと PR タイトルは `[<fix|add>] <日本語の要約> (#N)`。PR 本文には「概要」「変更点」「動作確認」「自己点検」の節を設け、`Closes #N` を書く(タスクに別の指定があればそれに従う)。
-- 区切りごとにコミットして push する。使用量の上限で止まっても、作業が残るようにする。
-- PR を作る前に `./PrePr.ps1` を実行する。差分に合うビルドとテストを実行し、自己点検の項目を出す。これが通らないと `gh pr create` はフックで止まる。項目を確かめた結果を PR 本文の「自己点検」の節に書く。結果はコマンドと実際の出力で報告する。
-- PR を作ったら `gh pr checks --watch` をフォアグラウンドで実行して CI を待ち、失敗していれば直す。待つ間にターンを終えない。
-- CI が通ったら、自分で `./CodexReview.ps1 -Pr <N> -Post` を実行し、指摘を確かめて、直すか、直さない理由を PR に返信する。直したら push して、CI とレビューをやり直す。`-Post` が「コーディネーターに `ask` で相談する」と出したら、直し続けずに相談する。
-- `-SetStatus` はコーディネーターだけが実行する(ワーカーの会話ではフックが止める)。
-- PASS したら、`ask` で「PR 準備完了」を、PR の URL、コマンド、実際の出力を付けて送る。直さなかった指摘があれば、理由と一緒に書く(コーディネーターが確かめる)。
-- GUI(`orca computer`/computer-use)は使わない。GUI でしか確かめられない項目は、PR の本文に `## GUI の確認手順` の見出しで番号付きで書く。確認そのものは、コーディネーターが `start-gui-check.ps1` で起動する別のワーカーが行う。
-- `gh` のコマンドに人の承認用のラベル(#160)の名前を書かない。ユーザー環境変数を書き換えない。
-- 自分で起動したプロセスは、終わったら必ず終了させる。一時ファイルは %TEMP% の下に作り、終わったら削除する。
-- 「worker_done を送ってよい」という返信が来るまで、ターンを終えずに待ち続ける。`ask` がタイムアウトしたら、同じメッセージ ID で `ask --resume` して待ち直す。ターンを終えてしまったら、次の `send` で再開する。
-- 使用量の上限に近づいたら、作業中の内容をコミットして push し、どこまで済んで何が残っているかをコーディネーターに伝えてから止まる。
-- 作業中に別の不具合を見つけたら、自分では直さず、コーディネーターに報告する。
-- worker_done には、PR の URL、確かめたこと(コマンドと実際の出力)、確かめられなかったこと、マージのあとに確かめる項目を書く。
+- The repository is DXForgeEX (GitHub nel2116/DXForgeEX). Read the root `AGENTS.md` first (Claude Code loads it through `CLAUDE.md`) and follow it. Write PR bodies and reports in Japanese.
+- Your worktree is a new top-level worktree created from origin/develop. First run `git fetch` and check it with `git merge-base --is-ancestor origin/develop HEAD` (if that fails, report to the coordinator with `ask`). Do not edit anything elsewhere (especially the root checkout F:\HAL\Self\DXForgeEX) and do not switch its branch. PRs target develop. Do not merge.
+- Branch names are `<fix|feature>/issue-N-...`. If the name starts with `nel2116/`, rename it first with `git branch -m`.
+- Commit messages and PR titles are `[<fix|add>] <Japanese summary> (#N)`. The PR body has the sections 「概要」「変更点」「動作確認」「自己点検」 and `Closes #N` (unless the task says otherwise).
+- Commit and push at every milestone, so the work survives if you stop at a usage limit.
+- Before creating the PR, run `./PrePr.ps1`. It runs the builds and tests the diff needs and prints self-check items; `gh pr create` is blocked by a hook until it passes. Write what you checked for each item in the 「自己点検」 section. Report results as the command and its actual output.
+- After creating the PR, wait for CI with `gh pr checks --watch` in the foreground and fix failures. Do not end your turn while waiting.
+- When CI passes, run `./CodexReview.ps1 -Pr <N> -Post` yourself, check each finding, and either fix it or reply on the PR with why not. After fixing, push and run CI and the review again. If `-Post` says to consult the coordinator with `ask`, stop fixing and ask.
+- Only the coordinator runs `-SetStatus` (a hook blocks it in worker conversations).
+- After a PASS, send 「PR 準備完了」 with `ask`, including the PR URL, the commands and their actual output. List any findings you did not fix, with reasons (the coordinator verifies them).
+- Do not use the GUI (`orca computer`/computer-use). Write items that can only be checked in the GUI in the PR body under the heading `## GUI の確認手順`, numbered. A separate worker that the coordinator starts with `start-gui-check.ps1` does the check.
+- Never write the name of the human-approval label (#160) in a `gh` command. Do not change user environment variables.
+- Always stop the processes you started when you are done. Create temporary files under %TEMP% and delete them afterwards.
+- Keep waiting without ending your turn until you get a reply saying you may send worker_done. If `ask` times out, wait again with `ask --resume` and the same message ID. If your turn did end, resume on the next `send`.
+- When you approach a usage limit, commit and push your work, tell the coordinator what is done and what remains, then stop.
+- If you find an unrelated bug while working, report it to the coordinator instead of fixing it yourself.
+- In worker_done, write the PR URL, what you verified (commands and actual output), what you could not verify, and what to check after the merge.
