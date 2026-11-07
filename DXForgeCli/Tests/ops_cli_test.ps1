@@ -1381,6 +1381,17 @@ try
 	Check ((Test-Path -LiteralPath (Join-Path $folder "0\Models\left.asset")) -and $r.Stderr -match [regex]::Escape($folder)) "a staging folder without a lock -> kept, warned on stderr" $r.Stderr
 	Check (@($r.Json.leftover_paths).Count -eq 0) "a staging folder without a lock -> not in leftover_paths" $r.Stdout
 
+	# ロックのない古いフォルダ(最終更新が 1 時間より前) -> 消す。新しいものは上のとおり残る(Issue #220)
+	$project = New-EmptyProject "SweepNoLockStale"
+	$folder = New-LeftStaging $project -NoLock
+	$fresh = New-LeftStaging $project -NoLock
+	$old = [DateTime]::UtcNow.AddHours(-2)
+	foreach ($item in @(Get-ChildItem -Force -Recurse -LiteralPath $folder) + (Get-Item -Force -LiteralPath $folder)) { $item.LastWriteTimeUtc = $old }
+	$r = Invoke-Ops $project @($changeOp)
+	Expect-Saved "a stale staging folder without a lock" $r
+	Check (-not (Test-Path -LiteralPath $folder)) "a stale staging folder without a lock -> removed" $r.Stderr
+	Check ((Test-Path -LiteralPath $fresh) -and $r.Stderr -match [regex]::Escape($fresh) -and $r.Stderr -notmatch ("\[warning\][^`n]*" + [regex]::Escape($folder))) "a stale one is removed while a fresh one without a lock is kept and warned" $r.Stderr
+
 	# 名前が自分の形でないものには触らない
 	$project = New-EmptyProject "SweepOtherName"
 	$other = Join-Path (Split-Path $project) ".dxforge-import-keep"

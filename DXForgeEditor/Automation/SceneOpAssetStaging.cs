@@ -27,6 +27,14 @@ namespace DXForgeEditor.Automation
         private const string StagingLockFileName = "staging.lock";
         private const int ErrorSharingViolation = 32;
 
+        /// <summary>
+        /// ロックのない一時フォルダを消してよい、最終更新からの時間(Issue #220)。import の待ち時間の上限(ImporterTimeout の 10 分)の 6 倍。
+        /// NOTE: ロックのないフォルダは、この変更より前の dxforge の残りか、作成とロックの作成の間に止まったもの。
+        ///       フォルダの中へ開いたハンドルがあるとフォルダの名前は変えられない(確認済み)ので、別名で作って改名する方式は取れない。
+        ///       作成とロックの間の隙は残るが、新しいフォルダは消さないので実害はない。
+        /// </summary>
+        internal static readonly TimeSpan NoLockStaleAge = TimeSpan.FromHours(1);
+
         // DXForgeImport の終了コード(DXForgeImport/Program.cs の ExitCode)
         private const int ImporterInputNotFound = 3;
         private const int ImporterUnsupportedFormat = 4;
@@ -55,7 +63,7 @@ namespace DXForgeEditor.Automation
 
         /// <summary>
         /// 強制終了で残った一時フォルダを片付ける。例外は投げない。ロックを共有なしで開けたフォルダだけを消す(所有者も、その子の importer も、もういない)。
-        /// 共有違反は使用中なので触らない。ロックがない、または確かめられないフォルダは、使っていないと言えないので消さずに警告する。
+        /// 共有違反は使用中なので触らない。ロックがないフォルダは、最終更新から NoLockStaleAge を過ぎたものだけ消し、新しいものは消さずに警告する。確かめられないフォルダも消さずに警告する。
         /// </summary>
         public static StagingSweepResult SweepAbandoned(string projectFile)
         {
@@ -85,7 +93,26 @@ namespace DXForgeEditor.Automation
                 catch (Exception ex) when (ex is FileNotFoundException || ex is DirectoryNotFoundException)
                 {
                     // 確かめる間に所有者が消したなら、何も残っていない
-                    if (Directory.Exists(folder)) result.Warnings.Add($"ロックのない一時フォルダは消しません。使っている dxforge がなければ、手で消してください: {folder}");
+                    if (Directory.Exists(folder))
+                    {
+                        if (IsStale(folder))
+                        {
+                            var staleError = DeleteStagingFolder(folder, null);
+                            if (staleError == null)
+                            {
+                                result.Removed.Add(folder);
+                            }
+                            else
+                            {
+                                result.Leftovers.Add(folder);
+                                result.Warnings.Add($"残った一時フォルダを消せませんでした: {folder}({staleError})");
+                            }
+                        }
+                        else
+                        {
+                            result.Warnings.Add($"ロックのない一時フォルダは消しません。使っている dxforge がなければ、手で消してください: {folder}");
+                        }
+                    }
                 }
                 catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
                 {
@@ -105,6 +132,25 @@ namespace DXForgeEditor.Automation
                 }
             }
             return result;
+        }
+
+        /// <summary>フォルダとその中の最新の更新が NoLockStaleAge より前なら true。確かめられないときは false(消さない)。</summary>
+        private static bool IsStale(string folder)
+        {
+            try
+            {
+                var newest = Directory.GetLastWriteTimeUtc(folder);
+                foreach (var entry in Directory.EnumerateFileSystemEntries(folder, "*", SearchOption.AllDirectories))
+                {
+                    var time = File.GetLastWriteTimeUtc(entry);
+                    if (time > newest) newest = time;
+                }
+                return DateTime.UtcNow - newest > NoLockStaleAge;
+            }
+            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException)
+            {
+                return false;
+            }
         }
 
         /// <summary>取り込んで一時フォルダに書く。結果の assets と warnings を埋める。Content には触らない。</summary>
@@ -270,9 +316,9 @@ namespace DXForgeEditor.Automation
         }
 
         /// <summary>
-        /// ロックを持ったまま中身を消し、最後にロックを閉じてフォルダごと消す。held は必ず閉じる。消せなければその理由を返し、ロックのファイルは残す(次の実行が片付ける)。
+        /// ロックを持ったまま中身を消し、最後にロックを閉じてフォルダごと消す。held は必ず閉じる(ロックのない古いフォルダは null)。消せなければその理由を返し、ロックのファイルは残す(次の実行が片付ける)。
         /// </summary>
-        private static string? DeleteStagingFolder(string folder, FileStream held)
+        private static string? DeleteStagingFolder(string folder, FileStream? held)
         {
             try
             {
@@ -282,7 +328,7 @@ namespace DXForgeEditor.Automation
                     if (Directory.Exists(entry)) Directory.Delete(entry, recursive: true);
                     else File.Delete(entry);
                 }
-                held.Dispose();
+                held?.Dispose();
                 Directory.Delete(folder, recursive: true);
                 return null;
             }
@@ -296,7 +342,7 @@ namespace DXForgeEditor.Automation
             }
             finally
             {
-                held.Dispose();
+                held?.Dispose();
             }
         }
 
