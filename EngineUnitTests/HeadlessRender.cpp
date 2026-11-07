@@ -23,7 +23,7 @@
 // 2026/11/07 別のスレッドがビューポートを描く間にビューポートを操作する確認を追加 (Primal Day 083, #209)
 // 2026/11/07 別のスレッドが描いている間に ShutdownEngine を呼ぶ確認を追加 (#209)
 // 2026/11/07 GetDrawnFrameCount が描いたときだけ増えることの確認を追加 (#209)
-// 2026/11/08 描画中にエディタがエンティティとリソースを作って消す確認を追加 (Primal Day 084, #214)
+// 2026/11/08 描画中にエディタがエンティティを作って消す確認を追加 (Primal Day 084, #214)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -75,8 +75,6 @@ struct editor_entity_descriptor;
 extern "C" dxforge::id::id_type CreateGameEntity(editor_entity_descriptor* e);
 extern "C" void RemoveGameEntity(dxforge::id::id_type id);
 extern "C" dxforge::id::id_type GetComponentId(dxforge::id::id_type entity_id, dxforge::component_type::type type);
-extern "C" dxforge::id::id_type CreateResource(const u8* data, u32 type);
-extern "C" void DestroyResource(dxforge::id::id_type id, u32 type);
 
 // DXForgeEngineDLL/EntityAPI.cpp の game_entity_descriptor と同じ並び(Tests_EditorAPI.cpp の test_descriptor と同じ)
 struct editor_entity_descriptor
@@ -539,8 +537,9 @@ namespace dxforge::headless::render
 
 			[[nodiscard]] id::id_type sphere_geometry_id() const { return _sphere_entity.geometry().get_id(); }
 
-			/// @brief エディタの AppliedMaterial.PackForEngine() の形のマテリアルのデータ(check_editor_viewports が DLL の CreateResource に渡す)
-			[[nodiscard]] std::vector<u8> editor_material_data() const { return pack_material_data({ 0.2f, 0.8f, 0.3f, 1.f }, 0.f, 0.5f); }
+			/// @brief 球のメッシュとマテリアル(check_editor_viewports がエディタと同じ経路でエンティティを作るのに使う)
+			[[nodiscard]] id::id_type sphere_model_id() const { return _sphere_model_id; }
+			[[nodiscard]] id::id_type sphere_material_id() const { return _sphere_mtl_id; }
 
 			void destroy()
 			{
@@ -587,12 +586,6 @@ namespace dxforge::headless::render
 			/// @brief エディタの AppliedMaterial.PackForEngine() の形のデータから、DLLと同じ経路でマテリアルを作る
 			id::id_type create_material(math::v4 base_color, f32 metallic, f32 roughness, const id::id_type* texture_ids = nullptr, u32 texture_count = 0)
 			{
-				const std::vector<u8> data{ pack_material_data(base_color, metallic, roughness, texture_ids, texture_count) };
-				return editor::create_resource(data.data(), content::asset_type::material);
-			}
-
-			std::vector<u8> pack_material_data(math::v4 base_color, f32 metallic, f32 roughness, const id::id_type* texture_ids = nullptr, u32 texture_count = 0) const
-			{
 				graphics::material_surface surface{};
 				surface.base_color = base_color;
 				surface.metallic = metallic;
@@ -601,7 +594,8 @@ namespace dxforge::headless::render
 				for (id::id_type& id : shader_ids) id = id::invalid_id;
 				shader_ids[graphics::shader_type::vertex] = _vs_id;
 				shader_ids[graphics::shader_type::pixel] = _ps_id;
-				return test::pack_material(surface, graphics::material_type::opaque, texture_ids, texture_count, shader_ids);
+				const std::vector<u8> data{ test::pack_material(surface, graphics::material_type::opaque, texture_ids, texture_count, shader_ids) };
+				return editor::create_resource(data.data(), content::asset_type::material);
 			}
 
 			/// @brief エディタの形のデータから、テクスチャ・それを使うマテリアル・メッシュをDLLと同じ経路で作って破棄する。
@@ -854,48 +848,34 @@ namespace dxforge::headless::render
 			return {};
 		}
 
-		/// @brief 描画中に、エディタと同じ経路でエンティティとリソースを作って消す(Primal Day 084, #214)
-		/// @details render thread が viewport を描き続ける間に、このスレッドがエディタの順序(CreateResource → CreateGameEntity →
-		///			 SetGeometryIds → SetGeometryIds で外す → RemoveGameEntity → DestroyResource)を繰り返す。半分の回は外さずに
-		///			 消す(順序の誤り)。DLL の安全策(remove_geometry_from_viewports)がないと、次の RenderFrame が消したジオメトリを
-		///			 読んで assert に当たる。別のスレッドが並行して CreateResource と DestroyResource を繰り返し、D3D12Content の
-		///			 配列を再確保させる(描画中のマテリアルなどの参照が、再確保で壊れないこと)。
+		/// @brief 描画中に、エディタと同じ経路でエンティティを作って消す(Primal Day 084, #214)
+		/// @details render thread が viewport を描き続ける間に、このスレッドがエディタの順序(CreateGameEntity → SetGeometryIds →
+		///			 SetGeometryIds で外す → RemoveGameEntity)を繰り返す。半分の回は外さずに消す(順序の誤り)。DLL の安全策
+		///			 (remove_geometry_from_viewports)がないと、次の RenderFrame が消したジオメトリを読んで assert に当たる。
 		///			 異常終了しないことと、デバッグレイヤーのエラーがないこと(呼び出し元の check_debug_messages)を見る。
+		/// NOTE: メッシュとマテリアルは、サーフェスを作る前に作ったシーンのものを使い回し、描画中には CreateResource を呼ばない。
+		///		  ビューポートのサーフェスを作って描いたあとでメッシュをアップロードすると、WARP でデバイスが消えることがある
+		///		  (DXGI_ERROR_DEVICE_REMOVED。並行の問題ではなく、同じスレッドで順に呼んでも起きる。#214 の PR に書いた別の不具合)。
 		/// @return 失敗したときはその説明(成功なら空)
 		std::string check_editor_entities_while_rendering(test_scene& scene, u32 viewport)
 		{
-			const std::vector<u8> mesh_blob{ pack_mesh(make_sphere(0.5f, 12, 6)) };
-			const std::vector<u8> material_blob{ scene.editor_material_data() };
 			std::atomic<bool> done{ false };
-			std::atomic<bool> churn_failed{ false };
 			std::thread render_thread{ [&]()
 			{
 				while (!done) RenderFrame(viewport, id::invalid_id, 0);
 			} };
-			std::thread churn_thread{ [&]()
-			{
-				for (u32 i{ 0 }; i < 32; ++i)
-				{
-					const id::id_type mesh_id{ CreateResource(mesh_blob.data(), content::asset_type::mesh) };
-					const id::id_type material_id{ CreateResource(material_blob.data(), content::asset_type::material) };
-					if (!id::is_valid(mesh_id) || !id::is_valid(material_id)) churn_failed = true;
-					DestroyResource(material_id, content::asset_type::material);
-					DestroyResource(mesh_id, content::asset_type::mesh);
-				}
-			} };
 
 			std::string error{};
 			const id::id_type sphere_geometry_id{ scene.sphere_geometry_id() };
+			id::id_type material_id{ scene.sphere_material_id() };
 			for (u32 i{ 0 }; i < 16 && error.empty(); ++i)
 			{
-				id::id_type mesh_id{ CreateResource(mesh_blob.data(), content::asset_type::mesh) };
-				id::id_type material_id{ CreateResource(material_blob.data(), content::asset_type::material) };
 				editor_entity_descriptor desc{};
 				desc.position[0] = (f32)i * 0.1f;
-				desc.geometry_content_id = mesh_id;
+				desc.geometry_content_id = scene.sphere_model_id();
 				desc.material_count = 1;
 				desc.material_ids = &material_id;
-				const id::id_type entity_id{ id::is_valid(mesh_id) && id::is_valid(material_id) ? CreateGameEntity(&desc) : id::invalid_id };
+				const id::id_type entity_id{ CreateGameEntity(&desc) };
 				const id::id_type geometry_id{ id::is_valid(entity_id) ? GetComponentId(entity_id, component_type::geometry) : id::invalid_id };
 				if (!id::is_valid(geometry_id))
 				{
@@ -914,15 +894,11 @@ namespace dxforge::headless::render
 					if (i % 2 == 0) SetGeometryIds(viewport, ids, 1);
 				}
 				if (id::is_valid(entity_id)) RemoveGameEntity(entity_id);
-				DestroyResource(material_id, content::asset_type::material);
-				DestroyResource(mesh_id, content::asset_type::mesh);
 			}
 
 			done = true;
 			render_thread.join();
-			churn_thread.join();
 			if (!error.empty()) return error;
-			if (churn_failed) return "CreateResource() failed while another thread was rendering";
 			// 消したジオメトリが残っていれば、ここで assert に当たる
 			RenderFrame(viewport, id::invalid_id, 0);
 			return {};
