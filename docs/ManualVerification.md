@@ -1,120 +1,120 @@
-# エディタの手動検証手順
+# Manual verification of the editor
 
 <!-- last-reviewed: 2026-11-07 -->
 
-エディタの基本操作(プロジェクトの作成 → スクリプトの追加 → ゲームコードのDLLの読み込み → ゲームの実行)は、`EngineUnitTests`やCIでは確認できません。この手順書は、それを手作業で最後まで通すためのものです(Issue #43)。エディタや`DXForgeEngine`の実行時の挙動に関わる変更をしたときや、ツールチェーン(Visual Studio/.NET)を更新したときに使ってください。
+The editor's basic flow (create a project -> add a script -> load the game code DLL -> run the game) cannot be checked by `EngineUnitTests` or CI. This procedure walks through it by hand (issue #43). Use it after changes to the editor's or `DXForgeEngine`'s runtime behavior, and after toolchain updates (Visual Studio/.NET). Agents run these checks through the `gui-check` skill.
 
-所要時間の目安は、ビルド済みなら10分程度です。
+It takes about 10 minutes if everything is built.
 
-この手順書のコマンドは、すべて**リポジトリのルートで開いたPowerShell**(PowerShell 7またはWindows PowerShell 5.1)に、そのままコピーして実行できるように書いています。手順2で定義する変数(`$verifyName`など)を手順7の後片付けでも使うので、最後まで同じPowerShellのウィンドウで続けてください。
+Every command here can be pasted as-is into **PowerShell opened at the repository root** (PowerShell 7 or Windows PowerShell 5.1). Variables defined in step 2 (`$verifyName` etc.) are used again in the cleanup of step 7, so stay in the same PowerShell window until the end.
 
-## 1. 前提
+Japanese strings in code blocks and quotes are the editor's actual messages; they are kept verbatim so they can be matched.
 
-### 必要な環境
+## 1. Prerequisites
 
-- Windows 10/11、DirectX 12対応GPU
-- Visual Studio 2022(`v143`)。ワークロード「C++によるデスクトップ開発」と「.NETデスクトップ開発」に加えて、個別のコンポーネントの**「C++ ATL」**(`atlsafe.h`を使うため。ないと`DXForgeEngineDLL`とゲームのプロジェクトがビルドできません)
-- .NET 8 SDK以降
-- **Autodesk FBX SDK 2020.3.7**(`ContentTools`のビルドに必要。標準のインストール先以外にある場合は`FbxSdkDir`で指定する。READMEの「CI」の節を参照)
-- エディタは、ゲームのプロジェクトのビルドと実行にVisual Studio 2022をDTE(COM)経由で起動します。検証中にVisual Studioのウィンドウが開くことがあります。
+### Environment
 
-### ビルドしておくもの
+- Windows 10/11, a DirectX 12 GPU
+- Visual Studio 2022 (`v143`) with the workloads "Desktop development with C++" and ".NET desktop development", plus the individual component **"C++ ATL"** (for `atlsafe.h`; without it `DXForgeEngineDLL` and game projects do not build)
+- .NET 8 SDK or later
+- **Autodesk FBX SDK 2020.3.7** (needed to build `ContentTools`; if it is not in the default location, set `FbxSdkDir`; see `docs/dev/BuildAndTest.md`)
+- The editor starts Visual Studio 2022 through DTE (COM) to build and run game projects, so Visual Studio windows may open during the check.
 
-リポジトリのルートで、次の3つを実行します。
+### What to build
+
+At the repository root:
 
 ```powershell
-# 1) エディタ用の構成: DXForgeEngine(lib)、DXForgeEngineDLL、ContentTools
+# 1) Editor configuration: DXForgeEngine (lib), DXForgeEngineDLL, ContentTools
 ./build.ps1 -Configuration DebugEditor -Target native
 
-# 2) エディタ本体 (x64\DebugEditor\DXForgeEditor.exe に出力される)
+# 2) The editor (output: x64\DebugEditor\DXForgeEditor.exe)
 ./build.ps1 -Target editor
 
-# 3) スタンドアロン用の構成のエンジンのlib (x64\Debug\DXForgeEngine.lib)
+# 3) The engine lib in the standalone configuration (x64\Debug\DXForgeEngine.lib)
 ./build.ps1 -Configuration Debug -Target native -Project DXForgeEngine
 ```
 
-3)が必要な理由: エディタでゲームを実行(F5/Ctrl+F5)すると、ゲームのプロジェクトがスタンドアロン用の`Debug`構成(実行ファイル)でビルドされ、`$(DXFORGE_ENGINE)x64\Debug\DXForgeEngine.lib`をリンクします。これがないと、LoggerViewに「Build: Debug configuration 失敗」と出て、ゲームは起動しません(Visual Studioの出力は`LNK1104: ファイル 'DXForgeEngine.lib' を開くことができません`)。`EngineTest`や`EngineUnitTests`は不要で、`DXForgeEngine`だけをビルドすれば足ります(2026/10/18に実測)。
+Why 3) is needed: running the game from the editor (F5/Ctrl+F5) builds the game project in the standalone `Debug` configuration (an executable), which links `$(DXFORGE_ENGINE)x64\Debug\DXForgeEngine.lib`. Without it, LoggerView shows 「Build: Debug configuration 失敗」 and the game does not start (Visual Studio's output: `LNK1104: ファイル 'DXForgeEngine.lib' を開くことができません`). `EngineTest` and `EngineUnitTests` are not needed; building `DXForgeEngine` alone is enough (measured 2026/10/18).
 
-新しいclone/worktreeでは`packages/`が空ですが、`build.ps1`が`Restore.ps1`で自動的に復元します。
+In a fresh clone/worktree `packages/` is empty, but `build.ps1` restores it automatically through `Restore.ps1`.
 
-> この手順は、#44(`build.ps1`のエラー要約/`-DetailedLog`)、#45(`Restore.ps1`による`packages/`の自動復元)、#46(エディタを`x64\<構成>\`に出力)がマージされていることを前提にしています。
+### The `DXFORGE_ENGINE` environment variable
 
-### 環境変数`DXFORGE_ENGINE`
+Game projects find the engine's headers and libs through the user environment variable `DXFORGE_ENGINE` (the engine repository root, with a trailing `\`). If it is unset, the editor asks for it in a dialog on first start.
 
-ゲームのプロジェクトは、ユーザー環境変数`DXFORGE_ENGINE`(エンジンのリポジトリのルート、末尾に`\`)でエンジンのヘッダとlibを探します。エディタの初回起動時に、未設定ならダイアログで設定を求められます。
-
-**検証したいチェックアウト(worktree)を指しているかを必ず確認してください。** 別のチェックアウトを指していると、そちらのlibでビルドされ、検証したい変更が反映されません。
+**Always check that it points at the checkout (worktree) you want to verify.** If it points elsewhere, that checkout's lib is linked and your change is not tested.
 
 ```powershell
 [Environment]::GetEnvironmentVariable("DXFORGE_ENGINE", "User")
-# 一時的にこのチェックアウトへ切り替える場合(元の値を$origEngineに控え、手順7で戻す)
+# To switch to this checkout temporarily (keep the old value in $origEngine; restored in step 7)
 $origEngine = [Environment]::GetEnvironmentVariable("DXFORGE_ENGINE", "User")
 [Environment]::SetEnvironmentVariable("DXFORGE_ENGINE", "$PWD\", "User")
 ```
 
-エディタは起動時にユーザー環境変数`DXFORGE_ENGINE`を読む(レジストリから読むので、エディタを起動したシェルの環境変数は関係ありません)ため、変更はエディタを起動する前に行ってください。
+The editor reads the user environment variable `DXFORGE_ENGINE` at startup (from the registry, so the environment of the shell that started it does not matter); change it before starting the editor.
 
-エディタがDTE(COM)で起動するVisual Studioは、DcomLaunchサービス(`svchost.exe`)の子プロセスになり、**ログオン時の環境ブロックを受け継ぎます。** ログオン後に変えたユーザー環境変数は、devenvが1つも動いていない状態で起動し直しても、Visual Studioのプロセスには反映されません(#102で実測。サインアウトするまでは古い値のまま)。そのためエディタは、ゲームのビルドの前に、ソリューションのフォルダ(`<Name>.sln`と同じ場所)に`Directory.Build.props`を書き出し、エディタが読んだ`DXFORGE_ENGINE`をMSBuildのプロパティとして渡します(プロジェクトのプロパティは環境変数より優先されます)。上位のフォルダに`Directory.Build.props`があれば、それも読み込みます。そのフォルダに、エディタが作ったものではない`Directory.Build.props`があるときは上書きせず、LoggerViewに警告を出します。その場合は、Visual Studioのプロセスの環境変数が使われます。
+The Visual Studio that the editor starts through DTE (COM) is a child of the DcomLaunch service (`svchost.exe`) and **inherits the environment block from logon**. A user environment variable changed after logon does not reach the Visual Studio process even if it is restarted with no devenv running (measured in #102; it keeps the old value until sign-out). So before building the game, the editor writes `Directory.Build.props` into the solution folder (next to `<Name>.sln`) and passes the `DXFORGE_ENGINE` it read as an MSBuild property (project properties win over environment variables). A `Directory.Build.props` in a parent folder is imported too. If that folder already has a `Directory.Build.props` the editor did not create, it is not overwritten and LoggerView shows a warning; the Visual Studio process's environment variable is used then.
 
-どのlibがリンクされたかは、ゲームの`Debug`構成のビルド(手順6のF5/Ctrl+F5)のあとに、リンカーの読み込み記録で確かめられます(`$verifyRoot`/`$verifyName`は手順2で設定します)。
+Which lib was linked can be checked after the game's `Debug` build (F5/Ctrl+F5 in step 6) in the linker's read log (`$verifyRoot`/`$verifyName` are set in step 2):
 
 ```powershell
 Get-Content "$verifyRoot\$verifyName\GameCode\x64\Debug\$verifyName.tlog\link.read.1.tlog" -Encoding Unicode | Select-String DXFORGEENGINE.LIB
-# 例: C:\...\<このworktree>\X64\DEBUG\DXFORGEENGINE.LIB
+# e.g. C:\...\<this worktree>\X64\DEBUG\DXFORGEENGINE.LIB
 ```
 
-## 2. プロジェクトの作成/開く
+## 2. Create/open a project
 
-1. 検証用の名前と場所を変数に入れ、エディタを起動する。Project Browserが開く。
+1. Put the check project's name and location into variables and start the editor. The Project Browser opens.
 
 ```powershell
-# 検証用のプロジェクトの名前と、それを作るフォルダ(展開済みの絶対パス)。手順7でも使う
+# Name of the check project and the folder it is created in (expanded absolute path); also used in step 7
 $verifyName = "Verify43"
 $verifyRoot = Join-Path $env:TEMP "DXForgeVerify"
-# 手順2でPath欄に貼り付けるため、クリップボードに入れておく
+# Put it on the clipboard to paste into the Path field below
 Set-Clipboard "$verifyRoot\"
 "$verifyRoot\"
-# エディタはテンプレートを実行ファイルの場所(x64\DebugEditor\ProjectTemplates)から読むので、作業フォルダはどこでもよい
-# (テクスチャの読み込み時の試験用の書き出し先 <リポジトリ>\x64\texture.img も実行ファイルの場所から決まる。#91)
+# The editor reads templates from next to its executable (x64\DebugEditor\ProjectTemplates), so any working directory works
+# (the test output of texture loading, <repo>\x64\texture.img, is also located from the executable; #91)
 Start-Process -FilePath "$PWD\x64\DebugEditor\DXForgeEditor.exe"
 ```
 
-2. 「Create Project」を選び、テンプレート`Empty Project`、Nameに`$verifyName`の値(`Verify43`)、Pathに`$verifyRoot\`の値を入力して「Create」。
-   - Path欄は、中身を全部選択(Ctrl+A)してから貼り付け(Ctrl+V)ます。上のコマンドで表示した値(例: `C:\Users\<ユーザー名>\AppData\Local\Temp\DXForgeVerify\`)を手で入力してもかまいません。
-   - Path欄の環境変数は展開されるので、`%TEMP%\DXForgeVerify\`と入力しても同じ場所に作られます(「Create」を押すと、Path欄の表示も展開済みの絶対パスに変わります)。相対パス(例: `DXForgeVerify\`)は「プロジェクトパスには絶対パスを入力してください」と表示されて作成できません。
-   - 既定のPathは、ユーザー環境変数`DXFORGE_PROJECTS`があればその値、なければ`%USERPROFILE%\DXForgeProjects\`です(#141。値が使えないときはLoggerViewにWarningが出て、後者になります)。後片付けを簡単にするため、専用のフォルダを使うことをおすすめします。
-   - 前回の検証のフォルダ(`$verifyRoot\$verifyName\`)が残っていると「選択したプロジェクトフォルダはすでに存在しています」と出て作成できません。手順7の後片付けを先に行ってください。
+2. Choose "Create Project", template `Empty Project`, Name = the value of `$verifyName` (`Verify43`), Path = the value of `$verifyRoot\`, then "Create".
+   - Select everything in the Path field (Ctrl+A) and paste (Ctrl+V). Typing the value shown above (e.g. `C:\Users\<user>\AppData\Local\Temp\DXForgeVerify\`) also works.
+   - Environment variables in the Path field are expanded, so `%TEMP%\DXForgeVerify\` creates it in the same place (after "Create" the field shows the expanded absolute path). A relative path (e.g. `DXForgeVerify\`) is rejected with 「プロジェクトパスには絶対パスを入力してください」.
+   - The default Path is the user environment variable `DXFORGE_PROJECTS` if set, else `%USERPROFILE%\DXForgeProjects\` (#141; if the value is unusable, LoggerView shows a Warning and the latter is used). A dedicated folder makes cleanup easier.
+   - If the previous check's folder (`$verifyRoot\$verifyName\`) is still there, creation fails with 「選択したプロジェクトフォルダはすでに存在しています」. Do the cleanup of step 7 first.
 
-テンプレートは、エディタのビルド(`./build.ps1 -Target editor`)で`DXForgeEditor\ProjectTemplates`から`x64\DebugEditor\ProjectTemplates`にコピーされます。テンプレートを編集したら、エディタをビルドし直してください。テンプレートが見つからない場合は、新規プロジェクトの一覧が空になり、LoggerViewに「プロジェクト・テンプレートの読み込みに失敗しました: <パス>」と出ます。
+The editor build (`./build.ps1 -Target editor`) copies the templates from `DXForgeEditor\ProjectTemplates` to `x64\DebugEditor\ProjectTemplates`; rebuild the editor after editing a template. If no template is found, the new-project list is empty and LoggerView shows 「プロジェクト・テンプレートの読み込みに失敗しました: <path>」.
 
-**期待される結果**
+**Expected**
 
-- ワールドエディタ(タイトル「DXForge Editor」)が開き、Hierarchyに「Sample Scene」がある。
-- `<Path>\<Name>\`に`<Name>.dxproj`、`<Name>.sln`、`GameCode\<Name>.vcxproj`などができる。
-- 開いたときに自動でビルドが走り、LoggerViewに次の3行が出る。3行目の警告は、空のプロジェクトにはソースがなくDLLが作られないためで、**想定どおり**です。
+- The world editor (title "DXForge Editor") opens and Hierarchy has "Sample Scene".
+- `<Path>\<Name>\` contains `<Name>.dxproj`, `<Name>.sln`, `GameCode\<Name>.vcxproj` and so on.
+- A build runs automatically on open and LoggerView shows these three lines. The third (a yellow warning) is **expected**: an empty project has no sources, so no DLL is produced.
 
 ```
 Build: GameCode\<Name>.vcxproj, DebugEditor, x64, DebugEditor|x64
 Build: DebugEditor configuration 成功
-ゲームコードDLLファイルのロードに失敗しました。 まずプロジェクトをビルドしてみてください！   (警告・黄色)
+ゲームコードDLLファイルのロードに失敗しました。 まずプロジェクトをビルドしてみてください！   (warning, yellow)
 ```
 
-既存のプロジェクトは、Project Browserの「Open Project」の一覧から選んで「Open」で開けます。
+Existing projects open from the Project Browser's "Open Project" list with "Open".
 
-## 3. スクリプトの追加
+## 3. Add a script
 
-1. ツールバーの「New Script」を押す。
-2. Script nameに名前(例: `SpinScript`)を入力する。Pathは既定の`GameCode\`のまま。ダイアログに「`SpinScript.h と SpinScript.cpp が <Name> に追加されます`」と表示される。
-3. 「Create」を押す。
+1. Press "New Script" in the toolbar.
+2. Enter a Script name (e.g. `SpinScript`), leaving Path at the default `GameCode\`. The dialog shows 「`SpinScript.h と SpinScript.cpp が <Name> に追加されます`」.
+3. Press "Create".
 
-**期待される結果**
+**Expected**
 
-- `GameCode\SpinScript.h`と`GameCode\SpinScript.cpp`が作られる(`REGISTER_SCRIPT(SpinScript);`と、`begin_play()`/`update(float dt)`の空の実装)。
-- Visual Studioのウィンドウが開き(前面に出る)、ソリューションエクスプローラーの`<Name>`プロジェクトに2つのファイルが追加され、`SpinScript.cpp`がエディタで開かれる。
+- `GameCode\SpinScript.h` and `GameCode\SpinScript.cpp` are created (`REGISTER_SCRIPT(SpinScript);` and empty `begin_play()`/`update(float dt)`).
+- A Visual Studio window opens (in front), the two files are added to the `<Name>` project in Solution Explorer, and `SpinScript.cpp` opens in the editor.
 
-**注意:** この時点では、追加はVisual Studioのメモリ上だけで、`GameCode\<Name>.vcxproj`のファイルにはまだ書き込まれていません。次の手順のビルドのときに保存され、`<ClCompile Include="SpinScript.cpp" />`/`<ClInclude Include="SpinScript.h" />`が入ります。vcxprojを直接見て確認する場合は、手順4のあとに確認してください。
+**Note:** at this point the files are added only in Visual Studio's memory, not yet to the `GameCode\<Name>.vcxproj` file. It is saved during the build in the next step, which adds `<ClCompile Include="SpinScript.cpp" />`/`<ClInclude Include="SpinScript.h" />`. Check the vcxproj after step 4.
 
-**(任意)スクリプトが動いたことを確かめる仕掛け:** 手順6でスクリプトが実行されたことを目で確認できるように、`update()`に、ファイルに1行書き出す処理を入れておくと便利です。例:
+**(Optional) a probe showing the script ran:** to see in step 6 that the script executed, have `update()` append a line to a file. For example:
 
 ```cpp
 #include <fstream>
@@ -127,16 +127,16 @@ void SpinScript::update(float dt)
 }
 ```
 
-F5(デバッグあり)で実行するなら、代わりに`update()`にブレークポイントを置いても確認できます。
+When running with F5 (with debugging), a breakpoint in `update()` works too.
 
-## 4. ゲームコードのDLLのビルドと読み込み
+## 4. Build and load the game code DLL
 
-1. エディタに戻り、ツールバーの「Build」を押す(またはF7)。
+1. Back in the editor, press "Build" in the toolbar (or F7).
 
-**期待される結果**
+**Expected**
 
-- `<Path>\<Name>\x64\DebugEditor\<Name>.dll`ができる。
-- LoggerViewに次のように出て、**DLL読み込みの警告が出ない**。
+- `<Path>\<Name>\x64\DebugEditor\<Name>.dll` is produced.
+- LoggerView shows the following, **without the DLL load warning**:
 
 ```
 Build: GameCode\<Name>.vcxproj, DebugEditor, x64, DebugEditor|x64
@@ -144,166 +144,166 @@ Build: DebugEditor configuration 成功
 ゲームコードDLLは正常にロードされました。
 ```
 
-- エディタのプロセスに`<Name>.dll`が読み込まれている(`tasklist /M <Name>.dll`で`DXForgeEditor.exe`が出る)。
+- `<Name>.dll` is loaded in the editor process (`tasklist /M <Name>.dll` lists `DXForgeEditor.exe`).
 
-「Build: …」の開始の行は、ビルド1回につき1行です。以前は、ビルドのたびに1行ずつ増えていく不具合(#48)がありました(2回目のビルドで2行、3回目で3行)。
+There is one "Build: ..." start line per build. A former bug (#48) added one more line per build (two on the second build, three on the third).
 
-## 5. スクリプトのアタッチ
+## 5. Attach the script
 
-1. Hierarchyの「Sample Scene」の「+」を押して、エンティティ(「Empty Entity」)を追加する。
-2. 追加したエンティティを選択する。インスペクタにName/EnabledとTransform(Position/Rotation/Scale)が表示される。
-3. インスペクタの「Add Component」を押し、「Script」にマウスを合わせる。
+1. Press "+" on "Sample Scene" in Hierarchy to add an entity ("Empty Entity").
+2. Select it. The inspector shows Name/Enabled and Transform (Position/Rotation/Scale).
+3. Press "Add Component" in the inspector and hover over "Script".
 
-**期待される結果**
+**Expected**
 
-- 「Script」のサブメニューに、手順3で追加したスクリプト(`SpinScript`)が出る。この一覧は、読み込んだゲームコードのDLLからエンジン側の`get_script_names`経由で取得したものです。DLLが読み込まれていないと「Script」が無効になります。
-- `SpinScript`を選ぶと、インスペクタにScriptコンポーネント(Name: `SpinScript`)が追加される。
-- 「Geometry」を選ぶと、既定のジオメトリ(`DefaultCube`)のGeometryコンポーネントが追加される(#32)。Physicsは未実装のため無効(#20)。
+- The "Script" submenu lists the script added in step 3 (`SpinScript`). The list comes from the loaded game code DLL through the engine's `get_script_names`; without a loaded DLL, "Script" is disabled.
+- Choosing `SpinScript` adds a Script component (Name: `SpinScript`) to the inspector.
+- Choosing "Geometry" adds a Geometry component with the default geometry (`DefaultCube`) (#32). Physics is disabled because it is not implemented (#20).
 
-追加したエンティティのTransformは、Positionが`0, 0, 0`、Rotationが`0, 0, 0`、Scaleが`1, 1, 1`で表示される(#49で修正。それ以前はScaleも`0, 0, 0`だった)。
+A new entity's Transform shows Position `0, 0, 0`, Rotation `0, 0, 0`, Scale `1, 1, 1` (fixed in #49; before that Scale was `0, 0, 0` too).
 
-## 6. ゲームの実行
+## 6. Run the game
 
-ツールバーの右側のコンボボックス(既定は`Debug`)が、実行時にビルドするスタンドアロン用の構成です。ゲームの実行と停止は、**キーボードショートカットでのみ**行えます(メニューやボタンはありません)。ショートカットは、ワールドエディタにフォーカスがあるときに効きます(Hierarchyなどをクリックしてから押す)。
+The combo box on the right of the toolbar (default `Debug`) is the standalone configuration built for running. Running and stopping the game is **only possible with keyboard shortcuts** (no menu or button). They work while the world editor has focus (click Hierarchy or similar first).
 
-| 操作 | キー | 動作 |
+| Action | Key | Behavior |
 |---|---|---|
-| 実行(デバッグあり) | F5 | `Debug`構成でビルド → `game.bin`を書き出し → Visual Studioの`Debug.Start` |
-| 実行(デバッグなし) | Ctrl+F5 | 同上、`Debug.StartWithoutDebugging` |
-| 停止 | Shift+F5 | Visual Studioの`Debug.StopDebugging` |
+| Run with debugging | F5 | Build `Debug` -> write `game.bin` -> Visual Studio `Debug.Start` |
+| Run without debugging | Ctrl+F5 | Same, `Debug.StartWithoutDebugging` |
+| Stop | Shift+F5 | Visual Studio `Debug.StopDebugging` |
 
-**期待される結果**
+**Expected**
 
-- LoggerViewに次のように出る。
+- LoggerView shows:
 
 ```
 Build: GameCode\<Name>.vcxproj, Debug, x64, Debug|x64
 Build: Debug configuration 成功
 ```
 
-- `<Path>\<Name>\x64\Debug\<Name>.exe`と、**実行の直前に`SaveToBinary`が書き出した`x64\Debug\game.bin`**ができる(更新日時が実行した時刻になる)。Empty Entity 1個 + Scriptコンポーネントの場合は70バイトで、末尾にスクリプト名(`SpinScript`)が入っている。ゲームは実行ファイルのディレクトリをカレントにして`game.bin`を読み込みます。
-- タイトル「DXForge Game」のゲームのウィンドウが開く(今はまだ何も描画しないので、背景だけのウィンドウ)。
-- スクリプトの`update()`が毎フレーム呼ばれる(手順3の仕掛けを入れた場合は`script_log.txt`に`update frames=60 dt=10`…が追記されていく)。
-- F5の場合、Visual Studioのタイトルが「`<Name> (実行中)`」になる。Shift+F5でゲームのプロセスが終了し、タイトルが元に戻る。
+- `<Path>\<Name>\x64\Debug\<Name>.exe` and **`x64\Debug\game.bin`, written by `SaveToBinary` right before running**, exist (modified at the run time). With one Empty Entity + a Script component it is 70 bytes and ends with the script name (`SpinScript`). The game reads `game.bin` with the executable's directory as the current directory.
+- A game window titled "DXForge Game" opens (it shows only the background for now).
+- The script's `update()` is called every frame (with the probe from step 3, `script_log.txt` gets `update frames=60 dt=10`... appended).
+- With F5, Visual Studio's title becomes 「`<Name> (実行中)`」. Shift+F5 ends the game process and the title returns.
 
-**注意:**
+**Notes:**
 
-- `begin_play()`は今のところ呼ばれません。既知の不具合(#47)です。スクリプトの確認には`update()`を使ってください。
-- **Ctrl+F5(デバッグなし)で起動したゲームは、Shift+F5では止まりません。** Visual Studioがプロセスにアタッチしていないためで、Visual Studio自体の動作と同じです。ゲームのウィンドウを閉じて終了してください。
-- `x64\Debug\DXForgeEngine.lib`がないと、ここで「Build: Debug configuration 失敗」になります(前提の3)を参照)。
+- `begin_play()` is not called yet, a known bug (#47). Use `update()` to check scripts.
+- **A game started with Ctrl+F5 (no debugging) does not stop with Shift+F5**, because Visual Studio is not attached; this is Visual Studio's own behavior. Close the game window instead.
+- Without `x64\Debug\DXForgeEngine.lib` this fails with 「Build: Debug configuration 失敗」 (see 3) in the prerequisites).
 
-## 7. 後片付け
+## 7. Cleanup
 
-別のPowerShellのウィンドウで後片付けをする場合は、先に手順2の`$verifyName`と`$verifyRoot`の2行を実行して、変数を定義し直してください(`$origEngine`は失われているので、手順4では元の値を直接指定します)。
+If you clean up from another PowerShell window, first run the two lines defining `$verifyName` and `$verifyRoot` from step 2 again (`$origEngine` is lost, so give the old value directly in step 4 below).
 
-1. エディタを閉じる(ウィンドウの×)。プロジェクトのアンロード時に、エディタが起動したVisual Studioも閉じられます。`DXForgeEditor.exe`と`devenv.exe`が残っていないことを確認します(自分で別に開いているVisual Studioは除く)。
+1. Close the editor (the window's x). Unloading the project also closes the Visual Studio the editor started. Confirm no `DXForgeEditor.exe` or `devenv.exe` is left (except a Visual Studio you opened yourself).
 
 ```powershell
 tasklist /FI "IMAGENAME eq DXForgeEditor.exe"
 tasklist /FI "IMAGENAME eq devenv.exe"
 ```
 
-2. 検証用のプロジェクトのフォルダを削除する。
+2. Delete the check project's folder.
 
 ```powershell
 Remove-Item -Recurse -Force $verifyRoot
 ```
 
-3. `%APPDATA%\DXForgeEditor\ProjectData.xml`から、検証用のプロジェクトのエントリだけを削除する。このファイルはProject Browserの「Open Project」の一覧で、作成/オープンしたプロジェクトが登録されます。フォルダを消しても一覧のエントリは残るので、ほかのエントリには触らず、該当の`<ProjectData>`要素だけを消します。エディタはプロジェクトを`ProjectPath`+`ProjectName`(フルパス)で区別するので、別の場所にある同じ名前のプロジェクトを消さないよう、**`ProjectName`と`ProjectPath`の両方が一致するもの**だけを消します。
+3. Delete only the check project's entry from `%APPDATA%\DXForgeEditor\ProjectData.xml`. This file is the Project Browser's "Open Project" list, where created/opened projects are registered. Deleting the folder leaves the entry, so remove just that `<ProjectData>` element without touching others. The editor identifies projects by `ProjectPath` + `ProjectName` (full path), so to avoid deleting a same-named project elsewhere, delete only entries where **both `ProjectName` and `ProjectPath` match**.
 
-まず、バックアップを取り、消すエントリの`ProjectPath`を決めます。バックアップは日時入りの名前で毎回新しく作るので、前回の検証のバックアップと取り違えたり、上書きしたりすることはありません。
+First take a backup and set the `ProjectPath` to delete. The backup gets a timestamped name each time, so it is never confused with or overwritten by an earlier one.
 
 ```powershell
 $f = "$env:APPDATA\DXForgeEditor\ProjectData.xml"
 $bak = "$f.$(Get-Date -Format yyyyMMdd-HHmmss).bak"
 Copy-Item $f $bak
-# エディタは、Path欄の値(環境変数を展開した絶対パス) + プロジェクト名 + "\" をProjectPathとして登録する
+# The editor registers the Path field (environment variables expanded) + project name + "\" as ProjectPath
 $projectPath = "$verifyRoot\$verifyName\"
 ```
 
-次に、`ProjectName`と`ProjectPath`の両方が一致するエントリを消します。
+Then delete the entries where both `ProjectName` and `ProjectPath` match.
 
 ```powershell
 [xml]$x = Get-Content $f -Raw -Encoding UTF8
 $ns = New-Object Xml.XmlNamespaceManager $x.NameTable
 $ns.AddNamespace("d", "http://schemas.datacontract.org/2004/07/DXForgeEditor.GameProject")
 $targets = @($x.SelectNodes("//d:ProjectData", $ns) | Where-Object { $_.ProjectName -eq $verifyName -and $_.ProjectPath -eq $projectPath })
-"削除するエントリ: $($targets.Count)件 ($projectPath)"
+"Entries to delete: $($targets.Count) ($projectPath)"
 foreach ($e in $targets) { [void]$e.ParentNode.RemoveChild($e) }
 $x.Save($f)
 ```
 
-削除するエントリが0件と表示された場合は、手順2でPath欄に`$verifyRoot\`以外の値を入力しています。`ProjectData.xml`を開き、該当するエントリの`ProjectPath`の値を`$projectPath`に入れて(例: `$projectPath = "D:\Work\Verify43\"`)から、**2つ目のコードブロックだけ**をもう一度実行してください(1つ目を実行すると`$projectPath`が元の値に戻ります)。
+If it reports 0 entries, a value other than `$verifyRoot\` was entered in the Path field in step 2. Open `ProjectData.xml`, put that entry's `ProjectPath` into `$projectPath` (e.g. `$projectPath = "D:\Work\Verify43\"`), and run **only the second code block** again (running the first resets `$projectPath`).
 
-最後に、残っているエントリを表示し、検証用のエントリが消えて、ほかのエントリが残っていることを確かめます。
+Finally, list the remaining entries and confirm the check entry is gone and the others remain.
 
 ```powershell
 $x.SelectNodes("//d:ProjectData", $ns) | ForEach-Object { "$($_.ProjectName)  $($_.ProjectPath)" }
 ```
 
-問題がなければ、このとき作ったバックアップを消します(次回の検証で古いバックアップが残らないように)。意図しないエントリまで消えていた場合は、消さずに`Copy-Item $bak $f`で元に戻してください。
+If all is well, delete the backup made above (so no old backup is left for the next check). If an unintended entry disappeared, keep it and restore with `Copy-Item $bak $f`.
 
 ```powershell
 Remove-Item $bak
 ```
 
-4. `DXFORGE_ENGINE`を一時的に切り替えた場合は、元の値に戻す。
+4. If you switched `DXFORGE_ENGINE` temporarily, restore it.
 
 ```powershell
-# $origEngineは手順1の「一時的に切り替える場合」で控えた値。切り替えていなければ何もしない
+# $origEngine is the value saved under "switch temporarily" in step 1; nothing happens if you did not switch
 if (Test-Path variable:origEngine) { [Environment]::SetEnvironmentVariable("DXFORGE_ENGINE", $origEngine, "User") }
 [Environment]::GetEnvironmentVariable("DXFORGE_ENGINE", "User")
 ```
 
-エディタをもう一度起動して、Project Browserの一覧から検証用のプロジェクトが消え、ほかのプロジェクトが残っていることを確認できます。
+Starting the editor again, the Project Browser list no longer has the check project and still has the others.
 
-## ビューポートの描画の確認(Primal Day 083, #209)
+## Checking viewport rendering (Primal Day 083, #209)
 
-上の手順2でプロジェクトを開いた状態から行います。オブジェクトの描画は Day 084 なので、Day 083 で見えるのは何も描かれていないフレームだけです。
+Start from a project opened as in step 2. Object rendering comes in Day 084, so in Day 083 the frame is empty.
 
-1. **描かれている**: 次の両方で判定します。ビューポートが、WPF の下地の紺 RGB(26,48,76) でないこと(DebugEditor のクリア色の灰色の見込み。IBL があれば空が出ます)。ツールバーの`FPS`が数値(リフレッシュレート付近)で、`DT`が更新され続けること。さらに、`gui.ps1 -Action tree -ProcId <PID> -Pattern '^Text'`で`Frames: N`を2回読み、差を経過秒数で割って`FPS`に近いこと(表示は1秒ごとに更新されるので、10秒以上空けます。`N`は実際に描いた回数の累計です。`FPS`は描かないときも増えるので、描かれていることの判定には`Frames`を使います)。
-2. **入力**: ビューポート上でマウスのドラッグ、ホイール、`F`キーを操作して、異常終了しないこと。カメラはまだエンジンにつながっていないので、**画面が変わらないのが正しい動作です**。
-3. **UI**: 描画中に階層パネルやメニューが応答すること。ウィンドウの縁をドラッグしてリサイズしている間も、応答なしにならないこと。リサイズのあとも`FPS`が更新されること。
-4. **切り替えと終了**: `File`メニューからプロジェクトを2回切り替え、最後にエディタを閉じて、異常終了せず、Windows のエラーダイアログが出ないこと。`gui.ps1 -Action end-session -ProcId <PID>`でログオフを模擬し、プロジェクトを開いた状態、起動時の Project Browser、`File > Open Project`の Project Browser のどれでも終了コードが 0 であること(実際のログオフはしません)。
-5. **CPU**: `Get-Process DXForgeEditor`の`CPU`の秒数の差を10秒ずつ測ります。1論理コアを100%とし、プロジェクトブラウザーを開いた状態(render thread なし)を基準に、プロジェクトを開いた状態、最小化した状態、スプリッターでビューポートを最小にした状態を比べます。1論理コア未満なら合格で、基準から50%を超えて増えたら理由を調べます。
+1. **It renders**: judge by both of these. The viewport is not WPF's navy background RGB(26,48,76) (expected: DebugEditor's gray clear color; with IBL the sky shows). The toolbar's `FPS` is a number (near the refresh rate) and `DT` keeps updating. Also read `Frames: N` twice with `gui.ps1 -Action tree -ProcId <PID> -Pattern '^Text'` and check that the difference divided by the elapsed seconds is close to `FPS` (the display updates every second, so wait 10 seconds or more; `N` is the running count of frames actually drawn. `FPS` also counts when nothing is drawn, so use `Frames` to judge that rendering happens).
+2. **Input**: mouse drag, wheel and the `F` key over the viewport do not crash. The camera is not connected to the engine yet, so **the picture not changing is correct**.
+3. **UI**: the hierarchy panel and menus respond while rendering. The window does not hang while its edge is dragged to resize. `FPS` keeps updating after resizing.
+4. **Switching and exit**: switch projects twice from the `File` menu, then close the editor; no crash and no Windows error dialog. Simulate logoff with `gui.ps1 -Action end-session -ProcId <PID>` with a project open, with the Project Browser at startup and with the `File > Open Project` Project Browser; the exit code is 0 in every case (no real logoff happens).
+5. **CPU**: measure the difference of `Get-Process DXForgeEditor`'s `CPU` seconds over 10 seconds each. With one logical core = 100%, take the Project Browser open (no render thread) as the baseline and compare: project open, minimized, and the viewport minimized with the splitter. Under one logical core passes; investigate if it rises more than 50% over the baseline.
 
-## 検証記録
+## Verification record
 
-### 2026/10/18(Issue #43)
+### 2026/10/18 (issue #43)
 
-#44・#45・#46をマージした状態(`origin/develop` + 3ブランチをローカルでマージ)で、新しいworktreeから上の手順を最後まで通しました。GUIの操作はOrcaの`orca computer`(UI Automation)で行い、F5/Ctrl+F5/Shift+F5は`WScript.Shell`の`SendKeys`で送りました。今の手順は`gui-check`スキルの`gui.ps1`です(#195)。
+With #44, #45 and #46 merged (`origin/develop` + the three branches merged locally), the procedure above was run to the end from a new worktree. The GUI was operated with Orca's `orca computer` (UI Automation), and F5/Ctrl+F5/Shift+F5 were sent with `WScript.Shell`'s `SendKeys`. The current tool is `gui.ps1` of the `gui-check` skill (#195).
 
-| 手順 | 結果 | 確認したこと |
+| Step | Result | What was checked |
 |---|---|---|
-| 1. 前提 | OK | `DebugEditor`のnative/editorのビルドは警告0件。`x64\Debug\DXForgeEngine.lib`がないとF5でLNK1104になることを実測し、`-Configuration Debug -Project DXForgeEngine`だけで解消 |
-| 2. 作成/開く | OK | 「Build: DebugEditor configuration 成功」+ DLL読み込みの警告(想定どおり) |
-| 3. New Script | OK | `.h`/`.cpp`の生成、Visual Studioのプロジェクトへの追加(vcxprojへの保存はビルドのとき) |
-| 4. Build | OK | `x64\DebugEditor\Verify43.dll`、「ゲームコードDLLは正常にロードされました。」、`DXForgeEditor.exe`に`Verify43.dll`が読み込まれている |
-| 5. アタッチ | OK | Scriptのサブメニューに`SpinScript`、インスペクタにScriptコンポーネント |
-| 6. 実行/停止 | OK(既知の不具合あり) | Ctrl+F5/F5ともに「DXForge Game」のウィンドウが開き、`update()`が呼ばれた。`game.bin`(70バイト)が実行の直前に更新された。F5の実行はShift+F5で停止できた。`begin_play()`は呼ばれない(#47) |
-| 7. 後片付け | OK | フォルダの削除、`ProjectData.xml`の該当エントリだけの削除、`DXFORGE_ENGINE`を元の値に戻した |
+| 1. Prerequisites | OK | `DebugEditor` native/editor builds with 0 warnings. Confirmed that F5 fails with LNK1104 without `x64\Debug\DXForgeEngine.lib`, fixed by `-Configuration Debug -Project DXForgeEngine` alone |
+| 2. Create/open | OK | 「Build: DebugEditor configuration 成功」 + the DLL load warning (expected) |
+| 3. New Script | OK | `.h`/`.cpp` generated and added to the Visual Studio project (saved to the vcxproj at build time) |
+| 4. Build | OK | `x64\DebugEditor\Verify43.dll`, 「ゲームコードDLLは正常にロードされました。」, `Verify43.dll` loaded in `DXForgeEditor.exe` |
+| 5. Attach | OK | `SpinScript` in the Script submenu, Script component in the inspector |
+| 6. Run/stop | OK (known bug) | With both Ctrl+F5 and F5 the "DXForge Game" window opened and `update()` was called. `game.bin` (70 bytes) was updated right before the run. The F5 run stopped with Shift+F5. `begin_play()` is not called (#47) |
+| 7. Cleanup | OK | Folder deleted, only the matching `ProjectData.xml` entry deleted, `DXFORGE_ENGINE` restored |
 
-このとき見つけて起票した不具合:
+Bugs found and filed then:
 
-- #47 スクリプトの`begin_play()`がエンジンから一度も呼ばれない
-- #48 エディタでビルドするたびにDTEのビルドイベントのハンドラが重複登録され、ログの行が増え続ける
-- #49 エディタで追加したエンティティのTransformのScaleが0,0,0のまま`game.bin`に書き出される
+- #47 The engine never calls a script's `begin_play()`
+- #48 Every editor build registers the DTE build event handler again, so log lines keep multiplying
+- #49 The Transform Scale of an entity added in the editor is written to `game.bin` as 0,0,0
 
-## 自動化の検討
+## Automation notes
 
-### UI Automationでの再現
+### Reproducing with UI Automation
 
-今回、手順2〜7はすべてOrcaの`orca computer`(Windowsでは UI Automation)で操作でき、LoggerViewのテキストもアクセシビリティツリーから読み取れました。そのため、手順書に沿ったスクリプト化は可能です。ただし、次の点に手当てが必要です。
+Steps 2-7 could all be operated with Orca's `orca computer` (UI Automation on Windows), and LoggerView's text was readable from the accessibility tree, so scripting the procedure is possible. These points needed care:
 
-- **WPFのToggleButtonの一部はUIAのToggle/Invokeに反応しません。** Project Browserの「Create Project」と、インスペクタの「Add Component」(`PreviewMouseLeftButtonDown`で開く)は、要素のクリックでは切り替わらず、座標でのクリックが必要でした。テキストボックスの`SetValue`も、表示が切り替わる前は「値を設定できない」と拒否されます。要素に`AutomationProperties.AutomationId`を付け、操作をコマンドに寄せると安定します。
-- **ファンクションキー(F5/F7)は`orca computer`のキー操作で送れません**(`Unsupported key: F5`)。今回はウィンドウを前面に出して`SendKeys`で送りました。ツールバーに実行/停止のボタンがあれば、UIAだけで完結します。
-- Ctrl+F5で起動したときなど、Visual Studioはウィンドウを表示しないままビルドする(`MainWindow.Visible = showWindow`)ため、失敗時の出力はUIAでは読めません。原因の調査には、生成された`.sln`を`MSBuild <Name>.sln /p:Configuration=Debug /p:Platform=x64`で直接ビルドするのが早いです(エディタが一度ビルドしたあとなら、エディタが書き出した`Directory.Build.props`のエンジンのパスが使われます)。
-- 合否の判定は、LoggerViewの文字列、生成物(`<Name>.dll`、`<Name>.exe`、`game.bin`)の有無と更新日時、`tasklist /M <Name>.dll`、スクリプトが書き出すファイル、で機械的にできます。
+- **Some WPF ToggleButtons do not react to UIA Toggle/Invoke.** The Project Browser's "Create Project" and the inspector's "Add Component" (opened on `PreviewMouseLeftButtonDown`) did not switch on an element click and needed a click by coordinates. A text box's `SetValue` is also rejected ("cannot set value") until the view switches. Giving elements `AutomationProperties.AutomationId` and routing actions through commands makes it stable.
+- **Function keys (F5/F7) cannot be sent with `orca computer`'s key input** (`Unsupported key: F5`). The window was brought to the front and `SendKeys` used instead. Run/stop buttons in the toolbar would make UIA alone enough.
+- In some cases (e.g. Ctrl+F5) Visual Studio builds without showing its window (`MainWindow.Visible = showWindow`), so failure output cannot be read through UIA. To investigate, build the generated `.sln` directly with `MSBuild <Name>.sln /p:Configuration=Debug /p:Platform=x64` (after the editor built once, the engine path in the `Directory.Build.props` it wrote is used).
+- Pass/fail can be judged mechanically from LoggerView strings, the presence and timestamps of outputs (`<Name>.dll`, `<Name>.exe`, `game.bin`), `tasklist /M <Name>.dll`, and the files scripts write.
 
-### ヘッドレス駆動(#11)に寄せる部分
+### Parts to move to headless driving (#11)
 
-GUIが本質的に必要なのは、エディタのUI(Project Browser、インスペクタ、メニュー)の確認だけです。次の部分は、#11(エンジンのヘッドレス駆動)が進めば、GUIなしでCIでも確認できるようになります。
+Only the editor UI itself (Project Browser, inspector, menus) truly needs the GUI. As #11 (headless engine driving) progresses, these can be checked without the GUI, in CI too:
 
-- **ゲームコードのDLLの読み込みとスクリプト名の取得**: エンジンのDLLの`LoadGameCodeDll`/`GetScriptNames`(ゲームコードのDLLがエクスポートする`get_script_names`を呼ぶ)を、テスト用のプロジェクトのDLLに対して呼ぶだけで確認できる。
-- **`game.bin`の読み込みとスクリプトの実行**: `content::load_game()` → `script::update()`を数フレーム回し、`begin_play()`/`update()`の呼ばれ方を確認する(#47の再発防止にもなる)。`game.bin`の形式はエディタの`SaveToBinary`と対になっているので、固定の`game.bin`をテストデータとして持てば、エディタなしで検証できる。
-- **ゲームのプロジェクトのビルド**: テンプレートから生成したプロジェクトを`MSBuild`で`DebugEditor`/`Debug`構成でビルドする部分は、DTEを使わずにCLIだけで確認できる(Visual Studioの起動が不要になる)。ただし、テンプレートの展開はエディタの`NewProject.cs`にあるため、CLIからの呼び出し口が必要。
+- **Loading the game code DLL and getting script names**: call the engine DLL's `LoadGameCodeDll`/`GetScriptNames` (which calls `get_script_names` exported by the game code DLL) on a test project's DLL.
+- **Loading `game.bin` and running scripts**: run `content::load_game()` -> `script::update()` for a few frames and check how `begin_play()`/`update()` are called (also prevents #47 from recurring). The `game.bin` format pairs with the editor's `SaveToBinary`, so a fixed `game.bin` as test data allows checking without the editor.
+- **Building the game project**: building a project generated from the template with `MSBuild` in `DebugEditor`/`Debug` can be checked from the CLI alone without DTE (no Visual Studio start). Template expansion lives in the editor's `NewProject.cs`, though, so a CLI entry point is needed.
