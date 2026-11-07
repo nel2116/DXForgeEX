@@ -6,6 +6,7 @@
 //
 // 更新履歴
 // 2025/01/19 新規作成
+// 2026/11/08 Light Grid のバッファを作り直したあとで、ライトがなくてもカリングを1回走らせるようにした (#224)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12LightCulling.h"
@@ -141,6 +142,10 @@ namespace dxforge::graphics::d3d12::delight
 
 				const D3D12_GPU_VIRTUAL_ADDRESS light_grid_opaque_buffer{ culler.light_grid_and_index_list.gpu_address() };
 				culler.light_index_list_opaque_buffer = light_grid_opaque_buffer + light_grid_buffer_size;
+				// NOTE: 作り直したバッファは中身が不定(CREATE_NOT_ZEROED)。has_lights の初期値(true)と同じ理由で、この culler の
+				//		 cull_lights(リサイズしたのと同じ呼び出し)でカリングシェーダを必ず1回走らせ、ライトが 0 でも LightGrid を数 0 で埋める。走らせないと、ピクセル
+				//		 シェーダーが不定の LightGrid で LightIndexList を範囲外まで読み、WARP ではデバイスが消える(#224)。
+				culler.has_lights = true;
 				NAME_D3D12_OBJECT_INDEXED(culler.light_grid_and_index_list.buffer(), light_grid_and_index_list_buffer_size, L"Light Grid and Index List Buffer - size");
 
 				if (!culler.light_index_counter.buffer())

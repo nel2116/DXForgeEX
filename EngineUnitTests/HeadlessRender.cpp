@@ -24,6 +24,7 @@
 // 2026/11/07 別のスレッドが描いている間に ShutdownEngine を呼ぶ確認を追加 (#209)
 // 2026/11/07 GetDrawnFrameCount が描いたときだけ増えることの確認を追加 (#209)
 // 2026/11/08 描画中にエディタがエンティティを作って消す確認を追加 (Primal Day 084, #214)
+// 2026/11/08 描いたあとでメッシュをアップロードする確認を追加 (#224)
 // 2026/11/08 エディタのカメラの API(UpdateEditorCamera / SetCameraRange / SetCameraFoV)の確認を追加 (Primal Day 085, #225)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
@@ -854,6 +855,25 @@ namespace dxforge::headless::render
 			return {};
 		}
 
+		/// @brief サーフェスを描いたあとで、エディタと同じ経路(DLL の CreateResource)でメッシュをアップロードして描く(#224)
+		/// @details 描画のコマンドが GPU に積まれたあとのアップロードで、デバイスが消えないことを確かめる。
+		///			 修正前は WARP の 160x90 で、アップロードの直後に DXGI_ERROR_DEVICE_REMOVED になった。
+		/// @return 失敗したときはその説明(成功なら空)
+		std::string check_upload_after_render(const graphics::surface& surface, test_scene& scene)
+		{
+			const std::vector<u8> mesh_blob{ pack_mesh(make_sphere(1.f, 48, 24)) };
+			for (u32 i{ 0 }; i < 4; ++i)
+			{
+				surface.render(scene.frame_info());
+				const id::id_type mesh_id{ editor::create_resource(mesh_blob.data(), content::asset_type::mesh) };
+				if (!id::is_valid(mesh_id)) return "failed to upload a mesh after rendering (round " + std::to_string(i + 1) + ")";
+				surface.render(scene.frame_info());
+				editor::destroy_resource(mesh_id, content::asset_type::mesh);
+			}
+			surface.render(scene.frame_info());
+			return {};
+		}
+
 		/// @brief 描画中に、エディタと同じ経路でエンティティを作って消す(Primal Day 084, #214)
 		/// @details render thread が viewport を描き続ける間に、このスレッドがエディタの順序(CreateGameEntity → SetGeometryIds →
 		///			 SetGeometryIds で外す → RemoveGameEntity)を繰り返す。半分の回は外さずに消す(順序の誤り)。DLL の安全策
@@ -1139,6 +1159,7 @@ namespace dxforge::headless::render
 			if (check_error.empty()) check_error = check_renderer_options();
 			if (check_error.empty()) check_error = scene.check_geometry_updates(surface.get());
 			if (check_error.empty()) check_error = check_editor_viewports(scene, state);
+			if (check_error.empty()) check_error = check_upload_after_render(surface.get(), scene);
 			if (check_error.empty()) check_error = check_editor_camera(state);
 			if (!check_error.empty())
 			{
