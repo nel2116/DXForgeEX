@@ -131,6 +131,20 @@ exit 1
 $fakeCodex = @'
 # 偽の codex(テスト用)。呼ばれたことを記録し、DXFORGE_TEST_REVIEW を出す
 Add-Content -LiteralPath (Join-Path $env:DXFORGE_TEST_STATE "codex.log") -Value "called" -Encoding utf8
+# レビューの間にロックが開けないことを記録する
+foreach ($file in Get-ChildItem -LiteralPath ([IO.Path]::GetTempPath()) -Filter "DXForgeCodexReview-7-*.lock") {
+	try { [IO.File]::Open($file.FullName, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None).Dispose(); $seen = "free" }
+	catch { $seen = "held" }
+	Add-Content -LiteralPath (Join-Path $env:DXFORGE_TEST_STATE "lock.log") -Value $seen
+}
+# hold-file: worktreeのファイルを開いたままにして、git worktree remove を失敗させる
+if ($env:DXFORGE_TEST_CODEX_MODE -eq "hold-file") {
+	$global:heldFile = [IO.File]::Open((Join-Path (Get-Location) "held.txt"), [IO.FileMode]::Create, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+}
+# hang: 子プロセスの中で待つ(TaskStop などで親だけが強制終了され、子が残る場合の再現)
+if ($env:DXFORGE_TEST_CODEX_MODE -eq "hang") {
+	pwsh -NoProfile -File (Join-Path $PSScriptRoot "hang-child.ps1")
+}
 Write-Output $env:DXFORGE_TEST_REVIEW
 exit 0
 '@
@@ -152,9 +166,13 @@ $bin = Join-Path $root "bin"
 $state = Join-Path $root "state"
 $origin = Join-Path $root "origin.git"
 $repo = Join-Path $root "repo"
+$temp = Join-Path $root "tmp"
 $savedPath = $env:PATH
+$savedTemp = $env:TEMP, $env:TMP
+$hangParent = $null
+$hangChild = $null
 try {
-	New-Item -ItemType Directory -Path $bin, $state | Out-Null
+	New-Item -ItemType Directory -Path $bin, $state, $temp | Out-Null
 	Set-Content -LiteralPath (Join-Path $bin "gh.ps1") -Value $fakeGh -Encoding utf8
 	Set-Content -LiteralPath (Join-Path $bin "codex.ps1") -Value $fakeCodex -Encoding utf8
 
@@ -167,7 +185,15 @@ try {
 	Invoke-Git -C $repo commit -q --allow-empty -m change | Out-Null
 	$head = (Invoke-Git -C $repo rev-parse HEAD).Trim()
 	Invoke-Git -C $repo push -q $origin "HEAD:refs/pull/7/head" | Out-Null
+	# CleanupMerged.ps1 も一緒に動かす(スクリプトのフォルダをリポジトリとして扱い、origin を読む)
+	Copy-Item -LiteralPath (Join-Path (Split-Path $ScriptPath) "CleanupMerged.ps1") -Destination (Join-Path $repo "CleanupMerged.ps1")
+	Invoke-Git -C $repo remote add origin $origin | Out-Null
+	Invoke-Git -C $repo fetch -q origin | Out-Null
+	Invoke-Git -C $repo branch -q -u origin/develop | Out-Null
 
+	# ロックとworktreeはこのフォルダに作らせ、残りを調べる
+	$env:TEMP = $temp
+	$env:TMP = $temp
 	$env:PATH = "$bin;$savedPath"
 	$env:DXFORGE_TEST_STATE = $state
 	$env:DXFORGE_TEST_ORIGIN = $origin
@@ -280,9 +306,81 @@ try {
 	$r = Invoke-Review @("-SetStatus") $passText
 	$env:DXFORGE_TEST_UNPROTECTED = ""
 	Check ($r.Exit -ne 0 -and -not $r.Codex -and -not $r.Success -and -not $r.Merge -and $r.Output -match "ブランチ保護") "the protection check still stops a PASS on an unprotected base"
+
+	Write-Host "== ロックと後始末 =="
+	function Get-RunLeftovers {
+		$items = @(Get-ChildItem -LiteralPath $temp -Filter "DXForgeCodexReview-*" | ForEach-Object { $_.Name })
+		$items += @(Invoke-Git -C $repo for-each-ref --format='%(refname)' "refs/codex-review")
+		return @($items | Where-Object { $_ })
+	}
+	function Invoke-RepoCleanup { & pwsh -NoProfile -File (Join-Path $repo "CleanupMerged.ps1") 2>&1 | Out-String }
+	function Test-LockHeld([string]$path) {
+		try { [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None).Dispose(); return $false }
+		catch { return $true }
+	}
+	$lockLog = Join-Path $state "lock.log"
+
+	# ここまでの通しの実行(省略、保護で止まる、指摘あり)のどれも残さない
+	Check ((Get-RunLeftovers).Count -eq 0) "none of the runs above left a lock, worktree, log or ref"
+
+	Remove-Item -ErrorAction SilentlyContinue $lockLog
+	Set-Comments @()
+	$r = Invoke-Review @() $passText
+	Check ((Get-Content -LiteralPath $lockLog) -eq "held") "the lock is held while Codex runs"
+	Check ((Get-RunLeftovers).Count -eq 0) "a finished review leaves nothing"
+
+	# refを取得する前に失敗したときも、ロックを残さない
+	$env:DXFORGE_TEST_ORIGIN = Join-Path $root "missing.git"
+	$r = Invoke-Review @() $passText
+	$env:DXFORGE_TEST_ORIGIN = $origin
+	Check ($r.Exit -ne 0 -and $r.Output -match "git fetch に失敗" -and (Get-RunLeftovers).Count -eq 0) "a failed fetch leaves no lock"
+
+	# worktreeを消せなかったときは、閉じたロックを残し、次の CleanupMerged.ps1 に任せる
+	$env:DXFORGE_TEST_CODEX_MODE = "hold-file"
+	$r = Invoke-Review @() $passText
+	$env:DXFORGE_TEST_CODEX_MODE = ""
+	Check ($r.Output -match "一時worktreeを削除できませんでした") "a worktree that cannot be removed is reported"
+	$lockFile = @(Get-ChildItem -LiteralPath $temp -Filter "DXForgeCodexReview-7-*.lock")
+	Check ($lockFile.Count -eq 1 -and -not (Test-LockHeld $lockFile[0].FullName)) "the lock file stays, closed"
+	$cleanup = Invoke-RepoCleanup
+	Check ($cleanup -notmatch "WARNING" -and (Get-RunLeftovers).Count -eq 0) "CleanupMerged removes what that run left"
+
+	# 親だけが強制終了され(finally が走らない)、子が残っている間は、次の実行が触らない
+	$childPid = Join-Path $state "child.pid"
+	Set-Content -LiteralPath (Join-Path $bin "hang-child.ps1") -Value 'Set-Content -LiteralPath (Join-Path $env:DXFORGE_TEST_STATE "child.pid") -Value $PID; Start-Sleep -Seconds 120'
+	$env:DXFORGE_TEST_CODEX_MODE = "hang"
+	$hangParent = Start-Process pwsh -PassThru -WindowStyle Hidden -ArgumentList "-NoProfile -File `"$script`" -Pr 7"
+	$env:DXFORGE_TEST_CODEX_MODE = ""
+	$deadline = [DateTime]::UtcNow.AddSeconds(60)
+	while (-not ((Test-Path -LiteralPath $childPid) -and (Get-Content -LiteralPath $childPid))) {
+		if ([DateTime]::UtcNow -ge $deadline) { throw "偽の codex の子プロセスが起動しませんでした。" }
+		Start-Sleep -Milliseconds 200
+	}
+	$hangChild = Get-Process -Id ([int](Get-Content -LiteralPath $childPid))
+	Stop-Process -Id $hangParent.Id -Force
+	$null = $hangParent.WaitForExit(10000)
+	$lockFile = @(Get-ChildItem -LiteralPath $temp -Filter "DXForgeCodexReview-7-*.lock")
+	Check ($lockFile.Count -eq 1 -and (Test-LockHeld $lockFile[0].FullName)) "the surviving child still holds the inherited lock"
+	$cleanup = Invoke-RepoCleanup
+	Check ($cleanup -match "レビューの実行中" -and $cleanup -notmatch "WARNING") "CleanupMerged leaves a run whose child is alive"
+	$workFolder = $lockFile[0].FullName -replace '\.lock$', ''
+	$refCount = @(Invoke-Git -C $repo for-each-ref "refs/codex-review").Count
+	Check ((Test-Path -LiteralPath $workFolder) -and $refCount -eq 2) "the worktree and refs of that run are untouched"
+	Stop-Process -Id $hangChild.Id -Force
+	$null = $hangChild.WaitForExit(10000)
+	Check (-not (Test-LockHeld $lockFile[0].FullName)) "the lock is free once the child ends"
+	$cleanup = Invoke-RepoCleanup
+	Check ($cleanup -notmatch "WARNING" -and (Get-RunLeftovers).Count -eq 0) "CleanupMerged removes the killed run after the child ended"
 }
 finally {
 	$env:PATH = $savedPath
+	$env:TEMP, $env:TMP = $savedTemp
+	foreach ($process in $hangChild, $hangParent) {
+		if ($process -and -not $process.HasExited) {
+			Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+			$null = $process.WaitForExit(10000)
+		}
+	}
 	Remove-Item -Recurse -Force $root -ErrorAction SilentlyContinue
 }
 

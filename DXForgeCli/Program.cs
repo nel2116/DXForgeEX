@@ -387,6 +387,16 @@ namespace DXForgeCli
                         $"エディタがこのプロジェクトを開いているので、変更の操作はできません(読むだけの操作はできます): {projectPath}");
                 }
 
+                // 前の実行が強制終了で残した一時フォルダを片付ける。--dry-run と読むだけの操作では何も変えない
+                IReadOnlyList<string> sweepLeftovers = [];
+                if (!options.DryRun && ops.Any(SceneOpDocument.ChangesProject))
+                {
+                    var sweep = SceneOpAssetStaging.SweepAbandoned(projectPath);
+                    foreach (var folder in sweep.Removed) WriteLog("info", $"前の実行が残した一時フォルダを消しました: {folder}");
+                    foreach (var warning in sweep.Warnings) WriteLog("warning", warning);
+                    sweepLeftovers = sweep.Leftovers;
+                }
+
                 var assets = new SceneOpAssetStaging(projectPath, Path.GetFullPath(options.Importer ?? SceneOpAssetStaging.DefaultImporterPath));
                 try
                 {
@@ -411,7 +421,7 @@ namespace DXForgeCli
                 finally
                 {
                     assets.Dispose();
-                    result.LeftoverPaths = assets.LeftoverPaths;
+                    result.LeftoverPaths = [.. sweepLeftovers, .. assets.LeftoverPaths];
                 }
 
                 foreach (var warning in result.OpResults.SelectMany(x => x?["warnings"]?.AsArray() ?? new JsonArray()))
