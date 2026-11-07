@@ -10,6 +10,34 @@ DXForgeImport --input <file> --output <folder> [--type auto|geometry|texture] [-
 
 It writes the same `.asset` files as the editor's drag-and-drop import (FBX → geometry, images → texture; IBL prefiltering and primitive meshes are not exposed yet).
 
+```powershell
+./x64/DebugEditor/DXForgeImport.exe --input model.fbx --output Content/Models --settings import.json --json
+./x64/DebugEditor/DXForgeImport.exe --input albedo.png --output Content/Textures --set Compress=false --set MipLevels=1
+```
+
+| Argument | Meaning |
+|---|---|
+| `-i`, `--input` | File to import. `.fbx` is geometry; `.bmp .png .jpg .jpeg .tiff .tif .tga .dds .hdr` are textures |
+| `-o`, `--output` | Folder for the `.asset` (created if missing). The file name is the input name in lower case, as in the editor |
+| `-t`, `--type` | `auto` (default, from the extension), `geometry`, `texture`. A mismatch with the extension is exit 4 |
+| `-s`, `--settings` | Import settings JSON (below) |
+| `--set Name=Value` | One setting for the input's type, applied after the settings file; repeatable |
+| `--sources-output <folder>` | See Design below |
+| `--json` | Result as JSON on stdout. Logs always go to stderr |
+
+Settings are the property names of the editor's `GeometryImportSettings`/`TextureImportSettings` (case-insensitive); unset ones keep the editor's defaults; unknown names or mistyped values are exit 5.
+
+```json
+{
+  "geometry": { "CalculateNormals": false, "CalculateTangents": true, "SmoothingAngle": 178, "ReverseHandedness": false,
+                "ImportEmbeddedTextures": true, "ImportAnimations": true, "CoalesceMeshes": false },
+  "texture":  { "Dimension": "Texture2D", "MipLevels": 0, "AlphaThreshold": 0.5, "PreferBC7": true, "FormatIndex": 0,
+                "Compress": true, "CubeMapSize": 256, "MirrorCubeMap": true, "PrefilterCubeMap": true }
+}
+```
+
+`--json` output has `input`, `type`, `output`, `success`, `exitCode`, `exitCodeName`, `files`, `embeddedTextures` (results of the embedded FBX textures, imported with the default texture settings), `settings` (the applied values, plus `Sources` for textures), `errors` and `warnings`. An FBX with several LOD groups writes one `.asset` per group, as the editor does.
+
 ## Design
 
 - It does **not** reimplement the `.asset` format: it `ProjectReference`s `DXForgeEditor` (`InternalsVisibleTo("DXForgeImport")`) and calls the editor's own `Content` code (`ContentHelper.CreateAsset`/`GetAssetName`/`GetAssetFullPath`, `Asset.Import`/`Save`), so the format stays implemented in one place.

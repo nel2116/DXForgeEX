@@ -1,10 +1,12 @@
 # DXForgeEX
 
-<!-- last-reviewed: 2026-11-07 -->
+<!-- last-reviewed: 2026-11-08 -->
 
 [Game Engine Series (TheGameEngineers / Arash Khatami)](https://www.youtube.com/playlist?list=PLU2nPsAdxKWQYxkmQ3TdbLsyc1l2j25XM) と、その実装である [Primal](https://github.com/TheGameEngineers/Primal) を参考に実装している、学習用の3Dゲームエンジン + WPFレベルエディタです。
 
-C++によるプラットフォーム非依存のエンジンコア、C ABIのDLL境界、その上で動くC#/WPFエディタ、オフラインのコンテンツ(FBX/テクスチャ)インポートパイプラインという構成を踏襲しています。現在の実装は、PBRの直接光(GGX/Smith/Schlickフレネル)まで到達しており、IBL(Image Based Lighting)は未実装です。
+C++によるプラットフォーム非依存のエンジンコア、C ABIのDLL境界、その上で動くC#/WPFエディタ、オフラインのコンテンツ(FBX/テクスチャ)インポートパイプラインという構成を踏襲しています。現在の実装は、PBRの直接光(GGX/Smith/Schlickフレネル)と、オフラインで事前計算したIBL(Image Based Lighting)まで到達しています。
+
+この README は人が読むための概要です。ビルドやテストの詳細(`build.ps1` の引数、各CLIの引数・JSON・終了コードなど)は、エージェント向けに英語で `docs/` に置いています(下の「詳しい文書」)。
 
 ## 必要環境
 
@@ -12,6 +14,7 @@ C++によるプラットフォーム非依存のエンジンコア、C ABIのDLL
 - Visual Studio 2022 (ワークロード: 「C++によるデスクトップ開発」+「.NETデスクトップ開発」、`v143` toolset)
 - .NET 8 SDK以降 (`dotnet` CLI。`DXForgeEditor`のビルドに使用)
 - DirectX 12対応GPU (レンダラーを実際に動かす場合のみ必要。`EngineUnitTests`はGPU/ウィンドウ不要)
+- FBX SDK 2020.3.7 (`ContentTools`、つまりFBXと画像のインポートを動かす場合のみ必要)
 
 ## ソリューション構成
 
@@ -26,458 +29,58 @@ C++によるプラットフォーム非依存のエンジンコア、C ABIのDLL
 | `ContentTools` | DLL | FBX/テクスチャのオフラインインポートパイプライン(エディタから使用) |
 | `DXForgeEditor` | WPFアプリ (.NET 8) | レベルエディタ |
 | `DXForgeImport` | コンソールアプリ (.NET 8) | GUIなしでアセットをインポートするCLI。エディタと同じ`.asset`を書き出す(`*Editor`構成のみ) |
-| `DXForgeCli` | コンソールアプリ (.NET 8) | `dxforge.exe`。GUIなしでプロジェクト(`.dxproj`)を読み込み、シーンを指定フレーム数だけ実行するCLI(`*Editor`構成のみ) |
+| `DXForgeCli` | コンソールアプリ (.NET 8) | `dxforge.exe`。GUIなしでプロジェクト(`.dxproj`)を読み込んで実行したり、シーンを操作したりするCLI(`*Editor`構成のみ) |
 
-## ビルド方法
+## ビルドとテスト
 
-### Visual Studioから
-
-`DXForge.sln` を開き、任意の構成でビルドしてください。
-
-### CLIから (`build.ps1`)
-
-PowerShell 7+ (`pwsh`) から実行します。
+Visual Studioでは `DXForge.sln` を開き、任意の構成でビルドします。CLIでは PowerShell 7+ からルートの `build.ps1` を使います。必要なパッケージ(`packages/`)は初回のビルドで自動的に取得されます。
 
 ```powershell
-# ネイティブ側+エディタ側の両方をビルド (既定構成 DebugEditor)
-./build.ps1
-
-# 構成を指定してビルド
-./build.ps1 -Configuration Debug
-
-# ネイティブ側だけ、特定プロジェクトだけビルド(最速のフィードバックループ)
-./build.ps1 -Target native -Project EngineUnitTests
-
-# エディタ側だけビルド
-./build.ps1 -Target editor
-
-# ビルド後に自動テストも実行し、終了コードに反映する
-./build.ps1 -Target native -Project EngineUnitTests -RunTests
-
-# 終了コードに加えて、最後に1行のJSON要約も出力する(AIエージェント/CI向け)
-./build.ps1 -Target native -Project EngineUnitTests -RunTests -Json
+./build.ps1                                                   # ネイティブ側+エディタ側 (DebugEditor)
+./build.ps1 -Target native -Project EngineUnitTests -RunTests # 自動テストだけを手早く
+./build.ps1 -Target editor                                    # エディタ側だけ
 ```
 
-| パラメータ | 値 | 既定値 |
-|---|---|---|
-| `-Configuration` | `Debug` / `DebugEditor` / `Release` / `ReleaseEditor` | `DebugEditor` |
-| `-Target` | `native` / `editor` / `all` | `all` |
-| `-Project` | `DXForge.sln`内のプロジェクト名(`-Target native`時のみ有効)。`EngineTest`/`EngineUnitTests`だけを指定したときは、`*Editor`構成(既定値を含む)でも対応する`Debug`/`Release`構成でビルドする(`*Editor`構成にはこの2つが無いため。#129) | 省略時はソリューション全体 |
-| `-RunTests` | スイッチ。ビルド後に`EngineUnitTests.exe`と、ヘッドレス実行のテスト(`EngineUnitTests/Tests/headless_run_test.py`・`render_run_test.py`、pythonが必要)を実行。`EngineUnitTests`は`Debug`/`Release`構成にしかないため、`*Editor`構成のソリューション全体・`-Target editor`・別の`-Project`のときは対応する`Debug`/`Release`構成で`EngineUnitTests`を追加でビルドしてから実行する(古い実行ファイルを実行しないため。その前に`-NoRestore`でなければ D3D12 Agility SDK のパッケージを復元する)。ビルドに失敗したときはテストを実行しない | - |
-| `-NoRestore` | スイッチ。ネイティブビルド前の`packages/`の復元(`Restore.ps1`)を省く | - |
-| `-WarningsAsErrors` | スイッチ。ネイティブ側とエディタ側の警告をエラーとして扱う(CI用) | - |
-| `-Json` | スイッチ。1行のJSON要約を標準出力に出す | - |
-| `-DetailedLog` | スイッチ。ビルドツールの出力を全文表示する | - |
+ネイティブ側は必ず`DXForge.sln`経由でビルドしてください(`.vcxproj`を直接ビルドするとインクルードパスが崩れます。`build.ps1`はこれを守っています)。
 
-**注意:** ネイティブ側は必ず`DXForge.sln`経由でビルドしてください。`.vcxproj`を直接MSBuildに渡すと、`$(SolutionDir)`がプロジェクト自身のディレクトリにフォールバックしてしまい、インクルードパスが崩れてビルドに失敗します(MSBuildの既知の挙動)。`build.ps1`は常に`/t:<プロジェクト名>`で`DXForge.sln`を経由するため、この問題を踏みません。
+自動テストは、GPUとウィンドウを使わない`EngineUnitTests`と、エディタやCLIのコードを別のプロセスやリフレクションで確かめるスクリプトです。描画は、WARP(ソフトウェアのラスタライザ)で固定のシーンを描いて基準画像と比べます。それ以外の描画とエディタの操作は、実際に動かして目で確かめます(手順は [docs/ManualVerification.md](docs/ManualVerification.md))。
 
-### `packages/`の復元 (`Restore.ps1`)
+CI(GitHub Actions、`.github/workflows/ci.yml`)が、`main`/`develop`へのpushとすべてのPRで、`Debug`/`Release`のネイティブビルドと自動テスト、エディタのビルドとテスト、ファイル規約の検査(`Tests/check_conventions.py`)を、警告をエラーとして実行します。PRはさらに Codex のレビュー(`CodexReview.ps1`)を通してからマージします。
 
-`packages/`は`.gitignore`で除外しているため、新しいclone/worktreeでは空です。`build.ps1`はネイティブ側をビルドする前に`Restore.ps1`を呼び、足りないものだけを取得します。手作業でのコピーは不要です。
+## エディタの設定
 
-- **NuGet** (`ContentTools/packages.config`の`directxtex_desktop_win10`、`DXForgeEngineDLL/packages.config`の`Microsoft.Direct3D.DXC`と、`DXForgeEditor`・`DXForgeImport`の`PackageReference`): `packages/<id>.<version>`か、`DXForge.sln`に含まれるSDK形式の`.csproj`のどれかの`obj/project.assets.json`が無ければ`MSBuild DXForge.sln -t:restore -p:RestorePackagesConfig=true`でまとめて復元します(`nuget.exe`は不要)。ネイティブのビルドは*Editor構成でソリューション内のC#のプロジェクトもビルドするため、`obj`だけを消した状態でも`NETSDK1004`にならないようにしています(プロジェクトはソリューションから列挙するため、C#のプロジェクトが増えても漏れません。#116)。この判定のテストは`pwsh -NoProfile -File Tests/Restore.Tests.ps1`です(CIのEditor buildジョブでも実行)。いずれも`*Editor`構成でしかビルドされないため、`Debug`/`Release`構成では復元しません。
-- **DXC** (`packages/DirectXShaderCompiler`): フォルダが空なら`GetDXC.ps1`で最新版を取得します(GitHub APIを使います。環境変数`GITHUB_TOKEN`か`GH_TOKEN`があれば認証付きで呼び、レート制限の上限が上がります。CIはこれで`GITHUB_TOKEN`を渡しています。無ければ認証なしで呼びます。失敗したときは間をおいて再試行し、レート制限で失敗したときはそうとわかるエラーを出します)。このDXCを使うのは`EngineTest`だけなので、`EngineTest`をビルドするとき(`Debug`/`Release`構成で、`-Project`を省略したときか`EngineTest`を指定したとき)だけ取得します。`-Project EngineUnitTests`や`*Editor`構成のビルドは、オフラインやGitHub APIのレート制限の下でもこのDXCなしで進みます。エディタ側のシェーダのコンパイル(`DXForgeEngineDLL`の`CompileShader`、#29)は、これとは別に上のNuGetの`Microsoft.Direct3D.DXC`(版を固定)を使い、そのtargetsが`dxcompiler.dll`/`dxil.dll`を`DXForgeEngineDLL.dll`と同じ出力先(エディタの実行ファイルと同じ`x64/<構成>/`)にコピーします。`DXForgeEngineDLL.dll`はDXCを実行時に読み込むため、DXCが無くてもエディタは起動でき、シェーダのコンパイルだけが失敗してログに出ます。
+エディタは次のユーザー環境変数を読みます。
 
-既に揃っているときは、ファイルの有無を見るだけでネットワークにはアクセスせず、すぐに終わります(実測: 数十ms)。`Restore.ps1`は単体でも実行でき(`./Restore.ps1 -Configuration DebugEditor`)、`build.ps1 -NoRestore`で復元を省けます。DXCを最新版に更新したいときは、`packages/DirectXShaderCompiler`を削除してから実行してください。
+- `DXFORGE_PROJECTS`: Create ProjectのPath欄の既定値(例: `F:\DXForgeProjects`)。無ければ`%USERPROFILE%\DXForgeProjects\`。エディタは書き換えません。
+- `DXFORGE_ENGINE`: ゲームのビルドに使うエンジンのパス。エディタの実行ファイルがあるリポジトリが優先され、それが見つからないときだけ使われます。これも使えないときは起動時にエンジンのフォルダを選ぶダイアログを出し、選んだパスをここに保存します。
 
-### エディタが使うエンジンのパス
+## GUIなしで使うCLI
 
-エディタは、ゲームのソリューションの`Directory.Build.props`に書き込むエンジンのパス(`DXFORGE_ENGINE`)を次の順に決めます(#117)。
+将来的に、Unity CLI(`-batchmode`等)のように、エディタUIを介さずCLIからエンジンを操作・ビルドできる「AIフレンドリー」な構成を目指しています。今あるのは次のものです。
 
-1. エディタの実行ファイルがあるリポジトリ(`x64\<構成>\`の2つ上で、`DXForgeEngine\EngineAPI`があるフォルダ)。worktreeでビルドしたエディタから実行したゲームは、そのworktreeのエンジンとリンクされます。
-2. 見つからなければ、ユーザー環境変数`DXFORGE_ENGINE`。これも無効なら、起動時にエンジンのフォルダを選ぶダイアログを出し、選んだパスを`DXFORGE_ENGINE`に保存します。
+- `DXForgeImport.exe`: FBXと画像をインポートし、エディタと同じ`.asset`を書き出します。
+- `dxforge.exe --load-project`: `.dxproj`を読み込み、シーンを指定フレーム数だけ実行して、エンティティの状態をJSONで返します。`--ops`でシーンを読んだり変えたりできます。
+- `EngineUnitTests.exe --game-bin` / `--render`: `game.bin`のヘッドレス実行と、テストシーンの画面外への描画(PNGの書き出し)。
 
-エディタはユーザー環境変数を書き換えません(2.のダイアログを除く)。起動時とゲームのビルド時に、使うパスとその出どころをLoggerViewに出し、1.のパスが`DXFORGE_ENGINE`と違うときはWarningにします。決め方のテストは`pwsh -NoProfile -File DXForgeEditor/Tests/engine_path_test.ps1`です(エディタのビルドだけで動き、GUIもGPUも不要。CIのEditor buildジョブでも実行します)。
+いずれも `--help` で引数と終了コードの一覧を表示します。今後、スクリプトでの操作、プロジェクトの描画とスクリーンショットなどへ広げていく想定です。
 
-### 新しいプロジェクトの既定の場所
+## 詳しい文書
 
-Create ProjectのPath欄の既定値は、次の順に決まります(#141)。Path欄の書き換えとBrowseはこれまでどおりできます。
-
-1. ユーザー環境変数`DXFORGE_PROJECTS`(例: `F:\DXForgeProjects`。末尾の`\`はあってもなくてもよく、フォルダがなければ作成時に作られます)。
-2. 設定されていなければ、`%USERPROFILE%\DXForgeProjects\`。ドキュメントフォルダはOneDriveに移されていることがあるので使いません。
-
-`DXFORGE_PROJECTS`が使えない値(絶対パスでない、無効な文字を含む、ドライブがない)のときは、LoggerViewにWarningを出して2.を使います。エディタはこの環境変数を書き換えません。決め方のテストは`pwsh -NoProfile -File DXForgeEditor/Tests/projects_path_test.ps1`です(CIのEditor buildジョブでも実行します)。
-
-## アセットのインポート (`DXForgeImport`)
-
-`DXForgeImport`は、エディタを開かずに(GUIなしで)FBXと画像をインポートし、エディタのドラッグ&ドロップのインポートと同じ`.asset`ファイルを書き出すコマンドラインツールです(#10)。`.asset`の形式を別に実装するのではなく、エディタ(`DXForgeEditor`)の`Content`のコードをそのまま呼ぶので、エディタとCLIの出力はずれません。プロジェクトを開く必要も、ウィンドウもありません(テクスチャの圧縮はウィンドウなしでGPUを使い、使えなければCPUで行います)。
-
-### ビルド
-
-```powershell
-./build.ps1 -Target native -Configuration DebugEditor   # ContentTools.dll(FBX SDKが必要)
-./build.ps1 -Target editor -Configuration DebugEditor   # DXForgeEditor と DXForgeImport
-```
-
-`DXForgeImport.exe`はエディタと同じ`x64/<構成>/`(`DebugEditor`か`ReleaseEditor`)に出力され、同じフォルダの`ContentTools.dll`を使います。`ContentTools`はFBX SDKが必要なため(`ContentTools/FbxSdk.props`)、インポートを実際に動かせるのはFBX SDKを入れたマシンだけです。
-
-### 使い方
-
-```powershell
-./x64/DebugEditor/DXForgeImport.exe --input model.fbx --output Content/Models --settings import.json --json
-./x64/DebugEditor/DXForgeImport.exe --input albedo.png --output Content/Textures --type texture --json
-./x64/DebugEditor/DXForgeImport.exe --input albedo.png --output Content/Textures --set Compress=false --set MipLevels=1
-./x64/DebugEditor/DXForgeImport.exe --help
-```
-
-| 引数 | 説明 |
+| 内容 | 文書 |
 |---|---|
-| `-i`, `--input` | インポートするファイル。`.fbx`はジオメトリ、画像(`.bmp .png .jpg .jpeg .tiff .tif .tga .dds .hdr`)はテクスチャ |
-| `-o`, `--output` | `.asset`を書き出すフォルダ(なければ作る)。ファイル名は入力の名前を小文字にしたもの(エディタと同じ) |
-| `-t`, `--type` | `auto`(既定。拡張子から決める)、`geometry`、`texture`。拡張子と合わなければ終了コード4 |
-| `-s`, `--settings` | インポート設定のJSONファイル(下記) |
-| `--set Name=Value` | インポート設定の1項目。入力の種類の設定に、設定ファイルの後で適用する。繰り返し指定できる |
-| `--sources-output <フォルダ>` | `--output`を一時的な置き場にして、あとでこのフォルダへ移すときに指定する。テクスチャの`.asset`のソース画像のパス(`Sources`)を、`--output`の下ではなくこのフォルダの下で書く |
-| `--json` | 結果をJSONで標準出力に出す。ログは常に標準エラー |
-
-インポート設定の項目は、エディタのインポート設定(`GeometryImportSettings`/`TextureImportSettings`)のプロパティ名そのままです(大文字・小文字は区別しません)。指定しなかった項目はエディタの既定値になります。知らない項目や型の合わない値は終了コード5になります。
-
-```json
-{
-  "geometry": { "CalculateNormals": false, "CalculateTangents": true, "SmoothingAngle": 178, "ReverseHandedness": false,
-                "ImportEmbeddedTextures": true, "ImportAnimations": true, "CoalesceMeshes": false },
-  "texture":  { "Dimension": "Texture2D", "MipLevels": 0, "AlphaThreshold": 0.5, "PreferBC7": true, "FormatIndex": 0,
-                "Compress": true, "CubeMapSize": 256, "MirrorCubeMap": true, "PrefilterCubeMap": true }
-}
-```
-
-FBXの埋め込みテクスチャ(`ImportEmbeddedTextures`)は、エディタと同じく既定のテクスチャ設定で同じフォルダへ取り込み、`--json`の`embeddedTextures`に結果を出します。埋め込み画像は、出力先の`<FBXのアセット名>.fbm`フォルダ(FBX SDKが埋め込み画像を取り出すときと同じ名前の付け方)にコピーしてから取り込みます。テクスチャの`.asset`はソース画像のパス(エディタの再インポートが使う)を持つので、CLIが終了時に消す一時フォルダを指したままにしないためです。
-
-LODグループが複数あるFBXは、エディタと同じくLODグループごとに`.asset`を書きます。一部だけ書けた場合も終了コード1にし、書けたファイルは`files`に残します。
-
-`--json`の出力(例):
-
-```json
-{
-  "input": "C:\...\Checker64.png", "type": "texture", "output": "C:\...\out",
-  "success": true, "exitCode": 0, "exitCodeName": "Success",
-  "files": [ "C:\...\out\checker64.asset" ], "embeddedTextures": [],
-  "settings": { "Dimension": "Texture2D", "MipLevels": 0, "...": "...", "Sources": [ "C:\...\Checker64.png" ] },
-  "errors": [], "warnings": []
-}
-```
-
-| 終了コード | 意味 |
-|---|---|
-| 0 | 成功 |
-| 1 | インポートまたは保存に失敗した(壊れたファイルなど) |
-| 2 | 引数の誤り |
-| 3 | 入力ファイルがない |
-| 4 | 対応していない形式、または`--type`と拡張子が合わない |
-| 5 | インポート設定の誤り |
-| 6 | 出力先のフォルダを作れない |
-| 7 | `ContentTools.dll`を読み込めない |
-| 10 | 想定外のエラー |
-
-範囲外(今後): IBLの事前計算(`PrefilterDiffuseIBL`など)の単独実行、プリミティブメッシュの生成。
-
-### テスト
-
-```powershell
-pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1                              # DebugEditor
-pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1 -Configuration ReleaseEditor
-pwsh -STA -NoProfile -File DXForgeImport/Tests/import_cli_test.ps1 -ArgumentsOnly               # ContentTools.dll不要(CIと同じ)
-```
-
-引数・異常系(終了コードと`--json`のエラー)、テクスチャとFBXのインポート、設定ファイルと`--set`の反映、壊れたPNG/FBXと保存の失敗(読み取り専用の`.asset`)、FBXの埋め込みテクスチャ(テスト中に`box.fbx`へ`Checker64.png`を埋め込んだFBXを作る)に加え、CLIが書いた`.asset`をエディタのコード(`Texture.Load`/`Geometry.Load`)で読めること、同じ入力をエディタのインポートの経路(`ContentHelper.Import`)で書き出したものと一致すること(GUIDとインポート日時を除く)を確かめます。FBXには既定でFBX SDKのサンプル`C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\samples\ConvertScene\box.fbx`を使います(`-FbxFile`で変更可)。LODグループが2つ以上あるFBXを`-MultiLodFbxFile`で渡すと、一部だけ保存できた場合のテストも行います(該当するFBXがリポジトリにもFBX SDKのサンプルにもないため、既定では行いません)。CIではFBX SDKがないため`-ArgumentsOnly`だけを実行します。
-
-## テスト
-
-`EngineUnitTests` はGPU・ウィンドウを使わない自動テストです。ビルド後、生成された実行ファイルを直接実行できます。
-
-```powershell
-./x64/Debug/EngineUnitTests.exe          # 人間が読める出力
-./x64/Debug/EngineUnitTests.exe --json   # 機械可読なJSON出力
-./x64/Debug/EngineUnitTests.exe --interactive   # assert時にCRT既定のダイアログを出す(デバッガで調べたいとき)
-```
-
-終了コードは全テストPASSなら`0`、1件以上FAILなら`1`です。各失敗には式・ファイル・行番号が出力されます。
-
-無人実行で止まらないように、テスト対象のコードが`assert`に当たったり`abort()`が呼ばれたりしても、ダイアログは出しません。assertの内容(式・ファイル・行番号)と、そのとき実行していたテストケース名(`[ABORT] <名前>`)を標準エラーへ出し、終了コード`3`ですぐに終わります。結果は全ケースの実行後にまとめて出力するため、この場合は標準出力には何も出ません(`--json`でもJSONは出ません)。終了コードが`0`/`1`以外なら中断とみなしてください。ダイアログを出してデバッガをアタッチしたいときは`--interactive`を付けます。
-
-現在カバーしているのは、GPU/ウィンドウに依存しない純粋ロジックのみです:
-- `Common/Id.h` — 世代付きID(インデックス/世代のエンコード、`new_generation`、`DEFINE_TYPED_ID`)
-- `Utilities/FreeList.h` — 削除済みインデックスの再利用ロジック
-- `Content/ContentLoader.cpp` — `game.bin`の読み込み(0エンティティ、256以上の値、壊れたファイル、途中で失敗したときの後始末)
-
-`Graphics/Direct3D12/*` などGPUデバイス初期化が前提のコードは対象外です。そちらの動作確認は`EngineTest`を実行し、目視で確認してください。
-
-### ヘッドレス実行 (`--game-bin`)
-
-`EngineUnitTests.exe`に`--game-bin`を付けると、ユニットテストの代わりに、エディタが書き出す`game.bin`を読み込み、スクリプトの更新(`script::update`)を指定フレーム数だけ回して終了します(#11の第一段)。ウィンドウもGPUも使いません。`game.bin`の読み込みとスクリプトの更新は、ゲームのexe(`Core/EngineWin32.cpp`)と同じ`content::load_game`/`script::update`を使い、実行ループと引数の解析は`DXForgeEngine/Core/Headless.cpp`にあります。
-
-```powershell
-./x64/Debug/EngineUnitTests.exe --game-bin path/to/game.bin --frames 10 [--dt 0.016] [--json]
-./x64/Debug/EngineUnitTests.exe --help   # 引数と終了コードの一覧
-```
-
-- `--frames <N>`(必須): `script::update`を呼ぶ回数(0以上)。`--dt <秒>`: 毎回渡すデルタ時間(既定0.016)。
-- `--json`: 結果を1行のJSONで標準出力に出します。ログは標準エラーに出ます。引数の誤りもJSONで返します。
-  ```json
-  {"mode":"headless","game_bin":"...","frames_requested":10,"frames_run":10,"dt":0.016,"success":true,"exit_code":0,"error":null,
-   "entity_count":1,"entities":[{"id":0,"position":[10,0,0],"rotation":[0,0,0,1],"scale":[1,1,1]}]}
-  ```
-  失敗したときは`"error":{"code":"script_not_found","message":"entity 1: script 'Foo' is not registered"}`のようになります。`entities`は最後のフレームの、生きているエンティティの状態です。
-
-| 終了コード | 意味 |
-|---|---|
-| `0` | 成功(エンティティが0個の`game.bin`は空のシーンとして成功) |
-| `2` | 引数の誤り |
-| `3` | `abort()`(assertなど。ユニットテストと同じく、ダイアログは出さない) |
-| `10` | `game.bin`が無い |
-| `11` | `game.bin`が読めない(空のファイル、アクセスの拒否など存在の確認自体に失敗した場合を含む) |
-| `12` | `game.bin`の形式が壊れている(途中で切れている・余りのバイトがある・値が範囲外) |
-| `13` | 未知のコンポーネントの種類 |
-| `14` | スクリプトが登録されていない |
-| `15` | エンティティを作成できなかった |
-
-制約: 描画はしません(Renderer/D3D12は初期化しない)。スクリプトはゲームのexeと同じく`REGISTER_SCRIPT`で実行ファイルに静的に登録されたものだけが使え、今は`EngineUnitTests`に入っているテスト用のスクリプト(`EngineUnitTests/HeadlessTestScripts.cpp`の`headless_test_mover`)だけです。ゲームのプロジェクト(`.dxproj`)の読み込みは、下の`dxforge --load-project`が行います。スクリプトでの操作はまだありません。描画は別のモード(下の`--render`)で、固定のテストシーンだけを描けます。
-
-ヘッドレス実行の回帰テストは、`game.bin`を`%TEMP%`に作って実行ファイルを起動し、終了コードと`--json`を確かめます(`build.ps1 -RunTests`とCIからも実行されます)。
-
-```powershell
-python EngineUnitTests/Tests/headless_run_test.py                  # x64/Debug/EngineUnitTests.exe
-python EngineUnitTests/Tests/headless_run_test.py --config Release
-```
-
-### プロジェクトの読み込みと実行 (`dxforge --load-project`)
-
-`dxforge.exe`(`DXForgeCli`)は、エディタを開かずにプロジェクト(`.dxproj`)を読み込み、シーンのエンティティを作って指定フレーム数だけ実行し、終了コードとJSONを返します(#11)。`.dxproj`の読み込みと`game.bin`の書き出しはエディタのコード(`Project.Load`と、`SaveToBinary`から切り出した`Project.WriteGameBinary`)をそのまま使うので、形式を別に実装していません。実行は上の`EngineUnitTests --game-bin`に任せます(`dxforge`は`game.bin`を一時フォルダに書いて、それを子プロセスで実行し、JSONにプロジェクトの情報とエンティティの名前を足します)。ウィンドウもGPUも使いません。
-
-```powershell
-./build.ps1 -Target editor -Configuration DebugEditor                       # dxforge.exe(x64/DebugEditor/)
-./build.ps1 -Target native -Configuration Debug -Project EngineUnitTests    # ランナー(x64/Debug/)
-./x64/DebugEditor/dxforge.exe --load-project path/to/MyGame.dxproj --frames 10 --json
-./x64/DebugEditor/dxforge.exe --load-project path/to/MyGame.dxproj --frames 10 --scene "Sample Scene" --dt 0.016
-./x64/DebugEditor/dxforge.exe --load-project path/to/MyGame.dxproj --export-game-bin out/game.bin   # 書き出すだけ
-./x64/DebugEditor/dxforge.exe --help
-```
-
-- シーンは既定でアクティブなシーン(エディタと同じ)。`--scene <名前>`で選べます。
-- ランナーは既定で`x64/<Debug|Release>/EngineUnitTests.exe`(`DebugEditor`の`dxforge`は`Debug`、`ReleaseEditor`は`Release`)。`--runner`で変えられます。
-- `--keep-game-bin <パス>`で実行に使った`game.bin`を残します。`--export-game-bin`はエディタがゲームの実行前に書くものと同じ`game.bin`を書くだけで、実行しません。
-- 標準出力は`--json`ならJSONだけで、ログ(ランナーのものも)は標準エラーに出ます。JSONは`--game-bin --json`と同じ項目に、`mode`(`load_project`)、`project`、`scene`、`game_bin`(`--keep-game-bin`のときだけ)、`runner`と、各エンティティの`name`を足したものです。
-- 今はスクリプト(`Script`コンポーネント)のあるシーンは実行できません(終了コード33。ゲームのコードのDLLの読み込みは今後)。
-
-| 終了コード | 意味 |
-|---|---|
-| `0` | 成功 |
-| `2` | 引数の誤り(`dxforge`は`error.code`が`invalid_arguments`、ランナーは`usage_error`) |
-| `3`, `10`〜`15` | ランナーの終了コードをそのまま返す(上の`--game-bin`の表) |
-| `30` | `.dxproj`がない |
-| `31` | `.dxproj`を読み込めない(XMLが壊れている、プロジェクトではない、シーンやエンティティの一覧がない) |
-| `32` | シーンがない(アクティブなシーンがない、`--scene`の名前のシーンがない) |
-| `33` | シーンにスクリプトがある |
-| `34` | ランナーがない |
-| `35` | ランナーを起動できない、またはランナーの結果を読めない |
-| `36` | `game.bin`を書き出せない |
-| `39` | 想定外のエラー |
-
-テストは`dxforge`を別のプロセスとして実行し、終了コードとJSON、`--export-game-bin`のバイト列がエディタの`SaveToBinary`のものと一致することを確かめます(ランナーがないと実行のケースはSKIP。`-RequireRunner`で失敗にする。CIは付ける)。
-
-```powershell
-pwsh -STA -NoProfile -File DXForgeCli/Tests/load_project_cli_test.ps1 -RequireRunner
-pwsh -STA -NoProfile -File DXForgeCli/Tests/load_project_cli_test.ps1 -Configuration ReleaseEditor -RequireRunner
-```
-
-### シーンの操作 (`dxforge --ops`)
-
-エディタのUIを使わずに、`.dxproj`のシーンを読んだり変えたりします(#183)。操作の本体はエディタのコード(`DXForgeEditor/Automation/`)で、`dxforge`はそれを呼ぶだけです。操作の形はJSON Schema(`DXForgeCli/Schema/ops.schema.json`。ビルドすると`dxforge.exe`の隣の`Schema\`にもコピーされ、`--help`に場所が出ます)で定義しています。
-
-```powershell
-./x64/DebugEditor/dxforge.exe --load-project path/to/MyGame.dxproj --ops ops.json --json
-./x64/DebugEditor/dxforge.exe --load-project path/to/MyGame.dxproj --op '{"op":"list-entities"}' --json   # 1つだけ
-./x64/DebugEditor/dxforge.exe --load-project path/to/MyGame.dxproj --ops ops.json --dry-run --json        # 検証だけで保存しない
-```
-
-シーンは`create-scene`、`remove-scene`(最後のシーンとアクティブなシーンは消せない)、`set-active-scene`で変えます。`import-asset`は`DXForgeImport.exe`(`dxforge.exe`と同じフォルダ、`--importer`で変更可)でFBXや画像を取り込み、同じ`ops`の後続の`set-geometry`で使えます。取り込みは一時フォルダ(`.dxforge-import-*`)に書き、すべての操作が成功したときだけ`Content`へ移してから`.dxproj`を保存します。失敗すると`Content`と`.dxproj`は変わりません。既存のファイルは上書きしません。
-
-```json
-{"ops":[
-  {"op":"create-entity","as":"box","name":"Box"},
-  {"op":"set-transform","target":"$box","position":[0,1,0],"rotation_deg":[0,90,0]},
-  {"op":"add-component","target":"$box","type":"geometry","asset":"default:cube"}
-]}
-```
-
-| 種類 | 操作 |
-|---|---|
-| 読む | `list-scenes`、`list-entities`(`scene`は省略可)、`get-entity`(`target`) |
-| 変える | `create-entity`(`name`、`scene`、`as`は省略可)、`remove-entity`、`rename`(`name`)、`set-enabled`(`enabled`)、`set-transform`(`position`、`rotation_deg`か`rotation_rad`、`scale`)、`add-component`(`type`が`transform`/`script`(`name`)/`geometry`(`asset`))、`remove-component`(`type`)、`set-geometry`(`asset`) |
-
-- 対象(`target`)は`guid:<GUID>`、`name:<名前>`(1つに決まらなければエラー)、`index:<シーン名>/<番号>`(同じ名前のシーンが複数あればエラー)、`$<別名>`(同じopsの中の`create-entity`の`as`)。`create-entity`の結果にGUIDが入ります。
-- アセット(`asset`)は`guid:<GUID>`、`path:<Contentからの相対パス>`、`default:cube`(既定のキューブ)。スクリプトは名前が登録されているかを確かめられないので、付けるのは許し、結果に警告を出します。
-- 変更があり、すべて成功したときだけ、最後に1回保存します(一時ファイルに書いてから置き換える)。途中で失敗したら何も保存しません。結果のJSONには必ず`changed`と`saved`が入り、操作ごとの結果は`results`に、失敗の場所は`error.op_index`と`error.key`に入ります。
-- エディタがそのプロジェクトを開いている間は、変更の操作を含むものは`--dry-run`でも断ります(44)。読むだけの操作はできます。
-- `GameEntity`のGUIDは`.dxproj`に保存します(Primalにはありません。`game.bin`には書きません)。GUIDのない`.dxproj`は読むときに作るので、保存するまでは起動のたびに変わります。
-
-| 終了コード | 意味 |
-|---|---|
-| `40` | opsの形式の誤り(何も実行しない) |
-| `41` | 対象(エンティティ、シーン、アセット)が見つからない、1つに決まらない |
-| `42` | 操作の失敗(すでに持つコンポーネントの追加、Transformの削除など) |
-| `43` | `.dxproj`を保存できない |
-| `44` | エディタがそのプロジェクトを開いている |
-
-```powershell
-pwsh -STA -NoProfile -File DXForgeCli/Tests/ops_cli_test.ps1 -RequireRunner
-```
-
-### 描画のヘッドレス実行 (`--render`)
-
-`EngineUnitTests.exe`に`--render`を付けると、ウィンドウを作らずに、コードで組み立てた固定のテストシーン(球と床、平行光源と点光源、カメラ。IBLなし)を画面外のテクスチャに描画し、読み戻してPNGに書き出します(#127の前半)。アダプタは既定でWARP(ソフトウェアのラスタライザ)を使うので、GPUのない環境でも動き、同じ実行ファイルなら何度実行しても同じ画素になります。
-
-```powershell
-./x64/Release/EngineUnitTests.exe --render --frames 3 --width 320 --height 240 --screenshot $env:TEMP\a.png [--adapter warp|hardware] [--json]
-```
-
-`--json`では、標準出力に次の形のJSONを1行だけ出します(ログは標準エラー)。`pixel_hash`は書き出したRGB(8ビット、左上から行ごと)のFNV-1a(64ビット)です。
-
-```json
-{"mode":"render","screenshot":"...\\a.png","frames_requested":3,"frames_run":3,"width":320,"height":240,
- "adapter":"warp","adapter_name":"Microsoft Basic Render Driver","success":true,"exit_code":0,"error":null,"pixel_hash":"e5f1cb5fef00caf3"}
-```
-
-| 終了コード | 意味 |
-|---|---|
-| `0` | 成功 |
-| `2` | 引数の誤り(`--frames`/`--width`/`--height`/`--screenshot`がない、範囲外(幅・高さは16〜16384。16はライトカリングのタイルの大きさ)、`--game-bin`との併用など) |
-| `3` | `abort()`(assertの失敗など) |
-| `20` | グラフィックスの初期化に失敗した(アダプタ・WARPが使えない) |
-| `21` | シェーダーを用意できない(`dxcompiler.dll`やシェーダーのソースが見つからない、コンパイルに失敗した) |
-| `22` | 描画・読み戻しに失敗した(Debugビルドでは、D3D12のデバッグレイヤーのERROR/CORRUPTIONを含む) |
-| `23` | PNGを書き出せなかった |
-
-制約:
-- シェーダーは実行時にDXCでコンパイルします(エンジンのシェーダーは`EngineTest`と同じ`compile_shaders()`で`x64/<構成>/shaders/d3d12/shaders.bin`に、マテリアルは`EngineTest/TestShader.hlsl`)。そのため、`dxcompiler.dll`/`dxil.dll`が実行ファイルの隣に要ります。ビルド後に`packages/DirectXShaderCompiler`があればコピーし、なければ何もしません(`-Project EngineUnitTests`のビルドはDXCなしのオフラインのまま通ります)。`EngineTest`をビルドしたか、`Restore.ps1`のあとに`EngineUnitTests`をビルドすれば揃います。シェーダーのソースは実行ファイルから`..\..\`(リポジトリの`x64/<構成>/`に置いたまま)で探します。
-- 出力は`R16G16B16A16_FLOAT`の描画先を[0, 1]に収めてsRGBにした8ビットのPNGです(トーンマッピングなし。ウィンドウでの見た目と同じ)。
-- 背景はGパスのクリア色なので、Debugでは灰色、Releaseでは黒です。シェーダーの最適化も違うため、DebugとReleaseで画素は一致しません。WARPとGPU(`--adapter hardware`)でも、見た目は同じでも画素は少し違います。
-- Debugビルドでは、無人実行のためデバッグレイヤーのメッセージでブレークせず、WARNING以上を標準エラーに出します。デバッグレイヤー(Graphics Tools)の有無もログに出ます。
-- 描画するのは固定のテストシーンだけで、`game.bin`やエディタのシーンは描けません。
-
-回帰テストは、別プロセスで実行して終了コード・`--json`・PNG(WARPでの2回の一致と、基準画像との比較を含む)を確かめます(`build.ps1 -RunTests`とCIからも実行されます。DXCが実行ファイルの隣にないときは描画のテストをスキップし、環境変数`DXFORGE_REQUIRE_RENDER_TEST=1`のときは失敗にします。CIはこれを設定しています)。
-
-```powershell
-python EngineUnitTests/Tests/render_run_test.py                  # x64/Debug/EngineUnitTests.exe
-python EngineUnitTests/Tests/render_run_test.py --config Release
-```
-
-#### 基準画像との比較
-
-WARPで描いた画像を、構成ごとの基準画像(`EngineUnitTests/Tests/baselines/render_warp_320x240_<Debug|Release>.png`)と比べます。構成は`--config`か、実行ファイルのフォルダ名(`x64/<構成>/`)から決めます。チャンネルの差が1階調を超えた画素が1つでもあれば失敗にし、違った画素の数と最大の差を表示して、`%TEMP%\dxforge_render_diff\<構成>\`に`expected.png`・`actual.png`・`diff.png`(基準|実際|差分。赤は許容値を超えた画素、黄は1階調の差)を書きます。CIでは成果物`render-diff-<構成>`として残ります。`--adapter hardware`の結果はGPUで変わるため比べません(差を表示するだけです)。
-
-描画を意図して変えたときは、その構成をビルドしてから基準画像を更新し、新しいPNGを確かめてコミットします(WARPで2回描いて一致したときだけ書きます。構成の指定が必要で、CIでは実行できません):
-
-```powershell
-python EngineUnitTests/Tests/render_run_test.py --update-baselines --config Debug
-python EngineUnitTests/Tests/render_run_test.py --update-baselines --config Release
-```
-
-エディタの基本操作(プロジェクトの作成 → スクリプトの追加 → ゲームコードDLLの読み込み → ゲームの実行)の確認手順は [docs/ManualVerification.md](docs/ManualVerification.md) にまとめています。
-
-### 新しいテストケースの追加方法
-
-1. `EngineUnitTests/` に `Tests_<対象>.cpp` を作成
-2. `EngineUnitTests.vcxproj` と `.vcxproj.filters` の `ClCompile` に追加
-3. 以下の形式でテストケースを書く
-
-```cpp
-#include "MicroTest.h"
-#include "CommonHeaders.h"
-
-DXFORGE_TEST_CASE(my_new_test)
-{
-	CHECK(1 + 1 == 2);   // 失敗しても後続のCHECKは実行される
-	REQUIRE(true);       // 失敗したらこのテストケースのみ即中断する
-}
-```
-
-**新規ファイルは必ずUTF-8 BOM付きで保存してください。** このリポジトリの既存ファイルは全て日本語のヘッダーコメントで始まっており、BOMが無いとMSVCがShift-JISと誤認してコンパイルエラー(一見無関係な箇所でのエラー)になります。
-
-## 品質ゲート
-
-### CI (GitHub Actions)
-
-`.github/workflows/ci.yml` が、`main`/`develop`へのpushとすべてのPRで以下を実行します。
-
-- **ネイティブビルド + 自動テスト** — `Debug`と`Release`の両構成(`Release`では`NDEBUG`で`assert`が無効化され挙動が変わるため、両方を検証)。警告をエラーとして扱います。
-- **ファイル規約の検査** — `Tests/check_conventions.py`(下の「コーディング規約の自動化」)と、そのテスト。
-- **エディタビルド** — `dotnet build`で`DXForgeEditor`と`DXForgeImport`と`dxforge`(`DXForgeCli`)をビルドし、`DXForgeImport`の引数・異常系のテスト(`import_cli_test.ps1 -ArgumentsOnly`)と、ランナー(`EngineUnitTests`の`Debug`)をビルドしたうえで`dxforge`のテスト(`load_project_cli_test.ps1 -RequireRunner`)を実行。
-
-CIの対象範囲は意図的に絞っています:
-
-- `ContentTools`はFBX SDKが必要なためランナーではビルドできません(ソリューション構成`Debug`/`Release`ではビルド対象外なので問題になりません)。
-  ローカルでは既定でFBX SDK 2020.3.7の標準インストール先を参照します。別の場所にある場合は、環境変数または`/p:FbxSdkDir=<SDKのルート>`で指定してください(`ContentTools/FbxSdk.props`)。SDKが見つからない場合はビルド開始時に分かりやすいエラーで停止します。
-- `EngineTest`はビルドのみ(実行にはウィンドウとGPUが必要)。
-- `EngineUnitTests`はGPU・ウィンドウ不要なので、CIで実際に実行されます。ヘッドレス実行(`--game-bin`)のテスト(`EngineUnitTests/Tests/headless_run_test.py`)と、WARPでの描画のテスト(`render_run_test.py`、`--render`)も`Debug`/`Release`の両方で実行されます。描画のテストは基準画像との比較も含み、違ったときの差分の画像は成果物`render-diff-<構成>`に、WARPで描いたPNGは成果物`render-warp-<構成>`に残ります。
-- `DXForgeImport`の実際のインポートは`ContentTools.dll`(FBX SDK)が必要なのでローカルで確かめます(`import_cli_test.ps1`)。CIでは、それなしで確かめられる引数の解析と異常系(`ContentTools.dll`がないときの終了コード7を含む)だけを実行します。
-
-### ビルド出力の要約
-
-ビルドツールの出力は非常に大きくなり得るため(実測: ネイティブ約7,400文字、エディタはnull許容参照型の警告が残っていた頃に**約132,000文字**)、`build.ps1`は既定で要約だけを表示します。エラーは原因特定に必要なので全文表示し、警告はコード別の件数に畳みます。
-
-エディタ側の警告はIssue #9で0件になり、ネイティブ側と同様に`-WarningsAsErrors`で警告をエラー化できます(エディタには`-p:TreatWarningsAsErrors=true`を付けてフルビルドします)。CIはこのオプション付きでビルドするため、新しい警告を入れるとCIが失敗します。
-
-ビルド失敗の調査などで全文が必要な場合は`-DetailedLog`を指定してください。
-
-### 警告のエラー化
-
-ローカル開発では警告はエラーになりません。CIだけが厳格に扱います。
-
-```powershell
-./build.ps1 -Target native -WarningsAsErrors   # ローカルでCIと同じ厳しさで確認したいとき
-```
-
-**注意:** MSBuildの`/p:TreatWarningAsError=true`はグローバルプロパティであり、**C++プロジェクトには効きません**(`/WX-`のままになります)。そのためルートの`Directory.Build.props`で`ItemDefinitionGroup`として設定し、`/p:DXForgeWarningsAsErrors=true`で切り替える方式にしています。`build.ps1 -WarningsAsErrors`がこれを渡します。
-
-現在、ネイティブ側は`Debug`/`Release`ともに警告0件です。この状態を維持してください。
-
-**日本語をナロー文字列リテラルに書かないでください。** CIランナーのシステムコードページは1252(日本語環境ではない)で、MSVCはナロー文字列を実行文字セットへ変換するため、日本語は1文字ごとに`C4566`が出てビルドが失敗します。これはCI特有のノイズではなく、ビルドするマシンのロケールによって文字列データが変わってしまう実際の移植性問題です。コメントは問題ありません(リテラルのみが対象)。日本語が必要な場合はワイド文字版API(`OutputDebugStringW(L"...")`)を使ってください。なお`#if _DEBUG`の中にある場合、Debug構成だけが失敗するため原因が分かりにくくなります。
-
-### コーディング規約の自動化
-
-`.editorconfig`に、実測に基づいた文字コードとインデントの規約を定義しています。とくに**C/C++のUTF-8 BOM必須**(`charset = utf-8-bom`)は、BOM無しだとMSVCがShift-JISと誤認してコンパイルエラーになる問題を、エディタ側で自動的に防ぐためのものです。
-
-`.editorconfig`はエディタの設定にすぎないので、守られているかは`Tests/check_conventions.py`で検査します。CIが毎回実行するほか、Claude Codeでは`.claude/settings.json`のフックが、ファイルを編集するたびに同じ検査を実行します。
-
-```powershell
-python Tests/check_conventions.py                 # git で管理しているファイルすべて
-python Tests/check_conventions.py --fix <file>    # BOM の付け外しだけ自動で直す
-python Tests/check_conventions_test.py            # 検査スクリプト自体のテスト
-```
-
-検査する規約: C/C++・C#・XAML・PowerShellのUTF-8 BOM、日本語を含むエンジン側HLSLのBOM、fxcでコンパイルするHLSL(`ContentTools/`・`DXForgeEditor/`)にBOMを付けないこと、C/C++のナロー文字列リテラルに日本語を入れないこと、C/C++のヘッダーコメント。
-
-### AIエージェント向けの指示
-
-エージェント向けの指示は、ルートの`AGENTS.md`(Claude CodeとCodexの共通。Claude Codeは`CLAUDE.md`から取り込む)に短くまとめ、詳細は`docs/dev/`に置いています。`AGENTS.md`は詳細の在りかを示す地図として短く保ち、例外のない規則は文章ではなく検査スクリプトやフックで強制します。
-
-繰り返し行う作業の手順は、Claude Codeのスキルとして`.claude/skills/`に置いています: 次の作業の提案(`next-task`)、コーディネーター向けの指示文の作成(`orchestration-prompt`)、GUIでの確認(`gui-check`)、PRのレビューからマージ・後片付けまで(`ship-pr`)、Issueの作成(`create-issue`)。
-
-### Codexによるレビュー (`CodexReview.ps1`)
-
-PRの差分を[Codex CLI](https://github.com/openai/codex)(`codex review`)にレビューさせ、実装したエージェントとは別の視点から指摘を得ます。PRのheadを`%TEMP%`の下の使い捨てのworktreeに展開してレビューし、終わったら削除します。ビルドやテストは行わないので、CIの代わりにはなりません。1PRあたり1〜2分かかります。
-
-```powershell
-# 結果を表示するだけ
-./CodexReview.ps1 -Pr 52
-
-# 結果をPRにコメントとして投稿する
-./CodexReview.ps1 -Pr 52 -Post
-```
-
-Codex CLIがインストール済みで、ログインしている必要があります。Windowsでは、Codexのサンドボックスが無効だと、レビューのためのコマンドがすべて拒否されます。そのため、スクリプトは呼び出しごとに`-c windows.sandbox="unelevated"`を渡しています。
+| エージェント向けの指示(Claude Code・Codex共通)と文書の地図 | [AGENTS.md](AGENTS.md) |
+| 構成、レンダラーの状態、各プロジェクトの役割 | [docs/dev/Architecture.md](docs/dev/Architecture.md) |
+| `build.ps1`の引数、パッケージの復元、警告、文字コード、テスト、CI | [docs/dev/BuildAndTest.md](docs/dev/BuildAndTest.md) |
+| `DXForgeImport`の引数、設定、出力 | [docs/dev/DXForgeImport.md](docs/dev/DXForgeImport.md) |
+| PRのレビューとマージ | [docs/dev/ReviewAndMerge.md](docs/dev/ReviewAndMerge.md) |
+| 単位などの設計の決定 | [docs/design/](docs/design/) |
 
 ## 既知の制約
 
 - `EngineTest`は対話的なビジュアルテストで、ウィンドウとGPUが必須のため、CLI/CIでは実行できません。
 - グラフィックスバックエンドはDirect3D12のみ実装済みです。Vulkan/OpenGLは未実装のスタブです。
-- **シェーダファイルの文字コードが統一されていません。** 日本語コメントを含む`.hlsl`/`.hlsli`の8ファイルがShift-JISのまま残っており(C++側だけが過去にUTF-8へ変換された)、残りはASCIIです。DXCは現状これを許容していますが、統一するのが望ましい状態です。`.editorconfig`でもこのためHLSLの`charset`は指定していません(指定すると保存時に文字化けする恐れがあるため)。
+- `ContentTools`はFBX SDKが必要なため、CIではビルドもテストもしません(FBXと画像の実際のインポートはローカルで確かめます)。
 - `.clang-format`は未導入です(既存コード全体が再フォーマットされ巨大な差分になるため見送り)。
-
-## 今後の方向性
-
-将来的に、Unity CLI(`-batchmode`等)のように、エディタUIを介さずCLIからエンジンを操作・ビルドできる「AIフレンドリー」な構成を目指しています。`EngineUnitTests`はその最初の一歩(ウィンドウ/GPU無しでエンジンコードを動かすヘッドレスなCLIプログラム)という位置づけです。`--game-bin`による`game.bin`のヘッドレス実行(上の「ヘッドレス実行」)がその第一段で、`dxforge --load-project`による`.dxproj`の読み込みと実行が続きます。ContentToolsのCLI化は`DXForgeImport`(#10)で始めました。今後、スクリプトでの操作、プロジェクトの描画とスクリーンショットなどを通じて拡張していく想定です。
 
 ## サードパーティライセンス
 

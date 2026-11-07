@@ -15,7 +15,7 @@ namespace DXForgeCli
 {
     /// <summary>
     /// dxforge 自身の終了コード。ランナー(EngineUnitTests --game-bin)の終了コード(0, 2, 3, 10〜15)はそのまま返すので、
-    /// それと重ならない 30〜39 と 40〜44(ops、#183)を使う(2 だけは共通。JSON の error.code で区別できる)。--help と README.md にも同じ一覧を書く。
+    /// それと重ならない 30〜39 と 40〜44(ops、#183)を使う(2 だけは共通。JSON の error.code で区別できる)。--help と docs/dev/BuildAndTest.md にも同じ一覧を書く。
     /// </summary>
     enum ExitCode
     {
