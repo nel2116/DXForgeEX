@@ -1,74 +1,74 @@
 ---
 name: gui-check
-description: DXForgeEX のエディタやゲームを GUI で動かして確かめ、結果とスクリーンショットを PR の本文に載せる。PR に書かれた GUI の確認手順を実行するとき、ユーザーに「GUI 確認を行って」「エディタを起動して確認して」と言われたときに使う。コーディネーターは自分で操作せず、start-gui-check.ps1 で別のワーカーに任せる。
+description: Run the DXForgeEX editor or game in the GUI to verify behavior, and put the results and screenshots in the PR body. Use when executing the GUI check steps written in a PR, or when the user says 「GUI 確認を行って」「エディタを起動して確認して」. The coordinator does not operate the GUI itself; it hands the check to a separate worker with start-gui-check.ps1.
 ---
 
-# GUI で確認する
+# Checking in the GUI
 
 <!-- last-reviewed: 2026-11-07 -->
 
-エディタやゲームの動作、描画の結果は自動テストで確かめられないので、実際に画面を操作して確かめる。
+Editor/game behavior and rendering results cannot be checked by automated tests, so operate the actual screen.
 
-## コーディネーターは `start-gui-check.ps1` を使う
+## The coordinator uses `start-gui-check.ps1`
 
 ```powershell
-./.claude/skills/gui-check/start-gui-check.ps1 -Pr <N>           # 起動(-DryRun で仕様を見る、-Size normal で大きいモデル)
-./.claude/skills/gui-check/start-gui-check.ps1 -Pr <N> -Cleanup  # worker_done と worker-release のあとで worktree を消す
+./.claude/skills/gui-check/start-gui-check.ps1 -Pr <N>           # start (-DryRun shows the spec, -Size normal for the larger model)
+./.claude/skills/gui-check/start-gui-check.ps1 -Pr <N> -Cleanup  # delete the worktree after worker_done and worker-release
 ```
 
-PR の本文の `## GUI の確認手順`(番号付き)を読み、`worker-spec.md` と連結した仕様で新しいワーカーを起動する。ワーカーは PR の head をビルドして確かめ、画像を PR の本文に載せ、手順ごとの 1 行の結果だけを `worker_done` で返す(件名は `GUI 確認 PR #N: PASS|NG|未完了`)。マージの前に、`worker_done` の `head:` が今の PR の head と同じことを確かめる。違えば(確認のあとに push された)確認をやり直す。コーディネーターは自分で操作せず、画像も読まない(フックが止める)。マウスとキーの操作はデスクトップ全体に作用するので、GUI 確認は同時に 1 つだけにする(`gui-check-pr-*` の worktree が残っているか、別の起動の途中なら、終了コード 4 で起動しない)。
+It reads the PR body's `## GUI の確認手順` section (numbered) and starts a new worker with a spec made from it plus `worker-spec.md`. The worker builds the PR head, checks it, puts the images in the PR body and returns only one line of result per step in `worker_done` (subject `GUI 確認 PR #N: PASS|NG|未完了`). Before merging, confirm that the `head:` in `worker_done` equals the current PR head; if not (something was pushed after the check), check again. The coordinator does not operate the GUI or read the images (a hook blocks it). Mouse and keyboard input affects the whole desktop, so run only one GUI check at a time (if a `gui-check-pr-*` worktree is left or another start is in progress, it refuses with exit code 4).
 
-## ワーカーは `gui.ps1` を使う
+## The worker uses `gui.ps1`
 
-要素は操作のたびに UI Automation で読み直すので、番号は古くならない。子ウィンドウ(ダイアログ)も読める。`orca computer` は使わない。詳しい引数はスクリプトの先頭にある。
+Elements are re-read through UI Automation on every action, so indices never go stale, and child windows (dialogs) are readable too. Do not use `orca computer`. Detailed parameters are at the top of the script.
 
 ```powershell
 $gui = "./.claude/skills/gui-check/gui.ps1"
-$out = & $gui -Action create -Project GuiCheck200                # 最後の行が PID <n>
+$out = & $gui -Action create -Project GuiCheck200                # last line is PID <n>
 $p = [int](($out | Select-Object -Last 1) -replace 'PID ', '')
 & $gui -Action close -ProcId $p
 
-# GUI なしで中身を作る(エディタを閉じてから。開いていると dxforge は 44 で断る)
+# Fill the project without the GUI (close the editor first; while it is open dxforge refuses with 44)
 & $gui -Action prepare -Project GuiCheck200 -Import F:\DXForgeTestAssets\LODTest.fbx
-& $gui -Action prepare -Project GuiCheck200 -Op '{"op":"create-entity","name":"Box"}'   # -Ops <file> でまとめて
+& $gui -Action prepare -Project GuiCheck200 -Op '{"op":"create-entity","name":"Box"}'   # -Ops <file> for several
 
-$out = & $gui -Action open -Project GuiCheck200                  # 基準の版は -Exe <exe>
+$out = & $gui -Action open -Project GuiCheck200                  # baseline build: -Exe <exe>
 $p = [int](($out | Select-Object -Last 1) -replace 'PID ', '')
-& $gui -Action tree -ProcId $p -Pattern 'ListItem|^Text'         # 判定はまずテキストで
-& $gui -Action click -ProcId $p -Target AddEntity                # 名前の一覧は -Action names
-& $gui -Action click -ProcId $p -Target 'el:Text:^Box$'          # 要素で指定。Text は左端を押す
+& $gui -Action tree -ProcId $p -Pattern 'ListItem|^Text'         # judge by text first
+& $gui -Action click -ProcId $p -Target AddEntity                # list of names: -Action names
+& $gui -Action click -ProcId $p -Target 'el:Text:^Box$'          # by element; Text is clicked at its left edge
 & $gui -Action drag -ProcId $p -Target 'el:Text:^lodtest$' -To EntityDrop
 & $gui -Action keys -ProcId $p -Keys '{F5}'
 & $gui -Action shot -ProcId $p -Region Hierarchy -OutFile $env:TEMP\gui-check-pr-200\pr-hierarchy.png
-& $gui -Action switch -ProcId $p -Project GuiCheck200b           # File > Open Project。作るなら -Action create -ProcId $p
-& $gui -Action close -ProcId $p                                  # Project Browser が残っても閉じ、終了を確かめる
-& $gui -Action end-session -ProcId $p                            # ログオフを対象のプロセスにだけ模擬し、終了コードを確かめる(実際にはログオフしない)
-& $gui -Action remove-project -Project GuiCheck200               # GuiCheck で始まる名前だけ
-& $gui -Action diff -Dir $env:TEMP\gui-check-pr-200              # base-*.png と pr-*.png の画素の差
+& $gui -Action switch -ProcId $p -Project GuiCheck200b           # File > Open Project; to create: -Action create -ProcId $p
+& $gui -Action close -ProcId $p                                  # also closes a leftover Project Browser and confirms the exit
+& $gui -Action end-session -ProcId $p                            # simulates logoff for that process only and checks the exit code (no real logoff)
+& $gui -Action remove-project -Project GuiCheck200               # only names starting with GuiCheck
+& $gui -Action diff -Dir $env:TEMP\gui-check-pr-200              # pixel difference of base-*.png vs. pr-*.png
 ```
 
-部品が解決していること: タブや一覧は実際のマウスで押す。ALT による前面化は対象が前面でないときだけ行うので、開いたメニューは閉じない。Hierarchy の行は左端を押すので Remove を誤って押さない。空のリストは `EntityDrop` に落とす。
+Already handled by the script: tabs and lists are clicked with the real mouse. ALT-based activation only happens when the target is not in front, so open menus stay open. Hierarchy rows are clicked at the left edge, so Remove is not hit by mistake. Drop onto an empty list via `EntityDrop`.
 
-- 判定はテキストと数値を優先する。撮影は領域を絞る(`-Region` の名前か `x,y,w,h`、`-Target` の要素。幅は既定で 1000 まで)。座標はウィンドウの左上からの物理座標で、名前付きの座標は既定の大きさのウィンドウのもので、表示倍率に合わせて変換する。
-- ダイアログは `-Title <タイトルの一部>` で指定する。`window.ps1 -Action list -ProcId <PID>` で一覧を見られる。
-- デバッグ出力(`[DXForge] ...`、D3D12 のデバッグレイヤー)は `capture-debug-output.ps1` で取り込む(使い方はスクリプトの先頭)。
+- Prefer text and numbers for judging. Capture narrow regions (`-Region` name or `x,y,w,h`, or a `-Target` element; width is capped at 1000 by default). Coordinates are physical, from the window's top-left; named coordinates are for the default window size and are scaled to the display scale.
+- Address dialogs with `-Title <part of the title>`. `window.ps1 -Action list -ProcId <PID>` lists them.
+- Capture debug output (`[DXForge] ...`, the D3D12 debug layer) with `capture-debug-output.ps1` (usage at the top of the script).
 
-## 準備
+## Preparation
 
-- PR の worktree をビルドする: `./build.ps1 -Configuration DebugEditor -Target all` と `./build.ps1 -Configuration Debug -Target native -Project DXForgeEngine`(ゲームは Debug でリンクする)。
-- エディタは、自分の実行ファイルがあるリポジトリのエンジンでゲームをビルドする(#117)。ユーザー環境変数 `DXFORGE_ENGINE` は切り替えない。
-- 確認用のプロジェクトは `GuiCheck<N>` の名前で新しく作り、既存のものは使わない。場所はユーザー環境変数 `DXFORGE_PROJECTS`、なければ `%USERPROFILE%\DXForgeProjects\`(#141)。
-- ソースファイルがないと、ゲームの exe も DLL も作られない(#118)。New Script でスクリプトを足す。スクリプトが動いたかは、`begin_play`/`update` で目印のファイルを書かせて判定する。
-- EngineTest は `..\..\x64\*.model` と `*.texture`(git の管理外)を読むので、`x64\Debug` を作業フォルダにして起動する。新しい worktree では、ルートのチェックアウトの `x64` からコピーし、終わったら消す。
+- Build the PR worktree: `./build.ps1 -Configuration DebugEditor -Target all` and `./build.ps1 -Configuration Debug -Target native -Project DXForgeEngine` (games link against Debug).
+- The editor builds games with the engine of the repository its own executable is in (#117). Do not switch the user environment variable `DXFORGE_ENGINE`.
+- Create a fresh check project named `GuiCheck<N>`; never use existing ones. Location: user environment variable `DXFORGE_PROJECTS`, else `%USERPROFILE%\DXForgeProjects\` (#141).
+- Without a source file, neither the game exe nor the DLL is produced (#118). Add a script with New Script. To tell whether a script ran, have `begin_play`/`update` write a marker file.
+- EngineTest reads `..\..\x64\*.model` and `*.texture` (not in git), so start it with `x64\Debug` as the working directory. In a new worktree, copy them from the root checkout's `x64` and delete them afterwards.
 
-## 結果を残す
+## Recording the result
 
-**画面で確かめたときは、スクリーンショットを必ず PR の本文に載せる。** コメントだけにはしない。PR がない確認は、関係する Issue のコメントに載せる。
+**Whenever you checked on screen, always put screenshots in the PR body**, not only in a comment. A check without a PR goes in a comment on the related issue.
 
-- 変更の前後を `base-<名前>.png` と `pr-<名前>.png` の組で 1 つのフォルダ(`%TEMP%\gui-check-pr-<N>\`)に置く。基準の版は develop(ルートのチェックアウトの実行ファイルでよい。ブランチは切り替えない)。
-- `./.claude/skills/gui-check/push-pr-assets.ps1 -Pr <N> -Dir <フォルダ> -Summary <結果の Markdown> -BaseLabel "develop(<sha>)"` で載せる。`pr-assets` ブランチの `pr-<N>/gui-check/` に push し、本文の `<!-- gui-check:start -->` の節を置き換える(やり直しても節は 1 つ)。`-DryRun` で先に見られる。
-- `-Summary` には、確認の日付、比べた版(sha)、手順ごとの結果(期待どおりか、数値)を書く。
+- Put before/after pairs `base-<name>.png` and `pr-<name>.png` in one folder (`%TEMP%\gui-check-pr-<N>\`). The baseline is develop (the root checkout's executable is fine; do not switch its branch).
+- Publish with `./.claude/skills/gui-check/push-pr-assets.ps1 -Pr <N> -Dir <folder> -Summary <result Markdown> -BaseLabel "develop(<sha>)"`. It pushes to `pr-<N>/gui-check/` on the `pr-assets` branch and replaces the `<!-- gui-check:start -->` section of the body (one section even after reruns). `-DryRun` previews it.
+- `-Summary` (Japanese) contains the check date, the compared versions (sha) and the result per step (as expected or not, numbers).
 
-## 片付け
+## Cleanup
 
-起動したゲーム、VS、エディタを閉じる(worktree の DLL を掴んだままだと消せない)。assert のダイアログで止まったプロセスが残っていないかを確かめる。確認用のプロジェクトは `-Action remove-project` で消す。
+Close every game, VS and editor you started (the worktree cannot be deleted while its DLLs are held). Make sure no process is left stuck on an assert dialog. Delete check projects with `-Action remove-project`.

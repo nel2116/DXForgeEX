@@ -1,36 +1,36 @@
 ---
 name: create-issue
-description: DXForgeEX の GitHub Issue を、このリポジトリの書き方(日本語、「現象/原因/対応案/完了条件」の構成、確かめたことと推測の区別)で作る。作業中や GUI 確認中に見つかった問題を Issue にするとき、ユーザーに「Issue にして」「Issue を立てて」と言われたとき、既存の Issue に確認結果を追記するときに使う。
+description: Create a DXForgeEX GitHub issue in this repository's style (Japanese, sections 現象/原因/対応案/完了条件, verified facts kept apart from guesses). Use when turning a problem found during work or a GUI check into an issue, when the user says 「Issue にして」「Issue を立てて」, or when adding verification results to an existing issue.
 ---
 
-# Issue を作る
+# Creating an issue
 
 <!-- last-reviewed: 2026-10-27 -->
 
-作業中に見つかった問題を、あとで別の人(または別のセッションの Claude)が読んでも、再現・修正・完了の判定ができる Issue にする。
+Turn a problem found during work into an issue that someone else (or Claude in another session) can reproduce, fix and judge as done. The issue itself is written in Japanese.
 
-## 1. 重複を調べる
+## 1. Look for duplicates
 
 ```bash
 gh issue list --state all --limit 60 --json number,title,state --jq '.[]|[.number,.state,.title]|@tsv'
-gh issue list --state all --search "<キーワード>" --json number,title,state
+gh issue list --state all --search "<keyword>" --json number,title,state
 ```
 
-- 同じ問題の Issue が開いているときは、新しく作らない。その Issue に、今回わかったことをコメントで足す(`gh issue comment <N> --body-file <file>`)。特に、その Issue に「GUIでは未確認」「推測」と書かれている点を確かめられたときは、必ず追記する。
-- 閉じた Issue と同じ現象なら、再発として新しく作り、元の Issue を本文で参照する。
+- If an open issue covers the same problem, do not create a new one. Add what you found as a comment (`gh issue comment <N> --body-file <file>`). Always add it when you verified a point that issue marks as 「GUIでは未確認」 or 「推測」.
+- If it matches a closed issue, create a new one as a recurrence and reference the old issue in the body.
 
-## 2. 原因をコードで確かめる
+## 2. Confirm the cause in the code
 
-- 現象だけで書かない。関係するコードを読み、原因の箇所を `ファイル:行` か関数名で示す。
-- **確かめたことと推測を区別する。** 実際に起きたこと(ログ、ダイアログ、終了コード)は事実として書く。コードを読んで考えた原因は、見出しに「(コードからの推測)」「(推定)」と付けるか、該当する文に「(未確認)」と添える。
-- 実際に再現したときは、日付(`YYYY/MM/DD`、絶対日付)、どの作業中か(例: 「PR #114 の GUI 確認」)、使ったデータを書く。エラーやログは、そのままコードブロックで貼る。
-- 説明が途中で変わったとき(例: 最初は「新しい worktree で起きる」と考えたが、実際は「既存の worktree に develop をマージしたとき」だった)は、確かめた後のほうを書く。
+- Don't describe only the symptom. Read the related code and point at the cause as `file:line` or a function name.
+- **Keep verified facts apart from guesses.** What actually happened (logs, dialogs, exit codes) is stated as fact. A cause inferred from reading code gets 「(コードからの推測)」/「(推定)」 in the heading, or 「(未確認)」 after the sentence.
+- When you reproduced it, write the date (`YYYY/MM/DD`, absolute), the work it happened during (e.g. 「PR #114 の GUI 確認」) and the data used. Paste errors and logs verbatim in code blocks.
+- If your explanation changed along the way (e.g. first "happens in a new worktree", actually "when develop is merged into an existing worktree"), write the verified version.
 
-## 3. 本文を書く
+## 3. Write the body
 
-本文は、Write ツールで作業用フォルダ(scratchpad)にファイルとして書く。heredoc や `--body "..."` で渡すと、Windows のパスのバックスラッシュが消える(CLAUDE.md の「Write edit scripts to a file」を参照)。
+Write the body as a file in the scratchpad with the Write tool. Passing it through a heredoc or `--body "..."` drops the backslashes in Windows paths (see "Write edit scripts to a file" in CLAUDE.md).
 
-構成は次の 4 つの見出しに揃える(既存の Issue #104・#107・#111・#116〜#118 と同じ)。
+Use these four headings (as in #104, #107, #111, #116-#118):
 
 ```markdown
 ## 現象
@@ -46,25 +46,25 @@ gh issue list --state all --search "<キーワード>" --json number,title,state
 直ったと判定できる、確かめられる条件。GUI でしか確かめられないものには「(GUIで確認)」と付ける。自動テストで確かめられるものは、そのテスト(`EngineUnitTests`、`Tests/*.ps1`、CI)を書く。
 ```
 
-- 見出しの補足は括弧で付ける(例: `## 原因(2 はコードからの推測)`)。
-- 関係する Issue・PR は `#番号` で参照する。どの作業中に見つかったかも書く(例: 「#10(PR #108)の作業中にワーカーが見つけた」)。
-- 文章は「だ・である」調。ユーザーへの報告とは別物なので、敬語にしない。
+- Add notes to a heading in parentheses (e.g. `## 原因(2 はコードからの推測)`).
+- Reference related issues/PRs as `#N`, and say which work the problem was found in (e.g. 「#10(PR #108)の作業中にワーカーが見つけた」).
+- Plain だ・である style, not the polite style used for reports to the user.
 
-## 4. タイトル
+## 4. Title
 
-- 日本語で、**何が起きるか**を 1 文で書く。原因の箇所が分かっていれば、関数名やファイル名から始めてよい(例: 「`Restore.ps1`が…を検出せず、…が NETSDK1004 で失敗する」)。
-- `[bug]` などの接頭辞は付けない。
-- ラベルは基本的に付けない(最近の Issue はラベルなし)。付けるなら、リポジトリに既にあるもの(`bug`、`enhancement`、`chore`、`test`、`documentation`)だけを使い、新しいラベルは作らない。`hold` は PR を止めるラベルなので、Issue には付けない。
+- Japanese, one sentence saying **what happens**. If the location of the cause is known, it may start with a function or file name (e.g. 「`Restore.ps1`が…を検出せず、…が NETSDK1004 で失敗する」).
+- No prefix such as `[bug]`.
+- Normally no labels (recent issues have none). If you add one, use only existing labels (`bug`, `enhancement`, `chore`, `test`, `documentation`); never create labels. `hold` blocks PRs and is not for issues.
 
-## 5. 作る
+## 5. Create it
 
 ```bash
-gh issue create --title "<タイトル>" --body-file "<scratchpad>/issue_<名前>.md"
+gh issue create --title "<title>" --body-file "<scratchpad>/issue_<name>.md"
 ```
 
-- 複数の問題は、1 つの Issue にまとめず、問題ごとに 1 件作る。
-- 作った Issue の番号は、関係するメモ(`memory/`)やドキュメントにも反映する。
+- One issue per problem; don't bundle several.
+- Reflect the new issue number in related memory files (`memory/`) and docs.
 
-## 6. ユーザーに報告する
+## 6. Report to the user
 
-日本語で、作った Issue と追記した Issue のリンクの一覧を短く示す。それぞれについて、推測のまま残っている点(まだ確かめていないこと)があれば、それも伝える。
+In Japanese, list links to the issues created and commented on. For each, mention any point still left as a guess (not yet verified).
