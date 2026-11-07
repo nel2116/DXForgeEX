@@ -211,7 +211,8 @@ namespace DXForgeCli
                       import-asset (source: 絶対パス, folder: Content からの相対フォルダ, settings: インポート設定)
               対象    guid:<GUID> | name:<名前> | index:<シーン名>/<番号> | $<別名>(create-entity の "as")
               アセット guid:<GUID> | path:<Content からの相対パス> | default:cube
-              回転    rotation_deg か rotation_rad(結果には両方)
+              回転    rotation_deg か rotation_rad(どちらも x = ピッチ、y = ヨー、z = ロール)。結果は rotation_deg と
+                      クォータニオンの rotation_quat(x, y, z, w。エンジンに渡す値)
               保存    変更があり、すべて成功したときだけ最後に 1 回保存する(途中で失敗したら何も保存しない)。結果の changed と saved を見る。
               取り込み 一時フォルダ(.dxforge-import-*)に書き、すべて成功したら Content へ移してから保存する。既存のファイルは上書きしない。
                       消せずに残ったものは結果の leftover_paths に出す。

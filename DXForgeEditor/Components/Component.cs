@@ -38,6 +38,10 @@ namespace DXForgeEditor.Components
         /// エンティティをエンジンから消したあとに呼ばれる(GameEntity.IsActive が false になるとき)。Load() でアップロードしたものを外す。
         /// </summary>
         public virtual void Unload() { }
+        /// <summary>
+        /// 持ち主の GameEntity を読み込み終えたときに呼ばれる(名前などがそろっている)。読み込みの警告を出すのに使う。例外は投げない。
+        /// </summary>
+        public virtual void OnOwnerDeserialized() { }
 
         public Component(GameEntity owner)
         {

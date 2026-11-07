@@ -30,11 +30,12 @@ namespace DXForgeEditor.EngineAPIStructs
         Graphics,
     }
 
+    // DXForgeEngineDLL の transform_component(EntityAPI.cpp)と同じ並び。回転はクォータニオン(x, y, z, w。#205)
     [StructLayout(LayoutKind.Sequential)]
     class TransformComponent
     {
         public Vector3 Position;
-        public Vector3 Rotation;
+        public Quaternion Rotation = Quaternion.Identity;
         public Vector3 Scale = new(1, 1, 1);
     }
 
@@ -526,7 +527,7 @@ namespace DXForgeEditor.DllWrappers
                     // Transform is required on every entity and cannot be removed.
                     var c = entity.GetComponent<Transform>()!;
                     desc.Transform.Position = c.Position;
-                    desc.Transform.Rotation = c.Rotation;
+                    desc.Transform.Rotation = c.RotationQuaternion;
                     desc.Transform.Scale = c.Scale;
                 }
                 // script component

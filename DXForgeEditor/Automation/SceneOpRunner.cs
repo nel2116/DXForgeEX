@@ -143,11 +143,12 @@ namespace DXForgeEditor.Automation
             var transform = entity.GetComponent<Transform>()
                 ?? throw new SceneOpException(SceneOpErrorKind.OperationFailed, "component_not_found", $"エンティティ {entity.Name} に Transform がありません。");
             var position = op.Position ?? transform.Position;
-            var rotation = op.RotationRad ?? transform.Rotation;
+            var rotation = op.RotationDeg ?? transform.RotationEulerHint;
             var scale = op.Scale ?? transform.Scale;
-            var changed = position != transform.Position || rotation != transform.Rotation || scale != transform.Scale;
+            var changed = position != transform.Position || rotation != transform.RotationEulerHint || scale != transform.Scale;
             transform.Position = position;
-            transform.Rotation = rotation;
+            // 度数法の手がかりとクォータニオンの両方を書く
+            if (op.RotationDeg != null) transform.RotationEulerHint = rotation;
             transform.Scale = scale;
             result["entity"] = ToJson(entity);
             return changed;
@@ -347,7 +348,10 @@ namespace DXForgeEditor.Automation
             ["entity_count"] = scene.GameEntities.Count,
         };
 
-        /// <summary>エンティティの結果の形(get-entity など)。回転は、単位を取り違えないよう、ラジアンと度の両方を出す。</summary>
+        /// <summary>
+        /// エンティティの結果の形(get-entity など)。回転は度数法のオイラー角(rotation_deg、Transform の手がかり)と、
+        /// エンジンに渡すクォータニオン(rotation_quat、x, y, z, w)。ラジアンは出さない(#205)。
+        /// </summary>
         private static JsonObject ToJson(GameEntity entity)
         {
             var components = new JsonArray();
@@ -358,8 +362,9 @@ namespace DXForgeEditor.Automation
                 {
                     case Transform transform:
                         json["position"] = ToJson(transform.Position);
-                        json["rotation_rad"] = ToJson(transform.Rotation);
-                        json["rotation_deg"] = new JsonArray(Degrees(transform.Rotation.X), Degrees(transform.Rotation.Y), Degrees(transform.Rotation.Z));
+                        json["rotation_deg"] = ToJson(transform.RotationEulerHint);
+                        json["rotation_quat"] = new JsonArray(Number(transform.RotationQuaternion.X), Number(transform.RotationQuaternion.Y),
+                            Number(transform.RotationQuaternion.Z), Number(transform.RotationQuaternion.W));
                         json["scale"] = ToJson(transform.Scale);
                         break;
                     case Script script:
@@ -388,7 +393,6 @@ namespace DXForgeEditor.Automation
         // float を double にすると 0.1 が 0.10000000149011612 になるので、float の最短の表記を保つ
         private static JsonNode Number(float value) => JsonValue.Create(double.Parse(value.ToString("R", CultureInfo.InvariantCulture), CultureInfo.InvariantCulture));
 
-        private static JsonNode Degrees(float radians) => JsonValue.Create(Math.Round(radians * 180.0 / Math.PI, 4));
     }
 
     /// <summary>プロジェクトをファイルに保存する(Issue #183)。</summary>
