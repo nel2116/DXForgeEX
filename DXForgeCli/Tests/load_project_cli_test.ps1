@@ -480,11 +480,10 @@ namespace DXForgeCliTest
 			$addedGuids = @($second.GameEntities | Select-Object -Skip $countBefore | ForEach-Object { $entity = $_; @($entity.Components | Where-Object { $_.GetType() -eq $geometryType })[0].GeometryGuid })
 			Check ($added.Count -eq 2 -and ($names -join ",") -eq "Rock,Tree" -and $addedGuids[0] -eq $rockGuid -and $addedGuids[1] -eq $treeGuid) "AddGeometryEntities: one entity per mesh asset, named after the asset, with the Geometry" "$($names -join ',') / $($addedGuids -join ',')"
 			Check (@($second.GameEntities | Where-Object { $_.IsActive }).Count -eq 0 -and $logged.Count -eq 0) "AddGeometryEntities in an inactive scene creates nothing in the engine, without logging" ($logged -join "; ")
+			# NOTE: ドロップした複数のエンティティは、undo の履歴が 1 件(Scene.AddGameEntities, Primal Day 084)
 			$undoRedo.Undo()
-			Check (($second.GameEntities.Count -eq $countBefore + 1) -and $second.GameEntities[$countBefore].Name -eq "Rock") "undo removes the last dropped entity" "$($second.GameEntities.Count)"
-			$undoRedo.Undo()
-			Check ($second.GameEntities.Count -eq $countBefore) "a second undo removes the first dropped entity" "$($second.GameEntities.Count)"
-			$undoRedo.Redo(); $undoRedo.Redo()
+			Check ($second.GameEntities.Count -eq $countBefore) "one undo removes all the dropped entities" "$($second.GameEntities.Count)"
+			$undoRedo.Redo()
 			$names = @($second.GameEntities | Select-Object -Skip $countBefore | ForEach-Object { $_.Name })
 			Check (($names -join ",") -eq "Rock,Tree") "redo adds both entities back in order" ($names -join ",")
 			$undoRedo.Reset()
