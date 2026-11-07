@@ -1,10 +1,14 @@
 # AGENTS.md
 
+<!-- last-reviewed: 2026-11-05 -->
+
 Shared instructions for coding agents (Claude Code reads this through `CLAUDE.md`; Codex reads it directly, including in `CodexReview.ps1` reviews). Keep it short: it is a map, and the details live in `docs/dev/`. Add a rule here only after a mistake has happened twice, and prefer a check in `Tests/check_conventions.py` or a hook over a sentence when the rule has no exceptions.
 
 ## Project
 
 DXForgeEX is a from-scratch 3D game engine + WPF level editor that follows the "Game Engine Series" (`Primal` engine: https://github.com/TheGameEngineers/Primal). It mirrors Primal's architecture: a C++ engine core (`DXForgeEngine`), a thin C-ABI DLL (`DXForgeEngineDLL`), a C#/WPF editor (`DXForgeEditor`) that drives the engine through it, and an offline asset pipeline (`ContentTools`, FBX/texture import). For "what comes next", follow Primal's commit history/video order. Only the Direct3D12 backend exists; the Vulkan/OpenGL folders are stubs.
+
+Primal decides *what* comes next, not *how* the code looks: where Primal's design is confusing or inconsistent with a DXForgeEX decision (e.g. its mixed rotation units), keeping the code clean and maintainable wins. Record the divergence in `docs/design/` and mention it in the PR.
 
 ## Where to read more
 
@@ -18,6 +22,8 @@ DXForgeEX is a from-scratch 3D game engine + WPF level editor that follows the "
 | editor behavior that needs a manual GUI check | `docs/ManualVerification.md` |
 | operating the editor for a GUI check, `start-gui-check.ps1` | `.claude/skills/gui-check/SKILL.md` |
 | `build.ps1` parameters, human-facing overview | `README.md` |
+| any Markdown doc: language, where a fact lives, last-reviewed date | `.claude/skills/writing-docs/SKILL.md` |
+| units, file formats, other recorded design decisions | `docs/design/` (e.g. `rotation-units.md` for all angles) |
 
 ## Commands
 
@@ -40,6 +46,7 @@ These are checked by `Tests/check_conventions.py` (CI, and a Claude Code hook af
 
 - C/C++, C#, XAML and `.ps1` files are UTF-8 **with BOM**. Engine HLSL with non-ASCII text needs the BOM too; HLSL under `ContentTools/` and `DXForgeEditor/` (compiled by fxc) must have **no** BOM. Fix with `python Tests/check_conventions.py --fix <file>`.
 - No Japanese (non-ASCII) text in narrow string or char literals in C/C++ — CI's code page 1252 turns it into `C4566` → `/WX` failure. Use `L"..."` and the wide API (`OutputDebugStringW`). Comments are fine.
+- Every tracked `.md` file has exactly one last-reviewed line (format and meaning: `writing-docs` skill). It means the whole doc was checked against the code, so don't bump it for a partial edit; a new doc gets today's date.
 - Native and editor builds are at zero warnings, and CI treats warnings as errors. Do not silence a warning without checking whether it points at a real defect (it has before: issue #4).
 
 ## Code conventions

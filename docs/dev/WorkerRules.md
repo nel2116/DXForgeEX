@@ -1,3 +1,5 @@
+<!-- last-reviewed: 2026-11-05 -->
+
 ## worker 共通のルール
 
 - リポジトリは DXForgeEX(GitHub の nel2116/DXForgeEX)。リポジトリ直下の `AGENTS.md`(Claude Code は `CLAUDE.md` 経由で読み込まれる)を最初に読み、それに従う。PR 本文と報告は日本語で書く。

@@ -1,5 +1,7 @@
 # Architecture
 
+<!-- last-reviewed: 2026-11-07 -->
+
 Reference for agents and contributors. The short version is in the root `AGENTS.md`; this file is the detail it points to.
 
 ## Renderer status

@@ -5,6 +5,8 @@ description: DXForgeEX の GitHub Issue を、このリポジトリの書き方(
 
 # Issue を作る
 
+<!-- last-reviewed: 2026-10-27 -->
+
 作業中に見つかった問題を、あとで別の人(または別のセッションの Claude)が読んでも、再現・修正・完了の判定ができる Issue にする。
 
 ## 1. 重複を調べる

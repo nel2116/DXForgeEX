@@ -147,6 +147,8 @@ $values = @{
 	STEPS    = $steps
 }
 $template = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot "worker-spec.md"), [System.Text.Encoding]::UTF8)
+# 文書の見直した日(#237)はワーカーへの仕様に要らないので除く
+$template = [regex]::Replace($template, '(?m)^<!-- last-reviewed: [^\r\n]*\r?\n(\r?\n)?', '')
 # 1 回の置き換えにする。手順の中に {{...}} があっても展開しない
 $spec = [regex]::Replace($template, '\{\{(\w+)\}\}', { param($m) $values[$m.Groups[1].Value] })
 

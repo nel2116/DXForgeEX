@@ -5,6 +5,8 @@ description: DXForgeEX の PR を、CI の確認 → Codex レビュー → 指�
 
 # PR をマージまで進める
 
+<!-- last-reviewed: 2026-11-05 -->
+
 `CodexReview.ps1` と `CleanupMerged.ps1` は個々の手順を自動化しているが、それをどの順で、いつ、どこまで回すかはここに書く。仕組みの詳細と検証済みの落とし穴は `docs/dev/ReviewAndMerge.md`。
 
 自動マージの予約までと後片付けは、ユーザーに毎回頼まれなくても行う(ユーザーの方針)。今の develop は人の承認(`merge-ok`、#160)を必須にしていないので、CI と `codex-review` がそろえばそのままマージされる(個人開発で速度を優先するユーザーの方針、2026/11/03)。承認を必須に戻したときも、エージェントは `merge-ok` を付けない(`gh` で付けるコマンドは PreToolUse フック `Tests/guard_merge_approval.py` が止める)。ゲートは決して迂回しない。admin でのマージ、保護のないブランチでの `gh pr merge --auto`、`hold` ラベルの除去、`merge-ok` の付与はしない。

@@ -1,5 +1,7 @@
 # Build and test details
 
+<!-- last-reviewed: 2026-11-07 -->
+
 Reference for agents and contributors. The commands to run are in the root `AGENTS.md`; this file explains why they are the way they are. The `build.ps1` parameter list is in `README.md`.
 
 ## Building
