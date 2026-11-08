@@ -6,6 +6,7 @@
 // FBXファイルを読み込むクラス
 // 更新履歴
 // 2025/01/11 新規作成
+// 2026/11/08 初期化/読み込みに失敗してもデストラクタとコンストラクタが落ちないよう修正 (#189)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -33,16 +34,17 @@ namespace dxforge::tools
 			assert(file && _scene && _scene_data && _progression);
 			if (initialize_fbx())
 			{
+				// 読み込みに失敗したらシーンを破棄して無効にする。呼び出し側はis_valid()で確認する。
 				load_fbx_file(file);
-				assert(is_valid());
 			}
 		}
 
 		/// @brief デストラクタ
 		~fbx_context()
 		{
-			_fbx_scene->Destroy();
-			_fbx_manager->Destroy();
+			// 初期化やロードに失敗した場合はどちらもnullptrのことがある。
+			if (_fbx_scene) _fbx_scene->Destroy();
+			if (_fbx_manager) _fbx_manager->Destroy();
 			ZeroMemory(this, sizeof(fbx_context));
 		}
 
@@ -60,7 +62,7 @@ namespace dxforge::tools
 
 	private:	// プライベート関数
 		bool initialize_fbx();
-		void load_fbx_file(const char* file);
+		bool load_fbx_file(const char* file);
 		void get_meshes(FbxNode* node, utl::vector<mesh>& meshes, u32 lod_id, f32 lod_threshold);
 		void get_mesh(FbxNodeAttribute* attribute, utl::vector<mesh>& meshes, u32 lod_id, f32 lod_threshold);
 		void get_lod_group(FbxNodeAttribute* attribute);
