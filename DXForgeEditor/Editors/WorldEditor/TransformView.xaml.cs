@@ -64,9 +64,12 @@ namespace DXForgeEditor.Editors
             _undoAction = redoAction;
         }
 
-        private void OnPosition_VectorBox_BeginEdit(object sender, RoutedEventArgs e) => _undoAction = GetPositionAction();
-        private void OnRotation_VectorBox_BeginEdit(object sender, RoutedEventArgs e) => _undoAction = GetRotationAction();
-        private void OnScale_VectorBox_BeginEdit(object sender, RoutedEventArgs e) => _undoAction = GetScaleAction();
+        private void OnPosition_VectorBox_PreviewMouse_LBD(object sender, MouseButtonEventArgs e) => _undoAction = GetPositionAction();
+        private void OnPosition_VectorBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => _undoAction = GetPositionAction();
+        private void OnRotation_VectorBox_PreviewMouse_LBD(object sender, MouseButtonEventArgs e) => _undoAction = GetRotationAction();
+        private void OnRotation_VectorBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => _undoAction = GetRotationAction();
+        private void OnScale_VectorBox_PreviewMouse_LBD(object sender, MouseButtonEventArgs e) => _undoAction = GetScaleAction();
+        private void OnScale_VectorBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => _undoAction = GetScaleAction();
 
         private void OnPosition_VectorBox_ValueChanged(object sender, RoutedPropertyChangedEventArgs<Vector4> e) => RecordAction(GetPositionAction, "Position Changed");
         private void OnRotation_VectorBox_ValueChanged(object sender, RoutedPropertyChangedEventArgs<Vector4> e) => RecordAction(GetRotationAction, "Rotation Changed");
