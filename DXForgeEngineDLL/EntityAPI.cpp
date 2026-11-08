@@ -10,6 +10,7 @@
 // 2026/11/06 回転を度数法で受け取り、ミューテックス、UpdateComponent、GetComponentId を追加 (Primal Day 082, #201)
 // 2026/11/07 ミューテックスを ticket_mutex にし、UpdateComponent の戻り値を b32 にした (Primal Day 083, #209)
 // 2026/11/08 消すジオメトリの ID をビューポートから取り除くようにした (#214)
+// 2026/11/08 エンティティの回転をクォータニオンで受け取り、オイラー角の変換をやめた (#205)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Common.h"
@@ -23,9 +24,9 @@
 
 using namespace dxforge;
 
-/// @brief オイラー角をクォータニオンにする
+/// @brief オイラー角をクォータニオンにする(エディタのカメラが使う。エンティティの回転はエディタがクォータニオンにして渡す)
 /// @param angles ピッチ、ヨー、ロール
-/// @param is_degrees angles が度数法なら true(エディタの Transform の回転は度数法)
+/// @param is_degrees angles が度数法なら true
 math::v4 to_quat(math::v3 angles, bool is_degrees)
 {
 	using namespace DirectX;
@@ -39,22 +40,22 @@ math::v4 to_quat(math::v3 angles, bool is_degrees)
 
 namespace
 {
+	// NOTE: 並びはエディタの EngineAPIStructs.TransformComponent(DllWrappers/EngineAPI.cs)と合わせる
+	//       Primal はここで度数法のオイラー角をクォータニオンにするが、DXForgeEX はエディタがクォータニオンを持つ
+	//       (docs/design/rotation-units.md、#205)
 	struct transform_component
 	{
 		f32 position[3];
-		f32 rotation[3];
+		f32 rotation[4];	// クォータニオン(x, y, z, w)
 		f32 scale[3];
 
 		transform::init_info to_init_info() const
 		{
 			transform::init_info info{};
 			memcpy(&info.position[0], &position[0], sizeof(position));
+			static_assert(sizeof(info.rotation) == sizeof(rotation));
+			memcpy(&info.rotation[0], &rotation[0], sizeof(rotation));
 			memcpy(&info.scale[0], &scale[0], sizeof(scale));
-
-			// エディター側で定義されているrotationのf32[3](度数法のオイラー角)をエンジン側で使えるようにf32[4](クォータニオン)に変換
-			const math::v3 rot{ &rotation[0] };
-			const math::v4 rot_quat{ to_quat(rot, true) };
-			memcpy(&info.rotation[0], &rot_quat.x, sizeof(info.rotation));
 			return info;
 		};
 

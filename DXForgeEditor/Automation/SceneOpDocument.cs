@@ -38,7 +38,8 @@ namespace DXForgeEditor.Automation
         public string? Alias { get; init; }
         public bool? Enabled { get; init; }
         public Vector3? Position { get; init; }
-        public Vector3? RotationRad { get; init; }
+        /// <summary>回転の度数法のオイラー角(rotation_rad は度数法にしてここに入れる)。</summary>
+        public Vector3? RotationDeg { get; init; }
         public Vector3? Scale { get; init; }
         public string? ComponentType { get; init; }
         public string? Asset { get; init; }
@@ -175,7 +176,7 @@ namespace DXForgeEditor.Automation
                 Alias = reader.NonEmptyString("as"),
                 Enabled = reader.Bool("enabled"),
                 Position = reader.Vector("position"),
-                RotationRad = reader.Rotation(),
+                RotationDeg = reader.Rotation(),
                 Scale = reader.Vector("scale"),
                 ComponentType = reader.ComponentType("type"),
                 Asset = reader.Asset("asset"),
@@ -194,7 +195,7 @@ namespace DXForgeEditor.Automation
                     }
                     break;
                 case "set-transform":
-                    if (op.Position == null && op.RotationRad == null && op.Scale == null)
+                    if (op.Position == null && op.RotationDeg == null && op.Scale == null)
                     {
                         throw Invalid($"ops[{index}]: set-transform には position, rotation_deg, rotation_rad, scale のどれかが必要です。", index);
                     }
@@ -283,8 +284,9 @@ namespace DXForgeEditor.Automation
 
             public Vector3? Rotation()
             {
-                var degrees = Vector("rotation_deg", x => x * Math.PI / 180.0);
-                var radians = Vector("rotation_rad");
+                // Transform は度数法の手がかりとクォータニオンを持つ(docs/design/rotation-units.md)。rotation_rad は度数法にする
+                var degrees = Vector("rotation_deg");
+                var radians = Vector("rotation_rad", x => x * 180.0 / Math.PI);
                 if (degrees != null && radians != null) throw Error("rotation_deg", "rotation_deg と rotation_rad は、どちらか一方だけです。");
                 return degrees ?? radians;
             }

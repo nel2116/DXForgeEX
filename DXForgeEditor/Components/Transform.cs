@@ -1,6 +1,7 @@
 ﻿using DXForgeEditor.Utilities;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http.Headers;
@@ -29,19 +30,44 @@ namespace DXForgeEditor.Components
             }
         }
 
-        private Vector3 _rotation;
-        [DataMember]
-        public Vector3 Rotation
+        // NOTE: 回転の正はクォータニオン。度数法のオイラー角はインスペクターに出すための手がかり(docs/design/rotation-units.md)。
+        //       Primal は度数法のオイラー角の Rotation を持つが、単位と順序を取り違えないよう DXForgeEX はクォータニオンを持つ(#205)。
+        [DataMember(Name = nameof(RotationQuaternion))]
+        private Quaternion _rotationQuaternion = Quaternion.Identity;
+        /// <summary>回転(正規化したクォータニオン)。エンジンにはこれを渡す。</summary>
+        public Quaternion RotationQuaternion => _rotationQuaternion;
+
+        [DataMember(Name = nameof(RotationEulerHint))]
+        private Vector3 _rotationEulerHint;
+        /// <summary>
+        /// 回転の度数法のオイラー角(x = ピッチ、y = ヨー、z = ロール。EulerRotation を参照)。入力された値をそのまま残し、表示に使う。
+        /// 設定すると RotationQuaternion も変わる。
+        /// </summary>
+        public Vector3 RotationEulerHint
         {
-            get => _rotation;
+            get => _rotationEulerHint;
             set
             {
-                if (_rotation != value)
-                {
-                    _rotation = value;
-                    OnPropertyChanged(nameof(Rotation));
-                }
+                // 数として読めない入力(NaN など)では回転を変えない
+                if (IsFinite(value)) SetRotation(EulerRotation.FromDegrees(value), value);
             }
+        }
+
+        // 古い .dxproj の Rotation(単位の決まっていないオイラー角)。読み込んだら捨てる(移行しない。rotation-units.md の決定 5)
+        [DataMember(Name = "Rotation", EmitDefaultValue = false)]
+        private Vector3? _legacyRotation;
+
+        /// <summary>回転を、クォータニオンとその手がかりの組で設定する(元に戻す・やり直しが両方を戻すのに使う)。</summary>
+        public void SetRotation(Quaternion rotation, Vector3 eulerHintDegrees)
+        {
+            Debug.Assert(EulerRotation.IsValid(rotation));
+            rotation = Quaternion.Normalize(rotation);
+            var quaternionChanged = _rotationQuaternion != rotation;
+            var hintChanged = _rotationEulerHint != eulerHintDegrees;
+            _rotationQuaternion = rotation;
+            _rotationEulerHint = eulerHintDegrees;
+            if (quaternionChanged) OnPropertyChanged(nameof(RotationQuaternion));
+            if (hintChanged) OnPropertyChanged(nameof(RotationEulerHint));
         }
 
         // 新しく作るTransformのスケールは1 (0だと何も描画されない)
@@ -65,7 +91,8 @@ namespace DXForgeEditor.Components
         {
             // 位置、回転、スケールをバイナリに書き込む
             bw.Write(_position.X); bw.Write(_position.Y); bw.Write(_position.Z);
-            bw.Write(_rotation.X); bw.Write(_rotation.Y); bw.Write(_rotation.Z);
+            // NOTE: game.bin の回転は、まだラジアンのオイラー角(ContentLoader が変換する)。クォータニオンにするのは #205 の PR 2
+            bw.Write(EulerRotation.ToRadians(_rotationEulerHint.X)); bw.Write(EulerRotation.ToRadians(_rotationEulerHint.Y)); bw.Write(EulerRotation.ToRadians(_rotationEulerHint.Z));
             bw.Write(_scale.X); bw.Write(_scale.Y); bw.Write(_scale.Z);
         }
 
@@ -75,7 +102,50 @@ namespace DXForgeEditor.Components
         private void OnDeserializing(StreamingContext context)
         {
             _scale = Vector3.One;
+            _rotationQuaternion = Quaternion.Identity;
+            _rotationEulerHint = Vector3.Zero;
+            _legacyRotation = null;
         }
+
+        // 読み込みで回転を捨てたときの警告。エンティティの名前はこのあとで読まれるので、OnOwnerDeserialized() で出す
+        private string? _loadWarning;
+
+        [OnDeserialized]
+        private void OnDeserialized(StreamingContext context)
+        {
+            _loadWarning = null;
+            if (_legacyRotation != null)
+            {
+                _loadWarning = "古い形式の回転(Rotation)なので、読み込まずに回転なしにしました。";
+                _legacyRotation = null;
+                _rotationQuaternion = Quaternion.Identity;
+                _rotationEulerHint = Vector3.Zero;
+                return;
+            }
+            if (!EulerRotation.IsValid(_rotationQuaternion))
+            {
+                _loadWarning = "回転のクォータニオンが不正なので、回転なしにしました。";
+                _rotationQuaternion = Quaternion.Identity;
+                _rotationEulerHint = Vector3.Zero;
+                return;
+            }
+            // クォータニオンが正。手がかりが同じ回転にならなければ(手で書き換えたなど)、クォータニオンから作り直す
+            _rotationQuaternion = Quaternion.Normalize(_rotationQuaternion);
+            if (!IsFinite(_rotationEulerHint) || !EulerRotation.IsSameRotation(EulerRotation.FromDegrees(_rotationEulerHint), _rotationQuaternion))
+            {
+                _rotationEulerHint = EulerRotation.ToDegrees(_rotationQuaternion);
+            }
+        }
+
+        // NOTE: Project.Load は OpenProjectView や async void のコマンドから呼ばれるので、例外を投げずに警告だけを出す
+        public override void OnOwnerDeserialized()
+        {
+            if (_loadWarning == null) return;
+            Logger.Log(MessageType.Warning, $"エンティティ {Owner.Name} の Transform は{_loadWarning}");
+            _loadWarning = null;
+        }
+
+        private static bool IsFinite(Vector3 v) => float.IsFinite(v.X) && float.IsFinite(v.Y) && float.IsFinite(v.Z);
 
         public Transform(GameEntity owner) : base(owner)
         {
@@ -223,7 +293,8 @@ namespace DXForgeEditor.Components
                 case nameof(RotX):
                 case nameof(RotY):
                 case nameof(RotZ):
-                    SelectedComponents.ForEach(c => c.Rotation = new Vector3(_rotX ?? c.Rotation.X, _rotY ?? c.Rotation.Y, _rotZ ?? c.Rotation.Z));
+                    // 度数法のオイラー角(手がかり)を変える。クォータニオンも変わる
+                    SelectedComponents.ForEach(c => c.RotationEulerHint = new Vector3(_rotX ?? c.RotationEulerHint.X, _rotY ?? c.RotationEulerHint.Y, _rotZ ?? c.RotationEulerHint.Z));
                     return true;
 
                 case nameof(ScaleX):
@@ -240,9 +311,9 @@ namespace DXForgeEditor.Components
             PosY = MSEntity.GetMixedValue(SelectedComponents, new Func<Transform, float>(x => x.Position.Y));
             PosZ = MSEntity.GetMixedValue(SelectedComponents, new Func<Transform, float>(x => x.Position.Z));
 
-            RotX = MSEntity.GetMixedValue(SelectedComponents, new Func<Transform, float>(x => x.Rotation.X));
-            RotY = MSEntity.GetMixedValue(SelectedComponents, new Func<Transform, float>(x => x.Rotation.Y));
-            RotZ = MSEntity.GetMixedValue(SelectedComponents, new Func<Transform, float>(x => x.Rotation.Z));
+            RotX = MSEntity.GetMixedValue(SelectedComponents, new Func<Transform, float>(x => x.RotationEulerHint.X));
+            RotY = MSEntity.GetMixedValue(SelectedComponents, new Func<Transform, float>(x => x.RotationEulerHint.Y));
+            RotZ = MSEntity.GetMixedValue(SelectedComponents, new Func<Transform, float>(x => x.RotationEulerHint.Z));
 
             ScaleX = MSEntity.GetMixedValue(SelectedComponents, new Func<Transform, float>(x => x.Scale.X));
             ScaleY = MSEntity.GetMixedValue(SelectedComponents, new Func<Transform, float>(x => x.Scale.Y));

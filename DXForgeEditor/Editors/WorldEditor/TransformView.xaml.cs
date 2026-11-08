@@ -36,8 +36,8 @@ namespace DXForgeEditor.Editors
             ((MSTransform)DataContext).PropertyChanged += (s, e) => _propertyChanged = true;
         }
 
-        private Action? GetAction(Func<Transform, (Transform transform, Vector3)> selector,
-            Action<(Transform transform, Vector3)> forEachAction)
+        private Action? GetAction<T>(Func<Transform, (Transform transform, T)> selector,
+            Action<(Transform transform, T)> forEachAction)
         {
             if (!(DataContext is MSTransform vm))
             {
@@ -57,7 +57,9 @@ namespace DXForgeEditor.Editors
 
         private Action? GetPositionAction() => GetAction((x) => (x, x.Position), (x) => x.transform.Position = x.Item2);
 
-        private Action? GetRotationAction() => GetAction((x) => (x, x.Rotation), (x) => x.transform.Rotation = x.Item2);
+        // クォータニオン(正)と度数法の手がかりの両方を戻す
+        private Action? GetRotationAction() => GetAction((x) => (x, (x.RotationQuaternion, x.RotationEulerHint)),
+            (x) => x.transform.SetRotation(x.Item2.RotationQuaternion, x.Item2.RotationEulerHint));
 
         private Action? GetScaleAction() => GetAction((x) => (x, x.Scale), (x) => x.transform.Scale = x.Item2);
 

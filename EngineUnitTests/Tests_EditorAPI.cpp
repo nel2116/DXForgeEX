@@ -6,6 +6,7 @@
 // 　エディタが呼ぶ DLL の関数(EntityAPI.cpp、EngineAPI.cpp)のうち、GPU のいらない経路のテスト (Primal Day 082, #201)
 // 更新履歴
 // 2026/11/06 新規作成
+// 2026/11/08 エンティティの回転をクォータニオンで渡すテストにした (#205)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
@@ -16,6 +17,7 @@
 #include "../DXForgeEngineDLL/EngineInit.h"
 
 #include <cmath>
+#include <cstring>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -30,7 +32,7 @@ namespace
 	struct test_descriptor
 	{
 		f32 position[3]{};
-		f32 rotation[3]{};
+		f32 rotation[4]{ 0.f, 0.f, 0.f, 1.f };	// クォータニオン(#205)
 		f32 scale[3]{ 1.f, 1.f, 1.f };
 		script::detail::script_creator script_creator{ nullptr };
 		id::id_type geometry_content_id{ id::invalid_id };
@@ -79,22 +81,55 @@ DXFORGE_TEST_CASE(math_to_radians_and_to_degrees_convert_each_axis)
 }
 
 // エディタの Transform の回転は度数法(修正前はラジアンとして解釈していた)
-DXFORGE_TEST_CASE(editor_api_create_game_entity_reads_rotation_in_degrees)
+// エディタは回転をクォータニオンで渡し、DLL は変換せずにそのまま使う(#205)
+DXFORGE_TEST_CASE(editor_api_create_game_entity_takes_rotation_as_quaternion)
 {
-	test_descriptor desc{};
-	desc.rotation[1] = 90.f;
-	const id::id_type id{ CreateGameEntity(&desc) };
-	REQUIRE(id::is_valid(id));
-
-	const game_entity::entity entity{ game_entity::entity_id{ id } };
-	const math::v4 rotation{ entity.rotation() };
+	// Y 軸まわりに 90 度と、どの成分も 0 でない回転
 	constexpr f32 half_sqrt2{ 0.70710678f };
-	CHECK(nearly_equal(rotation.x, 0.f));
-	CHECK(nearly_equal(rotation.y, half_sqrt2));
-	CHECK(nearly_equal(rotation.z, 0.f));
-	CHECK(nearly_equal(rotation.w, half_sqrt2));
+	const f32 cases[][4]{ { 0.f, half_sqrt2, 0.f, half_sqrt2 }, { 0.1f, -0.3f, 0.5f, 0.80622577f } };
+	for (const auto& q : cases)
+	{
+		test_descriptor desc{};
+		memcpy(&desc.rotation[0], &q[0], sizeof(desc.rotation));
+		const id::id_type id{ CreateGameEntity(&desc) };
+		REQUIRE(id::is_valid(id));
 
-	RemoveGameEntity(id);
+		const game_entity::entity entity{ game_entity::entity_id{ id } };
+		const math::v4 rotation{ entity.rotation() };
+		CHECK(nearly_equal(rotation.x, q[0]));
+		CHECK(nearly_equal(rotation.y, q[1]));
+		CHECK(nearly_equal(rotation.z, q[2]));
+		CHECK(nearly_equal(rotation.w, q[3]));
+		RemoveGameEntity(id);
+	}
+}
+
+// エディタ(DXForgeEditor/Utilities/EulerRotation.cs)と同じオイラー角の順序: x = ピッチ、y = ヨー、z = ロールで Z -> X -> Y。
+// 期待値は C# の Quaternion.CreateFromYawPitchRoll で求めたもの。DXForgeCli/Tests/ops_cli_test.ps1 も同じ表で C# の側を確かめる
+DXFORGE_TEST_CASE(euler_order_matches_the_editor)
+{
+	using namespace DirectX;
+	struct euler_case { f32 degrees[3]; f32 quaternion[4]; };
+	const euler_case cases[]
+	{
+		{ { 0.f, 90.f, 0.f }, { 0.f, 0.70710678f, 0.f, 0.70710678f } },
+		{ { 90.f, 0.f, 0.f }, { 0.70710678f, 0.f, 0.f, 0.70710678f } },
+		{ { 0.f, 0.f, 90.f }, { 0.f, 0.f, 0.70710678f, 0.70710678f } },
+		{ { 30.f, 45.f, 60.f }, { 0.39190382f, 0.20056215f, 0.36042339f, 0.82236314f } },
+		{ { -120.f, 200.f, 15.f }, { 0.21336880f, 0.46856225f, 0.83423936f, -0.19740298f } },
+	};
+	for (const auto& c : cases)
+	{
+		const math::v3 radians{ math::to_radians({ c.degrees[0], c.degrees[1], c.degrees[2] }) };
+		math::v4 q{};
+		XMStoreFloat4(&q, XMQuaternionRotationRollPitchYawFromVector(XMLoadFloat3(&radians)));
+		// q と -q は同じ回転
+		const f32 sign{ (q.x * c.quaternion[0] + q.y * c.quaternion[1] + q.z * c.quaternion[2] + q.w * c.quaternion[3]) < 0.f ? -1.f : 1.f };
+		CHECK(nearly_equal(sign * q.x, c.quaternion[0]));
+		CHECK(nearly_equal(sign * q.y, c.quaternion[1]));
+		CHECK(nearly_equal(sign * q.z, c.quaternion[2]));
+		CHECK(nearly_equal(sign * q.w, c.quaternion[3]));
+	}
 }
 
 DXFORGE_TEST_CASE(editor_api_update_component_replaces_and_removes_a_script)

@@ -184,6 +184,7 @@ namespace DXForgeEditor.Components
             {
                 Components = new ReadOnlyObservableCollection<Component>(_components);
                 OnPropertyChanged(nameof(Components));
+                foreach (var component in _components) component.OnOwnerDeserialized();
             }
         }
 
