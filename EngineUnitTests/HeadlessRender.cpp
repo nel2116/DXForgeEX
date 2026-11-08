@@ -28,6 +28,7 @@
 // 2026/11/08 エディタのカメラの API(UpdateEditorCamera / SetCameraRange / SetCameraFoV)の確認を追加 (Primal Day 085, #225)
 // 2026/11/08 ウィンドウを持つスレッドがミューテックスを待つ間に別のスレッドが Present する確認と --show-viewports を追加 (#213)
 // 2026/11/08 エディタのエンティティの記述子の回転をクォータニオンにした (#205)
+// 2026/11/08 SetCameraFoV の確認を、視野角がラジアン(既定は 0.25 * pi)であることに合わせた (#205)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -1057,7 +1058,7 @@ namespace dxforge::headless::render
 			const auto settings_are = [&](const graphics::camera& camera, math::v3 position, math::v3 rotation, f32 near_z, f32 far_z, f32 fov_degrees)
 			{
 				return position_is(camera, position) && rotation_is(camera, rotation) &&
-					near_equal(camera.near_z(), near_z) && near_equal(camera.far_z(), far_z) && near_equal(camera.field_of_view(), fov_degrees / 180.f);
+					near_equal(camera.near_z(), near_z) && near_equal(camera.far_z(), far_z) && near_equal(camera.field_of_view(), fov_degrees * math::to_rad);
 			};
 			const auto resize = [](u32 id, int width, int height)
 			{
@@ -1071,6 +1072,18 @@ namespace dxforge::headless::render
 			if (!camera.is_valid()) return "a viewport created with a size should have a camera";
 			RenderFrame(viewport, id::invalid_id, 0);
 			const math::m4x4 before{ camera.view_projection() };
+			const math::m4x4 default_projection{ camera.projection() };
+			// エディタの既定の 45 度は、エンジンの既定(0.25 * pi ラジアン)と同じ射影になる(#205)
+			if (!near_equal(camera.field_of_view(), 0.25f * math::pi)) return "the default field of view should be 0.25 * pi radians";
+			SetCameraFoV(viewport, 45.f);
+			RenderFrame(viewport, id::invalid_id, 0);
+			{
+				const math::m4x4 projection{ camera.projection() };
+				const f32* const a{ &projection.m[0][0] };
+				const f32* const b{ &default_projection.m[0][0] };
+				for (u32 i{ 0 }; i < 16; ++i)
+					if (!near_equal(a[i], b[i])) return "SetCameraFoV(45 degrees) should give the default projection";
+			}
 
 			const math::v3 position{ 1.f, 2.f, 3.f };
 			const math::v3 rotation{ 0.1f, -2.f, 0.f };
@@ -1079,7 +1092,7 @@ namespace dxforge::headless::render
 			SetCameraRange(viewport, 0.5f, 50.f);
 			if (!near_equal(camera.near_z(), 0.5f) || !near_equal(camera.far_z(), 50.f)) return "SetCameraRange() should set the range of the viewport camera";
 			SetCameraFoV(viewport, 90.f);
-			if (!near_equal(camera.field_of_view(), 0.5f)) return "SetCameraFoV() should set the field of view in degrees / 180";
+			if (!near_equal(camera.field_of_view(), math::half_pi)) return "SetCameraFoV() should convert the field of view from degrees to radians";
 
 			const u64 drawn{ GetDrawnFrameCount(viewport) };
 			RenderFrame(viewport, id::invalid_id, 0);

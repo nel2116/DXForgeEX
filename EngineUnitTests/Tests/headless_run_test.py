@@ -51,8 +51,9 @@ def entity(*components):
     return u32(0) + u32(len(components)) + b"".join(components)
 
 
-def transform(position=(0.0, 0.0, 0.0), rotation=(0.0, 0.0, 0.0), scale=(1.0, 1.0, 1.0)):
-    return u32(0) + struct.pack("<9f", *position, *rotation, *scale)
+def transform(position=(0.0, 0.0, 0.0), rotation=(0.0, 0.0, 0.0, 1.0), scale=(1.0, 1.0, 1.0)):
+    """回転はクォータニオン(x, y, z, w)。オイラー角ではない(#205、docs/design/rotation-units.md)"""
+    return u32(0) + struct.pack("<10f", *position, *rotation, *scale)
 
 
 def script(name):
@@ -131,7 +132,7 @@ def test_runs_scripts_for_n_frames(r):
     name = "runs scripts for N frames"
     path = r.write(game_bin(
         entity(transform(position=(0.5, 0.0, -1.0)), script(MOVER_SCRIPT)),
-        entity(transform(position=(7.0, 8.0, 9.0), scale=(2.0, 3.0, 4.0))),
+        entity(transform(position=(7.0, 8.0, 9.0), rotation=(0.0, 0.6, 0.0, 0.8), scale=(2.0, 3.0, 4.0))),
     ))
     code, result, stderr = r.run_json(["--game-bin", path, "--frames", "10", "--dt", "0.25"])
     r.check_no_crash(name, code, stderr)
@@ -150,7 +151,7 @@ def test_runs_scripts_for_n_frames(r):
         r.check(f"{name}: script updated N times", mover["position"] == [10.5, 2.5, -1.0], mover)
         r.check(f"{name}: entity without script is unchanged",
                 static["position"] == [7.0, 8.0, 9.0] and static["scale"] == [2.0, 3.0, 4.0]
-                and static["rotation"] == [0.0, 0.0, 0.0, 1.0], static)
+                and all(abs(a - b) < 1e-6 for a, b in zip(static["rotation"], [0.0, 0.6, 0.0, 0.8])), static)
     r.check(f"{name}: logs go to stderr", "[headless] loaded 2 entities" in stderr, stderr)
     print(f"[PASS] {name}" if not any(f.startswith(name) for f in r.failures) else f"[----] {name}")
 

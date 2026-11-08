@@ -91,8 +91,8 @@ namespace DXForgeEditor.Components
         {
             // 位置、回転、スケールをバイナリに書き込む
             bw.Write(_position.X); bw.Write(_position.Y); bw.Write(_position.Z);
-            // NOTE: game.bin の回転は、まだラジアンのオイラー角(ContentLoader が変換する)。クォータニオンにするのは #205 の PR 2
-            bw.Write(EulerRotation.ToRadians(_rotationEulerHint.X)); bw.Write(EulerRotation.ToRadians(_rotationEulerHint.Y)); bw.Write(EulerRotation.ToRadians(_rotationEulerHint.Z));
+            // game.bin の回転はクォータニオン(x, y, z, w)。手がかりは表示用なので書かない(docs/design/rotation-units.md の決定 4)
+            bw.Write(_rotationQuaternion.X); bw.Write(_rotationQuaternion.Y); bw.Write(_rotationQuaternion.Z); bw.Write(_rotationQuaternion.W);
             bw.Write(_scale.X); bw.Write(_scale.Y); bw.Write(_scale.Z);
         }
 

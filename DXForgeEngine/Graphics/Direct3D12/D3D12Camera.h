@@ -8,6 +8,7 @@
 // 2025/01/12 新規作成
 // 2025/01/14 コメントの追加
 // 2026/10/18 上方向のsetterを削除し、上方向はエンティティのup()だけで決まるよう変更 (#62)
+// 2026/11/08 視野角(field_of_view)を pi の倍数から垂直方向のラジアンにした (#205)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -26,8 +27,8 @@ namespace dxforge::graphics::d3d12::camera
 		/// @brief カメラを更新する
 		void update();
 		/// @brief 視野角を設定する (パースペクティブカメラ用)
-		/// @param fov 新しい視野角
-		constexpr void field_of_view(f32 fov);
+		/// @param fov_radians 新しい垂直方向の視野角 (ラジアン)
+		constexpr void field_of_view(f32 fov_radians);
 		/// @brief アスペクト比を設定する (パースペクティブカメラ用)
 		/// @param aspect_ratio 新しいアスペクト比
 		constexpr void aspect_ratio(f32 aspect_ratio);
@@ -75,7 +76,7 @@ namespace dxforge::graphics::d3d12::camera
 		f32 _far_z;									///< 遠クリッピング平面距離
 		union
 		{
-			f32 _field_of_view;						///< 視野角 (パースペクティブカメラ用)
+			f32 _field_of_view;						///< 垂直方向の視野角、ラジアン (パースペクティブカメラ用)
 			f32 _view_width;						///< ビュー幅 (オーソグラフィックカメラ用)
 		};
 		union

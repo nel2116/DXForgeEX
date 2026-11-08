@@ -7,6 +7,7 @@
 // 更新履歴
 // 2026/10/27 新規作成 (#107, #112, #11)
 // 2026/11/06 Geometryコンポーネントが読めないことのテストを追加 (Primal Day 082, #201)
+// 2026/11/08 game.binの回転をクォータニオンにし、その読み込みのテストを追加 (#205)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
@@ -14,8 +15,10 @@
 #include "Content/ContentLoader.h"
 #include "Components/Entity.h"
 #include "Components/Script.h"
+#include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <string>
 
 #ifndef WIN32_LEAN_AND_MEAN
@@ -64,12 +67,12 @@ namespace
 		// エンティティの見出し(エンティティ・タイプ、コンポーネント数)
 		game_bin_builder& entity(u32 num_components) { return u32_value(0).u32_value(num_components); }
 
-		// Transformコンポーネント(種類0、位置・回転(オイラー)・スケール)
-		game_bin_builder& transform(f32 x, f32 y, f32 z)
+		// Transformコンポーネント(種類0、位置・回転(クォータニオン x, y, z, w)・スケール)
+		game_bin_builder& transform(f32 x, f32 y, f32 z, math::v4 rotation = { 0.f, 0.f, 0.f, 1.f })
 		{
 			u32_value(0);
 			f32_value(x).f32_value(y).f32_value(z);
-			f32_value(0.f).f32_value(0.f).f32_value(0.f);
+			f32_value(rotation.x).f32_value(rotation.y).f32_value(rotation.z).f32_value(rotation.w);
 			return f32_value(1.f).f32_value(1.f).f32_value(1.f);
 		}
 
@@ -163,6 +166,58 @@ DXFORGE_TEST_CASE(content_loader_loads_entities_with_transform_and_script)
 	CHECK(content::loaded_game_entities().empty());
 	CHECK(!game_entity::is_alive(first.get_id()));
 	CHECK(!game_entity::is_alive(second.get_id()));
+}
+
+// #205: game.binの回転はクォータニオンで、オイラー角の変換をせずにそのまま(正規化だけして)エンティティの回転になる
+DXFORGE_TEST_CASE(content_loader_reads_rotation_as_quaternion)
+{
+	// Y軸まわりに90度(エディタの EulerRotation で [0, 90, 0] 度にしたときの値)
+	const f32 h{ 0.70710678f };
+	const math::v4 yaw90{ 0.f, h, 0.f, h };
+	// 任意の軸まわりの回転(正規化済み)と、その2倍の長さ(正規化して読む)
+	const math::v4 general{ 0.18257419f, 0.36514837f, 0.54772256f, 0.73029674f };
+	const math::v4 general_twice{ general.x * 2.f, general.y * 2.f, general.z * 2.f, general.w * 2.f };
+	game_bin_builder bin{};
+	bin.u32_value(3);
+	bin.entity(1).transform(0.f, 0.f, 0.f, yaw90);
+	bin.entity(1).transform(0.f, 0.f, 0.f, general);
+	bin.entity(1).transform(0.f, 0.f, 0.f, general_twice);
+	REQUIRE(load(bin) == content::load_game_result::ok);
+	REQUIRE(content::loaded_game_entities().size() == 3);
+
+	const auto same = [](math::v4 a, math::v4 b)
+	{
+		constexpr f32 tolerance{ 1e-5f };
+		return std::fabs(a.x - b.x) < tolerance && std::fabs(a.y - b.y) < tolerance &&
+			std::fabs(a.z - b.z) < tolerance && std::fabs(a.w - b.w) < tolerance;
+	};
+	CHECK(same(content::loaded_game_entities()[0].rotation(), yaw90));
+	CHECK(same(content::loaded_game_entities()[1].rotation(), general));
+	CHECK(same(content::loaded_game_entities()[2].rotation(), general));
+	content::unload_game();
+}
+
+// #205: 長さが0や有限でないクォータニオンは壊れたgame.binとして扱う(回転なしにして黙って読まない)
+DXFORGE_TEST_CASE(content_loader_rejects_invalid_rotation_quaternion)
+{
+	const f32 inf{ std::numeric_limits<f32>::infinity() };
+	const f32 nan{ std::numeric_limits<f32>::quiet_NaN() };
+	const math::v4 invalid[]{
+		{ 0.f, 0.f, 0.f, 0.f },
+		{ nan, 0.f, 0.f, 1.f },
+		{ 0.f, inf, 0.f, 1.f },
+		{ 1e20f, 0.f, 0.f, 0.f },	// 成分は有限でも、長さが f32 で溢れる
+	};
+	for (const math::v4& rotation : invalid)
+	{
+		game_bin_builder bin{};
+		bin.u32_value(2);
+		bin.entity(1).transform(0.f, 0.f, 0.f);
+		bin.entity(1).transform(0.f, 0.f, 0.f, rotation);
+		CHECK(load(bin) == content::load_game_result::invalid_format);
+		CHECK(content::last_load_game_error().find("rotation") != std::string::npos);
+		CHECK(content::loaded_game_entities().empty());
+	}
 }
 
 // #112: 256以上の値(エンティティ数)を4バイトで正しく読む

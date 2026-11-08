@@ -505,9 +505,9 @@ namespace DXForgeEditor.DllWrappers
         [DllImport(_engineDll)]
         public static extern void SetCameraRange(int surfaceId, float nearZ, float farZ);
 
-        // fov は度数
+        // 垂直方向の視野角を度数で渡す(DLL がラジアンにしてエンジンのカメラに渡す)
         [DllImport(_engineDll)]
-        public static extern void SetCameraFoV(int surfaceId, float fov);
+        public static extern void SetCameraFoV(int surfaceId, float fovDegrees);
 
         internal static class EntityAPI
         {

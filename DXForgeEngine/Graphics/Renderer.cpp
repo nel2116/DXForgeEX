@@ -14,6 +14,7 @@
 // 2026/10/29 画面外のサーフェス、読み戻し、初期化情報の転送を追加 (#127)
 // 2026/11/02 D3D12 のランタイム(Agility SDK か OS か)の情報を追加 (#155)
 // 2026/11/06 set_option, get_option を追加 (Primal Day 082, #201)
+// 2026/11/08 視野角(field_of_view)を pi の倍数から垂直方向のラジアンにした (#205)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Renderer.h"
@@ -288,10 +289,10 @@ namespace dxforge::graphics
 		gfx.camera.remove(id);
 	}
 
-	void camera::field_of_view(f32 fov) const
+	void camera::field_of_view(f32 fov_radians) const
 	{
 		assert(is_valid());
-		gfx.camera.set_parameter(_id, camera_parameter::field_of_view, &fov, sizeof(fov));
+		gfx.camera.set_parameter(_id, camera_parameter::field_of_view, &fov_radians, sizeof(fov_radians));
 	}
 	void camera::aspect_ratio(f32 aspect_ratio) const
 	{
