@@ -93,11 +93,11 @@
                         <StackPanel Margin="5,15,5,5">
                             <DockPanel Margin="5,5,5,0">
                                 <TextBlock Text="Width" Width="40" DockPanel.Dock="Left" VerticalAlignment="Center"/>
-                                <utl:ScalarBox x:Name="widthScalarBoxPlane" Value="1" ValueChanged="OnScalarBox_ValueChanged"/>
+                                <utl:ScalarBox x:Name="widthScalarBoxPlane" Value="1" ValueChanging="OnScalarBox_ValueChanging"/>
                             </DockPanel>
                             <DockPanel Margin="5,5,5,0">
                                 <TextBlock Text="Length" Width="40" DockPanel.Dock="Left" VerticalAlignment="Center"/>
-                                <utl:ScalarBox x:Name="lengthScalarBoxPlane" Value="1" ValueChanged="OnScalarBox_ValueChanged"/>
+                                <utl:ScalarBox x:Name="lengthScalarBoxPlane" Value="1" ValueChanging="OnScalarBox_ValueChanging"/>
                             </DockPanel>
                         </StackPanel>
                     </Border>
@@ -154,15 +154,15 @@
                         <StackPanel Margin="5,15,5,5">
                             <DockPanel Margin="5,5,5,0">
                                 <TextBlock Text="X" Width="40" DockPanel.Dock="Left" VerticalAlignment="Center"/>
-                                <utl:ScalarBox x:Name="xScalarBoxCube" Value="1" ValueChanged="OnScalarBox_ValueChanged"/>
+                                <utl:ScalarBox x:Name="xScalarBoxCube" Value="1" ValueChanging="OnScalarBox_ValueChanging"/>
                             </DockPanel>
                             <DockPanel Margin="5,5,5,0">
                                 <TextBlock Text="Y" Width="40" DockPanel.Dock="Left" VerticalAlignment="Center"/>
-                                <utl:ScalarBox x:Name="yScalarBoxCube" Value="1" ValueChanged="OnScalarBox_ValueChanged"/>
+                                <utl:ScalarBox x:Name="yScalarBoxCube" Value="1" ValueChanging="OnScalarBox_ValueChanging"/>
                             </DockPanel>
                             <DockPanel Margin="5,5,5,0">
                                 <TextBlock Text="Z" Width="40" DockPanel.Dock="Left" VerticalAlignment="Center"/>
-                                <utl:ScalarBox x:Name="zScalarBoxCube" Value="1" ValueChanged="OnScalarBox_ValueChanged"/>
+                                <utl:ScalarBox x:Name="zScalarBoxCube" Value="1" ValueChanging="OnScalarBox_ValueChanging"/>
                             </DockPanel>
                         </StackPanel>
                     </Border>
@@ -222,15 +222,15 @@
                         <StackPanel Margin="5,15,5,5">
                             <DockPanel Margin="5,5,5,0">
                                 <TextBlock Text="X" Width="40" DockPanel.Dock="Left" VerticalAlignment="Center"/>
-                                <utl:ScalarBox x:Name="xScalarBoxUvSphere" Value="1" ValueChanged="OnScalarBox_ValueChanged"/>
+                                <utl:ScalarBox x:Name="xScalarBoxUvSphere" Value="1" ValueChanging="OnScalarBox_ValueChanging"/>
                             </DockPanel>
                             <DockPanel Margin="5,5,5,0">
                                 <TextBlock Text="Y" Width="40" DockPanel.Dock="Left" VerticalAlignment="Center"/>
-                                <utl:ScalarBox x:Name="yScalarBoxUvSphere" Value="1" ValueChanged="OnScalarBox_ValueChanged"/>
+                                <utl:ScalarBox x:Name="yScalarBoxUvSphere" Value="1" ValueChanging="OnScalarBox_ValueChanging"/>
                             </DockPanel>
                             <DockPanel Margin="5,5,5,0">
                                 <TextBlock Text="Z" Width="40" DockPanel.Dock="Left" VerticalAlignment="Center"/>
-                                <utl:ScalarBox x:Name="zScalarBoxUvSphere" Value="1" ValueChanged="OnScalarBox_ValueChanged"/>
+                                <utl:ScalarBox x:Name="zScalarBoxUvSphere" Value="1" ValueChanging="OnScalarBox_ValueChanging"/>
                             </DockPanel>
                         </StackPanel>
                     </Border>

@@ -10,6 +10,8 @@
       1. アクティブなシーンのリストが読み込まれると先頭のエンティティが選ばれ、インスペクターに出る。スクロールバーを持たない。
       2. 選択の undo/redo。選択したエンティティを削除・追加したあとで、履歴の最初まで undo し、最後まで redo しても落ちない。
          選択したエンティティより前のものを消して番号がずれても、同じエンティティに戻る。
+      2c. インスペクターの Transform の欄のドラッグと入力の確定がそれぞれ Undo 1 件になる。複数選択で値がそろっていない欄は空で、
+          入力するとすべてが変わり、Undo でそれぞれの値に戻る(Primal Day 086 の NumberBox/VectorBox、#244)。
       3. シーンごとの Rename ボタンで、名前の入力欄が開く。
       4. 空のシーンのプロジェクトに切り替えると、インスペクターが空になる(#178)。
       5. 共通にした RemoveButtonStyle を使う、インポート設定のビューを作れる。
@@ -173,6 +175,77 @@ try
 	Check ($renamed.Name -eq "Typed Name" -and $undo.UndoList.Count -eq $undoCount + 1) "the name is committed and one undo entry is added ($($renamed.Name), $($undo.UndoList.Count - $undoCount))"
 	$undo.Undo(); Pump
 	Check ($renamed.Name -eq $oldName) "undo restores the name ($($renamed.Name))"
+
+	# インスペクターの Transform の数値の欄(Primal Day 086 の NumberBox/VectorBox、#244): 1 回のドラッグと 1 回の入力の確定が
+	# それぞれ Undo 1 件になり、複数選択ではすべてのエンティティが変わり、Undo でそれぞれの値に戻る。マウスの移動は
+	# 表示しないウィンドウでは起こせないので、ボタンを押すイベントを出したあと、NumberBox のドラッグのメソッドを直接呼ぶ
+	Write-Host "2c. dragging and typing in the inspector's Transform boxes"
+	$numberBoxType = $editor.GetType("DXForgeEditor.Utilities.Controls.NumberBox", $true)
+	$vectorBoxType = $editor.GetType("DXForgeEditor.Utilities.Controls.VectorBox", $true)
+	function Position-Box
+	{
+		$vector = @(Find $inspector $vectorBoxType)[0]
+		return $vector.Template.FindName("nbX", $vector)
+	}
+	$nbX = Position-Box
+	$first = $scene.GameEntities[0]; $second = $scene.GameEntities[1]
+	$firstTransform = @($first.Components)[0]; $secondTransform = @($second.Components)[0]
+	$x0 = $firstTransform.Position.X; $x1 = $secondTransform.Position.X
+	$textBox = $nbX.Template.FindName("PART_textBox", $nbX)
+	$press = [System.Windows.Input.MouseButtonEventArgs]::new([System.Windows.Input.Mouse]::PrimaryDevice, 0, [System.Windows.Input.MouseButton]::Left)
+	# NOTE: PreviewMouseLeftButtonDown は Direct のイベントで、WPF がトンネルの PreviewMouseDown から要素ごとに出し直す。
+	#       PreviewMouseLeftButtonDown を直接出すと TextBox にしか届かないので、PreviewMouseDown を出す
+	$press.RoutedEvent = [System.Windows.UIElement]::PreviewMouseDownEvent
+	$undoCount = $undo.UndoList.Count
+	$textBox.RaiseEvent($press)
+	$null = [System.Windows.Input.Mouse]::Capture($null)
+	# 押した位置はウィンドウの外の実際のマウスの位置なので、0 から始め直す
+	$null = $numberBoxType.GetMethod("BeginDrag", $flags).Invoke($nbX, [object[]]@([double]0))
+	$null = $numberBoxType.GetMethod("DragTo", $flags).Invoke($nbX, [object[]]@([double]50, [System.Windows.Input.ModifierKeys]::None))
+	$null = $numberBoxType.GetMethod("DragTo", $flags).Invoke($nbX, [object[]]@([double]100, [System.Windows.Input.ModifierKeys]::None))
+	$null = $numberBoxType.GetMethod("EndDrag", $flags).Invoke($nbX, @())
+	Pump
+	Check ([Math]::Abs($firstTransform.Position.X - ($x0 + 1)) -lt 1e-4 -and $undo.UndoList.Count -eq $undoCount + 1) "a drag of 100 px moves Position.X by 1 with one undo entry ($x0 -> $($firstTransform.Position.X), $($undo.UndoList.Count - $undoCount))"
+	$undo.Undo(); Pump
+	Check ([Math]::Abs($firstTransform.Position.X - $x0) -lt 1e-6 -and (Position-Box).Value -eq [double]$x0) "undo restores Position.X and the box ($($firstTransform.Position.X), $((Position-Box).Value))"
+	$undo.Redo(); Pump
+	Check ([Math]::Abs($firstTransform.Position.X - ($x0 + 1)) -lt 1e-4) "redo moves it again ($($firstTransform.Position.X))"
+	$undo.Undo(); Pump
+
+	# Position に入力し、Enter を押さずに Rotation を押す: WPF は Rotation の PreviewMouseDown を Position の確定
+	# (PreviewLostKeyboardFocus)より先に出す。それでも Position の Undo は位置を戻す(行ごとに前の値を覚える。Codex の指摘)
+	function Text-Box($numberBox) { return $numberBox.Template.FindName("PART_textBox", $numberBox) }
+	$positionText = Text-Box (Position-Box)
+	$focusArgs = [System.Windows.Input.KeyboardFocusChangedEventArgs]::new([System.Windows.Input.Keyboard]::PrimaryDevice, 0, $null, $positionText)
+	$focusArgs.RoutedEvent = [System.Windows.Input.Keyboard]::GotKeyboardFocusEvent
+	$positionText.RaiseEvent($focusArgs)
+	$rotationVector = @(Find $inspector $vectorBoxType)[1]
+	$rotationText = Text-Box ($rotationVector.Template.FindName("nbX", $rotationVector))
+	$press = [System.Windows.Input.MouseButtonEventArgs]::new([System.Windows.Input.Mouse]::PrimaryDevice, 0, [System.Windows.Input.MouseButton]::Left)
+	$press.RoutedEvent = [System.Windows.UIElement]::PreviewMouseDownEvent
+	$rotationText.RaiseEvent($press)
+	$null = [System.Windows.Input.Mouse]::Capture($null)
+	$null = $numberBoxType.GetMethod("EndDrag", $flags).Invoke($rotationVector.Template.FindName("nbX", $rotationVector), @())
+	$null = $numberBoxType.GetMethod("CommitText", $flags).Invoke((Position-Box), [object[]]@("7"))
+	Pump
+	Check ($firstTransform.Position.X -eq 7) "typing 7 into Position.X, committed after pressing Rotation.X ($($firstTransform.Position.X))"
+	$undo.Undo(); Pump
+	Check ([Math]::Abs($firstTransform.Position.X - $x0) -lt 1e-6) "undo still restores Position.X ($($firstTransform.Position.X))"
+
+	$null = $list.SelectedItems.Add($second.PSObject.BaseObject); Pump
+	$nbX = Position-Box
+	Check ($x0 -ne $x1 -and $null -eq $nbX.Value) "two entities with different X: the box is mixed (null) ($($nbX.Value))"
+	$textBox = $nbX.Template.FindName("PART_textBox", $nbX)
+	$focusArgs = [System.Windows.Input.KeyboardFocusChangedEventArgs]::new([System.Windows.Input.Keyboard]::PrimaryDevice, 0, $null, $textBox)
+	$focusArgs.RoutedEvent = [System.Windows.Input.Keyboard]::GotKeyboardFocusEvent
+	$textBox.RaiseEvent($focusArgs)
+	$undoCount = $undo.UndoList.Count
+	$null = $numberBoxType.GetMethod("CommitText", $flags).Invoke($nbX, [object[]]@("5"))
+	Pump
+	Check ($firstTransform.Position.X -eq 5 -and $secondTransform.Position.X -eq 5 -and $undo.UndoList.Count -eq $undoCount + 1) "typing 5 sets both X with one undo entry ($($firstTransform.Position.X), $($secondTransform.Position.X), $($undo.UndoList.Count - $undoCount))"
+	$undo.Undo(); Pump
+	Check ($firstTransform.Position.X -eq $x0 -and $secondTransform.Position.X -eq $x1) "undo restores each entity's own X ($($firstTransform.Position.X), $($secondTransform.Position.X))"
+	$list.SelectedIndex = 0; Pump
 	$inspectorWindow.Content = $null
 	$inspectorWindow.Close()
 

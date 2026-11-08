@@ -10,7 +10,8 @@
     確かめること:
       1. Cube を選ぶと Cube の設定欄だけが表示され、LOD グループ "cube" の 24 頂点・36 インデックスのメッシュができる。
       2. 分割数のスライダーで、頂点数とインデックス数が変わる(面ごとに (a+1)(b+1) 頂点、6ab インデックス)。
-      3. 大きさの欄で、頂点の位置の範囲が変わる(-size〜size)。LOD の欄を変えても壊れず、数字でない値でも止まらない。
+      3. 大きさの欄に入力すると、頂点の位置の範囲が変わる(-size〜size)。数字でない入力は受け付けず、負の大きさは最小値にする。
+         LOD の欄を変えても壊れない。
       4. 作ったジオメトリをアセットとして保存でき、読み戻したメタデータとエンジン用の形が合っている。
       5. Plane と UV Sphere の設定欄の動作が変わらない。
 
@@ -77,6 +78,10 @@ $updatePrimitive = $dialogType.GetMethod("UpdatePrimitive", $flags)
 $null = $updatePrimitive.Invoke($dialog, $null)
 
 function Control([string]$name) { return $dialogType.GetField($name, $flags).GetValue($dialog) }
+
+# ScalarBox に入力して確定する(Enter と同じ。Primal Day 086 の NumberBox は、ユーザーの操作でだけ ValueChanging を出す)
+$commitText = $editor.GetType("DXForgeEditor.Utilities.Controls.NumberBox", $true).GetMethod("CommitText", $flags)
+function Type-Value([string]$name, [string]$text) { return [bool]$commitText.Invoke((Control $name), [object[]]@($text)) }
 
 function Pump
 {
@@ -148,15 +153,18 @@ try
 	Check ($mesh.Vertices -eq $expectedVertices -and $mesh.Indices -eq $expectedIndices) "2x3x4 -> $expectedVertices vertices, $expectedIndices indices (V $($mesh.Vertices), I $($mesh.Indices))"
 
 	Write-Host "3. size and LOD"
-	(Control "xScalarBoxCube").Value = "2"
-	(Control "yScalarBoxCube").Value = "0.5"
-	(Control "zScalarBoxCube").Value = "3"
+	$null = Type-Value "xScalarBoxCube" "2"
+	$null = Type-Value "yScalarBoxCube" "0.5"
+	$null = Type-Value "zScalarBoxCube" "3"
 	$mesh = Current-Mesh
 	Check ((Near $mesh.SizeX 2) -and (Near $mesh.MinX -2) -and (Near $mesh.SizeY 0.5) -and (Near $mesh.SizeZ 3)) "size 2, 0.5, 3 -> the extents follow ($($mesh.SizeX), $($mesh.SizeY), $($mesh.SizeZ))"
-	(Control "xScalarBoxCube").Value = "not a number"
+	$accepted = Type-Value "xScalarBoxCube" "not a number"
 	$mesh = Current-Mesh
-	Check (Near $mesh.SizeX 0.001) "a size that is not a number becomes the minimum 0.001 ($($mesh.SizeX))"
-	(Control "xScalarBoxCube").Value = "2"
+	Check (-not $accepted -and (Near $mesh.SizeX 2) -and (Control "xScalarBoxCube").Value -eq 2) "a size that is not a number is rejected and the size stays 2 ($accepted, $($mesh.SizeX))"
+	$null = Type-Value "xScalarBoxCube" "-1"
+	$mesh = Current-Mesh
+	Check (Near $mesh.SizeX 0.001) "a negative size becomes the minimum 0.001 ($($mesh.SizeX))"
+	$null = Type-Value "xScalarBoxCube" "2"
 	$before = Current-Mesh
 	foreach ($lod in @("1", "-1", "abc", ""))
 	{

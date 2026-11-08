@@ -520,40 +520,36 @@
         </Setter>
     </Style>
 
+    <!-- NumberBox と ScalarBox の TextBox。確定とドラッグは NumberBox が扱うので、既定の TextBox のイベントは付けない(Primal Day 086) -->
+    <Style TargetType="{x:Type TextBox}" x:Key="NumberBoxTextBoxStyle" BasedOn="{StaticResource TextBoxStyle}">
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Style.Triggers>
+            <MultiTrigger>
+                <MultiTrigger.Conditions>
+                    <Condition Property="IsMouseOver" Value="True"/>
+                    <Condition Property="IsKeyboardFocused" Value="False"/>
+                </MultiTrigger.Conditions>
+                <Setter Property="Cursor" Value="SizeWE"/>
+            </MultiTrigger>
+        </Style.Triggers>
+    </Style>
+
     <Style TargetType="{x:Type utl:NumberBox}" x:Key="{x:Type utl:NumberBox}">
         <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="IsTabStop" Value="False"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type utl:NumberBox}">
-                    <Grid>
-                        <TextBlock x:Name="PART_textBlock"
-                                   Text="{Binding Value, RelativeSource={RelativeSource TemplatedParent}}"
-                                   HorizontalAlignment="Center">
-                            <TextBlock.Style>
-                                <Style TargetType="{x:Type TextBlock}">
-                                    <Style.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter Property="Cursor" Value="SizeWE"/>
-                                        </Trigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                        <TextBox x:Name="PART_textBox" BorderThickness="0" Padding="0"
-                                 Text="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, UpdateSourceTrigger=Explicit}"
-                                 Foreground="{TemplateBinding Foreground}" Visibility="Collapsed"
-                                 Style="{StaticResource TextBoxStyle_WithRename}" HorizontalContentAlignment="Center"
-                                 HorizontalAlignment="Center"/>
-                    </Grid>
+                    <TextBox x:Name="PART_textBox" Style="{StaticResource NumberBoxTextBoxStyle}"
+                             Foreground="{TemplateBinding Foreground}" Background="Transparent" CaretBrush="{TemplateBinding Foreground}"/>
                     <ControlTemplate.Triggers>
-                        <DataTrigger Binding="{Binding Visibility, ElementName=PART_textBox}" Value="Visible">
-                            <Setter Property="Visibility" TargetName="PART_textBlock" Value="Collapsed"/>
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding Value, RelativeSource={RelativeSource Self}}" Value="{x:Null}">
-                            <Setter Property="Background" TargetName="PART_textBlock" Value="{StaticResource Editor.Disabled.FontBrush}"/>
-                            <Setter Property="ToolTip" TargetName="PART_textBlock" Value="Mixed values"/>
-                            <Setter Property="MinWidth" TargetName="PART_textBlock" Value="20"/>
-                        </DataTrigger>
+                        <Trigger Property="Value" Value="{x:Null}">
+                            <Setter Property="Background" TargetName="PART_textBox" Value="{StaticResource Editor.Disabled.FontBrush}"/>
+                            <Setter Property="ToolTip" TargetName="PART_textBox" Value="Mixed values"/>
+                            <Setter Property="MinWidth" TargetName="PART_textBox" Value="20"/>
+                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
@@ -575,42 +571,21 @@
                             Background="{TemplateBinding Background}" Padding="5,2"
                             BorderBrush="{TemplateBinding BorderBrush}" CornerRadius="10"
                             BorderThickness="{TemplateBinding BorderThickness}">
-                        <Grid x:Name="grid" MinWidth="50">
-                            <TextBlock x:Name="PART_textBlock"
-                                   Text="{Binding Value, RelativeSource={RelativeSource TemplatedParent}}"
-                                   HorizontalAlignment="Center">
-                                <TextBlock.Style>
-                                    <Style TargetType="{x:Type TextBlock}">
-                                        <Style.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter Property="Cursor" Value="SizeWE"/>
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                            <TextBox x:Name="PART_textBox" BorderThickness="0" Padding="0"
-                                 Text="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, UpdateSourceTrigger=Explicit}"
-                                 Foreground="{TemplateBinding Foreground}" Visibility="Collapsed"
-                                 Style="{StaticResource TextBoxStyle_WithRename}" HorizontalContentAlignment="Center"
-                                 HorizontalAlignment="Center"/>
-                        </Grid>
+                        <TextBox x:Name="PART_textBox" Style="{StaticResource NumberBoxTextBoxStyle}" MinWidth="50"
+                                 Foreground="{TemplateBinding Foreground}" Background="Transparent" CaretBrush="{TemplateBinding Foreground}"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter Property="BorderBrush" TargetName="border" Value="{StaticResource Editor.Window.GrayBrush6}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter Property="Opacity" TargetName="grid" Value="0.5"/>
+                            <Setter Property="Opacity" TargetName="PART_textBox" Value="0.5"/>
                         </Trigger>
-                        <DataTrigger Binding="{Binding Visibility, ElementName=PART_textBox}" Value="Visible">
-                            <Setter Property="Visibility" TargetName="PART_textBlock" Value="Collapsed"/>
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding Value, RelativeSource={RelativeSource Self}}" Value="{x:Null}">
-                            <Setter Property="Background" TargetName="PART_textBlock" Value="{StaticResource Editor.Disabled.FontBrush}"/>
-                            <Setter Property="ToolTip" TargetName="PART_textBlock" Value="Mixed values"/>
-                            <Setter Property="MinWidth" TargetName="PART_textBlock" Value="20"/>
-                        </DataTrigger>
+                        <Trigger Property="Value" Value="{x:Null}">
+                            <Setter Property="Background" TargetName="PART_textBox" Value="{StaticResource Editor.Disabled.FontBrush}"/>
+                            <Setter Property="ToolTip" TargetName="PART_textBox" Value="Mixed values"/>
+                            <Setter Property="MinWidth" TargetName="PART_textBox" Value="20"/>
+                        </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
@@ -632,6 +607,9 @@
                             <Setter Property="ToolTipService.InitialShowDelay" Value="3000"/>
                             <Setter Property="ToolTipService.BetweenShowDelay" Value="1000"/>
                             <Setter Property="Multiplier" Value="{Binding Multiplier,RelativeSource={RelativeSource TemplatedParent}}"/>
+                            <Setter Property="Minimum" Value="{Binding Minimum,RelativeSource={RelativeSource TemplatedParent}}"/>
+                            <Setter Property="Maximum" Value="{Binding Maximum,RelativeSource={RelativeSource TemplatedParent}}"/>
+                            <Setter Property="WrapAround" Value="{Binding WrapAround,RelativeSource={RelativeSource TemplatedParent}}"/>
                         </Style>
                     </ControlTemplate.Resources>
                     <Border x:Name="border" SnapsToDevicePixels="true" Margin="0,2,0,3"
