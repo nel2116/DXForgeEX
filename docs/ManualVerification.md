@@ -1,4 +1,4 @@
-# Manual verification of the editor
+﻿# Manual verification of the editor
 
 <!-- last-reviewed: 2026-11-07 -->
 
@@ -271,7 +271,7 @@ Start from a project opened as in step 2. Object rendering comes in Day 084, so 
 
 The inspector's Transform rows and the Primitive mesh dialog's size boxes are `NumberBox`es (`docs/design/number-box.md`). The value logic and events have a headless test (`number_box_test.ps1`); check the mouse and keyboard handling here.
 
-1. **Drag**: press on a Transform box and drag left/right; the value changes while dragging (faster with Shift, slower with Ctrl) and the cursor is the left-right arrow. Releasing leaves the value. One drag is one `Edit > Undo` step, and undo/redo restore the values before/after the drag.
+1. **Drag**: press on a Transform box and drag left/right; the value changes while dragging (faster with Shift, slower with Ctrl) and the cursor is the left-right arrow. Releasing leaves the value. One drag is one `Edit > Undo` step, and undo/redo restore the values before/after the drag. The drag takes the keyboard focus: pressing Delete right after it does not delete the entity selected in the Hierarchy.
 2. **Type**: click without moving; the box becomes editable with the text selected. Enter, Tab or clicking elsewhere commits (one undo step); Escape discards the typing. Text that is not a number is rejected and the old value comes back.
 3. **Mixed values**: select two entities with different positions; the differing boxes are empty with a gray background. Typing or dragging there sets all selected entities to the same value, and undo restores each one's own value.
 4. **Primitive mesh dialog**: dragging a size box updates the preview while dragging; typing a value updates it on commit.

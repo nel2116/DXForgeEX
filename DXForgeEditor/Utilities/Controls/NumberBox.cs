@@ -147,7 +147,15 @@ namespace DXForgeEditor.Utilities.Controls
         private double Constrain(double value)
         {
             value = ClampOrWrap(value, Minimum, Maximum, WrapAround);
-            return IsInteger ? Math.Round(value) : value;
+            if (!IsInteger) return value;
+
+            // 丸めたあとも範囲に収める(Maximum 3.7 で 4 にしない。回り込みなら 359.6 を 360 でなく 0 にする)
+            var rounded = Math.Round(value);
+            if (WrapAround) rounded = ClampOrWrap(rounded, Minimum, Maximum, true);
+            var lowest = Math.Ceiling(Minimum);
+            var highest = Math.Floor(Maximum);
+            // 範囲に整数がひとつもなければ、範囲に収めた値のままにする
+            return lowest <= highest ? Math.Clamp(rounded, lowest, highest) : value;
         }
 
         /// <summary>
@@ -295,6 +303,9 @@ namespace DXForgeEditor.Utilities.Controls
             // 入力中はふつうの TextBox としてカーソルを動かす
             if (_textBox == null || _textBox.IsKeyboardFocused) return;
             BeginDrag(e.GetPosition(this).X);
+            // キーボードのフォーカスもこのコントロールに移す。移さないと、ドラッグのあとの Delete などが前のフォーカス先
+            // (Hierarchy のエンティティの削除など)に届く(以前の NumberBox も Focus() していた。Codex の指摘)
+            Focus();
             _captured = Mouse.Capture(_textBox);
             e.Handled = true;
         }

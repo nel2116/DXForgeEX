@@ -121,6 +121,15 @@ $i = New-NumberBox
 $i.Box.IsInteger = $true
 $null = Type-Text $i.Box "2.6"
 Check ((Near $i.Box.Value 3) -and [string]$formatValue.Invoke($i.Box, @()) -eq "3") "IsInteger: 2.6 -> 3, shown as 3 ($($i.Box.Value))"
+$i.Box.Minimum = 0; $i.Box.Maximum = 3.7
+$null = Type-Text $i.Box "4"
+Check (Near $i.Box.Value 3) "IsInteger with Maximum 3.7: 4 -> 3, not 4 (rounding stays in range) ($($i.Box.Value))"
+$i.Box.Maximum = 360; $i.Box.WrapAround = $true
+$null = Type-Text $i.Box "359.6"
+Check (Near $i.Box.Value 0) "IsInteger with WrapAround 0..360: 359.6 -> 0, not 360 ($($i.Box.Value))"
+$i.Box.WrapAround = $false; $i.Box.Minimum = 0.2; $i.Box.Maximum = 0.8
+$null = Type-Text $i.Box "0.5"
+Check (Near $i.Box.Value 0.5) "IsInteger with no integer in 0.2..0.8: keeps 0.5 in range ($($i.Box.Value))"
 
 Write-Host "4. dragging"
 $t = New-NumberBox
