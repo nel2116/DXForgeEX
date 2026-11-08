@@ -219,7 +219,7 @@ try
 	$focusArgs = [System.Windows.Input.KeyboardFocusChangedEventArgs]::new([System.Windows.Input.Keyboard]::PrimaryDevice, 0, $null, $positionText)
 	$focusArgs.RoutedEvent = [System.Windows.Input.Keyboard]::GotKeyboardFocusEvent
 	$positionText.RaiseEvent($focusArgs)
-	$rotationVector = @(Find $inspector $vectorBoxType)[1]
+	$rotationVector = @(Find $inspector $vectorBoxType)[2]
 	$rotationText = Text-Box ($rotationVector.Template.FindName("nbX", $rotationVector))
 	$press = [System.Windows.Input.MouseButtonEventArgs]::new([System.Windows.Input.Mouse]::PrimaryDevice, 0, [System.Windows.Input.MouseButton]::Left)
 	$press.RoutedEvent = [System.Windows.UIElement]::PreviewMouseDownEvent

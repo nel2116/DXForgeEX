@@ -276,6 +276,16 @@ The inspector's Transform rows and the Primitive mesh dialog's size boxes are `N
 3. **Mixed values**: select two entities with different positions; the differing boxes are empty with a gray background. Typing or dragging there sets all selected entities to the same value, and undo restores each one's own value.
 4. **Primitive mesh dialog**: dragging a size box updates the preview while dragging; typing a value updates it on commit.
 
+## Checking transform editing in the viewport (Primal Day 086, #244)
+
+Start from a project with an active scene showing entities with geometry (e.g. two cubes). The value paths and the engine sync have a headless test (`transform_edit_test.ps1`); check what the viewport shows.
+
+1. **Absolute rows**: dragging or typing Position, Rotation or Scale moves, turns or scales the selected entity in the viewport while dragging. With the uniform toggle (`U`) on, changing one Scale component sets all three.
+2. **Multi-selection**: with two entities selected, every edit changes both in the viewport.
+3. **Undo/Redo**: each drag or commit is one `Edit > Undo` step; undo and redo move the entities in the viewport back and forth, not only the inspector values.
+4. **Offsets**: rotate an entity (e.g. Rotation Y 90), then drag Local Offset Z: it moves along its own front, not world Z. Rotation Offset X with the `L` toggle on turns it about its own X axis, with the toggle off (label "World Offset") about world X; the two give different results. After each commit the offset row shows 0 again and the Rotation row shows angles that describe the new orientation.
+5. **Close**: close the project and the editor during and after edits; no crash and no assert dialog.
+
 ## Verification record
 
 ### 2026/10/18 (issue #43)
