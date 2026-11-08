@@ -9,7 +9,7 @@
 ## What the controls do (same as Primal)
 
 - `NumberBox.Value` is `double?`; `null` means "mixed values" (multi-selection) and shows as empty text with a gray background.
-- `Minimum`, `Maximum`, `WrapAround` and `IsInteger` constrain the value. An integer box rounds and then stays in range (with `Maximum` 3.7, 4 becomes 3; with wrapping 0..360, 359.6 becomes 0); if the range holds no integer, the value is only clamped. Dragging is incremental and its speed grows with the value's magnitude (`max(log10|v|, 1)^4`, updated after each commit).
+- `Minimum`, `Maximum`, `WrapAround` and `IsInteger` constrain the value. An integer box rounds and clamps or wraps among the integers in the range only (with `Maximum` 3.7, 4 becomes 3; wrapping 0..360, 359.6 becomes 0; wrapping 0.8..3.7, i.e. 1..3, 3.6 becomes 1); if the range holds no integer, the value is only clamped or wrapped. Dragging is incremental and its speed grows with the value's magnitude (`max(log10|v|, 1)^4`, updated after each commit).
 - Two routed events:
   - `ValueChanging` (`RoutedEventHandler`): after every user change (each drag step, each text commit). For live updates.
   - `ValueChanged` (`RoutedPropertyChangedEventHandler<double>`): once per commit (mouse release after a drag, Enter, Tab or clicking elsewhere after typing) with the values before and after the interaction. For one undo entry per interaction.

@@ -212,10 +212,28 @@ try
 	Check ([Math]::Abs($firstTransform.Position.X - ($x0 + 1)) -lt 1e-4) "redo moves it again ($($firstTransform.Position.X))"
 	$undo.Undo(); Pump
 
+	# Position に入力し、Enter を押さずに Rotation を押す: WPF は Rotation の PreviewMouseDown を Position の確定
+	# (PreviewLostKeyboardFocus)より先に出す。それでも Position の Undo は位置を戻す(行ごとに前の値を覚える。Codex の指摘)
+	function Text-Box($numberBox) { return $numberBox.Template.FindName("PART_textBox", $numberBox) }
+	$positionText = Text-Box (Position-Box)
+	$focusArgs = [System.Windows.Input.KeyboardFocusChangedEventArgs]::new([System.Windows.Input.Keyboard]::PrimaryDevice, 0, $null, $positionText)
+	$focusArgs.RoutedEvent = [System.Windows.Input.Keyboard]::GotKeyboardFocusEvent
+	$positionText.RaiseEvent($focusArgs)
+	$rotationVector = @(Find $inspector $vectorBoxType)[1]
+	$rotationText = Text-Box ($rotationVector.Template.FindName("nbX", $rotationVector))
+	$press = [System.Windows.Input.MouseButtonEventArgs]::new([System.Windows.Input.Mouse]::PrimaryDevice, 0, [System.Windows.Input.MouseButton]::Left)
+	$press.RoutedEvent = [System.Windows.UIElement]::PreviewMouseDownEvent
+	$rotationText.RaiseEvent($press)
+	$null = [System.Windows.Input.Mouse]::Capture($null)
+	$null = $numberBoxType.GetMethod("EndDrag", $flags).Invoke($rotationVector.Template.FindName("nbX", $rotationVector), @())
+	$null = $numberBoxType.GetMethod("CommitText", $flags).Invoke((Position-Box), [object[]]@("7"))
+	Pump
+	Check ($firstTransform.Position.X -eq 7) "typing 7 into Position.X, committed after pressing Rotation.X ($($firstTransform.Position.X))"
+	$undo.Undo(); Pump
+	Check ([Math]::Abs($firstTransform.Position.X - $x0) -lt 1e-6) "undo still restores Position.X ($($firstTransform.Position.X))"
+
 	$null = $list.SelectedItems.Add($second.PSObject.BaseObject); Pump
 	$nbX = Position-Box
-	$dbgvb = @(Find $inspector $vectorBoxType)[0]; $dbge = [System.Windows.Data.BindingOperations]::GetBindingExpression($dbgvb, $vectorBoxType.GetField("XProperty").GetValue($null)); Write-Host "DEBUG2 status $($dbge.Status) tnv [$($dbge.ParentBinding.TargetNullValue)] path $($dbge.ParentBinding.Path.Path) item $($dbge.DataItem.GetType().Name) $($dbge.DataItem.PosX) err $($dbge.HasError) $($dbge.ValidationError.ErrorContent)"
-	Write-Host "DEBUG posx [$(@(Find $inspector $vectorBoxType)[0].DataContext.PosX)] vbs $(@(Find $inspector $vectorBoxType | % { "[$($_.X)]" }) -join ',') sel $(@($inspector.DataContext.SelectedEntities | % Name) -join ',')"
 	Check ($x0 -ne $x1 -and $null -eq $nbX.Value) "two entities with different X: the box is mixed (null) ($($nbX.Value))"
 	$textBox = $nbX.Template.FindName("PART_textBox", $nbX)
 	$focusArgs = [System.Windows.Input.KeyboardFocusChangedEventArgs]::new([System.Windows.Input.Keyboard]::PrimaryDevice, 0, $null, $textBox)

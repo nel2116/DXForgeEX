@@ -146,16 +146,16 @@ namespace DXForgeEditor.Utilities.Controls
         /// <summary>範囲と整数の指定に合わせる。</summary>
         private double Constrain(double value)
         {
-            value = ClampOrWrap(value, Minimum, Maximum, WrapAround);
-            if (!IsInteger) return value;
+            if (!IsInteger) return ClampOrWrap(value, Minimum, Maximum, WrapAround);
 
-            // 丸めたあとも範囲に収める(Maximum 3.7 で 4 にしない。回り込みなら 359.6 を 360 でなく 0 にする)
-            var rounded = Math.Round(value);
-            if (WrapAround) rounded = ClampOrWrap(rounded, Minimum, Maximum, true);
+            // 整数は、範囲の中の整数だけで丸めと回り込みをする(Maximum 3.7 で 4 にしない、0〜360 の回り込みで 359.6 を 0 にする、
+            // 0.8〜3.7 の回り込みで 3.6 を 1 にする。Codex の指摘)。範囲は [Minimum, Maximum]、回り込みなら [Minimum, Maximum)
             var lowest = Math.Ceiling(Minimum);
-            var highest = Math.Floor(Maximum);
-            // 範囲に整数がひとつもなければ、範囲に収めた値のままにする
-            return lowest <= highest ? Math.Clamp(rounded, lowest, highest) : value;
+            var highest = WrapAround ? Math.Ceiling(Maximum) - 1.0 : Math.Floor(Maximum);
+            // 範囲に整数がひとつもなければ、範囲に収めるだけにする
+            if (!(lowest <= highest)) return ClampOrWrap(value, Minimum, Maximum, WrapAround);
+            // 回り込みの幅は highest - lowest + 1 個の整数(highest + 1 は含まない)
+            return ClampOrWrap(Math.Round(value), lowest, WrapAround ? highest + 1.0 : highest, WrapAround);
         }
 
         /// <summary>

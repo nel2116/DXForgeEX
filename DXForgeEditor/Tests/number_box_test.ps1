@@ -127,6 +127,11 @@ Check (Near $i.Box.Value 3) "IsInteger with Maximum 3.7: 4 -> 3, not 4 (rounding
 $i.Box.Maximum = 360; $i.Box.WrapAround = $true
 $null = Type-Text $i.Box "359.6"
 Check (Near $i.Box.Value 0) "IsInteger with WrapAround 0..360: 359.6 -> 0, not 360 ($($i.Box.Value))"
+$i.Box.Minimum = 0.8; $i.Box.Maximum = 3.7
+$i.Box.Value = 3.6
+Check (Near $i.Box.Value 1) "IsInteger with WrapAround 0.8..3.7 (integers 1, 2, 3): 3.6 -> 4 -> 1, an integer ($($i.Box.Value))"
+$null = Type-Text $i.Box "-0.2"
+Check (Near $i.Box.Value 3) "IsInteger with WrapAround 0.8..3.7: -0.2 -> 0 -> 3 ($($i.Box.Value))"
 $i.Box.WrapAround = $false; $i.Box.Minimum = 0.2; $i.Box.Maximum = 0.8
 $null = Type-Text $i.Box "0.5"
 Check (Near $i.Box.Value 0.5) "IsInteger with no integer in 0.2..0.8: keeps 0.5 in range ($($i.Box.Value))"

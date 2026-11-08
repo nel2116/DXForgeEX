@@ -21,8 +21,12 @@ namespace DXForgeEditor.Editors
     /// </summary>
     public partial class TransformView : UserControl
     {
-        // 編集を始めたときの値に戻すアクション(操作の前の値を覚えておく)
-        private Action? _undoAction = null;
+        // 編集を始めたときの値に戻すアクション(操作の前の値を覚えておく)。行ごとに持つ。
+        // NOTE: 1 つにすると、Position に入力して Enter を押さずに Rotation を押したとき、Rotation の PreviewMouseLeftButtonDown が
+        //       Position の確定(PreviewLostKeyboardFocus)より先に来て上書きし、Position の Undo が回転を戻すだけになる(Codex の指摘)
+        private Action? _positionUndo;
+        private Action? _rotationUndo;
+        private Action? _scaleUndo;
 
         public TransformView()
         {
@@ -53,26 +57,25 @@ namespace DXForgeEditor.Editors
 
         // NOTE: VectorBox の ValueChanged は操作の確定(ドラッグを離す、入力の確定)ごとに 1 回出る(Primal Day 086)。
         //       そのときにはもう値が変わっているので、操作の前の値はマウスのボタンを押したときかフォーカスを得たときに覚えておく
-        private void RecordAction(Func<Action?> getAction, string name)
+        private static void RecordAction(ref Action? undoAction, Action? redoAction, string name)
         {
-            var redoAction = getAction();
-            if (_undoAction != null && redoAction != null)
+            if (undoAction != null && redoAction != null)
             {
-                Project.UndoRedo.Add(new UndoRedoAction(_undoAction, redoAction, name));
+                Project.UndoRedo.Add(new UndoRedoAction(undoAction, redoAction, name));
             }
             // 同じフォーカスのまま続けて確定したときは、いま確定した値が次の操作の前の値になる
-            _undoAction = redoAction;
+            undoAction = redoAction;
         }
 
-        private void OnPosition_VectorBox_PreviewMouse_LBD(object sender, MouseButtonEventArgs e) => _undoAction = GetPositionAction();
-        private void OnPosition_VectorBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => _undoAction = GetPositionAction();
-        private void OnRotation_VectorBox_PreviewMouse_LBD(object sender, MouseButtonEventArgs e) => _undoAction = GetRotationAction();
-        private void OnRotation_VectorBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => _undoAction = GetRotationAction();
-        private void OnScale_VectorBox_PreviewMouse_LBD(object sender, MouseButtonEventArgs e) => _undoAction = GetScaleAction();
-        private void OnScale_VectorBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => _undoAction = GetScaleAction();
+        private void OnPosition_VectorBox_PreviewMouse_LBD(object sender, MouseButtonEventArgs e) => _positionUndo = GetPositionAction();
+        private void OnPosition_VectorBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => _positionUndo = GetPositionAction();
+        private void OnRotation_VectorBox_PreviewMouse_LBD(object sender, MouseButtonEventArgs e) => _rotationUndo = GetRotationAction();
+        private void OnRotation_VectorBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => _rotationUndo = GetRotationAction();
+        private void OnScale_VectorBox_PreviewMouse_LBD(object sender, MouseButtonEventArgs e) => _scaleUndo = GetScaleAction();
+        private void OnScale_VectorBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => _scaleUndo = GetScaleAction();
 
-        private void OnPosition_VectorBox_ValueChanged(object sender, RoutedPropertyChangedEventArgs<Vector4> e) => RecordAction(GetPositionAction, "Position Changed");
-        private void OnRotation_VectorBox_ValueChanged(object sender, RoutedPropertyChangedEventArgs<Vector4> e) => RecordAction(GetRotationAction, "Rotation Changed");
-        private void OnScale_VectorBox_ValueChanged(object sender, RoutedPropertyChangedEventArgs<Vector4> e) => RecordAction(GetScaleAction, "Scale Changed");
+        private void OnPosition_VectorBox_ValueChanged(object sender, RoutedPropertyChangedEventArgs<Vector4> e) => RecordAction(ref _positionUndo, GetPositionAction(), "Position Changed");
+        private void OnRotation_VectorBox_ValueChanged(object sender, RoutedPropertyChangedEventArgs<Vector4> e) => RecordAction(ref _rotationUndo, GetRotationAction(), "Rotation Changed");
+        private void OnScale_VectorBox_ValueChanged(object sender, RoutedPropertyChangedEventArgs<Vector4> e) => RecordAction(ref _scaleUndo, GetScaleAction(), "Scale Changed");
     }
 }
