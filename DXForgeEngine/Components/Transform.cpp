@@ -13,6 +13,7 @@
 // 2026/10/18 set_orientation()を削除し、向きを回転から導出するローカルフレーム(right/up/front)で保持するよう変更 (#4)
 // 2026/10/19 update()のassertで、キャッシュの所有エンティティが生きている(世代が一致する)ことまで確かめるよう変更 (#78)
 // 2026/11/03 calculate_transform_matrices()のassertの範囲の誤り(>=)を > に修正 (Primal Day 079, #32)
+// 2026/11/08 ローカル/ワールドの差分を適用した位置・回転を求める関数を追加 (Primal Day 086, #244)
 // /_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Transform.h"
@@ -305,5 +306,40 @@ namespace dxforge::transform
 	{
 		assert(is_valid());
 		return local_frames[id::index(_id)].frame;
+	}
+
+	math::v3 component::calculate_local_position(math::v3 delta) const
+	{
+		assert(is_valid());
+		const id::id_type index{ id::index(_id) };
+		using namespace DirectX;
+		// ローカルフレームは行が right/up/front なので、行ベクトル delta に掛けると delta.x * right + delta.y * up + delta.z * front になる
+		const XMMATRIX frame{ XMLoadFloat3x3(&local_frames[index].frame) };
+		const XMVECTOR local_delta{ XMVector3Transform(XMLoadFloat3(&delta), frame) };
+		math::v3 result{};
+		XMStoreFloat3(&result, XMVectorAdd(XMLoadFloat3(&positions[index]), local_delta));
+		return result;
+	}
+
+	math::v4 component::calculate_local_rotation(math::v4 delta_quaternion) const
+	{
+		assert(is_valid());
+		using namespace DirectX;
+		// NOTE: XMQuaternionMultiply(a, b) は a のあとに b を回す。差分を先に回すと、差分の軸はエンティティのローカル軸になる
+		const XMVECTOR q{ XMLoadFloat4(&rotations[id::index(_id)]) };
+		math::v4 result{};
+		XMStoreFloat4(&result, XMQuaternionNormalize(XMQuaternionMultiply(XMLoadFloat4(&delta_quaternion), q)));
+		return result;
+	}
+
+	math::v4 component::calculate_world_rotation(math::v4 delta_quaternion) const
+	{
+		assert(is_valid());
+		using namespace DirectX;
+		// NOTE: Primal は 3 軸のうち 0 でない 1 軸だけを回すが、差分はエディタがクォータニオンにして渡すので、そのまま掛ける(#244)
+		const XMVECTOR q{ XMLoadFloat4(&rotations[id::index(_id)]) };
+		math::v4 result{};
+		XMStoreFloat4(&result, XMQuaternionNormalize(XMQuaternionMultiply(q, XMLoadFloat4(&delta_quaternion))));
+		return result;
 	}
 }

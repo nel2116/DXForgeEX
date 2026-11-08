@@ -7,6 +7,7 @@
 // 更新履歴
 // 2024/08/12 新規作成
 // 2026/11/06 update_component を追加 (Primal Day 082, #201)
+// 2026/11/08 is_alive()が範囲外のインデックスに対して Release でも範囲外を読まず false を返すようにした (#244)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Entity.h"
@@ -161,6 +162,7 @@ namespace dxforge::game_entity
 		assert(id::is_valid(id));							// 有効なエンティティであることを確認
 		const id::id_type index{ id::index(id) };
 		assert(index < generations.size());					// インデックスが範囲内であることを確認
+		if (index >= generations.size()) return false;		// Release でも範囲外を読まない(DLL はエディタから受け取った ID を確かめるのに使う、#244)
 		return generations[index] == id::generation(id) && transforms[index].is_valid();
 	}
 

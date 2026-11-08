@@ -10,6 +10,7 @@
 // 2026/10/18 向きをエンティティのfront()から取得し、上方向もエンティティのup()に追従するよう変更 (#4)
 // 2026/10/18 update()で毎フレーム上書きされ効かなかった上方向のsetterを削除 (#62)
 // 2026/11/08 視野角(field_of_view)を pi の倍数から垂直方向のラジアンにした (#205)
+// 2026/11/08 設定できないパラメータ(dummy_set)を設定しようとしたら assert するようにした (Primal Day 086, #244)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -419,7 +420,7 @@ namespace dxforge::graphics::d3d12::camera
 	void set_parameter(camera_id id, camera_parameter::parameter parameter, const void* const data, u32 data_size)
 	{
 		assert(data && data_size);
-		assert(parameter < camera_parameter::count);
+		assert(parameter < camera_parameter::count && set_functions[parameter] != dummy_set);
 		d3d12_camera& camera{ get(id) };
 		set_functions[parameter](camera, data, data_size);
 	}

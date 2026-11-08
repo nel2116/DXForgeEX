@@ -8,6 +8,7 @@
 // 2025/01/18 新規作成
 // 2026/10/18 ライトの向きをエンティティのfront()から取得するよう変更 (#4)
 // 2026/10/19 環境光(IBL)のライトを追加 (Primal Day 075)
+// 2026/11/08 スポットライトの umbra を pi 未満に抑え、180 度の光錐で assert しないようにした (Primal Day 086, #244)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Light.h"
@@ -392,7 +393,7 @@ namespace dxforge::graphics::d3d12::light
 				assert(owner.type == graphics::light::spot);
 				assert(index < _cullable_lights.size());
 
-				umbra = std::clamp(umbra, 0.0f, math::pi);
+				umbra = std::clamp(umbra, 0.0f, math::pi - math::epsilon);
 				_cullable_lights[index].CosUmbra = DirectX::XMScalarCos(umbra * 0.5f);
 				make_dirty(index);
 
@@ -618,7 +619,7 @@ namespace dxforge::graphics::d3d12::light
 				XMVECTOR tip{ XMLoadFloat3(&params.Position) };
 				XMVECTOR direction{ XMLoadFloat3(&params.Direction) };
 				const f32 cone_cos{ params.CosPenumbra };
-				assert(cone_cos >= 0.0f);
+				assert(cone_cos > -0.001f);	// cos(180 度 / 2) の丸め誤差で assert しないよう、少し負の値まで許す
 
 				if (cone_cos >= 0.707107f)
 				{

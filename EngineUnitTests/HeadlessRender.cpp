@@ -28,6 +28,7 @@
 // 2026/11/08 エディタのカメラの API(UpdateEditorCamera / SetCameraRange / SetCameraFoV)の確認を追加 (Primal Day 085, #225)
 // 2026/11/08 ウィンドウを持つスレッドがミューテックスを待つ間に別のスレッドが Present する確認と --show-viewports を追加 (#213)
 // 2026/11/08 エディタのエンティティの記述子の回転をクォータニオンにした (#205)
+// 2026/11/08 DLL の SetPosition で動かした球が新しい場所に描かれることの確認を追加 (Primal Day 086, #244)
 // 2026/11/08 SetCameraFoV の確認を、視野角がラジアン(既定は 0.25 * pi)であることに合わせた (#205)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
@@ -85,6 +86,7 @@ struct editor_entity_descriptor;
 extern "C" dxforge::id::id_type CreateGameEntity(editor_entity_descriptor* e);
 extern "C" void RemoveGameEntity(dxforge::id::id_type id);
 extern "C" dxforge::id::id_type GetComponentId(dxforge::id::id_type entity_id, dxforge::component_type::type type);
+extern "C" u32 SetPosition(const dxforge::id::id_type* ids, const f32* x, const f32* y, const f32* z, u32 count, u32 frame);
 
 // DXForgeEngineDLL/EntityAPI.cpp の game_entity_descriptor と同じ並び(Tests_EditorAPI.cpp の test_descriptor と同じ)
 struct editor_entity_descriptor
@@ -512,6 +514,55 @@ namespace dxforge::headless::render
 				info.light_set_key = light_set_key;
 				info.camera_id = _camera.get_id();
 				return info;
+			}
+
+			/// @brief 作成後のエンティティを DLL の SetPosition(エディタのインスペクタの経路、Primal Day 086)で動かすと、描かれる場所が変わることを確かめる(#244)
+			/// @details 球を画面の右へ動かして描き、基準と違う画素が画面の右に寄ることを見る。元の位置に戻して描くと、基準と同じ画像になる。
+			///			 カメラは +Z を向く右手系なので、ワールドの -X が画面の右になる。
+			/// @param baseline 球が原点にあるときに読み戻した画素
+			/// @return 失敗したときはその説明(成功なら空)
+			std::string check_entity_moves(const graphics::surface& surface, u32 width, u32 frames, const utl::vector<math::v4>& baseline)
+			{
+				const auto set_sphere_x = [this](f32 x)
+				{
+					const id::id_type ids[]{ _sphere_entity.get_id() };
+					const f32 px[]{ x }, py[]{ 0.f }, pz[]{ 0.f };
+					return SetPosition(ids, px, py, pz, 1, transform::space::absolute) == 1;
+				};
+				const auto render_and_read = [&](utl::vector<math::v4>& pixels)
+				{
+					for (u32 i{ 0 }; i < frames; ++i) surface.render(frame_info());
+					return surface.read_back(pixels);
+				};
+				const auto differs = [](const math::v4& a, const math::v4& b)
+				{
+					return std::fabs(a.x - b.x) > 1e-3f || std::fabs(a.y - b.y) > 1e-3f || std::fabs(a.z - b.z) > 1e-3f;
+				};
+
+				if (!set_sphere_x(-1.f)) return "SetPosition() did not accept the sphere entity";
+				utl::vector<math::v4> moved{};
+				if (!render_and_read(moved) || moved.size() != baseline.size()) return "failed to read back the image with the moved sphere";
+				u64 changed{ 0 }, changed_on_right{ 0 };
+				for (u32 i{ 0 }; i < (u32)moved.size(); ++i)
+				{
+					if (!differs(moved[i], baseline[i])) continue;
+					++changed;
+					if (i % width >= width / 2) ++changed_on_right;
+				}
+				if (changed == 0) return "moving the sphere with SetPosition() did not change the image";
+				// 元の場所(中央)から消えた画素と、新しい場所(右)に描かれた画素なので、右半分のほうが多い
+				if (changed_on_right * 2 <= changed) return "the sphere moved with SetPosition() was not drawn on the right of the image";
+
+				if (!set_sphere_x(0.f)) return "SetPosition() did not accept the sphere entity";
+				utl::vector<math::v4> restored{};
+				if (!render_and_read(restored) || restored.size() != baseline.size()) return "failed to read back the image with the restored sphere";
+				for (u32 i{ 0 }; i < (u32)restored.size(); ++i)
+				{
+					if (differs(restored[i], baseline[i])) return "moving the sphere back with SetPosition() did not restore the image";
+				}
+				std::fprintf(stderr, "[render] SetPosition check (#244): %llu of %u pixels changed, %llu on the right half\n",
+					(unsigned long long)changed, (u32)moved.size(), (unsigned long long)changed_on_right);
+				return {};
 			}
 
 			/// @brief Geometryコンポーネントのあるエンティティから、IDを指定した取得と作り直しを確かめ、描画する(Primal Day 082)
@@ -1282,7 +1333,9 @@ namespace dxforge::headless::render
 			utl::vector<math::v4> pixels{};
 			const bool read{ surface.get().read_back(pixels) };
 			// NOTE: 読み戻したあとで、基準画像に影響しない確認をする(Primal Day 082)
-			std::string check_error{ check_deferred_release(surface.get(), scene) };
+			// NOTE: 床を消す check_geometry_updates より先に、基準の画像と比べる
+			std::string check_error{ read ? scene.check_entity_moves(surface.get(), opt.width, opt.frames, pixels) : std::string{} };
+			if (check_error.empty()) check_error = check_deferred_release(surface.get(), scene);
 			if (check_error.empty()) check_error = check_renderer_options();
 			if (check_error.empty()) check_error = scene.check_geometry_updates(surface.get());
 			if (check_error.empty()) check_error = check_editor_viewports(scene, state);
