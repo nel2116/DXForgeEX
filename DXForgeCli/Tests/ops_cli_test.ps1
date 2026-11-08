@@ -15,7 +15,8 @@
       6. エディタが開いている(44): エディタと同じ ProjectEditorLock をテストのプロセスで持つ。読むだけなら通り、離す・切り替えると通る。2 つのエディタが持つなら、両方が離すまで断る。
       7. 空のプロジェクトに作って保存し、エディタのコード(Project.Load)で読むと同じ内容で、--frames で実行できる。
          回転(#205): rotation_deg のエンティティを --export-game-bin とランナーで読むと、dxforge の rotation_quat(エディタが DLL に
-         渡すクォータニオン)と同じになる。いくつかの角度で、C# と C++(XMQuaternionRotationRollPitchYaw)のオイラー角の順序が一致する。
+         渡すクォータニオン)と同じになる。game.bin にはそのクォータニオンが 4 つの float で入っている。いくつかの角度で、
+         C# の EulerRotation が求めたクォータニオンが期待値の表(EngineUnitTests の euler_order_matches_the_editor と同じ)と一致する。
       8. GUID のない .dxproj。保存し直しても game.bin が変わらない。日本語の名前。
          古い形式の回転(Rotation)は警告を出して回転なしにする。手がかりがクォータニオンと違う回転なら作り直す。
       9. シーンの追加・削除・切り替え(最後のシーン、アクティブなシーン、消したシーンの別名、新しいアクティブのシーンの game.bin)。
@@ -786,9 +787,9 @@ try
 		$createdQuat = (Get-Component $created "transform").rotation_quat
 		Check (Same-Rotation @($r.Json.entities)[0].rotation $createdQuat) "--frames: the engine's rotation == dxforge's rotation_quat (rotation_deg [0,90,0])" "$(@($r.Json.entities)[0].rotation -join ',') vs $($createdQuat -join ',')"
 
-		# オイラー角の順序(#205): dxforge(C# の EulerRotation)のクォータニオンと、game.bin を読んだエンジン(C++ の
-		# XMQuaternionRotationRollPitchYawFromVector)のクォータニオンが同じ回転になる。期待値のある 5 つは
-		# EngineUnitTests の euler_order_matches_the_editor と同じ表
+		# 回転の経路(#205): dxforge(C# の EulerRotation)が求めたクォータニオンが、そのまま game.bin に入り、エンジンが
+		# 変換せずに読む(docs/design/rotation-units.md の決定 4)。期待値のある 5 つは EngineUnitTests の
+		# euler_order_matches_the_editor と同じ表で、C++ の XMQuaternionRotationRollPitchYaw との順序の一致はそちらが確かめる
 		$eulerCases = @(
 			@{ Deg = @(0, 90, 0); Quat = @(0, 0.70710678, 0, 0.70710678) },
 			@{ Deg = @(90, 0, 0); Quat = @(0.70710678, 0, 0, 0.70710678) },
@@ -812,12 +813,17 @@ try
 		$runCode = $LASTEXITCODE
 		$run = $runOutput | ConvertFrom-Json
 		Check ($runCode -eq 0 -and $run.entity_count -eq $eulerCases.Count) "Euler order: the runner loads the game.bin" "$runOutput"
+		$eulerBytes = Read-Bytes $eulerBin
+		# Transform だけのエンティティは 52 バイト(種類、コンポーネント数、Transform の種類、位置 3 + 回転 4 + スケール 3 の float)
+		Check ($null -ne $eulerBytes -and $eulerBytes.Length -eq 4 + 52 * $eulerCases.Count) "Euler order: game.bin has 4 floats of rotation per Transform" "$($eulerBytes.Length) bytes"
 		for ($i = 0; $i -lt $eulerCases.Count; ++$i)
 		{
 			$fromCli = (Get-Component @($r.Json.results)[2 * $i + 1].entity "transform").rotation_quat
 			$fromEngine = @($run.entities)[$i].rotation
+			$fromBin = if ($null -ne $eulerBytes -and $eulerBytes.Length -eq 4 + 52 * $eulerCases.Count) { @(0..3 | ForEach-Object { [BitConverter]::ToSingle($eulerBytes, 4 + 52 * $i + 24 + 4 * $_) }) } else { @() }
 			$expected = if ($eulerCases[$i].Quat) { $eulerCases[$i].Quat } else { $fromCli }
-			Check ((Same-Rotation $fromCli $expected) -and (Same-Rotation $fromEngine $fromCli)) "Euler order: rotation_deg [$($eulerCases[$i].Deg -join ',')] -> the same quaternion in C# and in the engine" "C# $($fromCli -join ',') engine $($fromEngine -join ',')"
+			# 変換がないので、符号も含めて同じ値になる(q と -q の取り違えも見逃さない)
+			Check ((Same-Rotation $fromCli $expected) -and (Near $fromBin $fromCli 1e-6) -and (Near $fromEngine $fromCli 1e-6)) "Euler order: rotation_deg [$($eulerCases[$i].Deg -join ',')] -> the same quaternion in dxforge, game.bin and the engine" "C# $($fromCli -join ',') game.bin $($fromBin -join ',') engine $($fromEngine -join ',')"
 		}
 	}
 
