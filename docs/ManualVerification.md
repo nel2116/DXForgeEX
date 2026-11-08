@@ -271,7 +271,7 @@ Start from a project opened as in step 2. Object rendering comes in Day 084, so 
 
 The inspector's Transform rows and the Primitive mesh dialog's size boxes are `NumberBox`es (`docs/design/number-box.md`). The value logic and events have a headless test (`number_box_test.ps1`); check the mouse and keyboard handling here.
 
-1. **Drag**: press on a Transform box and drag left/right; the value changes while dragging (faster with Shift, slower with Ctrl) and the cursor is the left-right arrow. Releasing leaves the value. One drag is one `Edit > Undo` step, and undo/redo restore the values before/after the drag. The drag takes the keyboard focus: pressing Delete right after it does not delete the entity selected in the Hierarchy.
+1. **Drag**: press on a Transform box and drag left/right; the value changes while dragging (faster with Shift, slower with Ctrl) and the cursor is the left-right arrow. Releasing leaves the value. One drag is one undo step (Ctrl+Z; the editor has no Edit menu), and undo/redo (Ctrl+Z/Ctrl+Y) restore the values before/after the drag. The drag takes the keyboard focus: pressing Delete right after it does not delete the entity selected in the Hierarchy.
 2. **Type**: click without moving; the box becomes editable with the text selected. Enter, Tab or clicking elsewhere commits (one undo step); Escape discards the typing. Text that is not a number is rejected and the old value comes back.
 3. **Mixed values**: select two entities with different positions; the differing boxes are empty with a gray background. Typing or dragging there sets all selected entities to the same value, and undo restores each one's own value.
 4. **Primitive mesh dialog**: dragging a size box updates the preview while dragging; typing a value updates it on commit.
@@ -282,7 +282,7 @@ Start from a project with an active scene showing entities with geometry (e.g. t
 
 1. **Absolute rows**: dragging or typing Position, Rotation or Scale moves, turns or scales the selected entity in the viewport while dragging. With the uniform toggle (`U`) on, changing one Scale component sets all three.
 2. **Multi-selection**: with two entities selected, every edit changes both in the viewport.
-3. **Undo/Redo**: each drag or commit is one `Edit > Undo` step; undo and redo move the entities in the viewport back and forth, not only the inspector values.
+3. **Undo/Redo**: each drag or commit is one undo step; undo (Ctrl+Z) and redo (Ctrl+Y) move the entities in the viewport back and forth, not only the inspector values.
 4. **Offsets**: rotate an entity (e.g. Rotation Y 90), then drag Local Offset Z: it moves along its own front, not world Z. Rotation Offset X with the `L` toggle on turns it about its own X axis, with the toggle off (label "World Offset") about world X; the two give different results. After each commit the offset row shows 0 again and the Rotation row shows angles that describe the new orientation.
 5. **Close**: close the project and the editor during and after edits; no crash and no assert dialog.
 
