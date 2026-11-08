@@ -9,6 +9,7 @@
 // 2025/01/14 コメントの追加
 // 2026/10/18 向きをエンティティのfront()から取得し、上方向もエンティティのup()に追従するよう変更 (#4)
 // 2026/10/18 update()で毎フレーム上書きされ効かなかった上方向のsetterを削除 (#62)
+// 2026/11/08 視野角(field_of_view)を pi の倍数から垂直方向のラジアンにした (#205)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -330,7 +331,7 @@ namespace dxforge::graphics::d3d12::camera
 		if (_is_dirty)
 		{
 			_projection = (_projection_type == graphics::camera::perspective)
-				? XMMatrixPerspectiveFovRH(_field_of_view * XM_PI, _aspect_ratio, _far_z, _near_z)
+				? XMMatrixPerspectiveFovRH(_field_of_view, _aspect_ratio, _far_z, _near_z)
 				: XMMatrixOrthographicRH(_view_width, _view_height, _far_z, _near_z);
 			_inverse_projection = XMMatrixInverse(nullptr, _projection);
 			_is_dirty = false;
@@ -341,11 +342,11 @@ namespace dxforge::graphics::d3d12::camera
 	}
 
 	/// @brief カメラの視野角を設定する関数
-	/// @param fov 視野角
-	constexpr void d3d12_camera::field_of_view(f32 fov)
+	/// @param fov_radians 垂直方向の視野角 (ラジアン)
+	constexpr void d3d12_camera::field_of_view(f32 fov_radians)
 	{
 		assert(_projection_type == graphics::camera::perspective);
-		_field_of_view = fov;
+		_field_of_view = fov_radians;
 		_is_dirty = true;
 	}
 

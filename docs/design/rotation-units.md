@@ -2,7 +2,7 @@
 
 <!-- last-reviewed: 2026-11-08 -->
 
-- Status: Accepted. #205 PR 1 implements points 2, 3 and 5 (editor model, `.dxproj`, dxforge, DLL); points 4 and 6 (`game.bin` quaternion, `ContentLoader`, FoV) are pending in #205 PR 2
+- Status: Implemented. #205 PR 1 (#242) implements points 2, 3 and 5 (editor model, `.dxproj`, dxforge, DLL); #205 PR 2 implements points 4 and 6 (`game.bin` quaternion, `ContentLoader`, FoV in radians)
 - Decided: 2026/11/08, by the user
 - Issues: #208 (decision), #205 (bug and implementation), #183 (dxforge value conventions, partly superseded)
 
@@ -47,5 +47,6 @@ Every path that carries a rotation or angle (editor UI, `.dxproj`, dxforge, the 
 ## Consequences
 
 - #205 implements points 2-6: editor model and `.dxproj` data members, dxforge (`rotation_deg` input, writes both forms; `rotation_rad` may stay as input), DLL conversion, `game.bin` writer and `ContentLoader`, FoV, and a C#/C++ Euler-order agreement test.
+- Where the tests are: the C++ Euler order is `euler_order_matches_the_editor` in `EngineUnitTests` (expected values computed with C#'s `Quaternion.CreateFromYawPitchRoll`). Because `game.bin` now carries the quaternion, `ops_cli_test.ps1` section 7 checks that dxforge's `rotation_quat`, the 4 floats in the exported `game.bin` and the engine's loaded rotation are the same values, and `Tests_ContentLoader.cpp` checks that `ContentLoader` keeps a known quaternion. `camera_field_of_view_is_vertical_radians` checks that the default projection equals the old `0.25 * XM_PI` one, and `EngineUnitTests --render` checks that `SetCameraFoV(45)` gives the default projection and 90 degrees gives `pi / 2`.
 - The #183 statement that `.dxproj` holds radians is superseded by this record.
 - The editor camera (Day 085) keeps its own radians-internal state via `to_quat(rot, false)`; it is not entity rotation and is unaffected except for FoV.

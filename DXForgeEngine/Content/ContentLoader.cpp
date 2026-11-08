@@ -12,6 +12,7 @@
 // 2026/10/27 エラーメッセージに入れるスクリプト名の、表示できないASCII以外のバイトを\xNNにした(不正なUTF-8が--jsonに入っていたため) (#11)
 // 2026/10/27 ファイルの存在の確認自体に失敗したときは、file_not_foundではなくread_failedにして理由を返すようにした (#11)
 // 2026/11/06 コンポーネントの種類を Entity.h の component_type にし、read_geometry を追加 (Primal Day 082, #201)
+// 2026/11/08 Transformの回転をオイラー角ではなくクォータニオン(4つのf32)として読むようにした (#205)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "ContentLoader.h"
@@ -21,6 +22,7 @@
 #include "Graphics/Renderer.h"
 
 #if !defined(SHIPPING) && defined(_WIN64)
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <filesystem>
@@ -90,8 +92,7 @@ namespace dxforge::content
 		/// @return 読み込みの結果
 		load_game_result read_transform(blob_reader& data, game_entity::entity_info& info)
 		{
-			using namespace DirectX;
-			f32 rotation[3];
+			f32 rotation[4];	// クォータニオン(x, y, z, w)。オイラー角の変換はしない (docs/design/rotation-units.md)
 
 			// すでにTransformがあるならエラー
 			if (info.transform)
@@ -107,12 +108,19 @@ namespace dxforge::content
 				return load_game_result::invalid_format;
 			}
 
-			// 回転をオイラーからクォータニオンに変換
-			XMFLOAT3A rot{ &rotation[0] };
-			XMVECTOR quat{ XMQuaternionRotationRollPitchYawFromVector(XMLoadFloat3A(&rot)) };
-			XMFLOAT4A rot_quat{};
-			XMStoreFloat4A(&rot_quat, quat);
-			memcpy(&transform_info.rotation[0], &rot_quat.x, sizeof(transform_info.rotation));
+			// 書き手(エディタ)は正規化したクォータニオンを書く。長さが 0 や有限でない値は壊れたファイルとして扱い、
+			// それ以外は誤差を除くために正規化し直す
+			const f32 length{ std::sqrt(rotation[0] * rotation[0] + rotation[1] * rotation[1] + rotation[2] * rotation[2] + rotation[3] * rotation[3]) };
+			if (!std::isfinite(length) || length < math::epsilon)
+			{
+				last_error = "invalid rotation quaternion in transform component";
+				return load_game_result::invalid_format;
+			}
+			for (u32 i{ 0 }; i < _countof(rotation); ++i)
+			{
+				transform_info.rotation[i] = rotation[i] / length;
+			}
+			static_assert(sizeof(transform_info.rotation) == sizeof(rotation));
 
 			info.transform = &transform_info;
 			return load_game_result::ok;

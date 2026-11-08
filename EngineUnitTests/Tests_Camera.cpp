@@ -6,6 +6,7 @@
 // Graphics/Direct3D12/D3D12Camera.cppの上方向の扱いのテスト(GPUデバイス不要)
 // 更新履歴
 // 2026/10/18 新規作成 (#62)
+// 2026/11/08 視野角がラジアンで、既定の射影が以前と同じであることのテストを追加 (#205)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "MicroTest.h"
@@ -71,6 +72,34 @@ DXFORGE_TEST_CASE(camera_has_no_api_that_accepts_an_up_vector)
 	CHECK(!has_up_member<graphics::camera_init_info>::value);
 	CHECK(!has_up_member<graphics::perspective_camera_init_info>::value);
 	CHECK(!has_up_member<graphics::orthographic_camera_init_info>::value);
+}
+
+// #205: 視野角は垂直方向のラジアン。既定(0.25 * pi = 45 度)の射影は、pi の倍数で持っていたときの既定(0.25)と同じ
+DXFORGE_TEST_CASE(camera_field_of_view_is_vertical_radians)
+{
+	using namespace DirectX;
+	const game_entity::entity entity{ create_rolled_entity() };
+	REQUIRE(entity.is_valid());
+
+	const graphics::perspective_camera_init_info info{ entity.get_id() };
+	graphics::d3d12::camera::d3d12_camera camera{ info };
+	CHECK(nearly_equal(camera.field_of_view(), XM_PIDIV4));
+	// 変更前の D3D12Camera.cpp と同じ式(field_of_view * XM_PI、既定 0.25)で作った射影
+	XMFLOAT4X4 expected, actual;
+	XMStoreFloat4x4(&expected, XMMatrixPerspectiveFovRH(0.25f * XM_PI, info.aspect_ratio, info.far_z, info.near_z));
+	XMStoreFloat4x4(&actual, camera.projection());
+	for (u32 row{ 0 }; row < 4; ++row)
+		for (u32 column{ 0 }; column < 4; ++column)
+			CHECK(nearly_equal(actual.m[row][column], expected.m[row][column]));
+
+	// 90 度の垂直視野では、射影の [1][1](1 / tan(fov / 2))が 1 になる
+	graphics::perspective_camera_init_info wide_info{ entity.get_id() };
+	wide_info.field_of_view = XM_PIDIV2;
+	const graphics::d3d12::camera::d3d12_camera wide{ wide_info };
+	XMStoreFloat4x4(&actual, wide.projection());
+	CHECK(nearly_equal(actual.m[1][1], 1.f));
+
+	game_entity::remove(entity.get_id());
 }
 
 DXFORGE_TEST_CASE(camera_up_follows_entity_rotation)

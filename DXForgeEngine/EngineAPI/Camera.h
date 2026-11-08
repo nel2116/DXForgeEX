@@ -7,6 +7,7 @@
 // 更新履歴
 // 2025/01/12 新規作成
 // 2026/10/18 上方向のsetter up(math::v3)を削除 (#62)
+// 2026/11/08 視野角(field_of_view)を pi の倍数から垂直方向のラジアンにした (#205)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -30,7 +31,7 @@ namespace dxforge::graphics
 		constexpr camera_id get_id() const { return _id; }
 		constexpr bool is_valid() const { return id::is_valid(_id); }
 
-		void field_of_view(f32 fov) const;
+		void field_of_view(f32 fov_radians) const;	// 垂直方向の視野角 (ラジアン)
 		void aspect_ratio(f32 aspect_ratio) const;
 		void view_width(f32 width) const;
 		void view_height(f32 height) const;
@@ -44,7 +45,7 @@ namespace dxforge::graphics
 		math::v3 up() const;	// カメラのエンティティのup()に追従する (向きはエンティティの回転で変える)
 		f32 near_z() const;
 		f32 far_z() const;
-		f32 field_of_view() const;
+		f32 field_of_view() const;					// 垂直方向の視野角 (ラジアン)
 		f32 aspect_ratio() const;
 		f32 view_width() const;
 		f32 view_height() const;

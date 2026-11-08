@@ -17,6 +17,7 @@
 // 2026/11/07 実際に描いた回数を返す GetDrawnFrameCount を追加 (#209)
 // 2026/11/08 消すジオメトリの ID をビューポートから取り除く remove_geometry_from_viewports を追加 (#214)
 // 2026/11/08 エディタのカメラの UpdateEditorCamera / SetCameraRange / SetCameraFoV とマウスの追跡を追加 (Primal Day 085, #225)
+// 2026/11/08 SetCameraFoV の度数を、エンジンの単位(pi の倍数)ではなくラジアンにして渡すようにした (#205)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "Common.h"
@@ -62,7 +63,7 @@ namespace
 		math::v4 rotation{};	// クォータニオン
 		f32 near_z{ 0.f };
 		f32 far_z{ 0.f };
-		f32 field_of_view{ 0.f };	// エンジンの単位(度数 / 180)
+		f32 field_of_view{ 0.f };	// 垂直方向の視野角(ラジアン、エンジンの単位)
 		bool has_transform{ false };
 		bool has_range{ false };
 		bool has_field_of_view{ false };
@@ -712,14 +713,14 @@ EDITOR_INTERFACE void SetCameraRange(u32 surface_id, f32 near_z, f32 far_z)
 }
 
 // ビューポートのカメラの視野角(度数)を設定する(Primal Day 085)。カメラがなければ、作ったときに反映する。
-// NOTE: エンジンのカメラは field_of_view * pi を視野角にするので、180 で割る。
-EDITOR_INTERFACE void SetCameraFoV(u32 surface_id, f32 fov)
+// NOTE: エディタは垂直方向の視野角を度数で渡し、エンジンのカメラはラジアンで受け取る(docs/design/rotation-units.md)。
+EDITOR_INTERFACE void SetCameraFoV(u32 surface_id, f32 fov_degrees)
 {
 	std::lock_guard lock{ mutex };
-	assert(fov > 0);
+	assert(fov_degrees > 0);
 	if (!is_editor_camera_target(surface_id)) return;
 	viewport_surface& surface{ surfaces[surface_id] };
-	surface.camera_settings.field_of_view = fov * (1.f / 180.f);
+	surface.camera_settings.field_of_view = fov_degrees * math::to_rad;
 	surface.camera_settings.has_field_of_view = true;
 	apply_camera_settings(surface);
 }

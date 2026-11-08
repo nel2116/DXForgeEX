@@ -124,8 +124,8 @@ function New-GameBin([object[]]$entities)
 		$bw.Write([int]0)
 		$bw.Write([int]$(if ($e.Script) { 2 } else { 1 }))
 		$bw.Write([int]0) # Transform
-		# 回転は、エディタの Transform の度数法の手がかりをラジアンにしたもの(#205。クォータニオンにするのは PR 2)
-		foreach ($v in @($e.Position + (Radians $e.Rotation) + $e.Scale)) { $bw.Write([single]$v) }
+		# 回転はクォータニオン(x, y, z, w)。エディタが .dxproj から読んで正規化したもの(#205、docs/design/rotation-units.md の決定 4)
+		foreach ($v in @($e.Position + (Stored-Quaternion $e) + $e.Scale)) { $bw.Write([single]$v) }
 		if ($e.Script)
 		{
 			$bytes = [System.Text.Encoding]::UTF8.GetBytes($e.Script)
@@ -150,7 +150,7 @@ function Near([double[]]$actual, [double[]]$expected, [double]$tolerance = 1e-5)
 	return $true
 }
 
-# エディタの Transform.WriteToBinary と同じく、float の度数を double でラジアンにして float にする
+# エディタの EulerRotation.ToRadians と同じく、float の度数を double でラジアンにして float にする
 function Radians([double[]]$degrees) { return @($degrees | ForEach-Object { [single]([single]$_ * [Math]::PI / 180.0) }) }
 
 # エンジン(XMQuaternionRotationRollPitchYawFromVector(x=pitch, y=yaw, z=roll))と同じ回転のクォータニオン。引数は度数法
@@ -161,10 +161,20 @@ function Quaternion([double[]]$degrees)
 	return @($q.X, $q.Y, $q.Z, $q.W)
 }
 
+# フィクスチャの .dxproj に書いてあるクォータニオン(RotationQuaternion、x, y, z, w)を、エディタの Transform と同じく正規化したもの。
+# 書いていないエンティティは単位クォータニオン
+function Stored-Quaternion($entity)
+{
+	$v = if ($entity.RotationQuaternion) { $entity.RotationQuaternion } else { @(0, 0, 0, 1) }
+	$q = [System.Numerics.Quaternion]::Normalize([System.Numerics.Quaternion]::new([single]$v[0], [single]$v[1], [single]$v[2], [single]$v[3]))
+	return @($q.X, $q.Y, $q.Z, $q.W)
+}
+
 $ActiveSceneEntities = @(
 	@{ Name = "Origin"; Position = @(0, 0, 0); Rotation = @(0, 0, 0); Scale = @(1, 1, 1) },
-	@{ Name = "Moved"; Position = @(1.5, -2, 3.25); Rotation = @(0, 90, 0); Scale = @(1, 1, 1) },
-	@{ Name = "Scaled"; Position = @(-4, 0.5, 10); Rotation = @(30, 0, 15); Scale = @(2, 3, 0.5) }
+	# RotationQuaternion はフィクスチャに書いてある値(Rotation の度数から求めたもの)
+	@{ Name = "Moved"; Position = @(1.5, -2, 3.25); Rotation = @(0, 90, 0); RotationQuaternion = @(0, 0.7071068, 0, 0.7071068); Scale = @(1, 1, 1) },
+	@{ Name = "Scaled"; Position = @(-4, 0.5, 10); Rotation = @(30, 0, 15); RotationQuaternion = @(0.25660482, -0.033782665, 0.12607862, 0.9576622); Scale = @(2, 3, 0.5) }
 )
 $SecondSceneEntities = @(@{ Name = "OnlyInSecond"; Position = @(7, 8, 9); Rotation = @(0, 0, 0); Scale = @(1, 1, 1) })
 $WithScriptEntities = @(
@@ -179,7 +189,8 @@ function Check-Entities([string]$name, $json, [object[]]$expected)
 	{
 		$a = @($json.entities)[$i]
 		$e = $expected[$i]
-		$ok = $a.id -eq $i -and $a.name -eq $e.Name -and (Near $a.position $e.Position) -and (Near $a.rotation (Quaternion $e.Rotation)) -and (Near $a.scale $e.Scale)
+		# エンジンの回転は、game.bin のクォータニオンそのもので、度数法の手がかりから求めたものとも同じ回転
+		$ok = $a.id -eq $i -and $a.name -eq $e.Name -and (Near $a.position $e.Position) -and (Near $a.rotation (Stored-Quaternion $e)) -and (Near $a.rotation (Quaternion $e.Rotation)) -and (Near $a.scale $e.Scale)
 		Check $ok "$name -> entity $i ($($e.Name)) id, name and transform" ($a | ConvertTo-Json -Compress)
 	}
 }

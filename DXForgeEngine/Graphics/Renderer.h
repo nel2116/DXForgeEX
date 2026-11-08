@@ -17,6 +17,7 @@
 // 2026/10/30 material_surface から ambient_occlusion を削除(エディタのマテリアルと合わせる。Primal Day 077, #30)
 // 2026/11/02 D3D12 のランタイム(Agility SDK か OS か)の情報を追加 (#155)
 // 2026/11/06 レンダラーの設定(renderer_option, set_option, get_option)を追加 (Primal Day 082, #201)
+// 2026/11/08 視野角(field_of_view)を pi の倍数から垂直方向のラジアンにした (#205)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -173,7 +174,7 @@ namespace dxforge::graphics
 		camera::type type{};						// カメラの種類
 		union
 		{
-			f32 field_of_view;						// 視野角
+			f32 field_of_view;						// 垂直方向の視野角 (ラジアン)
 			f32 view_width;							// 視野の幅
 		};
 		union
@@ -192,7 +193,7 @@ namespace dxforge::graphics
 			assert(id::is_valid(id));
 			entity_id = id;
 			type = camera::type::perspective;
-			field_of_view = 0.25f;
+			field_of_view = 0.25f * math::pi;	// 45 度
 			aspect_ratio = 16.0f / 9.0f;
 			near_z = 0.01f;
 			far_z = 1000.0f;
