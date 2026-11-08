@@ -163,6 +163,14 @@ namespace DXForgeEditor.EngineAPIStructs
             Dispose();
         }
     }
+
+    // DXForgeEngine の transform::space::frame(EngineAPI/TransformComponent.h)と同じ値(Primal Day 086、#244)
+    enum TransformSpace : int
+    {
+        Absolute = 0,   // 値そのもの
+        Local = 1,      // エンティティのローカル軸(right/up/front)についての差分
+        World = 2,      // ワールド軸についての差分
+    }
 }
 
 namespace DXForgeEditor.DllWrappers
@@ -615,6 +623,109 @@ namespace DXForgeEditor.DllWrappers
                 }
 
                 return UpdateComponent(entity.EntityId, desc, type) != 0;
+            }
+
+            // ====== 作成後のトランスフォームの読み書き(Primal Day 086、#244) ======
+            // NOTE: どれも ids と同じ長さの配列を受け取る(複数選択)。DLL は mutex を 1 回だけ取る(1 回の呼び出し = ロック 1 回)。
+            //       無効な ID(非アクティブなエンティティの ID.INVALID_ID など)や削除済みのエンティティの ID は DLL が飛ばし、
+            //       ほかの ID は処理して false を返す。Get* は飛ばした ID の要素を書き換えないので、呼び出し側は C# の値を入れて渡せばよい。
+            //       配列の長さが ids と違うときは何もせず false を返す(例外は投げない)。ids が空なら何もせず true。
+            //       回転はいつもクォータニオンで、DLL はオイラー角に変換しない(docs/design/rotation-units.md)。
+            //       差分のオイラー角(度)は Utilities/EulerRotation.cs でクォータニオンにして渡す。
+
+            [DllImport(_engineDll, EntryPoint = "GetPosition")]
+            private static extern int GetPositionNative([In] int[] ids, [In, Out] float[] x, [In, Out] float[] y, [In, Out] float[] z, int count);
+            [DllImport(_engineDll, EntryPoint = "GetRotation")]
+            private static extern int GetRotationNative([In] int[] ids, [In, Out] float[] x, [In, Out] float[] y, [In, Out] float[] z, [In, Out] float[] w, int count);
+            [DllImport(_engineDll, EntryPoint = "GetScale")]
+            private static extern int GetScaleNative([In] int[] ids, [In, Out] float[] x, [In, Out] float[] y, [In, Out] float[] z, int count);
+            [DllImport(_engineDll, EntryPoint = "SetPosition")]
+            private static extern int SetPositionNative([In] int[] ids, [In] float[] x, [In] float[] y, [In] float[] z, int count, TransformSpace frame);
+            [DllImport(_engineDll, EntryPoint = "SetRotation")]
+            private static extern int SetRotationNative([In] int[] ids, [In] float[] x, [In] float[] y, [In] float[] z, [In] float[] w, int count, TransformSpace frame);
+            [DllImport(_engineDll, EntryPoint = "SetScale")]
+            private static extern int SetScaleNative([In] int[] ids, [In] float[] x, [In] float[] y, [In] float[] z, int count);
+
+            private static bool HasSameLength(int[] ids, Array values)
+            {
+                Debug.Assert(ids.Length == values.Length);
+                return ids.Length == values.Length;
+            }
+
+            private static (float[] x, float[] y, float[] z) Split(Vector3[] values)
+            {
+                var x = new float[values.Length]; var y = new float[values.Length]; var z = new float[values.Length];
+                for (int i = 0; i < values.Length; ++i) { x[i] = values[i].X; y[i] = values[i].Y; z[i] = values[i].Z; }
+                return (x, y, z);
+            }
+
+            private static (float[] x, float[] y, float[] z, float[] w) Split(Quaternion[] values)
+            {
+                var x = new float[values.Length]; var y = new float[values.Length]; var z = new float[values.Length]; var w = new float[values.Length];
+                for (int i = 0; i < values.Length; ++i) { x[i] = values[i].X; y[i] = values[i].Y; z[i] = values[i].Z; w[i] = values[i].W; }
+                return (x, y, z, w);
+            }
+
+            private delegate int GetVector3API(int[] ids, float[] x, float[] y, float[] z, int count);
+
+            private static bool GetVector3(int[] ids, Vector3[] values, GetVector3API api)
+            {
+                if (!HasSameLength(ids, values)) return false;
+                if (ids.Length == 0) return true;
+                var (x, y, z) = Split(values);
+                var result = api(ids, x, y, z, ids.Length) != 0;
+                for (int i = 0; i < values.Length; ++i) values[i] = new(x[i], y[i], z[i]);
+                return result;
+            }
+
+            /// <summary>エンジンのエンティティの位置を values に読む。飛ばした ID の要素はそのまま。すべて読めたら true</summary>
+            public static bool GetPosition(int[] ids, Vector3[] values) => GetVector3(ids, values, GetPositionNative);
+
+            /// <summary>エンジンのエンティティの拡大率を values に読む。飛ばした ID の要素はそのまま。すべて読めたら true</summary>
+            public static bool GetScale(int[] ids, Vector3[] values) => GetVector3(ids, values, GetScaleNative);
+
+            /// <summary>エンジンのエンティティの回転(クォータニオン)を values に読む。飛ばした ID の要素はそのまま。すべて読めたら true</summary>
+            public static bool GetRotation(int[] ids, Quaternion[] values)
+            {
+                if (!HasSameLength(ids, values)) return false;
+                if (ids.Length == 0) return true;
+                var (x, y, z, w) = Split(values);
+                var result = GetRotationNative(ids, x, y, z, w, ids.Length) != 0;
+                for (int i = 0; i < values.Length; ++i) values[i] = new(x[i], y[i], z[i], w[i]);
+                return result;
+            }
+
+            /// <summary>
+            /// エンジンのエンティティの位置を設定する。Absolute: values を位置にする / Local: エンティティのローカル軸に沿って values だけ動かす /
+            /// World: ワールド軸に沿って values だけ動かす。すべて設定できたら true
+            /// </summary>
+            public static bool SetPosition(int[] ids, Vector3[] values, TransformSpace frame)
+            {
+                if (!HasSameLength(ids, values)) return false;
+                if (ids.Length == 0) return true;
+                var (x, y, z) = Split(values);
+                return SetPositionNative(ids, x, y, z, ids.Length, frame) != 0;
+            }
+
+            /// <summary>
+            /// エンジンのエンティティの回転を設定する。Absolute: values を回転にする / Local: 差分 values をローカル軸について掛ける /
+            /// World: 差分 values をワールド軸について掛ける。DLL が結果を正規化する。すべて設定できたら true
+            /// </summary>
+            public static bool SetRotation(int[] ids, Quaternion[] values, TransformSpace frame)
+            {
+                if (!HasSameLength(ids, values)) return false;
+                if (ids.Length == 0) return true;
+                var (x, y, z, w) = Split(values);
+                return SetRotationNative(ids, x, y, z, w, ids.Length, frame) != 0;
+            }
+
+            /// <summary>エンジンのエンティティの拡大率を設定する。すべて設定できたら true</summary>
+            public static bool SetScale(int[] ids, Vector3[] values)
+            {
+                if (!HasSameLength(ids, values)) return false;
+                if (ids.Length == 0) return true;
+                var (x, y, z) = Split(values);
+                return SetScaleNative(ids, x, y, z, ids.Length) != 0;
             }
         }
     }
