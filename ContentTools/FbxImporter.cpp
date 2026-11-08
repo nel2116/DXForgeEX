@@ -8,6 +8,7 @@
 // 2025/01/11 新規作成
 // 2026/10/18 FBX SDKのライブラリ指定を絶対パスの#pragma commentからFbxSdk.propsに移動
 // 2026/11/04 頂点のないメッシュで、falseを返す前にassertしないよう修正 (#176)
+// 2026/11/08 読み込み失敗時にインポーターとシーンを破棄して無効にするよう修正 (#189)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "FbxImporter.h"
@@ -51,27 +52,36 @@ namespace dxforge::tools
 
 	/// @brief FBXファイルの読み込み
 	/// @param file ファイル名
-	void fbx_context::load_fbx_file(const char* file)
+	/// @return 成功した場合はtrue。失敗した場合はシーンを破棄するので、is_valid()はfalseになる
+	bool fbx_context::load_fbx_file(const char* file)
 	{
 		assert(_fbx_manager && !_fbx_scene);
 		_fbx_scene = FbxScene::Create(_fbx_manager, "Importer Scene");
 		if (!_fbx_scene)
 		{
-			return;
+			return false;
 		}
 
 		FbxImporter* importer{ FbxImporter::Create(_fbx_manager, "Importer") };
-		if (!(importer &&
+		const bool loaded{ importer &&
 			importer->Initialize(file, -1, _fbx_manager->GetIOSettings()) &&
-			importer->Import(_fbx_scene)))
+			importer->Import(_fbx_scene) };
+		if (importer)
 		{
-			return;
+			importer->Destroy();
 		}
 
-		importer->Destroy();
+		if (!loaded)
+		{
+			// ユーザー環境で起こりうる失敗(壊れたファイルなど)なのでassertしない。
+			_fbx_scene->Destroy();
+			_fbx_scene = nullptr;
+			return false;
+		}
 
 		// シーンのスケールをメートル単位で取得する。
 		_scene_scale = (f32)_fbx_scene->GetGlobalSettings().GetSystemUnit().GetConversionFactorTo(FbxSystemUnit::m);
+		return true;
 	}
 
 	/// @brief シーンの取得
