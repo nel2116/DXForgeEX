@@ -16,6 +16,7 @@
 #   2. 2つ目のソースがないときも file_not_found になる
 #   3. ある画像を渡すと成功する(このテストの構造体の定義が正しいことの確認)
 #   4. ないFBXを渡しても assert で止まらず、データを返さない
+#   5. 壊れたFBX(中身がFBXでないファイル)を渡しても assert や落下をせず、データを返さない(Issue #189)
 import argparse
 import ctypes
 import os
@@ -169,11 +170,20 @@ def case_missing_fbx(tools, work_dir):
 	return expect(not data.buffer and data.buffer_size == 0, f"データを返した: buffer_size={data.buffer_size}")
 
 
+def case_broken_fbx(tools, work_dir):
+	data = SceneData()
+	data.settings = GeometryImportSettings(178.0, 0, 1, 0, 1, 1, 0)
+	broken = os.path.join(work_dir, "broken.fbx")
+	tools.ImportFbx(broken.encode("mbcs"), ctypes.byref(data), None)
+	return expect(not data.buffer and data.buffer_size == 0, f"データを返した: buffer_size={data.buffer_size}")
+
+
 CASES = {
 	"ないファイルを1つ渡す": case_missing_single,
 	"2つ目のソースがない": case_missing_second,
 	"ある画像を渡す(対照)": case_existing,
 	"ないFBXを渡す": case_missing_fbx,
+	"壊れたFBXを渡す": case_broken_fbx,
 }
 
 
@@ -227,6 +237,8 @@ def main():
 	assert_enabled = False
 	with tempfile.TemporaryDirectory() as work_dir:
 		write_bmp(os.path.join(work_dir, "existing.bmp"))
+		with open(os.path.join(work_dir, "broken.fbx"), "wb") as f:
+			f.write(b"this is not an fbx file\n" * 8)
 		for case_name in CASES:
 			case_passed, reason, debug_crt = run_case(case_name, dll_path, work_dir)
 			assert_enabled = assert_enabled or debug_crt
