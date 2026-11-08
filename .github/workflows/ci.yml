@@ -209,6 +209,11 @@ jobs:
         # 構成ごとの DefineConstants を評価し、ビルドした DXForgeEditor.dll に Debug.Assert の呼び出しが残っていることを確かめる。
         run: pwsh -NoProfile -File DXForgeEditor/Tests/debug_define_test.ps1 -Configuration DebugEditor
 
+      # NumberBox と VectorBox の値の範囲とイベント(Primal Day 086, #244)。表示せずに作り、ドラッグと入力の確定を直接呼ぶ
+      - name: Test editor number boxes
+        shell: pwsh
+        run: pwsh -STA -NoProfile -File DXForgeEditor/Tests/number_box_test.ps1 -Configuration DebugEditor
+
       # エディタのマテリアルのアセット(Material / AppliedMaterial)と既定のマテリアル(Primal Day 077, #30)。
       # 上でビルドした DXForgeEngineDLL を使い、実際のシェーダのコンパイルと DLL の CreateResource / DestroyResource も確かめる。
       # -RequireEngineDll で、DLL がないときに項目を SKIP にせず失敗にする(#146)。GPU は要らない(エンジンを初期化しない)。

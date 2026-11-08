@@ -33,14 +33,15 @@ namespace DXForgeEditor.Content
 
         private void OnSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) => UpdatePrimitive();
 
-        private void OnScalarBox_ValueChanged(object sender, RoutedEventArgs e) => UpdatePrimitive();
+        // ドラッグの 1 歩ごとと入力の確定ごとに作り直す(Primal Day 086 の NumberBox の ValueChanging)
+        private void OnScalarBox_ValueChanging(object sender, RoutedEventArgs e) => UpdatePrimitive();
 
         private void OnTextBox_TextChanged(object sender, TextChangedEventArgs e) => UpdatePrimitive();
 
         private float Value(ScalarBox scalarBox, float min)
         {
-            float.TryParse(scalarBox.Value, out var result);
-            return Math.Max(result, min);
+            // 数として読めない入力は ScalarBox が受け付けない。null(複数の値)はここでは起きないが、最小値にする
+            return Math.Max((float)(scalarBox.Value ?? 0.0), min);
         }
 
         private int Value(TextBox textBox, int min)

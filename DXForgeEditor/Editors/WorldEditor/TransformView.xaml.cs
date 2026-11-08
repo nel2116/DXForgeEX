@@ -21,30 +21,18 @@ namespace DXForgeEditor.Editors
     /// </summary>
     public partial class TransformView : UserControl
     {
+        // 編集を始めたときの値に戻すアクション(操作の前の値を覚えておく)
         private Action? _undoAction = null;
-        private bool _propertyChanged = false;
 
         public TransformView()
         {
             InitializeComponent();
-            Loaded += OnTransformViewLoaded;
-        }
-
-        private void OnTransformViewLoaded(object sender, RoutedEventArgs e)
-        {
-            Loaded -= OnTransformViewLoaded;
-            ((MSTransform)DataContext).PropertyChanged += (s, e) => _propertyChanged = true;
         }
 
         private Action? GetAction<T>(Func<Transform, (Transform transform, T)> selector,
             Action<(Transform transform, T)> forEachAction)
         {
-            if (!(DataContext is MSTransform vm))
-            {
-                _undoAction = null;
-                _propertyChanged = false;
-                return null;
-            }
+            if (!(DataContext is MSTransform vm)) return null;
 
             var selection = vm.SelectedComponents.Select(x => selector(x)).ToList();
             return new Action(() =>
@@ -63,71 +51,25 @@ namespace DXForgeEditor.Editors
 
         private Action? GetScaleAction() => GetAction((x) => (x, x.Scale), (x) => x.transform.Scale = x.Item2);
 
-        private void RecordActions(Action? redoAction, string name)
+        // NOTE: VectorBox の ValueChanged は操作の確定(ドラッグを離す、入力の確定)ごとに 1 回出る(Primal Day 086)。
+        //       そのときにはもう値が変わっているので、操作の前の値はマウスのボタンを押したときかフォーカスを得たときに覚えておく
+        private void RecordAction(Func<Action?> getAction, string name)
         {
-            if (_propertyChanged)
+            var redoAction = getAction();
+            if (_undoAction != null && redoAction != null)
             {
-                Debug.Assert(_undoAction != null);
-                Debug.Assert(redoAction != null);
-                _propertyChanged = false;
                 Project.UndoRedo.Add(new UndoRedoAction(_undoAction, redoAction, name));
             }
+            // 同じフォーカスのまま続けて確定したときは、いま確定した値が次の操作の前の値になる
+            _undoAction = redoAction;
         }
 
-        private void OnPosition_VectorBox_PreviewMouse_LBD(object sender, MouseButtonEventArgs e)
-        {
-            _propertyChanged = false;
-            _undoAction = GetPositionAction();
-        }
+        private void OnPosition_VectorBox_BeginEdit(object sender, RoutedEventArgs e) => _undoAction = GetPositionAction();
+        private void OnRotation_VectorBox_BeginEdit(object sender, RoutedEventArgs e) => _undoAction = GetRotationAction();
+        private void OnScale_VectorBox_BeginEdit(object sender, RoutedEventArgs e) => _undoAction = GetScaleAction();
 
-        private void OnPosition_VectorBox_PreviewMouse_LBU(object sender, MouseButtonEventArgs? e)
-        {
-            RecordActions(GetPositionAction(), "Position Changed");
-        }
-        private void OnRotation_VectorBox_PreviewMouse_LBD(object sender, MouseButtonEventArgs e)
-        {
-            _propertyChanged = false;
-            _undoAction = GetRotationAction();
-        }
-
-        private void OnRotation_VectorBox_PreviewMouse_LBU(object sender, MouseButtonEventArgs? e)
-        {
-            RecordActions(GetRotationAction(), "Rotation Changed");
-        }
-
-        private void OnScale_VectorBox_PreviewMouse_LBD(object sender, MouseButtonEventArgs e)
-        {
-            _propertyChanged = false;
-            _undoAction = GetScaleAction();
-        }
-
-        private void OnScale_VectorBox_PreviewMouse_LBU(object sender, MouseButtonEventArgs? e)
-        {
-            RecordActions(GetScaleAction(), "Scale Changed");
-        }
-
-        private void OnPosition_VectorBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
-        {
-            if (_propertyChanged && _undoAction != null)
-            {
-                OnPosition_VectorBox_PreviewMouse_LBU(sender, null);
-            }
-        }
-
-        private void OnRotation_VectorBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
-        {
-            if (_propertyChanged && _undoAction != null)
-            {
-                OnRotation_VectorBox_PreviewMouse_LBU(sender, null);
-            }
-        }
-
-        private void OnScale_VectorBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
-        {
-            if (_propertyChanged && _undoAction != null)
-            {
-                OnScale_VectorBox_PreviewMouse_LBU(sender, null);
-            }
-        }
+        private void OnPosition_VectorBox_ValueChanged(object sender, RoutedPropertyChangedEventArgs<Vector4> e) => RecordAction(GetPositionAction, "Position Changed");
+        private void OnRotation_VectorBox_ValueChanged(object sender, RoutedPropertyChangedEventArgs<Vector4> e) => RecordAction(GetRotationAction, "Rotation Changed");
+        private void OnScale_VectorBox_ValueChanged(object sender, RoutedPropertyChangedEventArgs<Vector4> e) => RecordAction(GetScaleAction, "Scale Changed");
     }
 }

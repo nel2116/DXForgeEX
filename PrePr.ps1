@@ -59,6 +59,7 @@ function Get-PrePrPlan([string[]]$ChangedFiles) {
 	$material = Editor "material_asset_test"
 	$dialog = Editor "primitive_mesh_dialog_test"
 	$geometry = Editor "default_geometry_test"
+	$numberBox = Editor "number_box_test"
 	# -STA を付けないテストにも付ける。変更されたテストと同じコマンドにして、1 つのステップにまとめるため
 	$define = Editor "debug_define_test"
 	$loadProject = "pwsh -STA -NoProfile -File DXForgeCli/Tests/load_project_cli_test.ps1"
@@ -70,10 +71,12 @@ function Get-PrePrPlan([string[]]$ChangedFiles) {
 		"Automation"  = @($ops)
 		"Components"  = @($material, $loadProject, $geometry)
 		"Content"     = @($material, $geometry, $dialog)
+		"Dictionaries" = @($layout, $numberBox, $dialog)
 		"DllWrappers" = @((Editor "engine_init_test"), $material, "pwsh -STA -NoProfile -File DXForgeEngineDLL/Tests/editor_shader_compilation_test.ps1")
 		"Editors"     = @($layout, $dialog)
 		"GameDev"     = @($layout, (Editor "engine_path_test"))
 		"GameProject" = @($layout, (Editor "projects_path_test"), $loadProject)
+		"Utilities"   = @($layout, $numberBox, $dialog)
 	}
 	# リポジトリ直下などのスクリプト -> そのテスト
 	$scriptTests = @{

@@ -14,7 +14,7 @@ namespace DXForgeEditor.Dictionaries
     public partial class ControlTemplates : ResourceDictionary
     {
         // フォーカスを親のフォーカスできる要素に移す(Primal Day 081)。ClearFocus と違い、Hierarchy の ListBox などにキーの入力が残る
-        private static void MoveUpFocus(UIElement element)
+        internal static void MoveUpFocus(UIElement element)
         {
             DependencyObject parent = element;
             while ((parent = VisualTreeHelper.GetParent(parent)) != null && Keyboard.Focus(parent as UIElement) == element) ;
