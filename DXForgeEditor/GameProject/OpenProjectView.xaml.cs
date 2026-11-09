@@ -45,7 +45,7 @@ namespace DXForgeEditor.GameProject
             if (project == null)
             {
                 // 画面を閉じるとエディタが終了するので、理由を表示して別のプロジェクトを選べるようにする
-                MessageBox.Show($"プロジェクトを読み込めませんでした: {data.FullPath}", "プロジェクトを開けません", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"プロジェクトを読み込めませんでした: {data.FullPath}\n\n理由: {Project.LastLoadError ?? "不明"}", "プロジェクトを開けません", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
             var win = Window.GetWindow(this);

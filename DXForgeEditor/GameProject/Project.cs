@@ -201,10 +201,29 @@ namespace DXForgeEditor.GameProject
             }
         }
 
-        /// <returns>読み込んだプロジェクト。エディタでは、読み込めなければ null(ヘッドレスでは例外を投げる)</returns>
+        /// <summary>
+        /// 直近の Load が読み込めなかった理由(例外の型とメッセージ、InnerException も含む)。読み込めたとき、またはまだ Load していないときは null。
+        /// 呼び出し元(OpenProjectView / NewProjectView)がダイアログに出す(Issue #250)。
+        /// </summary>
+        public static string? LastLoadError { get; private set; }
+
+        /// <summary>例外の型とメッセージを、InnerException をたどって1つの文字列にする</summary>
+        internal static string DescribeException(Exception ex)
+        {
+            var sb = new StringBuilder();
+            for (Exception? e = ex; e != null; e = e.InnerException)
+            {
+                if (sb.Length > 0) sb.Append(" <- ");
+                sb.Append(e.GetType().Name).Append(": ").Append(e.Message);
+            }
+            return sb.ToString();
+        }
+
+        /// <returns>読み込んだプロジェクト。エディタでは、読み込めなければ null で、理由は LastLoadError に入る(ヘッドレスでは例外を投げる)</returns>
         public static Project? Load(string file)
         {
             Debug.Assert(File.Exists(file));
+            LastLoadError = null;
 
             // コマンドラインの dxforge(Issue #11)はアセットを使わず、読み込めなければ例外で終了コードを決める
             if (ProjectLoadEnvironment.Headless) return Serializer.FromFile<Project>(file);
@@ -229,8 +248,9 @@ namespace DXForgeEditor.GameProject
             catch (Exception ex)
             {
                 // NOTE: OpenProjectView の経路で例外を投げるとエディタが落ちる。null を返し、呼び出し元がダイアログに残す
-                Debug.WriteLine(ex.Message);
-                Logger.Log(MessageType.Error, $"プロジェクトを読み込めませんでした: {file}");
+                LastLoadError = DescribeException(ex);
+                Debug.WriteLine(LastLoadError);
+                Logger.Log(MessageType.Error, $"プロジェクトを読み込めませんでした: {file} ({LastLoadError})");
                 Current = null;
                 // 開けなかったプロジェクトのフォルダを見続けない(AssetRegistry は次の Load で登録し直す)
                 ContentWatcher.Reset(string.Empty, string.Empty);

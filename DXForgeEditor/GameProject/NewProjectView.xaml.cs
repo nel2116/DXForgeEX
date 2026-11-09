@@ -56,7 +56,7 @@ namespace DXForgeEditor.GameProject
             }
             if (project == null)
             {
-                MessageBox.Show($"作成したプロジェクトを読み込めませんでした: {projectPath}", "プロジェクトを開けません", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"作成したプロジェクトを読み込めませんでした: {projectPath}\n\n理由: {Project.LastLoadError ?? "不明"}", "プロジェクトを開けません", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
             var win = Window.GetWindow(this);
