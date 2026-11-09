@@ -30,6 +30,6 @@ Port Primal Day 087: the material properties are no longer in `PerObjectData`. T
 
 ## Consequences
 
-- The headless render (`render_run_test.py`) is within the baseline tolerance (1 level): measured 0 pixels over, 2071 (Debug) / 2069 (Release) pixels with a difference of 1, max difference 1 (estimate: from quantizing base color/roughness to 8 bits; the pre-change count was not measured). The baselines were not regenerated.
+- The headless render baselines (`EngineUnitTests/Tests/baselines/render_warp_320x240_{Debug,Release}.png`) were regenerated with `render_run_test.py --update-baselines`. Before that, the new code against the old baselines measured 0 pixels over the 1-level tolerance, 2071 (Debug) / 2069 (Release) pixels with a difference of 1, max difference 1, while origin/develop measured 0 different pixels (max 0) on the same machine, so the difference comes from this change (estimate: quantizing base color/roughness to 8 bits, e.g. roughness 0.9 → 230/255). Keeping the old baselines would leave those pixels with no margin under the tolerance, so they were regenerated; afterwards both configurations measure 0 pixels within, max difference 0.
 - Material changes in the editor have no UI yet (no XAML binds `MaterialSurface`), so the conversion is tested headless (`EngineUnitTests` `ResourceUpload_MaterialSurface*`, `material_asset_test.ps1` item 3).
 - Any new material shader that samples textures must use the counting rule of point 5, not fixed slots.
