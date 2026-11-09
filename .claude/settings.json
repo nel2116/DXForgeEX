@@ -23,6 +23,11 @@
             "type": "command",
             "command": "python \"$CLAUDE_PROJECT_DIR/Tests/guard_gui_images.py\" --hook",
             "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "python \"$CLAUDE_PROJECT_DIR/Tests/guard_large_read.py\" --hook",
+            "timeout": 10
           }
         ]
       }

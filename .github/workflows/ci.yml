@@ -124,7 +124,7 @@ jobs:
       - name: Review flow guard, context warning and usage report tests
         shell: pwsh
         run: |
-          foreach ($test in "guard_review_flow_test", "guard_gui_images_test", "context_size_warning_test", "usage_report_test") {
+          foreach ($test in "guard_review_flow_test", "guard_gui_images_test", "guard_large_read_test", "context_size_warning_test", "usage_report_test") {
             python "Tests/$test.py"
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }

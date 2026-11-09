@@ -94,6 +94,7 @@ function Get-PrePrPlan([string[]]$ChangedFiles) {
 		"Tests/guard_merge_approval.py"  = "python Tests/guard_merge_approval_test.py"
 		"Tests/guard_review_flow.py"     = "python Tests/guard_review_flow_test.py"
 		"Tests/guard_gui_images.py"      = "python Tests/guard_gui_images_test.py"
+		"Tests/guard_large_read.py"      = "python Tests/guard_large_read_test.py"
 		".claude/skills/gui-check/gui.ps1"             = "pwsh -NoProfile -File Tests/GuiCheck.Tests.ps1"
 		".claude/skills/gui-check/start-gui-check.ps1" = "pwsh -NoProfile -File Tests/GuiCheck.Tests.ps1"
 		".claude/skills/gui-check/worker-spec.md"      = "pwsh -NoProfile -File Tests/GuiCheck.Tests.ps1"

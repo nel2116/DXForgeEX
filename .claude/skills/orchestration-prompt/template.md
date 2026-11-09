@@ -9,7 +9,7 @@ Use the /orchestration skill to act as coordinator and have <issue #N (one-line 
 ## Preparation (coordinator)
 1. `git fetch` to update origin/develop and confirm develop's CI succeeded. If it failed, stop and report.
 2. Run `./CleanupMerged.ps1` and bring the root develop up to date. Report any warnings (treat them as real problems). <Worktrees intentionally kept, with names and reasons, e.g. "PR #108 awaits a GUI check, so `issue-10-import-cli` is correctly left">
-3. Read the procedure with `orca skills get orchestration` and confirm Orca runs with `orca status --json`. New worktrees are created, so also read `references/placement-and-remote.md`.
+3. Read the procedure with `orca skills get orchestration` (once per conversation; grep it afterwards) and confirm Orca runs with `orca status --json`. New worktrees are created, so also read `references/placement-and-remote.md`.
 4. Create one Run with `run-create --objective "<objective>"`.
 5. Do not switch the root checkout (develop). Run `CodexReview.ps1 -SetStatus` from a detached coordinator worktree created from origin/develop, and delete that worktree afterwards.
 
@@ -17,7 +17,7 @@ Use the /orchestration skill to act as coordinator and have <issue #N (one-line 
 - Write the task spec below to a file and start it with `./StartWorker.ps1 -SpecFile <file> -Name <issue-N-short-name>`. The script always prepends the common rules (`docs/dev/WorkerRules.md`). Add `-Size small` for small jobs.
 - If the start times out on agent_readiness, follow the recovery steps you receive and restart in the same worktree with `./StartWorker.ps1 -Task <task> -RetryOf <dispatch> -Worktree path:<path>`. Do not create a new worktree.
 - If a worker does not respond, check with `./WorkerStatus.ps1` (`send` returns `ok` even to exited workers). If `exited`, write a handover and restart it.
-- Start all workers before waiting (`check --wait --types "worker_done,escalation,question"`).
+- Start all workers before waiting. Wait with `check --wait --timeout-ms 3600000 --types "worker_done,escalation,question"` run in the background (`run_in_background`), not in the foreground: each foreground wake-up re-reads the whole context (#256).
 - Answer questions within the spec. <If approach approval is needed: "When a worker proposes an approach via ask, approve it against the approach criteria below or send back what to change."> For decisions beyond the spec, <confirm with the user before answering / since the user is away, decide in the direction of a smaller scope and give the reason in the final report>.
 
 ## Common worker rules
