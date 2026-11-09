@@ -7,6 +7,7 @@
 // 2025/01/13 新規作成
 // 2026/10/19 環境光(IBL)のテクスチャがあれば読み込み、環境光のライトを作る。Iキーで環境光の有効/無効を切り替える (Primal Day 075)
 // 2026/10/27 ShaderCompilation を DXForgeEngineDLL へ移動したため、インクルードのパスと shader_type(graphics::shader_type)を変更 (Primal Day 076)
+// 2026/11/09 深度プリパス用に位置だけの頂点シェーダーをコンパイルし、マテリアルの値を詰めた形で渡す (Primal Day 087, #252)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include <filesystem>
@@ -142,8 +143,10 @@ namespace
 
 		const char* shader_path{ "..\\..\\enginetest\\" };
 
-		std::wstring defines[]{ L"ELEMENTS_TYPE=1", L"ELEMENTS_TYPE=3" };
+		// NOTE: ELEMENTS_TYPE=0(位置だけ)は深度プリパスが使う(Primal Day 087)
+		std::wstring defines[]{ L"ELEMENTS_TYPE=0", L"ELEMENTS_TYPE=1", L"ELEMENTS_TYPE=3" };
 		utl::vector<u32> keys;
+		keys.emplace_back(tools::elements::elements_type::position_only);
 		keys.emplace_back(tools::elements::elements_type::static_normal);
 		keys.emplace_back(tools::elements::elements_type::static_normal_texture);
 
@@ -200,12 +203,13 @@ namespace
 			{1.f, 0.0f}, {1.f, 0.2f}, {1.f, 0.4f}, {1.f, 0.6f}, {1.f, 0.8f}, {1.f, 1.f},
 		};
 		graphics::material_surface& s{ info.surface };
-		s.base_color = { 0.5f, 0.5f, 0.5f, 1.f };
+		s.base_color[0] = s.base_color[1] = s.base_color[2] = graphics::material_surface::to_unorm8(0.5f);
+		s.base_color[3] = 255;
 
 		for (u32 i{ 0 }; i < _countof(pbr_mtl_ids); ++i)
 		{
-			s.metallic = metal_rough[i].x;
-			s.roughness = metal_rough[i].y;
+			s.metallic = graphics::material_surface::to_unorm8(metal_rough[i].x);
+			s.roughness = graphics::material_surface::to_unorm8(metal_rough[i].y);
 			pbr_mtl_ids[i] = content::create_resource(&info, content::asset_type::material);
 		}
 

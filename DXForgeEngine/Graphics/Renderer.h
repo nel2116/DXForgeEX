@@ -18,6 +18,7 @@
 // 2026/11/02 D3D12 のランタイム(Agility SDK か OS か)の情報を追加 (#155)
 // 2026/11/06 レンダラーの設定(renderer_option, set_option, get_option)を追加 (Primal Day 082, #201)
 // 2026/11/08 視野角(field_of_view)を pi の倍数から垂直方向のラジアンにした (#205)
+// 2026/11/09 material_surface を12バイトに詰め、input_mask を追加 (Primal Day 087, #252)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -259,14 +260,35 @@ namespace dxforge::graphics
 		};
 	};
 
+	/// @brief PBRのマテリアルのプロパティ。シェーダー(MaterialData[0..2])にそのまま渡すので、12バイトに詰める(Primal Day 087)
+	/// NOTE: 色は線形の値を 0..255 に、emissive_intensity は 0..max_emissive_intensity を 0..65535 に対応させる。
+	///       エディタの MaterialSurface.ToBinary(writer, asInteger: true) と並びを合わせる(docs/design/material-surface-packing.md)
 	struct material_surface
 	{
-		math::v4    base_color{ 1.f, 1.f, 1.f, 1.f };
-		math::v3    emissive{ 0.f, 0.f, 0.f };
-		f32         emissive_intensity{ 1.f };
-		f32         metallic{ 0.f };
-		f32         roughness{ 1.f };
+		constexpr static f32 max_emissive_intensity{ 10000.f };	// シェーダーの MaxEmissiveIntensity(CommonConstants.hlsli)と同じ
+
+		u8  base_color[4]{ 255, 255, 255, 255 };
+		u8  emissive[3]{ 0, 0, 0 };
+		u8  metallic{ 0 };
+		u8  roughness{ 255 };
+		u8  input_mask{ 0 };			// ビット i が立っていれば、入力 i のプロパティをテクスチャから取る
+		u16 emissive_intensity{ 7 };	// 1.0 に最も近い値(7 * 10000 / 65535 = 約1.068)
+
+		/// @brief 0..1 の値を 0..255 に四捨五入して詰める(0.5 は 128)。エディタの MaterialSurface.ToUnorm8() と同じ式
+		[[nodiscard]] constexpr static u8 to_unorm8(f32 value)
+		{
+			const f32 v{ value < 0.f ? 0.f : (value > 1.f ? 1.f : value) };
+			return (u8)(v * 255.f + 0.5f);
+		}
+
+		/// @brief 0..max_emissive_intensity の値を 0..65535 に四捨五入して詰める。エディタの MaterialSurface.ToEmissiveIntensity() と同じ式
+		[[nodiscard]] constexpr static u16 to_emissive_intensity(f32 value)
+		{
+			const f32 v{ value < 0.f ? 0.f : (value > max_emissive_intensity ? max_emissive_intensity : value) };
+			return (u16)(v * (65535.f / max_emissive_intensity) + 0.5f);
+		}
 	};
+	static_assert(sizeof(material_surface) == 12);
 
 	struct material_init_info
 	{

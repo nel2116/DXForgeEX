@@ -65,12 +65,13 @@ struct VertexElement
 };
 
 const static float InvIntervals = 2.f / ((1 << 16) - 1);
+const static float Inv255 = 1.f / 255.f;
 
 ConstantBuffer<GlobalShaderData>                GlobalData          : register(b0, space0);
 ConstantBuffer<PerObjectData>                   PerObjectBuffer     : register(b1, space0);
 StructuredBuffer<float3>                        VertexPositions     : register(t0, space0);
 StructuredBuffer<VertexElement>                 Elements            : register(t1, space0);
-StructuredBuffer<uint>                          SrvIndices          : register(t2, space0);
+StructuredBuffer<uint>                          MaterialData        : register(t2, space0);
 StructuredBuffer<DirectionalLightParameters>    DirectionalLights   : register(t3, space0);
 StructuredBuffer<LightParameters>               CullableLights      : register(t4, space0);
 StructuredBuffer<uint2>                         LightGrid           : register(t5, space0);
@@ -315,28 +316,59 @@ float3 EvaluateIBL(Surface S)
     return (diffuse + specular) * IBL.Intensity;
 }
 
+// The material properties (graphics::material_surface, 12 bytes) are MaterialData[0..2] (Primal Day 087):
+//   [0] base color r, g, b, a  [1] emissive r, g, b, metallic  [2] roughness, input mask, emissive intensity (16 bits)
+// The colors are linear values in 0..255 and the emissive intensity maps 0..65535 to 0..MaxEmissiveIntensity
+// (docs/design/material-surface-packing.md). The texture descriptor indices follow from MaterialData[3].
+const static uint MaterialSurfaceOffset = 3; // Size of the material surface property data (3 uints == 12 bytes)
+
+float3 UnpackColor(uint value)
+{
+    return float3((value & 0xff) * Inv255, ((value >> 8) & 0xff) * Inv255, ((value >> 16) & 0xff) * Inv255);
+}
+
+// Fills the material properties of S and returns the input mask.
+uint GetSurfaceData(inout Surface S)
+{
+    uint value = MaterialData[0]; // base color (4 channels, alpha is ignored for now)
+    S.BaseColor = UnpackColor(value);
+
+    value = MaterialData[1]; // emissive color (3 channels) + metallic
+    S.EmissiveColor = UnpackColor(value);
+    S.Metallic = ((value >> 24) & 0xff) * Inv255;
+
+    value = MaterialData[2]; // roughness, input mask, emissive intensity (16 bits)
+    S.PerceptualRoughness = (value & 0xff) * Inv255;
+    S.EmissiveIntensity = ((value >> 16) & 0xffff) * (MaxEmissiveIntensity / 65535.f);
+    return (value >> 8) & 0xff;
+}
+
+// EngineTest's textured material has its 5 textures in texture_usage order (EngineTest/RenderItem.cpp).
+const static uint AmbientOcclusionIndex = MaterialSurfaceOffset + 0;
+const static uint BaseColorIndex = MaterialSurfaceOffset + 1;
+const static uint EmissiveIndex = MaterialSurfaceOffset + 2;
+const static uint MetalRoughIndex = MaterialSurfaceOffset + 3;
+const static uint NormalMapIndex = MaterialSurfaceOffset + 4;
+
 Surface GetSurface(VertexOut psIn, float3 V)
 {
     Surface S;
 
-    S.BaseColor = PerObjectBuffer.BaseColor.rgb;
-    S.Metallic = PerObjectBuffer.Metallic;
+    GetSurfaceData(S);
+    S.PerceptualRoughness = max(S.PerceptualRoughness, 0.045f);
     S.Normal = normalize(psIn.WorldNormal);
-    S.PerceptualRoughness = max(PerObjectBuffer.Roughness, 0.045f);
-    S.EmissiveColor = PerObjectBuffer.Emissive;
-    S.EmissiveIntensity = PerObjectBuffer.EmissiveIntensity;
     S.AmbientOcclusion = 1.f;
 
 #if TEXTURED_MTL
     float2 uv = psIn.UV;
-    S.AmbientOcclusion = Sample(SrvIndices[0], LinearSampler, uv).r;
-    S.BaseColor = Sample(SrvIndices[1], LinearSampler, uv).rgb;
-    S.EmissiveColor = Sample(SrvIndices[2], LinearSampler, uv).rgb;
-    float2 metalRough = Sample(SrvIndices[3], LinearSampler, uv).rg;
+    S.AmbientOcclusion = Sample(MaterialData[AmbientOcclusionIndex], LinearSampler, uv).r;
+    S.BaseColor = Sample(MaterialData[BaseColorIndex], LinearSampler, uv).rgb;
+    S.EmissiveColor = Sample(MaterialData[EmissiveIndex], LinearSampler, uv).rgb;
+    float2 metalRough = Sample(MaterialData[MetalRoughIndex], LinearSampler, uv).rg;
     S.Metallic = metalRough.r;
     S.PerceptualRoughness = max(metalRough.g, 0.045f);
     S.EmissiveIntensity = 1.f;
-    float3 n = Sample(SrvIndices[4], LinearSampler, uv).rgb;
+    float3 n = Sample(MaterialData[NormalMapIndex], LinearSampler, uv).rgb;
     n = n * 2.f - 1.f;
     n.z = sqrt(1.f - saturate(dot(n.xy, n.xy)));
 

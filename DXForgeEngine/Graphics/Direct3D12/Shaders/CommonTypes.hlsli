@@ -38,13 +38,7 @@ struct PerObjectData
     float4x4 World;
     float4x4 InvWorld;
     float4x4 WorldViewProjection;
-
-    float4 BaseColor;
-    float3 Emissive;
-    float EmissiveIntensity;
-    float Metallic;
-    float Roughness;
-    uint2 _pad;     // 240 バイトにそろえる(Primal Day 078 で uint から uint2 に。オフセットは変わらない)
+    // NOTE: マテリアルのプロパティは、Primal Day 087 からルートパラメータ material_data(MaterialData)で渡す
 };
 
 struct Plane
@@ -165,12 +159,9 @@ struct DirectionalLightParameters
 static_assert((sizeof(PerObjectData) % 16) == 0,
               "Make sure PerObjectData is formatted in 16-byte chunks without any implicit padding.");
 // NOTE: float4x4(m4x4a)の16バイトのアラインメントがあるので、上の static_assert は暗黙の詰め物があっても通る。
-//       HLSL の定数バッファと同じ並び(_pad までで 240 バイト)であることを、大きさとオフセットで確かめる(#31)。
-static_assert(sizeof(PerObjectData) == 240 && offsetof(PerObjectData, BaseColor) == 192 &&
-              offsetof(PerObjectData, Roughness) == 228 && offsetof(PerObjectData, _pad) == 232,
+//       HLSL の定数バッファと同じ並び(行列3つで 192 バイト)であることを、大きさとオフセットで確かめる(#31)。
+static_assert(sizeof(PerObjectData) == 192 && offsetof(PerObjectData, WorldViewProjection) == 128,
               "PerObjectData must match the HLSL constant buffer layout.");
-static_assert(offsetof(PerObjectData, _pad) + sizeof(PerObjectData::_pad) == sizeof(PerObjectData),
-              "PerObjectData must not have implicit padding after _pad.");
 static_assert((sizeof(LightParameters) % 16) == 0,
               "Make sure LightParameters is formatted in 16-byte chunks without any implicit padding.");
 static_assert((sizeof(LightCullingLightInfo) % 16) == 0,
