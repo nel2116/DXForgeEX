@@ -201,10 +201,29 @@ namespace DXForgeEditor.GameProject
             }
         }
 
-        /// <returns>読み込んだプロジェクト。エディタでは、読み込めなければ null(ヘッドレスでは例外を投げる)</returns>
+        /// <summary>
+        /// 直近の Load が読み込めなかった理由(例外の型とメッセージ、InnerException も含む)。読み込めたとき、またはまだ Load していないときは null。
+        /// 呼び出し元(OpenProjectView / NewProjectView)がダイアログに出す(Issue #250)。
+        /// </summary>
+        public static string? LastLoadError { get; private set; }
+
+        /// <summary>例外の型とメッセージを、InnerException をたどって1つの文字列にする</summary>
+        internal static string DescribeException(Exception ex)
+        {
+            var sb = new StringBuilder();
+            for (Exception? e = ex; e != null; e = e.InnerException)
+            {
+                if (sb.Length > 0) sb.Append(" <- ");
+                sb.Append(e.GetType().Name).Append(": ").Append(e.Message);
+            }
+            return sb.ToString();
+        }
+
+        /// <returns>読み込んだプロジェクト。エディタでは、読み込めなければ null で、理由は LastLoadError に入る(ヘッドレスでは例外を投げる)</returns>
         public static Project? Load(string file)
         {
             Debug.Assert(File.Exists(file));
+            LastLoadError = null;
 
             // コマンドラインの dxforge(Issue #11)はアセットを使わず、読み込めなければ例外で終了コードを決める
             if (ProjectLoadEnvironment.Headless) return Serializer.FromFile<Project>(file);
@@ -212,6 +231,7 @@ namespace DXForgeEditor.GameProject
             var path = System.IO.Path.GetDirectoryName(file) ?? string.Empty;
             if (!path.EndsWith(System.IO.Path.DirectorySeparatorChar)) path += System.IO.Path.DirectorySeparatorChar;
 
+            Project? project = null;
             try
             {
                 // エンティティ(Geometry)がデシリアライズの中でアセットを探すので、先に登録する(Primal Day 081)
@@ -219,7 +239,7 @@ namespace DXForgeEditor.GameProject
                 ContentWatcher.Reset($@"{path}Content\", path);
 
                 // NOTE: ルートが i:nil="true" のファイルでは、FromFile は例外を投げず null を返す
-                var project = Serializer.FromFile<Project>(file) ?? throw new InvalidDataException($"ルート要素が nil です: {file}");
+                project = Serializer.FromFile<Project>(file) ?? throw new InvalidDataException($"ルート要素が nil です: {file}");
                 project.Path = path;
                 Current = project;
                 project.LoadEntitiesWithAssets();
@@ -229,9 +249,12 @@ namespace DXForgeEditor.GameProject
             catch (Exception ex)
             {
                 // NOTE: OpenProjectView の経路で例外を投げるとエディタが落ちる。null を返し、呼び出し元がダイアログに残す
-                Debug.WriteLine(ex.Message);
-                Logger.Log(MessageType.Error, $"プロジェクトを読み込めませんでした: {file}");
+                LastLoadError = DescribeException(ex);
+                Debug.WriteLine(LastLoadError);
+                Logger.Log(MessageType.Error, $"プロジェクトを読み込めませんでした: {file} ({LastLoadError})");
                 Current = null;
+                // デシリアライズのあとに失敗したら、作ったエンティティをエンジンに残さない
+                project?.ReleaseEntities();
                 // 開けなかったプロジェクトのフォルダを見続けない(AssetRegistry は次の Load で登録し直す)
                 ContentWatcher.Reset(string.Empty, string.Empty);
                 return null;
@@ -396,8 +419,29 @@ namespace DXForgeEditor.GameProject
             }
             catch
             {
-                _scenes.SelectMany(x => x.GameEntities).ToList().ForEach(x => x.IsActive = false);
+                ReleaseEntities();
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// このプロジェクトのエンティティをエンジンから外す(IsActive を false にする)。読み込みに失敗したとき、途中まで作ったものを
+        /// エンジンに残さないために使う(残ると、終了時に DXForgeEngineDLL が FreeList.h の assert(!_size) で止まる, Issue #250)。
+        /// 失敗の後始末なので、ここでは例外を投げず、外せなかったエンティティはログに残して続ける。
+        /// </summary>
+        internal void ReleaseEntities()
+        {
+            foreach (var entity in _scenes.SelectMany(x => x.GameEntities).ToList())
+            {
+                try
+                {
+                    entity.IsActive = false;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex.Message);
+                    Logger.Log(MessageType.Error, $"エンティティ {entity.Name} をエンジンから外せませんでした: {DescribeException(ex)}");
+                }
             }
         }
 

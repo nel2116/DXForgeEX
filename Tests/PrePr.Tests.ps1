@@ -76,7 +76,7 @@ $cases = @(
 	@("ContentTools/FbxSdk.props", @($tools), @($editor, $native)),
 	@("ContentTools/Tests/envmap_cpu_gpu_test.py", @($tools, "envmap_cpu_gpu_test.py --config DebugEditor"), @($native)),
 	@("DXForgeImport/Tests/import_cli_test.ps1", @($editor, "import_cli_test.ps1 -ArgumentsOnly"), @($native)),
-	@("DXForgeEditor/GameProject/A.cs", @($editor, "project_layout_view_test.ps1", "projects_path_test.ps1", "load_project_cli_test.ps1"), @($native)),
+	@("DXForgeEditor/GameProject/A.cs", @($editor, "project_layout_view_test.ps1", "projects_path_test.ps1", "load_project_cli_test.ps1", "project_load_test.ps1"), @($native)),
 	@("DXForgeEditor/Content/A.cs", @($editor, "material_asset_test.ps1", "default_geometry_test.ps1"), @($native)),
 	@("DXForgeEditor/Components/A.cs", @($editor, "material_asset_test.ps1", "transform_edit_test.ps1"), @($native)),
 	@("DXForgeEditor/Automation/A.cs", @($editor, "ops_cli_test.ps1"), @($native)),
