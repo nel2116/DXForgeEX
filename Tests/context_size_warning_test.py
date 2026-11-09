@@ -1,4 +1,4 @@
-# Tests/context_size_warning.py の回帰テスト(#195)。
+# Tests/context_size_warning.py の回帰テスト(#195、#256)。
 #
 #   python Tests/context_size_warning_test.py
 #
@@ -60,28 +60,86 @@ class LastContextTokens(TempDir):
         self.assertIsNone(warning.last_context_tokens(self.path))
 
 
+class StageOf(unittest.TestCase):
+    def test_stages(self):
+        cases = [(120000, 0), (120001, 1), (170000, 1), (170001, 2), (220000, 2), (220001, 3), (520001, 9)]
+        for tokens, stage in cases:
+            self.assertEqual(warning.stage_of(tokens, 120000, 50000), stage, tokens)
+
+    def test_no_step_warns_once(self):
+        self.assertEqual(warning.stage_of(999999, 100, 0), 1)
+        self.assertEqual(warning.stage_of(999999, 100, -5), 1)
+        self.assertEqual(warning.stage_of(100, 100, 0), 0)
+
+
 class Hook(TempDir):
-    def run_hook(self, session="s1", threshold=None, payload=None):
+    def run_hook(self, session="s1", threshold=None, payload=None, step=None):
         env = dict(os.environ, TEMP=self.dir, TMP=self.dir)
         env.pop("DXFORGE_CONTEXT_WARN_TOKENS", None)
+        env.pop("DXFORGE_CONTEXT_WARN_STEP", None)
         if threshold is not None:
             env["DXFORGE_CONTEXT_WARN_TOKENS"] = threshold
+        if step is not None:
+            env["DXFORGE_CONTEXT_WARN_STEP"] = step
         data = payload if payload is not None else json.dumps({"transcript_path": self.path, "session_id": session}).encode()
         return subprocess.run([sys.executable, SCRIPT, "--hook"], input=data, capture_output=True, env=env, encoding=None)
 
-    def test_warns_once_per_session_over_the_default_threshold(self):
-        self.write(assistant(1, 150000))
+    def test_warns_once_per_stage_over_the_default_threshold(self):
+        self.write(assistant(1, 120000))
         first = self.run_hook()
         self.assertEqual(first.returncode, 0)
         context = json.loads(first.stdout.decode("utf-8"))["hookSpecificOutput"]
         self.assertEqual(context["hookEventName"], "PostToolUse")
-        self.assertIn("150,001", context["additionalContext"])
+        self.assertIn("120,001", context["additionalContext"])
+        self.assertIn("1 回目", context["additionalContext"])
         self.assertIn("新しい会話", context["additionalContext"])
-        self.assertEqual(self.run_hook().stdout, b"", "second call in the same session")
+        self.assertEqual(self.run_hook().stdout, b"", "same stage in the same session")
         self.assertNotEqual(self.run_hook(session="s2").stdout, b"", "another session")
+        self.write(assistant(0, 170000))
+        self.assertEqual(self.run_hook().stdout, b"", "still the first stage")
+        self.write(assistant(0, 170001))
+        second = self.run_hook()
+        self.assertIn("2 回目", json.loads(second.stdout.decode("utf-8"))["hookSpecificOutput"]["additionalContext"])
+        self.assertEqual(self.run_hook().stdout, b"", "second stage already warned")
+        self.write(assistant(0, 120001))
+        self.assertEqual(self.run_hook().stdout, b"", "a smaller context after compaction does not warn again")
+
+    def test_jumping_stages_warns_once(self):
+        self.write(assistant(0, 400000))
+        self.assertIn("6 回目".encode("utf-8"), self.run_hook().stdout)
+        self.write(assistant(0, 410000))
+        self.assertEqual(self.run_hook().stdout, b"")
+
+    def test_step_zero_warns_only_once(self):
+        self.write(assistant(0, 130000))
+        self.assertNotEqual(self.run_hook(step="0").stdout, b"")
+        self.write(assistant(0, 900000))
+        self.assertEqual(self.run_hook(step="0").stdout, b"")
+
+    def test_old_empty_mark_counts_as_the_first_stage(self):
+        folder = os.path.join(self.dir, "dxforge-context-warning")
+        os.makedirs(folder)
+        with open(os.path.join(folder, "s1"), "w", encoding="ascii"):
+            pass  # #195 の印は空のファイル
+        self.write(assistant(0, 130000))
+        self.assertEqual(self.run_hook().stdout, b"")
+        self.write(assistant(0, 180000))
+        self.assertNotEqual(self.run_hook().stdout, b"")
+
+    def test_existing_stage_mark_is_exclusive(self):
+        # 並列の呼び出しが先に同じ段階の印を作っていたら、警告しない
+        folder = os.path.join(self.dir, "dxforge-context-warning")
+        os.makedirs(folder)
+        with open(os.path.join(folder, "s1-1"), "w", encoding="ascii"):
+            pass
+        self.write(assistant(0, 130000))
+        self.assertEqual(self.run_hook().stdout, b"")
+        self.write(assistant(0, 180000))
+        self.assertNotEqual(self.run_hook().stdout, b"")
+        self.assertTrue(os.path.exists(os.path.join(folder, "s1-2")))
 
     def test_silent_at_or_under_the_threshold(self):
-        self.write(assistant(0, 150000))
+        self.write(assistant(0, 120000))
         result = self.run_hook()
         self.assertEqual((result.returncode, result.stdout), (0, b""))
 
