@@ -55,10 +55,13 @@ def block_reason(tool_input):
         size = os.path.getsize(path)
     except OSError:
         return None
-    lines = _count_lines(path, MAX_LINES)
-    if size <= MAX_BYTES and (lines is None or lines <= MAX_LINES):
-        return None
-    shown = f"{MAX_LINES} 行超" if lines is not None and lines > MAX_LINES else f"{size:,} バイト"
+    if size > MAX_BYTES:
+        shown = f"{size:,} バイト"  # 行は数えない(改行のない巨大なファイルを 1 行として読み込まないため)
+    else:
+        lines = _count_lines(path, MAX_LINES)
+        if lines is None or lines <= MAX_LINES:
+            return None
+        shown = f"{MAX_LINES} 行超"
     return (
         f"{path} は大きい({shown})ので、範囲指定なしでは読みません(#256。読んだ中身は以降の毎ターン読み直されます)。"
         "grep -n で必要な場所(関数名、見出しなど)を探し、Read の offset と limit でその範囲だけを読んでください。"

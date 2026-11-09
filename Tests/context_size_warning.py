@@ -11,7 +11,8 @@
 # しきい値は環境変数 DXFORGE_CONTEXT_WARN_TOKENS(既定 120000、0 以下で無効)。そこから
 # DXFORGE_CONTEXT_WARN_STEP(既定 50000、0 以下なら 1 回だけ)増えるごとに、もう一度警告する。
 # 1 回きりの警告では見送られたあと何百ターンも続いた(#256 の集計で、15 万を超えたあとのターンが cache_read の約 65%)。
-# 警告した段階は %TEMP%\dxforge-context-warning\<session_id> に数字で置く。印を書けないときは、同じ警告を毎回出さないよう、
+# 警告した段階ごとに %TEMP%\dxforge-context-warning\<session_id>-<段階> の印を排他的に作る(並列のツール呼び出しで
+# 同じ段階を 2 回警告しないため)。#195 の印 <session_id> は 1 段階目とみなす。印を作れないときは、同じ警告を毎回出さないよう、
 # 警告しない。
 import json
 import os
@@ -82,24 +83,31 @@ def last_context_tokens(transcript_path):
     return None
 
 
+def _highest_warned(folder, name) -> int:
+    """この会話で警告済みの最も高い段階。印がなければ 0。"""
+    try:
+        entries = os.listdir(folder)
+    except OSError:
+        return 0
+    highest = 0
+    for entry in entries:
+        if entry == name:
+            highest = max(highest, 1)  # #195 の印
+        elif entry.startswith(name + "-") and entry[len(name) + 1:].isdigit():
+            highest = max(highest, int(entry[len(name) + 1:]))
+    return highest
+
+
 def mark_warned(session_id, stage) -> bool:
-    """この会話でこの段階をまだ警告していなければ、印を書き換えて True を返す。警告済みか、書けなければ False。"""
+    """この会話でこの段階より上をまだ警告していなければ、段階の印を排他的に作って True を返す。
+    警告済み、ほかの呼び出しが先に作った、または作れなければ False。"""
     name = re.sub(r"[^\w.-]", "_", str(session_id or "unknown"))
     folder = os.path.join(tempfile.gettempdir(), "dxforge-context-warning")
-    path = os.path.join(folder, name)
-    try:
-        with open(path, encoding="ascii") as file:
-            warned = int(file.read().strip() or 1)
-    except FileNotFoundError:
-        warned = 0
-    except (OSError, ValueError):
-        warned = 1  # #195 の印(空のファイル)や壊れた印は、1 段階目を警告済みとみなす
-    if stage <= warned:
+    if stage <= _highest_warned(folder, name):
         return False
     try:
         os.makedirs(folder, exist_ok=True)
-        with open(path, "w", encoding="ascii") as file:
-            file.write(str(stage))
+        os.close(os.open(os.path.join(folder, f"{name}-{stage}"), os.O_CREAT | os.O_EXCL | os.O_WRONLY))
     except OSError:
         return False
     return True

@@ -126,6 +126,18 @@ class Hook(TempDir):
         self.write(assistant(0, 180000))
         self.assertNotEqual(self.run_hook().stdout, b"")
 
+    def test_existing_stage_mark_is_exclusive(self):
+        # 並列の呼び出しが先に同じ段階の印を作っていたら、警告しない
+        folder = os.path.join(self.dir, "dxforge-context-warning")
+        os.makedirs(folder)
+        with open(os.path.join(folder, "s1-1"), "w", encoding="ascii"):
+            pass
+        self.write(assistant(0, 130000))
+        self.assertEqual(self.run_hook().stdout, b"")
+        self.write(assistant(0, 180000))
+        self.assertNotEqual(self.run_hook().stdout, b"")
+        self.assertTrue(os.path.exists(os.path.join(folder, "s1-2")))
+
     def test_silent_at_or_under_the_threshold(self):
         self.write(assistant(0, 120000))
         result = self.run_hook()

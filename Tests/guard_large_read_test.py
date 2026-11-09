@@ -46,6 +46,15 @@ class GuardLargeRead(unittest.TestCase):
         path = self.make("wide.md", ("y" * 200 + "\n") * 160)  # 160 行、約 32KB
         self.assertIn("バイト", guard.block_reason({"file_path": path}))
 
+    def test_large_file_is_blocked_without_counting_lines(self):
+        path = self.make("one_line.json", "z" * (guard.MAX_BYTES + 1))
+        original = guard._count_lines
+        guard._count_lines = lambda *_: self.fail("lines must not be counted")
+        try:
+            self.assertIn("バイト", guard.block_reason({"file_path": path}))
+        finally:
+            guard._count_lines = original
+
     def test_range_passes(self):
         path = self.make("long.cpp", "x\n" * 5000)
         self.assertIsNone(guard.block_reason({"file_path": path, "offset": 100}))
