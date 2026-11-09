@@ -30,6 +30,7 @@
 // 2026/11/08 エディタのエンティティの記述子の回転をクォータニオンにした (#205)
 // 2026/11/08 DLL の SetPosition で動かした球が新しい場所に描かれることの確認を追加 (Primal Day 086, #244)
 // 2026/11/08 SetCameraFoV の確認を、視野角がラジアン(既定は 0.25 * pi)であることに合わせた (#205)
+// 2026/11/09 深度プリパス用の位置だけの頂点シェーダーを登録し、マテリアルの値を詰めた形で渡す (Primal Day 087, #252)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -107,7 +108,8 @@ namespace dxforge::headless::render
 		constexpr u32 min_surface_size{ graphics::min_offscreen_surface_size };	// ライトカリングのタイルの大きさ(16)
 		constexpr u32 max_surface_size{ 16384 };	// D3D12のテクスチャの最大の幅・高さ
 
-		// 頂点の要素の種類(ContentTools/Geometry.h の elements::elements_type::static_normal と同じ値)
+		// 頂点の要素の種類(ContentTools/Geometry.h の elements::elements_type::position_only、static_normal と同じ値)
+		constexpr u32 elements_type_position_only{ 0x00 };
 		constexpr u32 elements_type_static_normal{ 0x01 };
 
 		// 引数の解析結果
@@ -448,16 +450,19 @@ namespace dxforge::headless::render
 				extra_args.emplace_back(L"-D");
 				extra_args.emplace_back(L"ELEMENTS_TYPE=1");
 				const std::unique_ptr<u8[]> vertex_shader{ compile_shader(info, shader_path, extra_args, false, include_folder) };
+				// 深度プリパスは位置だけ(キー0)の版を使う(Primal Day 087)
+				extra_args.back() = L"ELEMENTS_TYPE=0";
+				const std::unique_ptr<u8[]> position_only_vertex_shader{ compile_shader(info, shader_path, extra_args, false, include_folder) };
 
 				info.function = "TestShaderPS";
 				info.type = graphics::shader_type::pixel;
 				extra_args.clear();
 				const std::unique_ptr<u8[]> pixel_shader{ compile_shader(info, shader_path, extra_args, false, include_folder) };
-				if (!vertex_shader || !pixel_shader) return "failed to compile EngineTest/TestShader.hlsl";
+				if (!vertex_shader || !position_only_vertex_shader || !pixel_shader) return "failed to compile EngineTest/TestShader.hlsl";
 
-				const u8* vertex_shaders[]{ vertex_shader.get() };
-				const u32 vertex_keys[]{ elements_type_static_normal };
-				_vs_id = content::add_shader_group(vertex_shaders, 1, vertex_keys);
+				const u8* vertex_shaders[]{ position_only_vertex_shader.get(), vertex_shader.get() };
+				const u32 vertex_keys[]{ elements_type_position_only, elements_type_static_normal };
+				_vs_id = content::add_shader_group(vertex_shaders, _countof(vertex_shaders), vertex_keys);
 				const u8* pixel_shaders[]{ pixel_shader.get() };
 				_ps_id = content::add_shader_group(pixel_shaders, 1, &u32_invalid_id);
 				return {};
@@ -652,10 +657,14 @@ namespace dxforge::headless::render
 			/// @brief エディタの AppliedMaterial.PackForEngine() の形のデータから、DLLと同じ経路でマテリアルを作る
 			id::id_type create_material(math::v4 base_color, f32 metallic, f32 roughness, const id::id_type* texture_ids = nullptr, u32 texture_count = 0)
 			{
-				graphics::material_surface surface{};
-				surface.base_color = base_color;
-				surface.metallic = metallic;
-				surface.roughness = roughness;
+				using graphics::material_surface;
+				material_surface surface{};
+				surface.base_color[0] = material_surface::to_unorm8(base_color.x);
+				surface.base_color[1] = material_surface::to_unorm8(base_color.y);
+				surface.base_color[2] = material_surface::to_unorm8(base_color.z);
+				surface.base_color[3] = material_surface::to_unorm8(base_color.w);
+				surface.metallic = material_surface::to_unorm8(metallic);
+				surface.roughness = material_surface::to_unorm8(roughness);
 				id::id_type shader_ids[graphics::shader_type::count];
 				for (id::id_type& id : shader_ids) id = id::invalid_id;
 				shader_ids[graphics::shader_type::vertex] = _vs_id;

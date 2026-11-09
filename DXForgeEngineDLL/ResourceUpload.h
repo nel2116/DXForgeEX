@@ -6,6 +6,7 @@
 // 　エディタから渡されたアセット(ジオメトリ・テクスチャ・マテリアル)のデータからエンジンのリソースを作る
 // 更新履歴
 // 2026/10/30 新規作成(Primal Day 077 の CreateResource / DestroyResource と、Day 078 のその実体。#30)
+// 2026/11/09 material_surface が12バイトになり、material_init_info を末尾の詰め物なしで読むようにした (Primal Day 087, #252)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -21,7 +22,7 @@ namespace dxforge::editor
 	//  id::id_type         texture_ids[texture_count];
 	//  struct {                                        // = graphics::material_init_info
 	//   id::id_type*        texture_ids;               // エディタは0を書く。ここで texture_ids[] を指すようにする
-	//   material_surface    surface;
+	//   material_surface    surface;                   // 12バイト(u8 * 10 + u16)
 	//   material_type::type type;
 	//   u32                 texture_count;
 	//   id::id_type         shader_ids[shader_type::count];
@@ -29,7 +30,8 @@ namespace dxforge::editor
 	// }
 	// NOTE: エディタは material_init_info をアラインメントなしで詰めて書くので、ここの大きさとオフセットを変えたら
 	//       エディタの AppliedMaterial.PackForEngine() も合わせる(EngineUnitTests の Tests_ResourceUpload.cpp で固定している)。
-	constexpr u32 packed_material_init_info_size{ 88 };
+	//       material_init_info は8バイトにそろうので sizeof は64になるが、エディタは末尾の詰め物(4バイト)を書かない。
+	constexpr u32 packed_material_init_info_size{ 60 };
 
 	/// @brief エディタのマテリアルのデータの大きさ
 	constexpr u32 packed_material_size(u32 texture_count)

@@ -73,7 +73,8 @@ namespace DXForgeEditor.Content
     }
 
     /// <summary>
-    /// PBRのマテリアルの値。エンジンの graphics::material_surface(Graphics/Renderer.h)と同じ並びで書き出す。
+    /// PBRのマテリアルの値。.asset ファイルには float で、エンジンには graphics::material_surface(Graphics/Renderer.h)の
+    /// 12バイトに詰めた形で書き出す(Primal Day 087。docs/design/material-surface-packing.md)。
     /// </summary>
     class MaterialSurface : ViewModelBase
     {
@@ -156,14 +157,47 @@ namespace DXForgeEditor.Content
             _roughness = reader.ReadSingle();
         }
 
-        public void ToBinary(BinaryWriter writer)
+        /// <summary>
+        /// 値を書き出す。
+        /// </summary>
+        /// <param name="asInteger">
+        /// true ならエンジンの material_surface の並び(u8 base_color[4], u8 emissive[3], u8 metallic, u8 roughness,
+        /// u8 input_mask, u16 emissive_intensity)、false なら .asset ファイルの float の並び。
+        /// </param>
+        /// <param name="inputMask">asInteger のときだけ書く。ビット i が立っていれば、入力 i のプロパティをテクスチャから取る</param>
+        // NOTE: Primal は色を Color.R など(sRGB のバイト)で書くが、シェーダーは線形の値として読むので、ここでは ScR(線形)を詰める
+        public void ToBinary(BinaryWriter writer, bool asInteger, byte inputMask = 0)
         {
-            writer.Write(_baseColor.ScR); writer.Write(_baseColor.ScG); writer.Write(_baseColor.ScB); writer.Write(_baseColor.ScA);
-            writer.Write(_emissiveColor.ScR); writer.Write(_emissiveColor.ScG); writer.Write(_emissiveColor.ScB);
-            writer.Write(_emissiveIntensity);
-            writer.Write(_metallic);
-            writer.Write(_roughness);
+            if (asInteger)
+            {
+                writer.Write(ToUnorm8(_baseColor.ScR)); writer.Write(ToUnorm8(_baseColor.ScG)); writer.Write(ToUnorm8(_baseColor.ScB)); writer.Write(ToUnorm8(_baseColor.ScA));
+                writer.Write(ToUnorm8(_emissiveColor.ScR)); writer.Write(ToUnorm8(_emissiveColor.ScG)); writer.Write(ToUnorm8(_emissiveColor.ScB));
+                writer.Write(ToUnorm8(_metallic));
+                writer.Write(ToUnorm8(_roughness));
+                writer.Write(inputMask);
+                writer.Write(ToEmissiveIntensity(_emissiveIntensity));
+            }
+            else
+            {
+                writer.Write(_baseColor.ScR); writer.Write(_baseColor.ScG); writer.Write(_baseColor.ScB); writer.Write(_baseColor.ScA);
+                writer.Write(_emissiveColor.ScR); writer.Write(_emissiveColor.ScG); writer.Write(_emissiveColor.ScB);
+                writer.Write(_emissiveIntensity);
+                writer.Write(_metallic);
+                writer.Write(_roughness);
+            }
         }
+
+        /// <summary>
+        /// 0..1 の値を 0..255 に四捨五入して詰める(0.5 は 128)。エンジンの material_surface::to_unorm8() と同じ式。
+        /// </summary>
+        public static byte ToUnorm8(float value) => (byte)(Math.Clamp(value, 0f, 1f) * 255f + 0.5f);
+
+        /// <summary>
+        /// 0..Material.MaxEmissiveIntensity の値を 0..65535 に四捨五入して詰める(1.0 は 7、シェーダーでは約 1.068)。
+        /// エンジンの material_surface::to_emissive_intensity() と同じ式。
+        /// </summary>
+        public static ushort ToEmissiveIntensity(float value) =>
+            (ushort)(Math.Clamp(value, 0f, Material.MaxEmissiveIntensity) * (65535f / Material.MaxEmissiveIntensity) + 0.5f);
 
         public MaterialSurface Clone()
             => new()
@@ -290,7 +324,25 @@ namespace DXForgeEditor.Content
         private byte[] _uploadedData = [];
 
         public override List<AssetInfo> GetReferencedAssets() =>
-            Inputs.Where(x => x.Asset != null && x.Asset.Guid != Guid.Empty).Select(x => x.Asset!).ToList();
+            Inputs.Where(HasInputAsset).Select(x => x.Asset!).ToList();
+
+        private static bool HasInputAsset(AppliedMaterialInput input) => input.Asset != null && input.Asset.Guid != Guid.Empty;
+
+        /// <summary>
+        /// エンジンに渡す入力のマスク(material_surface::input_mask)。入力 i にアセットがあればビット i を立てる(8個まで)。
+        /// </summary>
+        // NOTE: Primal は既定のテクスチャ(Texture.Default)の入力だけを除き、どの入力のテクスチャも固定の位置に置く。
+        //       DXForgeEX には既定のテクスチャがなく(#180)、GetReferencedAssets() はアセットのない入力を詰めて並べるので、
+        //       シェーダーは入力 i のテクスチャのインデックスを、i より下の立っているビットの数で探す(DefaultMaterialShaders.hlsl)。
+        public byte GetInputMask()
+        {
+            byte mask = 0;
+            for (int i = 0; i < Math.Min(Inputs.Count, 8); ++i)
+            {
+                if (HasInputAsset(Inputs[i])) mask |= (byte)(1 << i);
+            }
+            return mask;
+        }
 
         // NOTE: Primal は入力のアセットを複製しない(Codexの指摘, #145)
         public AppliedMaterial Clone()
@@ -521,7 +573,7 @@ namespace DXForgeEditor.Content
         ///  u32                 texture_count,
         ///  id::id_type         texture_ids[texture_count];
         ///  id::id_type*        texture_ids;       // 0。エンジン(DLL)が上の配列を指すようにする
-        ///  material_surface    surface;
+        ///  material_surface    surface;       // 12バイト(MaterialSurface.ToBinary(writer, asInteger: true))
         ///  material_type::type type,
         ///  u32                 texture_count,
         ///  id::id_type         shader_ids[shader_type::count],
@@ -554,7 +606,7 @@ namespace DXForgeEditor.Content
 
             // テクスチャのIDへのポインタの場所(8バイト)。テクスチャがなければ null のまま。
             writer.Write(0L);
-            MaterialSurface.ToBinary(writer);
+            MaterialSurface.ToBinary(writer, asInteger: true, GetInputMask());
             writer.Write((int)_material.MaterialType);
             writer.Write(referencedAssets.Count);
             shaderIds.ForEach(writer.Write);
@@ -599,6 +651,9 @@ namespace DXForgeEditor.Content
     class Material : Asset
     {
         public static AssetInfo? Default => DefaultAssets.DefaultMaterial;
+
+        // NOTE: エンジンの material_surface::max_emissive_intensity、シェーダーの MaxEmissiveIntensity と同じ(10,000 cd/m^2)
+        public const float MaxEmissiveIntensity = 10000f;
 
         private readonly Dictionary<ShaderType, ShaderGroup> _shaders = [];
 
@@ -729,7 +784,7 @@ namespace DXForgeEditor.Content
                 writer.Write((int)MaterialType);
                 writer.Write((int)MaterialMode);
 
-                MaterialSurface.ToBinary(writer);
+                MaterialSurface.ToBinary(writer, asInteger: false);
                 DefaultMaterialInputs.ToBinary(writer);
 
                 FullPath = file;
