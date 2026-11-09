@@ -8,6 +8,7 @@
 // 2025/01/12 新規作成
 // 2025/01/13 シェーダーの追加と削除の関数を追加
 // 2025/01/13 get_submesh_gpu_ids()とget_lod_offset()を追加
+// 2026/11/09 キーに合う版がなくても assert しない find_shader() を追加 (Primal Day 087 の深度プリパス, #252)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ===
@@ -71,6 +72,8 @@ namespace dxforge::content
 	id::id_type add_shader_group(const u8* const* shaders, u32 num_shaders, const u32* const keys);
 	void remove_shader_group(id::id_type id);
 	compiled_shader_ptr get_shader(id::id_type id, u32 shader_key);
+	/// @brief get_shader() と同じだが、キーに合う版がなければ assert せずに nullptr を返す(版があるかを確かめるとき用)
+	compiled_shader_ptr find_shader(id::id_type id, u32 shader_key);
 
 	void get_submesh_gpu_ids(id::id_type geometry_content_id, u32 id_count, id::id_type* const gpu_ids);
 	void get_lod_offsets(const id::id_type* const geometry_ids, const f32* const thresholds, u32 id_count, utl::vector<lod_offset>& offsets);

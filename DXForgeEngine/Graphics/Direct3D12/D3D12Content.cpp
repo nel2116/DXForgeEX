@@ -392,13 +392,13 @@ namespace dxforge::graphics::d3d12::content
 		/// @param elements_type 頂点の要素の種類(頂点シェーダーのキー)
 		/// @param material マテリアル
 		/// @param shader_index マテリアルのシェーダーIDの並びの中の位置
-		/// @return バイトコード。キーに合う版がなければ空
+		/// @return バイトコード。キーに合う版がなければ空(assert しない。版があるかを確かめるのにも使う)
 		D3D12_SHADER_BYTECODE get_shader_byte_code(shader_type::type type, u32 elements_type, const d3d12_material_stream& material, u32 shader_index)
 		{
 			// NOTE: 各タイプのシェーダは、submeshまたはmaterialの異なるプロパティから生成されるキーを持つことがあります。
 			//		現時点では、elements_typeによって異なる種類の頂点シェーダーしかありません。
 			const u32 key{ type == shader_type::vertex ? elements_type : u32_invalid_id };
-			const dxforge::content::compiled_shader_ptr shader{ dxforge::content::get_shader(material.shader_ids()[shader_index], key) };
+			const dxforge::content::compiled_shader_ptr shader{ dxforge::content::find_shader(material.shader_ids()[shader_index], key) };
 			if (!shader) return {};
 			return { shader->byte_code(), shader->byte_code_size() };
 		}

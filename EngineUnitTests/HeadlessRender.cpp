@@ -31,6 +31,7 @@
 // 2026/11/08 DLL の SetPosition で動かした球が新しい場所に描かれることの確認を追加 (Primal Day 086, #244)
 // 2026/11/08 SetCameraFoV の確認を、視野角がラジアン(既定は 0.25 * pi)であることに合わせた (#205)
 // 2026/11/09 深度プリパス用の位置だけの頂点シェーダーを登録し、マテリアルの値を詰めた形で渡す (Primal Day 087, #252)
+// 2026/11/09 床のマテリアルに位置だけの版がない頂点シェーダーを使い、深度プリパスが元の版に戻ることを確かめる (#252 の Codex の指摘)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "HeadlessRender.h"
@@ -463,6 +464,9 @@ namespace dxforge::headless::render
 				const u8* vertex_shaders[]{ position_only_vertex_shader.get(), vertex_shader.get() };
 				const u32 vertex_keys[]{ elements_type_position_only, elements_type_static_normal };
 				_vs_id = content::add_shader_group(vertex_shaders, _countof(vertex_shaders), vertex_keys);
+				// 位置だけ(キー0)の版がない頂点シェーダー。床のマテリアルに使い、深度プリパスが描画用の頂点シェーダーに
+				// 戻ること(assert しないこと)を確かめる(#252 の Codex の指摘)
+				_vs_without_position_only_id = content::add_shader_group(&vertex_shaders[1], 1, &vertex_keys[1]);
 				const u8* pixel_shaders[]{ pixel_shader.get() };
 				_ps_id = content::add_shader_group(pixel_shaders, 1, &u32_invalid_id);
 				return {};
@@ -472,7 +476,7 @@ namespace dxforge::headless::render
 			/// @return 失敗したときはその説明(成功なら空)
 			std::string create(f32 aspect_ratio)
 			{
-				assert(id::is_valid(_vs_id) && id::is_valid(_ps_id));
+				assert(id::is_valid(_vs_id) && id::is_valid(_vs_without_position_only_id) && id::is_valid(_ps_id));
 				const std::vector<u8> sphere_blob{ pack_mesh(make_sphere(1.f, 48, 24)) };
 				const std::vector<u8> floor_blob{ pack_mesh(make_floor(4.f)) };
 				const std::string upload_error{ check_resource_round_trip(floor_blob) };
@@ -484,7 +488,7 @@ namespace dxforge::headless::render
 				if (!id::is_valid(_sphere_model_id) || !id::is_valid(_floor_model_id)) return "failed to create the test meshes";
 
 				_sphere_mtl_id = create_material({ 0.8f, 0.25f, 0.2f, 1.f }, 0.f, 0.4f);
-				_floor_mtl_id = create_material({ 0.6f, 0.6f, 0.6f, 1.f }, 0.f, 0.9f);
+				_floor_mtl_id = create_material({ 0.6f, 0.6f, 0.6f, 1.f }, 0.f, 0.9f, nullptr, 0, _vs_without_position_only_id);
 
 				// NOTE: ライトにはエンティティが要る(light::create()のassert)。平行光源はエンティティのfront()の向きに照らす。
 				graphics::create_light_set(light_set_key);
@@ -643,7 +647,7 @@ namespace dxforge::headless::render
 					editor::destroy_resource(*id, content::asset_type::material);
 					*id = id::invalid_id;
 				}
-				for (id::id_type* id : { &_vs_id, &_ps_id })
+				for (id::id_type* id : { &_vs_id, &_vs_without_position_only_id, &_ps_id })
 				{
 					if (id::is_valid(*id)) content::remove_shader_group(*id);
 					*id = id::invalid_id;
@@ -655,7 +659,9 @@ namespace dxforge::headless::render
 			constexpr static u64 light_set_key{ 1 };
 
 			/// @brief エディタの AppliedMaterial.PackForEngine() の形のデータから、DLLと同じ経路でマテリアルを作る
-			id::id_type create_material(math::v4 base_color, f32 metallic, f32 roughness, const id::id_type* texture_ids = nullptr, u32 texture_count = 0)
+			/// @param vs_id 頂点シェーダーのグループ。無効なら _vs_id(位置だけの版もある)
+			id::id_type create_material(math::v4 base_color, f32 metallic, f32 roughness, const id::id_type* texture_ids = nullptr, u32 texture_count = 0,
+				id::id_type vs_id = id::invalid_id)
 			{
 				using graphics::material_surface;
 				material_surface surface{};
@@ -667,7 +673,7 @@ namespace dxforge::headless::render
 				surface.roughness = material_surface::to_unorm8(roughness);
 				id::id_type shader_ids[graphics::shader_type::count];
 				for (id::id_type& id : shader_ids) id = id::invalid_id;
-				shader_ids[graphics::shader_type::vertex] = _vs_id;
+				shader_ids[graphics::shader_type::vertex] = id::is_valid(vs_id) ? vs_id : _vs_id;
 				shader_ids[graphics::shader_type::pixel] = _ps_id;
 				const std::vector<u8> data{ test::pack_material(surface, graphics::material_type::opaque, texture_ids, texture_count, shader_ids) };
 				return editor::create_resource(data.data(), content::asset_type::material);
@@ -751,6 +757,7 @@ namespace dxforge::headless::render
 			}
 
 			id::id_type _vs_id{ id::invalid_id };
+			id::id_type _vs_without_position_only_id{ id::invalid_id };
 			id::id_type _ps_id{ id::invalid_id };
 			id::id_type _sphere_model_id{ id::invalid_id };
 			id::id_type _floor_model_id{ id::invalid_id };
