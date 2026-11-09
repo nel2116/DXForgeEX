@@ -227,10 +227,10 @@ jobs:
         shell: pwsh
         run: pwsh -STA -NoProfile -File DXForgeEditor/Tests/material_asset_test.ps1 -Configuration DebugEditor -RequireEngineDll
 
-      # プロジェクトを開けないときの理由(Project.Load の例外の型とメッセージ)が Logger と Project.LastLoadError に残ること(#250)。GUI も GPU もエンジンも要らない
+      # プロジェクトを開けないときの理由(Project.Load の例外の型とメッセージ)が Logger と Project.LastLoadError に残ること、失敗の後始末(Project.ReleaseEntities)がエンジンのエンティティを外すこと(#250)。上でビルドした DXForgeEngineDLL を使い、GUI も GPU も要らない(エンジンを初期化しない)
       - name: Test editor project load errors
         shell: pwsh
-        run: pwsh -STA -NoProfile -File DXForgeEditor/Tests/project_load_test.ps1 -Configuration DebugEditor
+        run: pwsh -STA -NoProfile -File DXForgeEditor/Tests/project_load_test.ps1 -Configuration DebugEditor -RequireEngineDll
 
       # エディタの DllWrappers(EngineAPI.CompileShader / AddShaderGroup / RemoveShaderGroup)を通したシェーダのコンパイルと登録
       # (Primal Day 076, #29)。上でビルドした DXForgeEngineDLL と、その隣の dxcompiler.dll を使う。GUI も GPU も要らない(#146)。

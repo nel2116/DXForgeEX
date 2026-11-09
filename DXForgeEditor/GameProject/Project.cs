@@ -231,6 +231,7 @@ namespace DXForgeEditor.GameProject
             var path = System.IO.Path.GetDirectoryName(file) ?? string.Empty;
             if (!path.EndsWith(System.IO.Path.DirectorySeparatorChar)) path += System.IO.Path.DirectorySeparatorChar;
 
+            Project? project = null;
             try
             {
                 // エンティティ(Geometry)がデシリアライズの中でアセットを探すので、先に登録する(Primal Day 081)
@@ -238,7 +239,7 @@ namespace DXForgeEditor.GameProject
                 ContentWatcher.Reset($@"{path}Content\", path);
 
                 // NOTE: ルートが i:nil="true" のファイルでは、FromFile は例外を投げず null を返す
-                var project = Serializer.FromFile<Project>(file) ?? throw new InvalidDataException($"ルート要素が nil です: {file}");
+                project = Serializer.FromFile<Project>(file) ?? throw new InvalidDataException($"ルート要素が nil です: {file}");
                 project.Path = path;
                 Current = project;
                 project.LoadEntitiesWithAssets();
@@ -252,6 +253,8 @@ namespace DXForgeEditor.GameProject
                 Debug.WriteLine(LastLoadError);
                 Logger.Log(MessageType.Error, $"プロジェクトを読み込めませんでした: {file} ({LastLoadError})");
                 Current = null;
+                // デシリアライズのあとに失敗したら、作ったエンティティをエンジンに残さない
+                project?.ReleaseEntities();
                 // 開けなかったプロジェクトのフォルダを見続けない(AssetRegistry は次の Load で登録し直す)
                 ContentWatcher.Reset(string.Empty, string.Empty);
                 return null;
@@ -416,8 +419,29 @@ namespace DXForgeEditor.GameProject
             }
             catch
             {
-                _scenes.SelectMany(x => x.GameEntities).ToList().ForEach(x => x.IsActive = false);
+                ReleaseEntities();
                 throw;
+            }
+        }
+
+        /// <summary>
+        /// このプロジェクトのエンティティをエンジンから外す(IsActive を false にする)。読み込みに失敗したとき、途中まで作ったものを
+        /// エンジンに残さないために使う(残ると、終了時に DXForgeEngineDLL が FreeList.h の assert(!_size) で止まる, Issue #250)。
+        /// 失敗の後始末なので、ここでは例外を投げず、外せなかったエンティティはログに残して続ける。
+        /// </summary>
+        internal void ReleaseEntities()
+        {
+            foreach (var entity in _scenes.SelectMany(x => x.GameEntities).ToList())
+            {
+                try
+                {
+                    entity.IsActive = false;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine(ex.Message);
+                    Logger.Log(MessageType.Error, $"エンティティ {entity.Name} をエンジンから外せませんでした: {DescribeException(ex)}");
+                }
             }
         }
 

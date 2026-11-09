@@ -12,9 +12,16 @@
          Logger のエラーに例外の型とメッセージが入り、Project.LastLoadError にも同じ理由が入る。
       2. 入れ子の例外(InnerException)の理由もログに入る。
       3. 読み込みに失敗したあとの Project.Current は null。
+      4. 失敗の後始末(Project.ReleaseEntities): 読み込んだプロジェクトのエンティティをエンジンに作ったあと呼ぶと、すべてエンジンから
+         外れる。Project.Load の catch がこれを呼ぶので、読み込みに失敗してもエンジンにエンティティが残らない(残ると終了時に
+         FreeList.h の assert(!_size) で止まる)。Load 全体で失敗させるとゲームコードのビルド(Visual Studio)が走るので、ヘッドレスの
+         読み込みで作ったプロジェクトに直接呼ぶ。DXForgeEngineDLL.dll が要る(エンジンの初期化は要らない)。
 
 .PARAMETER Configuration
     DebugEditor(既定)か ReleaseEditor。
+
+.PARAMETER RequireEngineDll
+    DXForgeEngineDLL.dll がなければ失敗にする(失敗後の後始末の項目を SKIP にしない)。
 
 .EXAMPLE
     pwsh -STA -NoProfile -File DXForgeEditor/Tests/project_load_test.ps1
@@ -22,7 +29,8 @@
 [CmdletBinding()]
 param(
 	[ValidateSet("DebugEditor", "ReleaseEditor")]
-	[string]$Configuration = "DebugEditor"
+	[string]$Configuration = "DebugEditor",
+	[switch]$RequireEngineDll
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,6 +45,24 @@ function Check([bool]$condition, [string]$message)
 }
 
 if ([System.Threading.Thread]::CurrentThread.GetApartmentState() -ne "STA") { throw "Run this script on an STA thread (pwsh -STA)." }
+
+$engineDllPath = Join-Path $OutDir "DXForgeEngineDLL.dll"
+$hasEngineDll = Test-Path $engineDllPath
+if (-not $hasEngineDll -and $RequireEngineDll) { throw "$engineDllPath がありません(./build.ps1 -Target native -Configuration $Configuration -Project DXForgeEngineDLL)。" }
+if ($hasEngineDll)
+{
+	[void][System.Runtime.InteropServices.NativeLibrary]::Load($engineDllPath)
+	if ($Configuration -eq "DebugEditor")
+	{
+		# Debugのassertはモーダルなダイアログを出して止まるため、標準エラーに出してabortするようにする
+		Add-Type -Namespace DXForgeTest -Name Crt -MemberDefinition @'
+[DllImport("ucrtbased.dll")] public static extern int _set_error_mode(int mode);
+[DllImport("ucrtbased.dll")] public static extern uint _set_abort_behavior(uint flags, uint mask);
+'@
+		[void][DXForgeTest.Crt]::_set_error_mode(1)
+		[void][DXForgeTest.Crt]::_set_abort_behavior(0, 3)
+	}
+}
 
 Add-Type -AssemblyName PresentationFramework
 $app = [System.Windows.Application]::new()
@@ -117,6 +143,33 @@ try
 		$text = [string]$describe.Invoke($null, [object[]]@($ex))
 		Check ($text.Contains("InvalidOperationException") -and $text.Contains("outer message")) "外側の例外の型とメッセージが入る"
 		Check ($text.Contains("IOException") -and $text.Contains("inner message")) "内側の例外の型とメッセージが入る"
+	}
+
+	Write-Host "[release entities after a failed load]"
+	if (-not $hasEngineDll) { Write-Host "  SKIP (DXForgeEngineDLL.dll がない)" }
+	else
+	{
+		# ヘッドレスの読み込みはエンティティをエンジンに作らないので、作ってから ReleaseEntities を呼ぶ(以降、非ヘッドレスの Load は使わない)
+		$editor.GetType("DXForgeEditor.GameProject.ProjectLoadEnvironment", $true).GetProperty("Headless", $flags).SetValue($null, $true)
+		$workDir = Join-Path $temp "TransformOnly"
+		[void](New-Item -ItemType Directory -Path $workDir)
+		$workFile = Join-Path $workDir "TransformOnly.dxproj"
+		Copy-Item (Join-Path $RepoRoot "DXForgeCli\Tests\Projects\TransformOnly\TransformOnly.dxproj") $workFile
+		$project = $load.Invoke($null, [object[]]@([string]$workFile)).PSObject.BaseObject
+		$entities = @($project.ActiveScene.GameEntities)
+		foreach ($e in $entities) { $e.IsActive = $true }
+		Check (($entities.Count -ge 3) -and (@($entities | Where-Object { $_.EntityId -ge 0 }).Count -eq $entities.Count)) "エンティティがエンジンに作られた($($entities.Count) 件)"
+		$release = $projectType.GetMethod("ReleaseEntities", $flags)
+		Check ($null -ne $release) "ReleaseEntities がある"
+		if ($null -ne $release)
+		{
+			$threw = $false
+			try { $release.Invoke($project, @()) } catch { $threw = $true; Write-Host $_ }
+			Check (-not $threw) "ReleaseEntities は例外を投げない"
+			Check (@($entities | Where-Object { $_.IsActive -or $_.EntityId -ge 0 }).Count -eq 0) "すべてのエンティティがエンジンから外れた"
+			$release.Invoke($project, @())
+			Check $true "もう一度呼んでも何も起きない"
+		}
 	}
 }
 finally
