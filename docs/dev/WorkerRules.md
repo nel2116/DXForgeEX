@@ -17,5 +17,6 @@
 - Always stop the processes you started when you are done. Create temporary files under %TEMP% and delete them afterwards.
 - Keep waiting without ending your turn until you get a reply saying you may send worker_done. If `ask` times out, wait again with `ask --resume` and the same message ID. If your turn did end, resume on the next `send`.
 - When you approach a usage limit, commit and push your work, tell the coordinator what is done and what remains, then stop.
+- When the context size warning appears (#256), finish the step in hand, commit and push, and write a handover to `%TEMP%\handover-<branch>.md`: done, remaining, decisions approved by the coordinator, commands run with their results, and any uncommitted files. Then send `ask` with the subject 「引き継ぎ依頼」 and the file path, and wait. Do not keep working in the same conversation unless the coordinator replies that you should.
 - If you find an unrelated bug while working, report it to the coordinator instead of fixing it yourself.
 - In worker_done, write the PR URL, what you verified (commands and actual output), what you could not verify, and what to check after the merge.
