@@ -16,7 +16,9 @@
          読み戻すと同じシェーダと既定の値になる。同じシェーダならファイルを書き直さず、シェーダが変われば同じGUIDで作り直す。
       2. Material の Save → Load で、種類・モード・値・入力の名前・シェーダが同じになる。
       3. AppliedMaterial.PackForEngine() のバイト列が、エンジン(DXForgeEngineDLL/ResourceUpload.h)が読む並びと大きさになる
-         (EngineUnitTests の Tests_ResourceUpload.cpp と同じ定数: 92 バイト、material_init_info は 4 バイト目から)。
+         (EngineUnitTests の Tests_ResourceUpload.cpp と同じ定数: 64 バイト、material_init_info は 4 バイト目から)。
+         material_surface は12バイトに詰めた形(Primal Day 087, #252): float から 0..255 への四捨五入(0.5 → 128)と、
+         emissive_intensity の 0..10000 → 0..65535 も確かめる。
       4. 同じ Material を使う2つの AppliedMaterial の1つがシェーダを外しても、もう1つが使うシェーダはエンジンに残る。
       5. EngineAPI.CreateResource / DestroyResource: エンジンを初期化せずに呼べる範囲(扱わない種類・シェーダのないマテリアル・
          空のデータ・無効なID)で、DLL の境界を通って無効なIDが返る(例外もassertも起きない)。
@@ -249,18 +251,26 @@ try
 	$appliedSource = $appliedMaterialType.GetProperty("_material", $flags).GetValue($applied)
 	$vsId = (Get-Shader $appliedSource "Vertex").ContentId
 	$data = Invoke-Pack $applied $appliedIds
-	# EngineUnitTests の Tests_ResourceUpload.cpp と同じ定数: packed_material_size(0) = 92、material_init_info は 4 バイト目から
-	# (texture_ids +0、surface +8、type +48、texture_count +52、shader_ids +56)
-	Check ($data.Length -eq 92) "92 bytes without textures: $($data.Length)"
-	$f = { param($offset) [BitConverter]::ToSingle($data, $offset) }
+	# EngineUnitTests の Tests_ResourceUpload.cpp と同じ定数: packed_material_size(0) = 64、material_init_info は 4 バイト目から
+	# (texture_ids +0、surface +8(12バイト)、type +20、texture_count +24、shader_ids +28)
+	Check ($data.Length -eq 64) "64 bytes without textures: $($data.Length)"
 	$i = { param($offset) [BitConverter]::ToInt32($data, $offset) }
 	Check ((& $i 0) -eq 0 -and [BitConverter]::ToInt64($data, 4) -eq 0) "texture count 0 and a null texture_ids pointer"
-	Check ((& $f 12) -eq $surface.BaseColor.ScR -and (& $f 24) -eq $surface.BaseColor.ScA -and (& $f 28) -eq $surface.EmissiveColor.ScR -and
-		(& $f 40) -eq 2.5 -and (& $f 44) -eq 0.25 -and (& $f 48) -eq 0.75) "material_surface at +12: $((12..48 | Where-Object { $_ % 4 -eq 0 } | ForEach-Object { & $f $_ }) -join ', ')"
-	Check ((& $i 52) -eq 0 -and (& $i 56) -eq 0) "type (opaque) at +52 and texture count at +56"
-	$shaderIds = 0..7 | ForEach-Object { & $i (60 + 4 * $_) }
+	# 色は線形の値(ScR など)を round(x * 255) に、emissive_intensity は round(x * 65535 / 10000) に詰める
+	# BaseColor (0.1, 0.2, 0.3, 0.5) -> 26, 51, 77, 128、Emissive (0.4, 0.5, 0.6) -> 102, 128, 153、Metallic 0.25 -> 64、
+	# Roughness 0.75 -> 191、入力のマスク 0、EmissiveIntensity 2.5 -> 16
+	$surfaceBytes = $data[12..21]
+	$intensity = [BitConverter]::ToUInt16($data, 22)
+	Check (($surfaceBytes -join ",") -eq "26,51,77,128,102,128,153,64,191,0" -and $intensity -eq 16) "material_surface at +12 (12 bytes): $($surfaceBytes -join ', '), emissive intensity $intensity"
+	$toUnorm8 = $surface.GetType().GetMethod("ToUnorm8")
+	$toIntensity = $surface.GetType().GetMethod("ToEmissiveIntensity")
+	Check ($toUnorm8.Invoke($null, @([float]0.5)) -eq 128 -and $toUnorm8.Invoke($null, @([float]0.9)) -eq 230 -and $toUnorm8.Invoke($null, @([float]-1)) -eq 0 -and
+		$toUnorm8.Invoke($null, @([float]2)) -eq 255 -and $toIntensity.Invoke($null, @([float]1)) -eq 7 -and $toIntensity.Invoke($null, @([float]10000)) -eq 65535 -and
+		$toIntensity.Invoke($null, @([float]1e6)) -eq 65535) "ToUnorm8 rounds 0.5 to 128 and clamps; ToEmissiveIntensity maps 1.0 to 7 and 10000 to 65535 (EngineUnitTests ResourceUpload_MaterialSurfaceConversionRounds)"
+	Check ((& $i 24) -eq 0 -and (& $i 28) -eq 0) "type (opaque) at +24 and texture count at +28"
+	$shaderIds = 0..7 | ForEach-Object { & $i (32 + 4 * $_) }
 	Check ($vsId -ne $invalidId -and $shaderIds[0] -eq $vsId -and $shaderIds[4] -ne $invalidId -and $shaderIds[4] -ne $vsId -and
-		($shaderIds[1, 2, 3, 5, 6, 7] | Where-Object { $_ -ne $invalidId }).Count -eq 0) "shader ids at +60 (vertex, ..., pixel, ...): $($shaderIds -join ', ')"
+		($shaderIds[1, 2, 3, 5, 6, 7] | Where-Object { $_ -ne $invalidId }).Count -eq 0) "shader ids at +32 (vertex, ..., pixel, ...): $($shaderIds -join ', ')"
 
 	$applied.Inputs[0].Asset = [Activator]::CreateInstance($materialInfo.GetType())
 	$applied.Inputs[0].Asset.Guid = [Guid]::NewGuid()
@@ -296,8 +306,8 @@ try
 	if ($hasEngineDll)
 	{
 		Check ($createResource.Invoke($null, @([byte[]]@(1, 2, 3, 4), $animation)) -eq $invalidId) "an unsupported type is rejected by the DLL"
-		$noShaders = [byte[]]::new(92)
-		for ($k = 0; $k -lt 8; $k++) { [Array]::Copy([BitConverter]::GetBytes(-1), 0, $noShaders, 60 + 4 * $k, 4) }
+		$noShaders = [byte[]]::new(64)
+		for ($k = 0; $k -lt 8; $k++) { [Array]::Copy([BitConverter]::GetBytes(-1), 0, $noShaders, 32 + 4 * $k, 4) }
 		Check ($createResource.Invoke($null, @($noShaders, $materialAsset)) -eq $invalidId) "a material without shaders is rejected by the DLL"
 	}
 	else
@@ -367,12 +377,27 @@ try
 		$materialId = if ($withTexture.UploadedAsset) { $withTexture.UploadedAsset.ContentId } else { $invalidId }
 		$materialData = if ($script:fake.Data.ContainsKey($materialId)) { $script:fake.Data[$materialId] } else { [byte[]]@() }
 		Check ($uploaded -and $texId -ne $invalidId -and $script:fake.Created[$texId] -eq "Texture" -and $uploadedAssets[$texInfo.Guid].ReferenceCount -eq 1) "UploadToEngine uploads the input texture first: $uploaded, texture id $texId, references $(if ($uploadedAssets.ContainsKey($texInfo.Guid)) { $uploadedAssets[$texInfo.Guid].ReferenceCount } else { 0 })"
-		Check ($materialData.Length -eq 96 -and [BitConverter]::ToInt32($materialData, 0) -eq 1 -and [BitConverter]::ToInt32($materialData, 4) -eq $texId) "the material data has the texture id: $($materialData.Length) bytes"
+		Check ($materialData.Length -eq 68 -and [BitConverter]::ToInt32($materialData, 0) -eq 1 -and [BitConverter]::ToInt32($materialData, 4) -eq $texId -and
+			$materialData[16 + 9] -eq 1) "the material data has the texture id and input mask bit 0: $($materialData.Length) bytes, mask $(if ($materialData.Length -gt 25) { $materialData[25] })"
 		if ($uploaded)
 		{
 			$withTexture.UnloadFromEngine()
 			Check ($getContentId.Invoke($null, @($texInfo.Guid)) -eq $invalidId -and $script:fake.Destroyed.Contains($texId) -and $script:fake.Destroyed.Contains($materialId) -and $uploadedAssets.Count -eq 0) "UnloadFromEngine destroys the material and the texture: destroyed $($script:fake.Destroyed -join ', ')"
 		}
+		# 入力のマスクとテクスチャのIDの並び(#252): 入力 1 と 3 にだけテクスチャがあると、マスクは 0b01010 で、IDは入力の順に
+		# 詰めて2つ並ぶ。シェーダーは入力 i のIDを MaterialData[3 + (i より下の立っているビットの数)] から読む
+		# (DefaultMaterialShaders.hlsl の TextureIndex、docs/design/material-surface-packing.md)
+		$sparse = [Activator]::CreateInstance($appliedMaterialType, @($materialInfo))
+		$sparse.Inputs[1].Asset = $texInfo
+		$sparse.Inputs[3].Asset = $texInfo
+		$sparseUploaded = $sparse.UploadToEngine()
+		$sparseTexId = $getContentId.Invoke($null, @($texInfo.Guid))
+		$sparseId = if ($sparse.UploadedAsset) { $sparse.UploadedAsset.ContentId } else { $invalidId }
+		$sparseData = if ($script:fake.Data.ContainsKey($sparseId)) { $script:fake.Data[$sparseId] } else { [byte[]]@() }
+		Check ($sparse.GetInputMask() -eq 10 -and $sparseUploaded -and $sparseData.Length -eq 72 -and [BitConverter]::ToInt32($sparseData, 0) -eq 2 -and
+			[BitConverter]::ToInt32($sparseData, 4) -eq $sparseTexId -and [BitConverter]::ToInt32($sparseData, 8) -eq $sparseTexId -and $sparseData[20 + 9] -eq 10) "inputs 1 and 3 give input mask 0b01010 and 2 packed texture ids: mask $($sparse.GetInputMask()), $($sparseData.Length) bytes"
+		if ($sparseUploaded) { $sparse.UnloadFromEngine() }
+
 		Check ((Get-UploadedShaderCount) -eq 0) "no shaders are left uploaded: $(Get-UploadedShaderCount)"
 
 		# 2. Clone() が入力のアセットを複製する
@@ -497,9 +522,9 @@ try
 			$start = Get-MaterialCounts
 			$s1 = New-Applied
 			[void]$s1.UploadToEngine()
-			Assert-State "S1 upload" $s1 @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 92; Created = 1; Destroyed = 0 } $start
+			Assert-State "S1 upload" $s1 @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 64; Created = 1; Destroyed = 0 } $start
 			$again = $s1.UploadToEngine()
-			Assert-State "S1 upload again (same content, returns $again)" $s1 @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 92; Created = 1; Destroyed = 0 } $start
+			Assert-State "S1 upload again (same content, returns $again)" $s1 @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 64; Created = 1; Destroyed = 0 } $start
 			$s1.UnloadFromEngine()
 			Assert-State "S1 unload" $s1 @{ Uploaded = $false; Refs = 0; Shaders = 0; Pack = 0; Created = 1; Destroyed = 1 } $start
 			$s1.UnloadFromEngine()
@@ -511,10 +536,10 @@ try
 			[void]$s2.UploadToEngine()
 			$s2.MaterialSurface.Roughness = 0.2
 			[void]$s2.UploadToEngine()
-			Assert-State "S2 change and upload" $s2 @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 92; Created = 2; Destroyed = 1 } $start
+			Assert-State "S2 change and upload" $s2 @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 64; Created = 2; Destroyed = 1 } $start
 			$packed = $s2.PackForEngine()
-			$roughness = if ($packed.Length -ge 52) { [BitConverter]::ToSingle($packed, 48) } else { "(no data)" }
-			Check ($roughness -eq [float]0.2) "S2 the packed data has the new roughness: $roughness"
+			$roughness = if ($packed.Length -ge 21) { $packed[20] } else { "(no data)" }
+			Check ($roughness -eq 51) "S2 the packed data has the new roughness (0.2 -> 51): $roughness"
 			$s2.UnloadFromEngine()
 			Assert-State "S2 unload" $s2 @{ Uploaded = $false; Refs = 0; Shaders = 0; Created = 2; Destroyed = 2 } $start
 
@@ -524,14 +549,14 @@ try
 			$b = New-Applied
 			[void]$a.UploadToEngine()
 			[void]$b.UploadToEngine()
-			Assert-State "S3 A and B share" $b @{ Uploaded = $true; Refs = 2; Shaders = 2; Pack = 92; Created = 1; Destroyed = 0 } $start
+			Assert-State "S3 A and B share" $b @{ Uploaded = $true; Refs = 2; Shaders = 2; Pack = 64; Created = 1; Destroyed = 0 } $start
 			$a.UnloadFromEngine()
-			Assert-State "S3 A unloaded (B)" $b @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 92; Created = 1; Destroyed = 0 } $start
+			Assert-State "S3 A unloaded (B)" $b @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 64; Created = 1; Destroyed = 0 } $start
 			$a.MaterialSurface.Roughness = 0.3
 			[void]$a.UploadToEngine()
-			Assert-State "S3 A changed and uploaded (A)" $a @{ Uploaded = $true; Refs = 1; Shaders = 2; Pack = 92; Created = 2; Destroyed = 0 } $start
+			Assert-State "S3 A changed and uploaded (A)" $a @{ Uploaded = $true; Refs = 1; Shaders = 2; Pack = 64; Created = 2; Destroyed = 0 } $start
 			$b.UnloadFromEngine()
-			Assert-State "S3 B unloaded (A)" $a @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 92; Created = 2; Destroyed = 1 } $start
+			Assert-State "S3 B unloaded (A)" $a @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 64; Created = 2; Destroyed = 1 } $start
 			$a.UnloadFromEngine()
 			Assert-State "S3 A unloaded" $a @{ Uploaded = $false; Refs = 0; Shaders = 0; Created = 2; Destroyed = 2 } $start
 
@@ -544,18 +569,18 @@ try
 			Assert-State "S4 failed upload (returns $failed)" $s4 @{ Uploaded = $false; Refs = 0; Shaders = 0; Created = 0; Destroyed = 0 } $start
 			Check ($script:fakeShaders.Live.Count -eq 0) "S4 no shaders are left registered: $($script:fakeShaders.Live.Count)"
 			[void]$s4.UploadToEngine()
-			Assert-State "S4 upload after the failure" $s4 @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 92; Created = 1; Destroyed = 0 } $start
+			Assert-State "S4 upload after the failure" $s4 @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 64; Created = 1; Destroyed = 0 } $start
 
 			# S5: 内容を変えたアップロードに失敗しても、前のものを持ち続ける
 			$s4.MaterialSurface.Roughness = 0.4
 			$script:fake.Fail = $true
 			$failed = $s4.UploadToEngine()
 			$script:fake.Fail = $false
-			Assert-State "S5 failed upload of changed content (returns $failed)" $s4 @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 92; Created = 1; Destroyed = 0 } $start
+			Assert-State "S5 failed upload of changed content (returns $failed)" $s4 @{ Uploaded = $true; Refs = 1; Shaders = 1; Pack = 64; Created = 1; Destroyed = 0 } $start
 			# PackForEngine() は今の値でパックする。アップロードしたデータ(GetMetadata().PackedData)は前のまま
 			$packed = $s4.GetMetadata().PackedData
-			$roughness = if ($packed.Length -ge 52) { [BitConverter]::ToSingle($packed, 48) } else { "(no data)" }
-			Check ($packed.Length -eq 92 -and $roughness -ne [float]0.4 -and $getContentId.Invoke($null, @($s4.Guid)) -eq $s4.UploadedAsset.ContentId) "S5 it keeps the previous upload: uploaded roughness $roughness"
+			$roughness = if ($packed.Length -ge 21) { $packed[20] } else { "(no data)" }
+			Check ($packed.Length -eq 64 -and $roughness -ne 102 -and $getContentId.Invoke($null, @($s4.Guid)) -eq $s4.UploadedAsset.ContentId) "S5 it keeps the previous upload: uploaded roughness $roughness"
 			$s4.UnloadFromEngine()
 			Assert-State "S5 unload" $s4 @{ Uploaded = $false; Refs = 0; Shaders = 0; Created = 1; Destroyed = 1 } $start
 
@@ -566,7 +591,7 @@ try
 			[void]$s6.UploadToEngine()
 			[void]$s6.UploadToEngine()
 			$texRefs = if ($uploadedAssets.ContainsKey($texInfo.Guid)) { $uploadedAssets[$texInfo.Guid].ReferenceCount } else { 0 }
-			Check ($texRefs -eq 1 -and $s6.PackForEngine().Length -eq 96) "S6 the input texture is referenced once: $texRefs, pack $($s6.PackForEngine().Length)"
+			Check ($texRefs -eq 1 -and $s6.PackForEngine().Length -eq 68) "S6 the input texture is referenced once: $texRefs, pack $($s6.PackForEngine().Length)"
 			$s6.UnloadFromEngine()
 			Check (-not $uploadedAssets.ContainsKey($texInfo.Guid) -and $uploadedAssets.Count -eq 0 -and $script:fakeShaders.Live.Count -eq 0) "S6 unloading releases the texture and the shaders: $($uploadedAssets.Count) assets, $($script:fakeShaders.Live.Count) shaders"
 

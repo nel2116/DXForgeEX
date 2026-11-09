@@ -6,6 +6,7 @@
 // 　エディタのアセットの PackForEngine() と同じ並びのバイト列を作る(DLLの CreateResource に渡すデータのテスト用)
 // 更新履歴
 // 2026/10/30 新規作成 (Primal Day 077, #30)
+// 2026/11/09 マテリアルのプロパティを12バイトの詰めた形で書く (Primal Day 087, #252)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -48,12 +49,13 @@ namespace dxforge::test
 		writer.write(texture_count);
 		for (u32 i{ 0 }; i < texture_count; ++i) writer.write(texture_ids[i]);
 		writer.write((u64)0);	// texture_ids のポインタ(writer.Write(IntPtr.Zero))
-		// MaterialSurface.ToBinary()
-		writer.write(surface.base_color.x); writer.write(surface.base_color.y); writer.write(surface.base_color.z); writer.write(surface.base_color.w);
-		writer.write(surface.emissive.x); writer.write(surface.emissive.y); writer.write(surface.emissive.z);
-		writer.write(surface.emissive_intensity);
+		// MaterialSurface.ToBinary(writer, asInteger: true)
+		writer.write(surface.base_color, sizeof(surface.base_color));
+		writer.write(surface.emissive, sizeof(surface.emissive));
 		writer.write(surface.metallic);
 		writer.write(surface.roughness);
+		writer.write(surface.input_mask);
+		writer.write(surface.emissive_intensity);
 		writer.write((u32)type);
 		writer.write(texture_count);
 		for (u32 i{ 0 }; i < graphics::shader_type::count; ++i) writer.write(shader_ids[i]);

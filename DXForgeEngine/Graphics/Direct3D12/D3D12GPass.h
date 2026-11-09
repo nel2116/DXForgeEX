@@ -6,6 +6,7 @@
 // GPassのヘッダファイル
 // 更新履歴
 // 2025/01/07 新規作成
+// 2026/11/09 srv_indices を material_data にした (Primal Day 087, #252)
 // // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ======
@@ -30,7 +31,7 @@ namespace dxforge::graphics::d3d12::gpass
 			per_object_data,
 			position_buffer,
 			element_buffer,
-			srv_indices,
+			material_data,
 			directional_lights,
 			cullable_lights,
 			light_grid,

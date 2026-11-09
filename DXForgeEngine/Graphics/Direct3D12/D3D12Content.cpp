@@ -9,6 +9,7 @@
 // 2025/01/13 マテリアルの追加と削除の関数を追加
 // 2025/01/13 テクスチャの追加と削除の関数を追加
 // 2025/01/14 コメントの追加
+// 2026/11/09 srv_indices を material_data にし、深度プリパスに位置だけの頂点シェーダーを使う (Primal Day 087, #252)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "D3D12Content.h"
@@ -309,7 +310,7 @@ namespace dxforge::graphics::d3d12::content
 				parameters[params::per_object_data].as_cbv(data_visibility, 1);
 				parameters[params::position_buffer].as_srv(buffer_visibility, 0);
 				parameters[params::element_buffer].as_srv(buffer_visibility, 1);
-				parameters[params::srv_indices].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 2); // TODO: これは、テクスチャをサンプリングする必要のあるすべてのステージから見えるようにする必要があります。
+				parameters[params::material_data].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 2); // TODO: これは、テクスチャをサンプリングする必要のあるすべてのステージから見えるようにする必要があります。
 				parameters[params::directional_lights].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 3);
 				parameters[params::cullable_lights].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 4);
 				parameters[params::light_grid].as_srv(D3D12_SHADER_VISIBILITY_PIXEL, 5);
@@ -386,6 +387,22 @@ namespace dxforge::graphics::d3d12::content
 			return (shader_type::type)index;
 		}
 
+		/// @brief マテリアルのシェーダーのうち、キーに合う版のバイトコードを取得する(Primal Day 087)
+		/// @param type シェーダーの種類
+		/// @param elements_type 頂点の要素の種類(頂点シェーダーのキー)
+		/// @param material マテリアル
+		/// @param shader_index マテリアルのシェーダーIDの並びの中の位置
+		/// @return バイトコード。キーに合う版がなければ空(assert しない。版があるかを確かめるのにも使う)
+		D3D12_SHADER_BYTECODE get_shader_byte_code(shader_type::type type, u32 elements_type, const d3d12_material_stream& material, u32 shader_index)
+		{
+			// NOTE: 各タイプのシェーダは、submeshまたはmaterialの異なるプロパティから生成されるキーを持つことがあります。
+			//		現時点では、elements_typeによって異なる種類の頂点シェーダーしかありません。
+			const u32 key{ type == shader_type::vertex ? elements_type : u32_invalid_id };
+			const dxforge::content::compiled_shader_ptr shader{ dxforge::content::find_shader(material.shader_ids()[shader_index], key) };
+			if (!shader) return {};
+			return { shader->byte_code(), shader->byte_code_size() };
+		}
+
 		/// @brief PSOを作成する関数
 		/// @param material_id materialのID
 		/// @param primitive_topology プリミティブトポロジー
@@ -399,6 +416,7 @@ namespace dxforge::graphics::d3d12::content
 			new (stream_ptr) d3dx::d3d12_pipeline_state_subobject_stream{};
 
 			d3dx::d3d12_pipeline_state_subobject_stream& stream{ *(d3dx::d3d12_pipeline_state_subobject_stream* const)stream_ptr };
+			D3D12_SHADER_BYTECODE depth_prepass_vertex_shader{};
 
 			{ // materialsをロックして、materialの情報を取得する
 				std::lock_guard lock{ material_mutex };
@@ -421,15 +439,11 @@ namespace dxforge::graphics::d3d12::content
 				u32 shader_index{ 0 };
 				for (u32 i{ 0 }; i < shader_type::count; ++i)
 				{
-					if (flags & (1 << i))
+					const u32 flag{ flags & (1u << i) };
+					if (flag)
 					{
-						// NOTE: 各タイプのシェーダは、submeshまたはmaterialの異なるプロパティから生成されるキーを持つことがあります。
-						//		現時点では、elements_typeによって異なる種類の頂点シェーダーしかありません。
-						const u32 key{ get_shader_type(flags & (1 << i)) == shader_type::vertex ? elements_type : u32_invalid_id };
-						dxforge::content::compiled_shader_ptr shader{ dxforge::content::get_shader(material.shader_ids()[shader_index], key) };
-						assert(shader);
-						shaders[i].pShaderBytecode = shader->byte_code();
-						shaders[i].BytecodeLength = shader->byte_code_size();
+						shaders[i] = get_shader_byte_code(get_shader_type(flag), elements_type, material, shader_index);
+						assert(shaders[i].pShaderBytecode);
 						++shader_index;
 					}
 				}
@@ -442,11 +456,33 @@ namespace dxforge::graphics::d3d12::content
 				stream.cs = shaders[shader_type::compute];
 				stream.as = shaders[shader_type::amplification];
 				stream.ms = shaders[shader_type::mesh];
+
+				// 深度プリパスは位置しか使わないので、増幅・ジオメトリ・ハル・ドメインシェーダーがなければ、
+				// 頂点シェーダーのキー0(位置だけ。tools::elements::elements_type::position_only)の版を使う(Primal Day 087)。
+				// NOTE: Primal はキー0の版がないと assert で止まる。ここでは警告を出して、描画に使う頂点シェーダーに戻す。
+				//       頂点シェーダーは shader_type::vertex(ビット0)なので、シェーダーIDの並びの先頭にある。
+				constexpr u32 not_position_only_mask{ (1u << shader_type::amplification) | (1u << shader_type::geometry) |
+					(1u << shader_type::hull) | (1u << shader_type::domain) };
+				static_assert(shader_type::vertex == 0);
+				depth_prepass_vertex_shader = shaders[shader_type::vertex];
+				if ((flags & (1u << shader_type::vertex)) && !(flags & not_position_only_mask) && elements_type != 0)
+				{
+					const D3D12_SHADER_BYTECODE position_only{ get_shader_byte_code(shader_type::vertex, 0, material, 0) };
+					if (position_only.pShaderBytecode)
+					{
+						depth_prepass_vertex_shader = position_only;
+					}
+					else
+					{
+						OutputDebugStringW(L"Warning: マテリアルの頂点シェーダーに位置だけ(キー0)の版がないので、深度プリパスに描画用の頂点シェーダーを使います。\n");
+					}
+				}
 			}
 			pso_id id_pair{};
 			id_pair.gpass_pso_id = create_pso_if_needed(stream_ptr, aligned_stream_size, false);
 
 			stream.ps = D3D12_SHADER_BYTECODE{};
+			stream.vs = depth_prepass_vertex_shader;
 			stream.depth_stencil1 = d3dx::depth_state.reversed;
 			id_pair.depth_pso_id = create_pso_if_needed(stream_ptr, aligned_stream_size, true);
 

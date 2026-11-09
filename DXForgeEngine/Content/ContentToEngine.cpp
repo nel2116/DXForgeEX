@@ -9,6 +9,7 @@
 // 2025/01/13 シェーダーの追加と削除の関数を追加
 // 2025/01/13 マテリアルの追加と削除の関数を追加
 // 2026/10/30 マテリアルのデータの並びのコメントを、material_init_info の並びに合わせて直した(Primal Day 077, #30)
+// 2026/11/09 キーに合う版がなくても assert しない find_shader() を追加 (Primal Day 087 の深度プリパス, #252)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 #pragma once
 // ====== インクルード部 ===
@@ -437,6 +438,17 @@ namespace dxforge::content
 	/// @return シェーダー
 	compiled_shader_ptr get_shader(id::id_type id, u32 shader_key)
 	{
+		const compiled_shader_ptr shader{ find_shader(id, shader_key) };
+		assert(shader); // ここには来ないはず
+		return shader;
+	}
+
+	/// @brief シェーダーを探す関数。キーに合う版がなければ nullptr(assert しない)
+	/// @param id ID
+	/// @param shader_key シェーダーキー
+	/// @return シェーダー。なければ nullptr
+	compiled_shader_ptr find_shader(id::id_type id, u32 shader_key)
+	{
 		std::lock_guard lock{ shader_mutex };
 		assert(id::is_valid(id));
 
@@ -448,7 +460,6 @@ namespace dxforge::content
 			}
 		}
 
-		assert(false); // ここには来ないはず
 		return nullptr;
 	}
 

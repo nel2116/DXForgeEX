@@ -6,6 +6,7 @@
 // 　エディタから渡されたアセット(ジオメトリ・テクスチャ・マテリアル)のデータからエンジンのリソースを作る
 // 更新履歴
 // 2026/10/30 新規作成(Primal Day 077 の CreateResource / DestroyResource と、Day 078 のその実体。#30)
+// 2026/11/09 material_surface が12バイトになり、material_init_info を末尾の詰め物なしで読むようにした (Primal Day 087, #252)
 // _/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/
 // ====== インクルード部 ======
 #include "ResourceUpload.h"
@@ -14,10 +15,11 @@ namespace dxforge::editor
 {
 	using namespace graphics;
 
-	static_assert(sizeof(material_surface) == 40, "AppliedMaterial.PackForEngine() (MaterialSurface.ToBinary) writes 10 floats");
-	static_assert(sizeof(material_init_info) == packed_material_init_info_size, "AppliedMaterial.PackForEngine() writes material_init_info without padding");
-	static_assert(offsetof(material_init_info, surface) == 8 && offsetof(material_init_info, type) == 48 &&
-		offsetof(material_init_info, texture_count) == 52 && offsetof(material_init_info, shader_ids) == 56,
+	static_assert(sizeof(material_surface) == 12, "AppliedMaterial.PackForEngine() (MaterialSurface.ToBinary(asInteger: true)) writes 12 bytes");
+	static_assert(offsetof(material_init_info, shader_ids) + sizeof(material_init_info::shader_ids) == packed_material_init_info_size,
+		"AppliedMaterial.PackForEngine() writes material_init_info without its trailing padding");
+	static_assert(offsetof(material_init_info, surface) == 8 && offsetof(material_init_info, type) == 20 &&
+		offsetof(material_init_info, texture_count) == 24 && offsetof(material_init_info, shader_ids) == 28,
 		"AppliedMaterial.PackForEngine() writes material_init_info with these offsets");
 
 	namespace
@@ -35,7 +37,7 @@ namespace dxforge::editor
 		u32 texture_count{ 0 };
 		memcpy(&texture_count, data, sizeof(u32));
 		const id::id_type* const texture_ids{ (const id::id_type*)(data + sizeof(u32)) };
-		memcpy(&info, data + sizeof(u32) + texture_count * sizeof(id::id_type), sizeof(material_init_info));
+		memcpy(&info, data + sizeof(u32) + texture_count * sizeof(id::id_type), packed_material_init_info_size);
 		info.texture_ids = texture_count ? const_cast<id::id_type*>(texture_ids) : nullptr;
 
 		// NOTE: エンジンの add_material() は、以下を assert で確かめるだけなので、ここで弾く
